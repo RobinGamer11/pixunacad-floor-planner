@@ -444,6 +444,8 @@ export class CadApp {
   private _history: string[] = [];
   private _historyIndex = -1;
   private _historyMax = 100;
+  /** Solange true, werden keine automatischen History-Snapshots erzeugt (z. B. während Regler-Drag). */
+  suspendHistory = false;
   private _lastSnapshot = "";
   private _snapshotTimer: number | null = null;
   private _isRestoring = false;
@@ -1121,7 +1123,7 @@ export class CadApp {
   }
 
   private _maybeSnapshot() {
-    if (this._isRestoring || this._destroyed) return;
+    if (this._isRestoring || this._destroyed || this.suspendHistory) return;
     // Don't snapshot mid-drag
     if (this.input.mouse.left || this.input.mouse.mid || this.input.mouse.right || this.input.isPanning) return;
     // Don't snapshot during an active point edit (Bewegen/Verschieben/Drehen/Offset),

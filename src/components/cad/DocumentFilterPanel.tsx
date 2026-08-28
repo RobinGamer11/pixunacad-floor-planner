@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import {
   type DocumentFilter,
@@ -23,12 +23,44 @@ interface Props {
   showBgRemove?: boolean;
 }
 
+/** Patch oder Updater auf Basis des aktuellen Filterzustands. */
+export type FilterChange = (
+  patch: Partial<DocumentFilter> | ((cur: DocumentFilter) => Partial<DocumentFilter>),
+) => void;
+
 const MODE_OPTIONS: DocumentFilterMode[] = ["adjust", "bw", "grayscale", "tint", "free"];
 
 export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
   // Doc bei jedem Render frisch lesen (sig erzwingt Re-Render via parent state).
   void sig;
   const doc: any = app?.scene.getDocumentById(docId) || null;
+  // Lokale Revision — jede Reglerbewegung rendert das Panel sofort neu,
+  // unabhängig vom rAF-Polling der übergeordneten Oberflächen.
+  const [, bumpRevision] = useReducer((n: number) => n + 1, 0);
+  /** Nach jeder Änderung: Renderer/Filtercache aktualisieren + Panel neu rendern. */
+  const commit = useCallback(() => {
+    try { (app as any)?.renderer?.render?.(); } catch { /* noop */ }
+    bumpRevision();
+  }, [app]);
+  // Undo/Redo: Während eines Regler-Drags nur einen gemeinsamen Schritt speichern.
+  const beginDrag = useCallback(() => {
+    if (app) (app as any).suspendHistory = true;
+  }, [app]);
+  const endDrag = useCallback(() => {
+    if (!app) return;
+    (app as any).suspendHistory = false;
+    try { (app as any).commitHistorySnapshot?.(); } catch { /* noop */ }
+  }, [app]);
+  useEffect(() => {
+    const up = () => endDrag();
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      if (app) (app as any).suspendHistory = false;
+    };
+  }, [app, endDrag]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState<string>("");
@@ -41,10 +73,12 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
   const setOpacity = (v: number) => {
     if (!doc) return;
     doc.opacity = Math.max(0, Math.min(1, v));
+    commit();
   };
   const setActive = (id: string | null) => {
     if (!doc) return;
     doc.activeFilterId = id;
+    commit();
   };
   const addFilter = (mode: DocumentFilterMode) => {
     if (!doc) return;
@@ -59,24 +93,39 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
         } catch { /* ignore */ }
       }
     }
-    doc.filters = [...filters, f];
+    doc.filters = [...(doc.filters || []), f];
     doc.activeFilterId = f.id;
     setEditingId(f.id);
     setAddOpen(false);
+    commit();
   };
   const removeFilter = (id: string) => {
     if (!doc) return;
-    doc.filters = filters.filter(f => f.id !== id);
+    doc.filters = (doc.filters || []).filter((f: DocumentFilter) => f.id !== id);
     if (doc.activeFilterId === id) doc.activeFilterId = null;
     if (editingId === id) setEditingId(null);
+    commit();
   };
   const renameFilter = (id: string, name: string) => {
     if (!doc) return;
-    doc.filters = filters.map(f => f.id === id ? { ...f, name } : f);
+    doc.filters = (doc.filters || []).map((f: DocumentFilter) => f.id === id ? { ...f, name } : f);
+    commit();
   };
-  const updateFilter = (id: string, patch: Partial<DocumentFilter>) => {
+  /**
+   * Aktualisiert einen Filter. Liest doc.filters IMMER frisch (kein Stale-State
+   * bei schnellen Reglerbewegungen) und akzeptiert auch eine Updater-Funktion,
+   * die den aktuellen Filter erhält.
+   */
+  const updateFilter = (
+    id: string,
+    patch: Partial<DocumentFilter> | ((cur: DocumentFilter) => Partial<DocumentFilter>),
+  ) => {
     if (!doc) return;
-    doc.filters = filters.map(f => f.id === id ? { ...f, ...patch } : f);
+    const currentFilters: DocumentFilter[] = doc.filters ?? [];
+    doc.filters = currentFilters.map(f =>
+      f.id === id ? { ...f, ...(typeof patch === "function" ? patch(f) : patch) } : f,
+    );
+    commit();
   };
 
   const swatchesFor = (f: DocumentFilter): string[] => {
@@ -97,12 +146,18 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
   if (!doc) return null;
 
   return (
-    <div className="space-y-3">
+    <div
+      className="space-y-3"
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerMove={(e) => e.stopPropagation()}
+      onWheel={(e) => e.stopPropagation()}
+    >
       {/* Opacity */}
       <div>
         <span className="block mb-1 text-[11px] text-foreground">Transparenz</span>
         <input
           type="range" min={0} max={1} step={0.01} value={opacity}
+          onPointerDown={beginDrag}
           onChange={(e) => setOpacity(parseFloat(e.target.value))}
           className="w-full accent-foreground"
         />
@@ -190,6 +245,7 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
         <FilterEditor
           filter={editingFilter}
           onChange={(patch) => updateFilter(editingFilter.id, patch)}
+          onBeginDrag={beginDrag}
           doc={doc}
         />
       )}
@@ -526,7 +582,7 @@ function FilterButton(props: {
   );
 }
 
-function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void; doc: any }) {
+function FilterEditor({ filter, onChange, onBeginDrag, doc }: { filter: DocumentFilter; onChange: FilterChange; onBeginDrag?: () => void; doc: any }) {
   return (
     <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--border))", background: "hsl(var(--muted) / 0.3)" }}>
       <div className="text-[11px] font-semibold" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
@@ -541,6 +597,8 @@ function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onCha
           <input
             type="range" min={0} max={255} step={1}
             value={filter.bwThreshold ?? 160}
+            onPointerDown={() => onBeginDrag?.()}
+            onInput={(e) => onChange({ bwThreshold: parseInt((e.target as HTMLInputElement).value, 10) })}
             onChange={(e) => onChange({ bwThreshold: parseInt(e.target.value, 10) })}
             className="w-full"
           />
@@ -567,7 +625,7 @@ function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onCha
         <FreeFilterEditor filter={filter} onChange={onChange} doc={doc} />
       )}
       {filter.mode === "adjust" && (
-        <AdjustEditor filter={filter} onChange={onChange} />
+        <AdjustEditor filter={filter} onChange={onChange} onBeginDrag={onBeginDrag} />
       )}
       {filter.mode === "grayscale" && (
         <div className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
@@ -581,9 +639,15 @@ function FilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onCha
 // ---------------------------------------------------------------- AdjustEditor
 // Regler-Gruppen und Presets kommen zentral aus imageAdjustPipeline.ts.
 
-function AdjustEditor({ filter, onChange }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void }) {
+function AdjustEditor({ filter, onChange, onBeginDrag }: {
+  filter: DocumentFilter;
+  onChange: FilterChange;
+  onBeginDrag?: () => void;
+}) {
   const a: AdjustParams = { ...DEFAULT_ADJUST, ...(filter.adjust || {}) };
-  const set = (patch: Partial<AdjustParams>) => onChange({ adjust: { ...a, ...patch } });
+  // Nie aus dem (evtl. veralteten) a zusammensetzen — immer aus dem aktuellen Filter.
+  const set = (patch: Partial<AdjustParams>) =>
+    onChange((cur) => ({ adjust: { ...DEFAULT_ADJUST, ...(cur.adjust || {}), ...patch } }));
   const applyPreset = (params: Partial<AdjustParams>) => onChange({ adjust: { ...DEFAULT_ADJUST, ...params } });
 
   return (
@@ -636,6 +700,8 @@ function AdjustEditor({ filter, onChange }: { filter: DocumentFilter; onChange: 
                   max={100}
                   step={1}
                   value={value}
+                  onPointerDown={() => onBeginDrag?.()}
+                  onInput={(e) => set({ [key]: parseInt((e.target as HTMLInputElement).value, 10) } as Partial<AdjustParams>)}
                   onChange={(e) => set({ [key]: parseInt(e.target.value, 10) } as Partial<AdjustParams>)}
                   onDoubleClick={() => set({ [key]: 0 } as Partial<AdjustParams>)}
                   className="w-full"
@@ -651,11 +717,12 @@ function AdjustEditor({ filter, onChange }: { filter: DocumentFilter; onChange: 
 }
 
 
-function FreeFilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onChange: (patch: Partial<DocumentFilter>) => void; doc: any }) {
+function FreeFilterEditor({ filter, onChange, doc }: { filter: DocumentFilter; onChange: FilterChange; doc: any }) {
   const remaps: FreeRemap[] = filter.freeRemaps || [];
   const updateRemap = (i: number, patch: Partial<FreeRemap>) => {
-    const next = remaps.map((r, k) => k === i ? { ...r, ...patch } : r);
-    onChange({ freeRemaps: next });
+    onChange((cur) => ({
+      freeRemaps: (cur.freeRemaps || []).map((r, k) => (k === i ? { ...r, ...patch } : r)),
+    }));
   };
   const reextract = () => {
     const src = getDocSourceImage(doc);
