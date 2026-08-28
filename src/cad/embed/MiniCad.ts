@@ -2126,13 +2126,24 @@ export class MiniCad {
 
   /* ---- Mehrfachauswahl: Einstellungen auf alle gleichartigen Objekte ---- */
 
+  /**
+   * Polygon vs. Schraffur und Linie vs. Hilfslinie teilen sich die interne
+   * Struktur, sind aber getrennte Werkzeugtypen — nicht gemeinsam spiegeln.
+   */
+  private _sameToolType(primary: any, other: any): boolean {
+    if (!!other?.isPolygon !== !!primary?.isPolygon) return false;
+    if (!!other?.isGuide !== !!primary?.isGuide) return false;
+    return true;
+  }
+
   private _panelMirror<T extends object>(primary: T | null | undefined, kind: string, lookup: (id: string) => T | null | undefined): T | null {
     if (!primary) return null;
     const sibs: T[] = [];
     for (const ref of this._selectedRefs()) {
       if (ref.kind !== kind) continue;
       const o = lookup(ref.id);
-      if (o && o !== primary) sibs.push(o);
+      if (o && o !== primary && this._sameToolType(primary, o)) sibs.push(o);
+
     }
     return sibs.length ? mirrorProxy(primary, sibs) : primary;
   }
