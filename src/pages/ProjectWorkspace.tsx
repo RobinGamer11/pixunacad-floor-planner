@@ -2286,6 +2286,7 @@ export default function ProjectWorkspace() {
                       zoom={zoom}
                       activeTool={activeTool}
                       hatchDrawMode={hatchDrawMode}
+                      polygonDrawMode={polygonDrawMode}
                       toolSettings={toolSettings}
                       onCommitTool={() => setActiveTool(null)}
                       selectedElementIds={selectedElementIds}
@@ -2395,6 +2396,7 @@ export default function ProjectWorkspace() {
                               zoom={zoom}
                               activeTool={isActiveMember ? activeTool : null}
                               hatchDrawMode={hatchDrawMode}
+                              polygonDrawMode={polygonDrawMode}
                               toolSettings={toolSettings}
                               onCommitTool={() => setActiveTool(null)}
                               selectedElementIds={isActiveMember ? selectedElementIds : []}
