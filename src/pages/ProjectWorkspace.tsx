@@ -131,6 +131,7 @@ import type { MiniCadSelectionInfo } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
+import { StrokeSettingsPanel } from "@/components/cad/StrokeSettingsPanel";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
@@ -354,7 +355,7 @@ export default function ProjectWorkspace() {
     setRightTabState(t);
   };
   const [activeTool, setActiveTool] = useState<PageTool>(null);
-  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | undefined>();
+  const [selectedCadTool, setSelectedCadTool] = useState<"line" | "free" | "text" | "hatch" | "guide" | "polygon" | undefined>();
   const [cadSelectionCount, setCadSelectionCount] = useState<number>(0);
   const [cadSelectedLineSnap, setCadSelectedLineSnap] = useState<{ midpoint: boolean; division: number | null; isGuide: boolean } | null>(null);
   const [lineToolVariant, setLineToolVariant] = useState<LinePageTool>("line");
@@ -815,7 +816,7 @@ export default function ProjectWorkspace() {
   const activatePolygonTool = (mode: PolygonDrawMode) => {
     setPolygonDrawMode(mode);
     const pt: any = (cadEngineApiRef.current?.engine as any)?.polygonTool;
-    pt?.setDrawMode?.(mode);
+    pt?.setPolygonMode?.(mode);
     setActiveToolAndTab("polygon");
   };
 
@@ -2253,6 +2254,10 @@ export default function ProjectWorkspace() {
                       division: typeof info.divisionSnap === "number" ? info.divisionSnap : null,
                       isGuide: !!info.isGuide,
                     });
+                  } else if (info.tool === "polygon") {
+                    // Polygone haben eigene Kontur-Eigenschaften — niemals die
+                    // Schraffur- oder Linien-Defaults überschreiben.
+                    setCadSelectedLineSnap(null);
                   } else if (info.tool === "free") {
                     setCadSelectedLineSnap(null);
                   } else if (info.tool === "text") {
@@ -5876,7 +5881,7 @@ function RightInspector({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide" | "polygon";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -6478,7 +6483,7 @@ function ToolsTab({
   project: import("@/lib/projectStore").Project;
   activeTool: PageTool;
   setActiveTool: (t: PageTool) => void;
-  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide";
+  selectedCadTool?: "line" | "free" | "text" | "hatch" | "guide" | "polygon";
   selectedElementId?: string;
   selectedElementIds?: string[];
   setSelectedElementId: (id?: string) => void;
@@ -6587,7 +6592,13 @@ function ToolsTab({
           <PolygonModeSelect app={cadEngine} />
           <RasterModeToggle app={cadEngine} projectId={projectId} />
           <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <PolygonSettingsPanel app={cadEngine} projectId={projectId} hideChrome />
+            <PolygonSettingsPanel
+              app={cadEngine}
+              projectId={projectId}
+              hideChrome
+              variant="screen"
+              pxPerMm={guidePxPerMm}
+            />
           </div>
         </>
       )}
@@ -7066,63 +7077,25 @@ function LineSettings({
   pxPerMm: number;
   onChange: (p: Partial<ToolSettings["line"]>) => void;
 }) {
-  const thicknessPx = guideStrokeMmToPx(settings.thicknessMm, pxPerMm);
-
+  // Farbe, Strichstärke und Transparenz teilen sich Linie und Polygon.
   return (
-    <SettingsBlock title="LINIE">
-      <ToolColorPicker
-        label="Farbe"
-        value={settings.color}
-        onChange={(value) => onChange({ color: value })}
-      />
-      <div>
-        <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
-        <div className="grid grid-cols-2 gap-2">
-          <GuideMeasureInput
-            label="Bildschirm"
-            unit="px"
-            value={thicknessPx}
-            fractionDigits={2}
-            onChange={(value) => onChange({ thicknessMm: guideStrokePxToMm(value, pxPerMm) })}
-          />
-          <GuideMeasureInput
-            label="Tatsächliche Größe"
-            unit="mm"
-            value={settings.thicknessMm}
-            fractionDigits={3}
-            onChange={(value) => onChange({ thicknessMm: value })}
-          />
-        </div>
-      </div>
-      <div>
-        <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
-        <input
-          type="range"
-          min={1}
-          max={100}
-          step={1}
-          value={Math.max(1, settings.alpha)}
-          onChange={(e) => onChange({ alpha: Number(e.target.value) })}
-          className="w-full accent-foreground"
-        />
-        <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <input
-            type="number"
-            min={1}
-            max={100}
-            step={1}
-            value={Math.max(1, settings.alpha)}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v)) onChange({ alpha: Math.min(100, Math.max(1, Math.round(v))) });
-            }}
-            className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-xs tabular-nums outline-none"
-            aria-label="Transparenz in Prozent"
-          />
-          <span className="pr-2 text-[10px] text-muted-foreground">%</span>
-        </label>
-      </div>
-    </SettingsBlock>
+    <StrokeSettingsPanel
+      title="LINIE"
+      variant="screen"
+      pxPerMm={pxPerMm}
+      value={{
+        color: settings.color,
+        thicknessM: settings.thicknessMm / 1000,
+        alphaPct: settings.alpha,
+      }}
+      onChange={(patch) => {
+        const next: Partial<ToolSettings["line"]> = {};
+        if (patch.color !== undefined) next.color = patch.color;
+        if (patch.thicknessM !== undefined) next.thicknessMm = patch.thicknessM * 1000;
+        if (patch.alphaPct !== undefined) next.alpha = patch.alphaPct;
+        onChange(next);
+      }}
+    />
   );
 }
 

@@ -318,6 +318,29 @@ export class TopologyEngine {
       }
     }
 
+    // Polygon-Kanten: Mittelpunkt-/Teilungs-Snap (pro Objekt aktivierbar).
+    for (const hatch of this._hatchesFrontToBack()) {
+      const poly = hatch as any;
+      if (poly?.isPolygon !== true) continue;
+      if (exclusions?.hatchIds?.has(hatch.id)) continue;
+      const divN = (typeof poly.divisionSnap === "number" && poly.divisionSnap >= 2)
+        ? Math.floor(poly.divisionSnap) : 0;
+      if (!poly.midpointSnap && divN < 2) continue;
+      const pts = hatch.points || [];
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i];
+        const b = pts[(i + 1) % pts.length];
+        if (!a || !b) continue;
+        if (poly.midpointSnap) {
+          considerPoint({ x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 }, null, null, -1);
+        }
+        for (let k = 1; k < divN; k++) {
+          const t = k / divN;
+          considerPoint({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, null, null, -1);
+        }
+      }
+    }
+
     // Hatch points (outer + holes)
     const hatches = this._hatchesFrontToBack().filter((hatch) => !exclusions?.hatchIds?.has(hatch.id));
     for (const hatch of hatches) {

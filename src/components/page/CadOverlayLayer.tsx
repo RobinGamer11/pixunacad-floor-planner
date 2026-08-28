@@ -123,7 +123,7 @@ function syncHostSettings(engine: MiniCad, p: Props) {
   engine.setMultiSelectMode(!!p.multiSelectMode);
   if (p.selectMarqueeMode) engine.selectTool.marqueeMode = p.selectMarqueeMode;
   if (p.hatchDrawMode) engine.hatchTool.setDrawMode(p.hatchDrawMode);
-  if (p.polygonDrawMode) engine.polygonTool.setDrawMode(p.polygonDrawMode as any);
+  if (p.polygonDrawMode) engine.polygonTool.setPolygonMode(p.polygonDrawMode);
   engine.setTextDefaults({
     color: p.textColor,
     fontSizePx: p.textFontSizePx,
@@ -354,7 +354,7 @@ export default function CadOverlayLayer(props: Props) {
   }, [docHub.mode]);
   useEffect(() => {
     if (hatchDrawMode) engineRef.current?.hatchTool.setDrawMode(hatchDrawMode);
-    if (polygonDrawMode) engineRef.current?.polygonTool.setDrawMode(polygonDrawMode as any);
+    if (polygonDrawMode) engineRef.current?.polygonTool.setPolygonMode(polygonDrawMode);
   }, [hatchDrawMode, polygonDrawMode, activeTool]);
   useEffect(() => {
     if (typeof pageMarginsMm === "number") engineRef.current?.setPageMargins(pageMarginsMm);
