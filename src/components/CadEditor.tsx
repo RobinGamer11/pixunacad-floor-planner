@@ -4,6 +4,8 @@ import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
 import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
+import type { PolygonDrawMode } from "@/cad/PolygonTool";
+import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
@@ -81,6 +83,7 @@ const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
   { id: ToolIds.WALL, label: "Wand", key: "W", icon: BrickWall },
   { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
+  { id: ToolIds.POLYGON, label: "Polygon", key: "P", icon: Pentagon },
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
@@ -101,6 +104,7 @@ const LINE_VARIANTS = [
 type ToolVariant =
   | { kind: "tool"; id: string; label: string; icon: any }
   | { kind: "hatch"; mode: HatchDrawMode; label: string; icon: any }
+  | { kind: "polygon"; mode: PolygonDrawMode; label: string; icon: any }
   | { kind: "door"; mode: "door" | "window"; label: string; icon: any }
   | { kind: "marquee"; mode: "touch" | "enclose" | "click"; label: string; icon: any }
   | { kind: "selectAll"; label: string; icon: any };
@@ -113,6 +117,11 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   [ToolIds.LINE]: [
     { kind: "tool", id: ToolIds.LINE, label: "Linie", icon: Minus },
     { kind: "tool", id: ToolIds.FREE, label: "Freihand", icon: Pencil },
+  ],
+  [ToolIds.POLYGON]: [
+    { kind: "polygon", mode: "polygon", label: "Polygon", icon: Pentagon },
+    { kind: "polygon", mode: "rectangle", label: "Rechteck", icon: RectangleHorizontal },
+    { kind: "polygon", mode: "circle", label: "Kreis", icon: Circle },
   ],
   [ToolIds.HATCH]: [
     { kind: "hatch", mode: "polygon", label: "Polygon", icon: Spline },
@@ -445,6 +454,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
   const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
+  // Zuletzt verwendete Polygon-Zeichenart (bleibt über Werkzeugwechsel erhalten).
+  const [polygonDrawMode, setPolygonDrawMode] = useState<PolygonDrawMode>("polygon");
   // Marquee-Rahmen-Modus des Auswahl-Werkzeugs (Berühren / Umschließen).
   // Wird über das Flyout links am Auswahl-Symbol umgeschaltet.
   const [selectMarqueeMode, setSelectMarqueeMode] = useState<"touch" | "enclose" | "click">("click");
@@ -1356,6 +1367,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                                 setActiveTool(ToolIds.HATCH);
                               }
                               appRef.current?.hatchTool.setDrawMode(v.mode);
+                            } else if (v.kind === "polygon") {
+                              if (activeTool !== ToolIds.POLYGON) {
+                                appRef.current?.setTool(ToolIds.POLYGON);
+                                setActiveTool(ToolIds.POLYGON);
+                              }
+                              appRef.current?.polygonTool.setDrawMode(v.mode as any);
+                              setPolygonDrawMode(v.mode);
                             } else if (v.kind === "door") {
                               if (activeTool !== ToolIds.DOOR) {
                                 appRef.current?.setTool(ToolIds.DOOR);
@@ -2291,6 +2309,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
 
 
+
+          {/* Polygon — eigenständiges Werkzeug (Kontur ohne Füllung) */}
+          {(activeTool === ToolIds.POLYGON || (activeTool === ToolIds.SELECT && !!selectedPolygonId)) && (
+            <div className="cad-settings-panel mb-2">
+              {activeTool === ToolIds.POLYGON && <PolygonModeSelect app={appRef.current} />}
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
+              <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <PolygonSettingsPanel app={appRef.current} projectId={projectId} hideChrome />
+              </div>
+            </div>
+          )}
 
           {/* Schraffur — Design identisch zur Mappe (Modus & Objektart über dem Rahmen) */}
           {(activeTool === ToolIds.HATCH || (activeTool === ToolIds.SELECT && !!selectedHatchId)) && (
