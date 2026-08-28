@@ -240,13 +240,17 @@ export class SelectTool {
    * Plans direkt in die bestehende Mehrfachauswahl (`marqueeSelectedIds`).
    * Verwendet exakt denselben Objekt-Collector wie die Rahmen-Auswahl, damit
    * "Alles", "Berühren" und "Umschließen" dieselben Objektarten kennen.
+   *
+   * `toolFilter` beschränkt die Auswahl auf die Objekte eines Werkzeugs
+   * (z. B. nur Linien, nur Polygone). `null` wählt alles Auswählbare.
    * Gibt die Anzahl der ausgewählten Objekte zurück.
    */
-  selectAll(): number {
+  selectAll(toolFilter: ObjectToolId | null = null): number {
     const hits: { kind: string; id: string }[] = [];
     const seen = new Set<string>();
     for (const { kind, id, obj } of this._iterElements()) {
       if (!id) continue;
+      if (!engineObjectMatchesTool(toolFilter, kind, obj)) continue;
       const pts = this._elementPoints(kind, obj);
       if (!pts || !pts.length) continue;      // temporäre/geometrielose Objekte überspringen
       const key = kind + ":" + id;
@@ -257,6 +261,16 @@ export class SelectTool {
     this.marqueeSelectedIds = hits;
     return hits.length;
   }
+
+  /**
+   * Führendes Objekt der Mehrfachauswahl = zuletzt erfasster Eintrag.
+   * Wird von den Hosts genutzt, um das passende Eigenschaftenfenster zu zeigen.
+   */
+  get primarySelectedRef(): { kind: string; id: string } | null {
+    const list = this.marqueeSelectedIds;
+    return list.length ? list[list.length - 1] : null;
+  }
+
 
 
 
