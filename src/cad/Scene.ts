@@ -1097,10 +1097,32 @@ export class Scene {
   }
 
   /** Ersetzt einen Stroke durch beliebig viele Sub-Strokes (Eraser-Splitting). */
-  replaceFreeStrokeWithChunks(stroke: FreeStroke, chunks: Vec2[][]) {
+  replaceFreeStrokeWithChunks(
+    stroke: FreeStroke,
+    chunks: Array<Vec2[] | { points: Vec2[]; sourceStartDistanceM?: number }>,
+  ) {
+    // Kumulierte Länge des Originalpfads — jeder Abschnitt behält dadurch seine
+    // ursprüngliche Parametrisierung (Musterphase, Roughen, Körnung).
+    const src = stroke.points;
+    const cum: number[] = [0];
+    for (let i = 1; i < src.length; i++) cum.push(cum[i - 1] + Math.hypot(src[i].x - src[i - 1].x, src[i].y - src[i - 1].y));
+    const startDistanceOf = (p: Vec2): number => {
+      let best = 0, bestD = Infinity;
+      for (let i = 0; i < src.length; i++) {
+        const d = (src[i].x - p.x) ** 2 + (src[i].y - p.y) ** 2;
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      return cum[best] || 0;
+    };
+    const baseStart = stroke.sourceStartDistanceM || 0;
+    const originId = stroke.sourceStrokeId || stroke.id;
+
     this.removeFreeStroke(stroke);
-    for (const ch of chunks) {
+    for (const raw of chunks) {
+      const ch = Array.isArray(raw) ? raw : raw?.points;
       if (!ch || ch.length < 2) continue;
+      const explicit = Array.isArray(raw) ? undefined : raw?.sourceStartDistanceM;
+      const startM = baseStart + (typeof explicit === "number" ? explicit : startDistanceOf(ch[0]));
       this.createFreeStroke(ch, {
         color: stroke.color, thicknessM: stroke.thicknessM, opacity: stroke.opacity,
         lineStyle: stroke.lineStyle, gapM: stroke.gapM,
@@ -1108,9 +1130,13 @@ export class Scene {
         smoothing: stroke.smoothing, labelId: stroke.labelId,
         imageSrc: stroke.imageSrc, imageSizeM: stroke.imageSizeM,
         imageSpacingM: stroke.imageSpacingM, imageRotateAlongPath: stroke.imageRotateAlongPath,
+        sourceStartDistanceM: startM,
+        sourceStrokeId: originId,
+        ...copyStrokeEffects(stroke),
       });
     }
   }
+
 
   // ---- Documents (PDF/JPG/PNG) ----
   createDocument(opts: {
