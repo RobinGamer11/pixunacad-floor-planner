@@ -1353,7 +1353,9 @@ export class MiniCad {
         imageSizeM: s.imageSizeM,
         imageSpacingM: s.imageSpacingM,
         imageRotateAlongPath: s.imageRotateAlongPath,
+        ...copyStrokeEffects(s),
       })),
+
 
       hatches: this.scene.hatches.map((h) => ({
         id: h.id,
