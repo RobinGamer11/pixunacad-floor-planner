@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Grid2X2, Move, CheckCheck } from "lucide-react";
-import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
+import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
+import { onPatternsChanged } from "@/cad/customHatchPatterns";
 
 /** Trennt eine Maßeinheit in Klammern vom Beschriftungstext ab. */
 const splitUnit = (label: string): [string, string | null] => {
@@ -68,6 +69,12 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
   const [moveMode, setMoveMode] = useState(false);
   const [, force] = useState(0);
   const dragRef = useRef<{ wx: number; wy: number; ox: number; oy: number } | null>(null);
+  const patternOptions = useHatchPatternOptions();
+  useEffect(() => onPatternsChanged(() => { app?.renderer?.render?.(); app?.requestRender?.(); }), [app]);
+  const selectPattern = (val: string) => {
+    setPatternId(val);
+    apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
+  };
 
   const sync = () => {
     if (!app) return;
@@ -185,10 +192,19 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
         className={`w-full rounded border bg-transparent px-1.5 py-1 text-[11px] ${enabled ? "" : "opacity-50"}`}
         style={{ borderColor: hairline }}
       >
-        {HATCH_PATTERNS.map((p) => (
+        {patternOptions.map((p) => (
           <option key={p.id} value={p.id}>{p.label}</option>
         ))}
       </select>
+
+      <HatchPatternManage
+        patternId={patternId}
+        disabled={!enabled}
+        borderColor={hairline}
+        onSelect={selectPattern}
+      />
+
+
 
       <SliderRow
         label="Skalierung" min={0.05} max={scaleMax} step={0.01} decimals={2} value={scale} disabled={!enabled}

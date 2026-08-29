@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Check, Grid2X2 } from "lucide-react";
-import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
+import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
+import { onPatternsChanged } from "@/cad/customHatchPatterns";
 
 /** Regler + Zahlenfeld: grob per Slider, fein per Eingabe/Pfeiltasten. */
 const SliderRow: React.FC<{
@@ -48,6 +49,8 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
   const [angleDeg, setAngleDeg] = useState(0);
   const [skewDeg, setSkewDeg] = useState(0);
   const [, force] = useState(0);
+  const patternOptions = useHatchPatternOptions();
+  useEffect(() => onPatternsChanged(() => { app?.renderer?.render?.(); app?.requestRender?.(); }), [app]);
 
   const sync = () => {
     if (!app) return;
@@ -124,10 +127,20 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
             }}
             className="cad-settings-select w-full"
           >
-            {HATCH_PATTERNS.map((p) => (
+            {patternOptions.map((p) => (
               <option key={p.id} value={p.id}>{p.label}</option>
             ))}
           </select>
+
+          <HatchPatternManage
+            patternId={patternId}
+            borderColor="hsl(var(--border))"
+            onSelect={(val) => {
+              setPatternId(val);
+              apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
+            }}
+          />
+
 
           <SliderRow
             label="Skalierung" min={0.05} max={20} step={0.01} decimals={2} value={scale}

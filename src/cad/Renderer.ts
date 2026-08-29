@@ -1931,7 +1931,7 @@ export class Renderer {
       {
         patternId: (hatch.patternId || "mauerwerk") as HatchPatternId,
         scale: hatch.patternScale ?? 1,
-        angleDeg: hatch.patternAngleDeg ?? 0,
+        angleDeg: (hatch.patternAngleDeg ?? 0) + patternBaseAngleDeg(hatch.patternId),
         skewDeg: hatch.patternSkewDeg ?? 0,
         stretch: hatch.patternStretch ?? 1,
         color: hatch.strokeColor || Defaults.hatchStrokeColor,
