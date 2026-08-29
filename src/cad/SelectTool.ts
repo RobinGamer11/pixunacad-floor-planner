@@ -1187,6 +1187,9 @@ export class SelectTool {
     const loop: Vec2[] = holeIndex == null ? hatch.points : (hatch.holes?.[holeIndex] || []);
     const n = loop.length;
     if (n < 3) return;
+    // Offenes Polygon: Endpunkte besitzen keine zwei Nachbarkanten → kein Wölben.
+    if (holeIndex == null && hatch.closed === false && (pointIndex === 0 || pointIndex === n - 1)) return;
+
     this._clearTransformGuides();
     this.activeEditAction = PointEditAction.BULGE;
     this.editTarget = { kind: "hatchPointBulge", hatchId, holeIndex, pointIndex };
