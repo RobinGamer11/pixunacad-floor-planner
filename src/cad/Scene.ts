@@ -1573,12 +1573,16 @@ export class Scene {
     for (const hatch of this.hatches) {
       const n = hatch.points.length;
       if (n < 2) continue;
-      for (let i = 0; i < n; i++) {
+      // Offene Polygone (closed === false) besitzen KEINE Kante letzter → erster Punkt.
+      const closed = (hatch as any).closed !== false;
+      const edgeCount = closed ? n : n - 1;
+      for (let i = 0; i < edgeCount; i++) {
         edges.push({ hatch, edgeIndex: i, a: hatch.points[i], b: hatch.points[(i + 1) % n], bulge: (hatch.bulges || [])[i] || 0 });
       }
     }
     return edges;
   }
+
 
 
   // ---- Walls ----
