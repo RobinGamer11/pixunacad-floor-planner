@@ -89,7 +89,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
     };
     setEnabled(!!src.patternEnabled);
     setPatternId(src.patternId || "mauerwerk");
-    setScale(src.patternScale ?? 2);
+    setScale(src.patternScale ?? 60);
     setStretch(src.patternStretch ?? 1);
     setAngleDeg(src.patternAngleDeg ?? 0);
     setSkewDeg(src.patternSkewDeg ?? 0);

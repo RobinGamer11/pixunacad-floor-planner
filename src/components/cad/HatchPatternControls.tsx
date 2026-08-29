@@ -65,7 +65,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
     };
     setEnabled(!!src.patternEnabled);
     setPatternId(src.patternId || "mauerwerk");
-    setScale(src.patternScale ?? 2);
+    setScale(src.patternScale ?? 60);
     setStretch(src.patternStretch ?? 1);
     setAngleDeg(src.patternAngleDeg ?? 0);
     setSkewDeg(src.patternSkewDeg ?? 0);
@@ -143,7 +143,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
 
 
           <SliderRow
-            label="Skalierung" min={0.05} max={20} step={0.01} decimals={2} value={scale}
+            label="Skalierung" min={0.05} max={600} step={0.01} decimals={2} value={scale}
             onChange={(val) => {
               setScale(val);
               apply((h) => { h.patternScale = val; }, () => { app.defaultHatchPatternScale = val; });
