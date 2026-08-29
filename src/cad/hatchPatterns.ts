@@ -261,28 +261,47 @@ function drawTile(ctx: CanvasRenderingContext2D, id: BuiltinHatchPatternId, s: n
       break;
     }
     case "naturstein": {
-      // Bruchsteinmauerwerk: große unregelmäßige Steine mit kräftiger Fuge
+      // Bruchsteinmauerwerk: große, kantige Steine mit kräftiger Fuge
       const rand = rng(48271);
-      ctx.lineWidth = lw * 2.0;
+      ctx.lineWidth = lw * 2.2;
       const n = 3;
       const cell = s / n;
+      const stone = (cx: number, cy: number, rx: number, ry: number, seed: number) => {
+        const r = rng(seed);
+        const corners = 6 + Math.floor(r() * 3);
+        const pts: [number, number][] = [];
+        for (let i = 0; i < corners; i++) {
+          const a = (i / corners) * Math.PI * 2 + (r() - 0.5) * 0.35;
+          const k = 0.82 + r() * 0.36;
+          pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
+        }
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.closePath();
+        ctx.stroke();
+      };
       for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
-          const cx = (i + 0.5 + (rand() - 0.5) * 0.3) * cell;
-          const cy = (j + 0.5 + (rand() - 0.5) * 0.3) * cell;
-          const rx = cell * (0.40 + rand() * 0.08);
-          const ry = cell * (0.36 + rand() * 0.1);
+          const cx = (i + 0.5 + (rand() - 0.5) * 0.22) * cell;
+          const cy = (j + 0.5 + (rand() - 0.5) * 0.22) * cell;
+          const rx = cell * (0.50 + rand() * 0.10);
+          const ry = cell * (0.44 + rand() * 0.12);
           for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
-            blob(ctx, cx + dx, cy + dy, rx, ry, (rand() - 0.5) * 0.4, rng(i * 131 + j * 17), 0.14, 8);
+            stone(cx + dx, cy + dy, rx, ry, i * 131 + j * 17 + 3);
           }
         }
       }
-      // kleine Zwickelsteine
-      ctx.lineWidth = lw * 1.2;
-      for (let k = 0; k < 6; k++) {
-        const cx = rand() * s, cy = rand() * s, r = cell * 0.1;
-        for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
-          blob(ctx, cx + dx, cy + dy, r, r * 0.8, rand(), rng(k * 613 + 5), 0.25, 6);
+      // kleine Zwickelsteine in den Fugenkreuzen
+      ctx.lineWidth = lw * 1.3;
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          const cx = (i + 1) * cell + (rand() - 0.5) * cell * 0.15;
+          const cy = (j + 1) * cell + (rand() - 0.5) * cell * 0.15;
+          const r0 = cell * 0.11;
+          for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
+            stone(cx + dx, cy + dy, r0, r0 * 0.85, i * 77 + j * 191 + 9);
+          }
         }
       }
       break;
