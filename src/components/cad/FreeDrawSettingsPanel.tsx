@@ -334,10 +334,10 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               </label>
             </div>
 
-            {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
+            {style === "blob" && (
               <label className="block text-xs">
                 <span className="block mb-1 text-muted-foreground">
-                  {style === "blob" ? "Klecks-Abstand" : "Linienskalierung"}: {(gap * 1000).toFixed(1)} mm
+                  Klecks-Abstand: {(gap * 1000).toFixed(1)} mm
                 </span>
                 <input type="range" min={0.001} max={0.02} step={0.0005} value={gap}
                   onChange={(e) => {
@@ -348,6 +348,9 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
                   className="w-full" />
               </label>
             )}
+
+            <StrokeEffectsSettings app={app} kind="free" />
+
 
             <button type="button" onClick={onPickFile} className={framedBtn} style={framedStyle}>
               <span>Bild laden</span>
