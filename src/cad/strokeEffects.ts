@@ -35,7 +35,14 @@ export interface RoughenParams {
   mode: RoughenMode;
   /** Fester Zufalls-Seed — bleibt über Zoom, Speichern, Export erhalten. */
   seed: number;
+  /**
+   * Skalierung des abgeleiteten Roughen-Profils in Prozent (100 = bisherige
+   * Darstellung). Skaliert Stärke und räumlichen Abstand der Struktur —
+   * niemals die Originalgeometrie.
+   */
+  scalePercent: number;
 }
+
 
 export interface StrokeAppearance {
   pattern: StrokePatternParams;
