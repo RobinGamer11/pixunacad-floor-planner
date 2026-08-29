@@ -142,7 +142,6 @@ export class Hatch {
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number; patternRotateWithShape?: boolean;
-    patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
   } & StrokeEffectsInit) {
 
