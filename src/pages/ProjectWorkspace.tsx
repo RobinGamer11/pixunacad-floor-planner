@@ -3051,6 +3051,29 @@ function PageCanvas({
     return sel?.kind === "table" && tableEditCtxCanvas?.editId !== selectedElementId;
   })();
 
+  // NUR für Tabellen: Ein Klick irgendwo außerhalb der ausgewählten Tabelle
+  // (freie Blattfläche, CAD-Ebene, anderes Objekt) hebt die Tabellenauswahl
+  // sofort auf. Ausgenommen sind die Tabelle selbst, ihre HUB-/Griff-Elemente
+  // und das Tabellen-Einstellungsfenster. Das Auswahlverhalten aller anderen
+  // Werkzeuge bleibt unverändert.
+  React.useEffect(() => {
+    if (!selectedIsTableObject || !selectedElementId) return;
+    const onDown = (ev: PointerEvent) => {
+      if (ev.button !== 0) return;
+      const t = ev.target as Node | null;
+      const el = t instanceof Element ? t : (t?.parentElement ?? null);
+      if (!el) return;
+      if (el.closest(`[data-marquee-id="${CSS.escape(selectedElementId)}"]`)) return;
+      if (el.closest("[data-table-settings]")) return;
+      if (el.closest("[data-hub-control]")) return;
+      onSelect(undefined);
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  }, [selectedIsTableObject, selectedElementId, onSelect]);
+
+
+
   const handlePagePointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     if (e.button !== 0) {
@@ -3324,6 +3347,7 @@ function PageCanvas({
           return (
             <div
               className="absolute inset-0 pointer-events-none overflow-hidden"
+              data-canvas-self-dark="1"
               style={{ opacity: overlayOpacity, zIndex: 0 }}
             >
               {/* CAD-Ebene der Hintergrundseite als read-only Ghost */}
@@ -5049,6 +5073,11 @@ function ElementView({
       ref={rootRef}
       data-marquee-id={el.id}
       data-element-kind={el.kind}
+      // „Nur Zeichenfläche schwarz“: Rasterinhalte (JPG/PNG/PDF) werden nie
+      // invertiert; CAD-Blätter regeln den Dunkelmodus in ihrem eigenen
+      // Renderer (getrennte Raster-/Vektorebene).
+      data-raster-content={(el.kind === "image" || el.kind === "pdf") ? "1" : undefined}
+      data-canvas-self-dark={(el.kind === "cad-view" || el.kind === "cad-viewport") ? "1" : undefined}
       onPointerDown={handlePointerDown}
       onDoubleClick={(e) => {
         // Doppelklick auf eine Tabelle wechselt vom Objekt- in den Tabellenmodus.

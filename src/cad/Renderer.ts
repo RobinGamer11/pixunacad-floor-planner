@@ -6,6 +6,7 @@ import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, Free
 import { smoothChaikin } from "./freeGeom";
 import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx } from "./strokeEffects";
 import { getEffectiveContourGeometry } from "./effectiveGeometry";
+import { isCanvasDark } from "@/lib/theme";
 
 import { LabelManager } from "./LabelManager";
 import { getDimensionGeometry, getAngleDimensionParts, type DimensionLike } from "./dimensionGeometry";
@@ -285,6 +286,9 @@ export class Renderer {
       const labelId = order[i].id;
       if (!this.labels.isVisible(labelId)) continue;
       this._drawDocumentsForLabel(labelId);
+      // Dunkelmodus: Dokumente (JPG/PNG/PDF) werden in einem eigenen,
+      // ungefilterten Durchgang gezeichnet — hier endet dieser Durchgang.
+      if (this._darkPass === "docs") continue;
       // Rasterinhalt dieser Ebene (Pixelmodus der Projektmappe): liegt über den
       // Dokumenten, aber unter allen Vektorobjekten derselben Ebene.
       this.rasterLayers?.drawLayer(this.ctx, this.camera, labelId);
@@ -308,7 +312,73 @@ export class Renderer {
   }
 
 
+  /**
+   * „Nur Zeichenfläche schwarz“: Der dunkle Hintergrund und die Invertierung
+   * der Vektorfarben werden HIER erzeugt (kein CSS-Filter mehr auf dem ganzen
+   * Canvas). Rasterdokumente (JPG/PNG/PDF) werden in einem eigenen,
+   * ungefilterten Durchgang gezeichnet und bleiben damit farbecht.
+   */
+  private _darkPass: "all" | "docs" | "vector" = "all";
+  private _darkCanvas: HTMLCanvasElement | null = null;
+  private static readonly DARK_FILTER =
+    "invert(1) hue-rotate(180deg) saturate(1.7) contrast(0.82) brightness(1.12)";
+  /** Hintergrundfarbe der dunklen Zeichenfläche (entspricht invertiertem Weiß). */
+  static readonly DARK_BG = "#1a1a1a";
+
   render() {
+    if (!this.planMode && isCanvasDark()) { this._renderDark(); return; }
+    this._renderInner();
+  }
+
+  private _renderDark() {
+    const ctx = this.ctx;
+    if (!this.transparentBackground) {
+      ctx.save();
+      ctx.fillStyle = Renderer.DARK_BG;
+      ctx.fillRect(0, 0, this.vw, this.vh);
+      ctx.restore();
+    }
+
+    // 1) Rasterdokumente unverändert (keine Invertierung, keine Gegenfilter).
+    this._darkPass = "docs";
+    try { this._drawByLabelOrder(); } finally { this._darkPass = "all"; }
+
+    // 2) Alles Übrige in eine eigene Ebene, die invertiert aufgeblendet wird.
+    const dpr = window.devicePixelRatio || 1;
+    const wPx = Math.max(1, Math.floor(this.vw * dpr));
+    const hPx = Math.max(1, Math.floor(this.vh * dpr));
+    if (!this._darkCanvas) this._darkCanvas = document.createElement("canvas");
+    const off = this._darkCanvas;
+    if (off.width !== wPx) off.width = wPx;
+    if (off.height !== hPx) off.height = hPx;
+    const offCtx = off.getContext("2d");
+    if (!offCtx) { this._renderInner(); return; }
+    offCtx.setTransform(1, 0, 0, 1, 0, 0);
+    offCtx.clearRect(0, 0, wPx, hPx);
+    offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const realCtx = this.ctx;
+    const prevTransparent = this.transparentBackground;
+    this._darkPass = "vector";
+    this.transparentBackground = true;
+    (this as any).ctx = offCtx;
+    try {
+      this._renderInner();
+    } finally {
+      (this as any).ctx = realCtx;
+      this.transparentBackground = prevTransparent;
+      this._darkPass = "all";
+    }
+
+    realCtx.save();
+    realCtx.setTransform(1, 0, 0, 1, 0, 0);
+    realCtx.filter = Renderer.DARK_FILTER;
+    realCtx.drawImage(off, 0, 0);
+    realCtx.filter = "none";
+    realCtx.restore();
+  }
+
+  private _renderInner() {
     const ctx = this.ctx;
     if (this.planMode) {
       ctx.save();
@@ -576,6 +646,8 @@ export class Renderer {
   }
 
   private _drawDocumentsForLabel(labelId: string) {
+    // Vektor-Durchgang des Dunkelmodus lässt Rasterdokumente aus.
+    if (this._darkPass === "vector") return;
     for (const doc of this.scene.documents) {
       if (doc.labelId !== labelId) continue;
       if (!this.labels.isVisible(doc.labelId)) continue;
@@ -1781,13 +1853,14 @@ export class Renderer {
     ctx.globalAlpha = alpha;
     const geom = getEffectiveContourGeometry(poly as any);
     const pts = geom.outer;
+    const isClosed = geom.closed;
     // Muster läuft über die gesamte geschlossene Kontur durch (kein Neustart je Kante).
     const strokeOpts = {
       pattern: (poly as any).strokePattern,
       pxPerM: cam.scale, lineWidthPx: strokePx,
     };
 
-    const fillPct = (poly as any).fillAlphaPct ?? 0;
+    const fillPct = isClosed ? ((poly as any).fillAlphaPct ?? 0) : 0;
     if (fillPct > 0) {
       ctx.beginPath();
       for (const ring of geom.rings) {
@@ -1808,7 +1881,7 @@ export class Renderer {
     ctx.lineWidth = strokePx;
     ctx.lineJoin = "round";
     applyStrokePattern(ctx, strokeOpts);
-    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, true, strokeOpts);
+    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, isClosed, strokeOpts);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
@@ -1825,8 +1898,13 @@ export class Renderer {
 
 
   private _drawSingleHatch(hatch: Hatch) {
+    if ((hatch as any).isPolygon === true) {
+      // Offene Polygone sind bereits ab zwei Punkten gültig.
+      if (hatch.points.length < 2) return;
+      this._drawSinglePolygon(hatch);
+      return;
+    }
     if (hatch.points.length < 3) return;
-    if ((hatch as any).isPolygon === true) { this._drawSinglePolygon(hatch); return; }
     const ctx = this.ctx;
     const cam = this.camera;
 

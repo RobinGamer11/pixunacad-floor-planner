@@ -327,7 +327,8 @@ export class TopologyEngine {
         ? Math.floor(poly.divisionSnap) : 0;
       if (!poly.midpointSnap && divN < 2) continue;
       const pts = hatch.points || [];
-      for (let i = 0; i < pts.length; i++) {
+      const edgeCount = poly.closed === false ? pts.length - 1 : pts.length;
+      for (let i = 0; i < edgeCount; i++) {
         const a = pts[i];
         const b = pts[(i + 1) % pts.length];
         if (!a || !b) continue;

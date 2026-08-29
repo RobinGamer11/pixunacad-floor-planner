@@ -15,6 +15,7 @@ import { TableElementView } from "@/components/page/TableElementView";
 import { TableEditContext } from "@/components/page/TableElementView";
 import { cadTableStore } from "@/lib/cadTableStore";
 import { ANNOTATION_M_PER_MM } from "@/cad/textTypography";
+import { isCanvasDark, subscribeTheme } from "@/lib/theme";
 import {
   createTableData,
   normalizeTable,
@@ -36,6 +37,10 @@ export function CadTableLayer({
 }) {
   const ctx = React.useContext(TableEditContext);
   const [, force] = React.useReducer((n: number) => n + 1, 0);
+  // Nachtmodus / „Nur Zeichenfläche schwarz“: Das Bearbeitungs-Overlay folgt
+  // demselben Erscheinungsbild wie die gezeichnete Tabelle im Canvas.
+  const [dark, setDark] = React.useState(() => isCanvasDark());
+  React.useEffect(() => subscribeTheme(() => setDark(isCanvasDark())), []);
   const [editId, setEditId] = React.useState<string | null>(null);
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const sheetId: string = (app?.activeSheetId as string) || "default";
@@ -167,6 +172,9 @@ export function CadTableLayer({
             pointerEvents: "auto",
             outline: "1px solid #4da3ff",
             background: "#ffffff",
+            filter: dark
+              ? "invert(1) hue-rotate(180deg) saturate(1.7) contrast(0.82) brightness(1.12)"
+              : undefined,
           }}
           onPointerDown={(e) => e.stopPropagation()}
         >

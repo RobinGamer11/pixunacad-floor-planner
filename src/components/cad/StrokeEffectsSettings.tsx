@@ -194,17 +194,17 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
           <div className="space-y-2">
             <div className="space-y-2">
               <SliderField
-                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0} max={50}
+                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0} max={300}
                 onChange={(v) => applyRoughen({ strengthMm: v })}
                 onDragStart={dragStart} onDragEnd={dragEnd}
               />
               <SliderField
-                label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={100}
+                label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={500}
                 onChange={(v) => applyRoughen({ detailPer100Mm: v })}
                 onDragStart={dragStart} onDragEnd={dragEnd}
               />
               <SliderField
-                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10} max={300}
+                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10} max={1800}
                 onChange={(v) => applyRoughen({ scalePercent: v })}
                 onDragStart={dragStart} onDragEnd={dragEnd}
               />

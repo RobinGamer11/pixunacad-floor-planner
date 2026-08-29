@@ -2440,8 +2440,11 @@ export class SelectTool {
     // Ein Klick auf eine Polygonkante wählt immer das vollständige Polygon aus.
     for (const hatch of visibleHatches) {
       if (!(hatch as any).isPolygon) continue;
-      const ring = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 24);
-      for (let i = 0; i < ring.length; i++) {
+      // Offene Polygone besitzen KEINE Kante letzter → erster Punkt.
+      const polyClosed = (hatch as any).closed !== false;
+      const ring = tessellateWithBulges(hatch.points, (hatch as any).bulges, polyClosed, 24);
+      const edgeCount = polyClosed ? ring.length : ring.length - 1;
+      for (let i = 0; i < edgeCount; i++) {
         const a = ring[i];
         const b = ring[(i + 1) % ring.length];
         const q = projectPointToSegment(mouseW, a, b).q;
@@ -4700,22 +4703,24 @@ export class SelectTool {
         }
 
         // Hatch/Polygon → exakt die sichtbare (ggf. aufgeraute) Kontur.
-        if (kind === "hatch" && Array.isArray(obj.points) && obj.points.length >= 3) {
+        if (kind === "hatch" && Array.isArray(obj.points) && obj.points.length >= ((obj as any).closed === false ? 2 : 3)) {
           const geom = getEffectiveContourGeometry(obj);
           ctx.save();
           ctx.beginPath();
           for (const ring of geom.rings) {
-            if (!ring || ring.length < 3) continue;
+            if (!ring || ring.length < (geom.closed ? 3 : 2)) continue;
             const r0 = cam.worldToScreen(ring[0].x, ring[0].y);
             ctx.moveTo(r0.x, r0.y);
             for (let i = 1; i < ring.length; i++) {
               const p = cam.worldToScreen(ring[i].x, ring[i].y);
               ctx.lineTo(p.x, p.y);
             }
-            ctx.closePath();
+            if (geom.closed) ctx.closePath();
           }
-          ctx.fillStyle = fillCol;
-          ctx.fill("evenodd");
+          if (geom.closed) {
+            ctx.fillStyle = fillCol;
+            ctx.fill("evenodd");
+          }
           ctx.strokeStyle = strokeCol;
           ctx.lineWidth = 2;
           ctx.stroke();

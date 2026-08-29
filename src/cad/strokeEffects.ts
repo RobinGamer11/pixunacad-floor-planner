@@ -95,12 +95,12 @@ export function normalizeRoughen(raw: any, fallbackSeed?: number): RoughenParams
     : (fallbackSeed && fallbackSeed > 0 ? fallbackSeed : DEFAULT_ROUGHEN.seed);
   return {
     enabled: !!raw?.enabled,
-    strengthMm: num(raw?.strengthMm, DEFAULT_ROUGHEN.strengthMm, 0, 500),
-    detailPer100Mm: num(raw?.detailPer100Mm, DEFAULT_ROUGHEN.detailPer100Mm, 0.1, 200),
+    strengthMm: num(raw?.strengthMm, DEFAULT_ROUGHEN.strengthMm, 0, 3000),
+    detailPer100Mm: num(raw?.detailPer100Mm, DEFAULT_ROUGHEN.detailPer100Mm, 0.1, 1000),
     mode: raw?.mode === "corner" ? "corner" : "smooth",
     seed,
     // Alte Objekte ohne Wert bleiben migrationssicher bei 100 %.
-    scalePercent: num(raw?.scalePercent, DEFAULT_ROUGHEN.scalePercent, 10, 300),
+    scalePercent: num(raw?.scalePercent, DEFAULT_ROUGHEN.scalePercent, 10, 1800),
 
   };
 }

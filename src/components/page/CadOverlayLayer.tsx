@@ -487,6 +487,9 @@ export default function CadOverlayLayer(props: Props) {
   return (
     <div
       className="absolute inset-0"
+      // Dunkelmodus wird im CAD-Renderer selbst erzeugt (Rasterdokumente
+      // bleiben dort unverändert) — kein CSS-Filter von außen.
+      data-canvas-self-dark="1"
       style={{ pointerEvents: enabled ? "auto" : "none" }}
     >
       {/* Der Canvas ragt um FRAME_PAD_PX über die Seite hinaus, damit Inhalte

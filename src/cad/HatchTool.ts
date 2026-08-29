@@ -130,7 +130,10 @@ export class HatchTool {
   /** ENTER: laufende Kontur sofort abschließen und Schraffur erzeugen. */
   finishFromKey(): boolean {
     if (this.drawMode === "polygon" && this.state === "drawing") {
-      if (this.points.length >= 3) { this._finishAndCreateHatch(this.points.slice()); return true; }
+      if (this.points.length >= this._polygonMinPoints()) {
+        this._finishAndCreateHatch(this.points.slice(), this._polygonAutoCloses());
+        return true;
+      }
       this.finish();
       return true;
     }
@@ -596,9 +599,14 @@ export class HatchTool {
 
   /* ---- Finish ---- */
 
-  protected _finishAndCreateHatch(points: Vec2[]) {
-    if (points.length < 3) return;
-    this._createShapeFromPoints(points);
+  /** Mindestpunktzahl im freien Modus (offene Ketten brauchen nur zwei). */
+  protected _polygonMinPoints(): number { return 3; }
+  /** Wird die freie Kontur beim Beenden automatisch geschlossen? */
+  protected _polygonAutoCloses(): boolean { return true; }
+
+  protected _finishAndCreateHatch(points: Vec2[], closed = true) {
+    if (points.length < (closed ? 3 : 2)) return;
+    this._createShapeFromPoints(points, closed);
     this.app.clearSelection();
     this.points = [];
     this.state = "idle";
@@ -618,7 +626,7 @@ export class HatchTool {
    * Das Polygonwerkzeug überschreibt diesen Hook (erzeugt ein Polygonobjekt
    * statt einer Schraffur) — die gesamte Zeichenmechanik bleibt geteilt.
    */
-  protected _createShapeFromPoints(points: Vec2[]) {
+  protected _createShapeFromPoints(points: Vec2[], _closed = true) {
 
     // Wenn eine bestehende Schraffur ausgewählt ist und die neue Kontur
     // innerhalb dieser liegt, wird sie als Aussparung (Hole) in die
@@ -803,8 +811,8 @@ export class HatchTool {
       }
 
       if (input.doubleClicked) {
-        if (this.state === "drawing" && this.points.length >= 3) {
-          this._finishAndCreateHatch(this.points.slice());
+        if (this.state === "drawing" && this.points.length >= this._polygonMinPoints()) {
+          this._finishAndCreateHatch(this.points.slice(), this._polygonAutoCloses());
         } else {
           this.finish();
         }
@@ -848,7 +856,7 @@ export class HatchTool {
       this.state === "drawing" && this.snap && this.snap.isDraftStart &&
       this.points.length >= 3 && !this._hasAngleConstraint(input)
     ) {
-      this._finishAndCreateHatch(this.points.slice());
+      this._finishAndCreateHatch(this.points.slice(), true);
       return;
     }
 
@@ -883,7 +891,7 @@ export class HatchTool {
       this.points.length >= 3 && dist(point, this.points[0]) <= Defaults.minSegLenM &&
       !this._hasAngleConstraint(input)
     ) {
-      this._finishAndCreateHatch(this.points.slice());
+      this._finishAndCreateHatch(this.points.slice(), true);
       return;
     }
 
@@ -1193,7 +1201,7 @@ export class HatchTool {
 
     ctx.save();
 
-    if (path.length >= 3) {
+    if (path.length >= 3 && this._polygonAutoCloses()) {
       ctx.beginPath();
       const p0 = cam.worldToScreen(path[0].x, path[0].y);
       ctx.moveTo(p0.x, p0.y);
