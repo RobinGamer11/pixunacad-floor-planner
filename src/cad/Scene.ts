@@ -123,6 +123,8 @@ export class Hatch {
   patternStretch: number;
   patternOffsetX: number;
   patternOffsetY: number;
+  /** Weltfester Musteranker (nur gesetzt, wenn das Muster nicht mitdreht). */
+  patternOrigin?: { x: number; y: number } | null;
   /** true = Muster dreht sich beim Drehen der Schraffur exakt mit. */
   patternRotateWithShape: boolean;
   /** Signierte Kanten-Wölbungen der Außenkontur (Index = Kante i→i+1). */
