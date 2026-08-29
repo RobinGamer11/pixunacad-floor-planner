@@ -139,11 +139,12 @@ export class Hatch {
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
     patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch,
-    patternOffsetX, patternOffsetY, patternRotateWithShape, bulges, holeBulges, strokePattern, roughen, appearanceSeed }: {
+    patternOffsetX, patternOffsetY, patternOrigin, patternRotateWithShape, bulges, holeBulges, strokePattern, roughen, appearanceSeed }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number; patternRotateWithShape?: boolean;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
+    patternOrigin?: { x: number; y: number } | null; patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
   } & StrokeEffectsInit) {
 
