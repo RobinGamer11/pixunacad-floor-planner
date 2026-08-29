@@ -252,13 +252,17 @@ export default function ProjectWorkspace() {
 
   useEffect(() => {
     if (!templateKey || !projectId || !templateInfo) return;
+    // Wichtig: Erst arbeiten, wenn das Projekt tatsächlich geladen ist. Sonst
+    // würde vor der Hydration eine leere Vorlagenseite angelegt und später
+    // als "bereits vorhanden" behalten (weiße Seite trotz Mustervorlage).
+    if (!rawProject) return;
     const title = `${TEMPLATE_LABEL[templateInfo.type]} Vorlage`;
     const defaultKey = templateKeyOf(templateInfo.type, "__default");
     const isDefaultSlot = templateKey === defaultKey;
-    const isTemplateSlot =
-      isDefaultSlot || templateInfo.positionId === "__favorite";
+    const isFavoriteSlot = templateInfo.positionId === "__favorite";
+    const isTemplateSlot = isDefaultSlot || isFavoriteSlot;
 
-    const projectPages = rawProject?.pages ?? [];
+    const projectPages = rawProject.pages ?? [];
     const storedDefault = projectPages.filter((pg) => pg.templateKey === defaultKey);
     const favorite = getFavoriteTemplate<ProjectPage>(projectId, templateInfo.type);
     const legacyPages = findLegacyTemplatePages(projectPages, templateInfo.type);
@@ -293,27 +297,49 @@ export default function ProjectWorkspace() {
     }
 
     // ---- Vorlagenquelle für ein NEU angelegtes Finanz-Buch -----------------
-    //  1) die im Projekt gestaltete Standard-Mustervorlage (`…:__default`),
-    //  2) ausdrücklich gespeicherte Favoritenvorlage,
+    //  1) ausdrücklich gespeicherte Favoritenvorlage,
+    //  2) die im Projekt gestaltete Standard-Mustervorlage (`…:__default`),
     //  3) eingebaute leere Fallback-Seite.
-    // Die Standard-Mustervorlage selbst (und der Favoriten-Slot) klonen sich
-    // nicht aus sich heraus.
+    // Die Standard-Mustervorlage selbst klont sich nicht aus sich heraus;
+    // der Favoriten-Slot wird aus dem gespeicherten Favoriten aufgebaut.
     let source: ProjectPage[] | undefined;
     if (!isTemplateSlot) {
       if (hasTemplateObjects(favorite)) source = favorite;
       else if (hasTemplateObjects(storedDefault)) {
         source = storedDefault.map((pg) => ({ ...pg, id: "", templateKey: undefined }));
-      }
+      } else if (legacyPages) source = legacyPages;
     } else if (isDefaultSlot) {
       if (hasTemplateObjects(favorite)) source = favorite;
       else if (legacyPages) source = legacyPages;
+    } else if (isFavoriteSlot) {
+      if (hasTemplateObjects(favorite)) source = favorite;
+      else if (hasTemplateObjects(storedDefault)) {
+        source = storedDefault.map((pg) => ({ ...pg, id: "", templateKey: undefined }));
+      }
     }
+
+    const existing = projectPages.filter((pg) => pg.templateKey === templateKey);
+    if (existing.length) {
+      // Ein bereits angelegter, aber vollständig leerer Beleg-Slot darf einmalig
+      // mit der inzwischen vorhandenen Mustervorlage nachgefüllt werden.
+      if (!isTemplateSlot && source?.length && existing.every(isBlankTemplatePage)) {
+        const seedKey = `pixuna.finance.tplseed.${projectId}.${templateKey}`;
+        const seeded = (() => { try { return localStorage.getItem(seedKey); } catch { return null; } })();
+        if (!seeded) {
+          try { localStorage.setItem(seedKey, "1"); } catch { /* noop */ }
+          projectStore.replaceTemplatePages(projectId, templateKey, title, source);
+        }
+      }
+      return;
+    }
+
     projectStore.ensureTemplatePages(
       projectId,
       templateKey,
       title,
       source?.length ? source : buildDefaultTemplatePages(templateInfo.type, title),
     );
+
   }, [templateKey, projectId, templateInfo?.type, templateInfo?.positionId, rawProject]);
 
 
