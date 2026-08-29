@@ -4697,28 +4697,18 @@ export class SelectTool {
           continue;
         }
 
-        // Hatch → gefülltes Polygon in Blau (folgt Kantenwölbungen).
+        // Hatch/Polygon → exakt die sichtbare (ggf. aufgeraute) Kontur.
         if (kind === "hatch" && Array.isArray(obj.points) && obj.points.length >= 3) {
-          const outer = tessellateWithBulges(obj.points, obj.bulges, true, 32);
+          const geom = getEffectiveContourGeometry(obj);
           ctx.save();
           ctx.beginPath();
-          const p0 = cam.worldToScreen(outer[0].x, outer[0].y);
-          ctx.moveTo(p0.x, p0.y);
-          for (let i = 1; i < outer.length; i++) {
-            const p = cam.worldToScreen(outer[i].x, outer[i].y);
-            ctx.lineTo(p.x, p.y);
-          }
-          ctx.closePath();
-          const holes = obj.holes || [];
-          for (let hi = 0; hi < holes.length; hi++) {
-            const raw = holes[hi];
-            if (!raw || raw.length < 3) continue;
-            const loop = tessellateWithBulges(raw, obj.holeBulges?.[hi], true, 32);
-            const h0 = cam.worldToScreen(loop[0].x, loop[0].y);
-            ctx.moveTo(h0.x, h0.y);
-            for (let i = 1; i < loop.length; i++) {
-              const hp = cam.worldToScreen(loop[i].x, loop[i].y);
-              ctx.lineTo(hp.x, hp.y);
+          for (const ring of geom.rings) {
+            if (!ring || ring.length < 3) continue;
+            const r0 = cam.worldToScreen(ring[0].x, ring[0].y);
+            ctx.moveTo(r0.x, r0.y);
+            for (let i = 1; i < ring.length; i++) {
+              const p = cam.worldToScreen(ring[i].x, ring[i].y);
+              ctx.lineTo(p.x, p.y);
             }
             ctx.closePath();
           }
@@ -4730,6 +4720,7 @@ export class SelectTool {
           ctx.restore();
           continue;
         }
+
 
         // Fallback: dicker blauer Umriss entlang der Geometrie.
         const rawPts = this._elementPoints(kind, obj);
