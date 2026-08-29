@@ -23,6 +23,7 @@ import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
 import { RasterLayers, cadRasterPxPerMForReference } from "../RasterLayers";
 import { mirrorProxy } from "../multiEdit";
+import { setStrokeAutoShape } from "../freeAutoShape";
 import { asObjectToolId, type ObjectToolId } from "../selectionTools";
 
 import { LineHub } from "../LineHub";
@@ -2148,6 +2149,22 @@ export class MiniCad {
   getSelectedFreeStroke() {
     if (!this.selection || this.selection.type !== SelectionType.FREE_STROKE) return null;
     return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
+  }
+
+  /** Auto-Form nachträglich auf alle ausgewählten Freihandlinien anwenden/lösen. */
+  setSelectedFreeAutoShape(on: boolean): boolean {
+    const targets = new Set<any>();
+    const primary = this.getSelectedFreeStroke();
+    if (primary) targets.add(primary);
+    for (const ref of this._selectedRefs()) {
+      if (ref.kind !== "freeStroke") continue;
+      const s = this.scene.getFreeStrokeById(ref.id);
+      if (s) targets.add(s);
+    }
+    let changed = false;
+    for (const s of targets) if (setStrokeAutoShape(s, on)) changed = true;
+    if (changed) { (this as any).requestRender?.(); (this as any).notifyChange?.(); }
+    return changed;
   }
 
   /* ---- Mehrfachauswahl: Einstellungen auf alle gleichartigen Objekte ---- */

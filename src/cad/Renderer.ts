@@ -326,8 +326,36 @@ export class Renderer {
   static readonly DARK_BG = "#1a1a1a";
 
   render() {
-    if (!this.planMode && isCanvasDark()) { this._renderDark(); return; }
+    if (isCanvasDark()) { this._renderDark(); return; }
     this._renderInner();
+  }
+
+  /** Zeichnet `fn` in eine Offscreen-Ebene und blendet sie invertiert auf. */
+  private _compositeInverted(fn: () => void): boolean {
+    const dpr = window.devicePixelRatio || 1;
+    const wPx = Math.max(1, Math.floor(this.vw * dpr));
+    const hPx = Math.max(1, Math.floor(this.vh * dpr));
+    if (!this._darkCanvas) this._darkCanvas = document.createElement("canvas");
+    const off = this._darkCanvas;
+    if (off.width !== wPx) off.width = wPx;
+    if (off.height !== hPx) off.height = hPx;
+    const offCtx = off.getContext("2d");
+    if (!offCtx) return false;
+    offCtx.setTransform(1, 0, 0, 1, 0, 0);
+    offCtx.clearRect(0, 0, wPx, hPx);
+    offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const realCtx = this.ctx;
+    (this as any).ctx = offCtx;
+    try { fn(); } finally { (this as any).ctx = realCtx; }
+
+    realCtx.save();
+    realCtx.setTransform(1, 0, 0, 1, 0, 0);
+    realCtx.filter = Renderer.DARK_FILTER;
+    realCtx.drawImage(off, 0, 0);
+    realCtx.filter = "none";
+    realCtx.restore();
+    return true;
   }
 
   private _renderDark() {
@@ -339,46 +367,28 @@ export class Renderer {
       ctx.restore();
     }
 
-    // 1) Rasterdokumente unverändert (keine Invertierung, keine Gegenfilter).
+    // 1) Hintergrund/Papier/Gitter invertiert (Papier wird dunkel).
+    const okBg = this._compositeInverted(() => this._drawBackdrop());
+    if (!okBg) { this._renderInner(); return; }
+
+    // 2) Rasterdokumente unverändert (keine Invertierung, keine Gegenfilter).
     this._darkPass = "docs";
     try { this._drawByLabelOrder(); } finally { this._darkPass = "all"; }
 
-    // 2) Alles Übrige in eine eigene Ebene, die invertiert aufgeblendet wird.
-    const dpr = window.devicePixelRatio || 1;
-    const wPx = Math.max(1, Math.floor(this.vw * dpr));
-    const hPx = Math.max(1, Math.floor(this.vh * dpr));
-    if (!this._darkCanvas) this._darkCanvas = document.createElement("canvas");
-    const off = this._darkCanvas;
-    if (off.width !== wPx) off.width = wPx;
-    if (off.height !== hPx) off.height = hPx;
-    const offCtx = off.getContext("2d");
-    if (!offCtx) { this._renderInner(); return; }
-    offCtx.setTransform(1, 0, 0, 1, 0, 0);
-    offCtx.clearRect(0, 0, wPx, hPx);
-    offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const realCtx = this.ctx;
+    // 3) Alle Vektorobjekte in eine eigene Ebene, invertiert aufgeblendet.
     const prevTransparent = this.transparentBackground;
     this._darkPass = "vector";
     this.transparentBackground = true;
-    (this as any).ctx = offCtx;
     try {
-      this._renderInner();
+      this._compositeInverted(() => this._renderInner());
     } finally {
-      (this as any).ctx = realCtx;
       this.transparentBackground = prevTransparent;
       this._darkPass = "all";
     }
-
-    realCtx.save();
-    realCtx.setTransform(1, 0, 0, 1, 0, 0);
-    realCtx.filter = Renderer.DARK_FILTER;
-    realCtx.drawImage(off, 0, 0);
-    realCtx.filter = "none";
-    realCtx.restore();
   }
 
-  private _renderInner() {
+  /** Hintergrund der Zeichenfläche: Plan-Papier bzw. Flächenfarbe + Gitter. */
+  private _drawBackdrop() {
     const ctx = this.ctx;
     if (this.planMode) {
       ctx.save();
@@ -386,12 +396,6 @@ export class Renderer {
       ctx.fillRect(0, 0, this.vw, this.vh);
       ctx.restore();
       this._drawPlanPaper();
-      // Tracing-Pause anderer Druckpläne (unter aktiver Plan-Geometrie).
-      this._drawPlanTracingLayers();
-      // Plan-Projektionen (Step 4) — gezeichnet vom PlanController via Hook.
-      if (this.planOverlayDraw) {
-        try { this.planOverlayDraw(ctx); } catch (e) { console.error("planOverlayDraw error:", e); }
-      }
     } else {
       if (!this.transparentBackground) {
         ctx.save();
@@ -401,6 +405,21 @@ export class Renderer {
       }
       if (this.gridSettings.enabled) this._drawGrid();
     }
+  }
+
+  private _renderInner() {
+    const ctx = this.ctx;
+    // Im Dunkelmodus wird der Hintergrund in einem eigenen Durchgang gezeichnet.
+    if (this._darkPass !== "vector") this._drawBackdrop();
+    if (this.planMode) {
+      // Tracing-Pause anderer Druckpläne (unter aktiver Plan-Geometrie).
+      this._drawPlanTracingLayers();
+      // Plan-Projektionen (Step 4) — gezeichnet vom PlanController via Hook.
+      if (this.planOverlayDraw) {
+        try { this.planOverlayDraw(ctx); } catch (e) { console.error("planOverlayDraw error:", e); }
+      }
+    }
+
 
     // Overlay-Sheets (Transparentpause) UNTER aktiver Scene zeichnen.
     this._drawOverlayScenes();
@@ -2080,8 +2099,9 @@ export class Renderer {
     const scaledStrokePx = this._scaledStrokePx(hatch.strokeWidthPx);
 
     ctx.save();
-    if (hatch.points.length >= 3) {
-      const outer = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 32);
+    const selClosed = (hatch as any).closed !== false;
+    if (hatch.points.length >= 3 || !selClosed) {
+      const outer = tessellateWithBulges(hatch.points, (hatch as any).bulges, selClosed, 32);
       const holesRaw = hatch.holes || [];
       const holeLoops = holesRaw.map((loop: any, hi: number) =>
         (loop && loop.length >= 3) ? tessellateWithBulges(loop, (hatch as any).holeBulges?.[hi], true, 32) : null);
@@ -2093,7 +2113,7 @@ export class Renderer {
           const sp = cam.worldToScreen(outer[i].x, outer[i].y);
           ctx.lineTo(sp.x, sp.y);
         }
-        ctx.closePath();
+        if (selClosed) ctx.closePath();
       };
       const traceHoles = () => {
         for (const loop of holeLoops) {
@@ -2108,11 +2128,13 @@ export class Renderer {
         }
       };
 
-      // Blue fill: outer minus holes (evenodd)
-      tracePath();
-      traceHoles();
-      ctx.fillStyle = "rgba(77,163,255,0.12)";
-      ctx.fill("evenodd");
+      // Blue fill: outer minus holes (evenodd) — nur bei geschlossener Kontur.
+      if (selClosed) {
+        tracePath();
+        traceHoles();
+        ctx.fillStyle = "rgba(77,163,255,0.12)";
+        ctx.fill("evenodd");
+      }
 
       // Outer outline
       tracePath();
@@ -2134,6 +2156,7 @@ export class Renderer {
         ctx.stroke();
       }
     }
+
 
     const drawHandle = (sp: Vec2, isActive: boolean) => {
       ctx.fillStyle = "rgba(77,163,255,0.12)";

@@ -106,17 +106,23 @@ export class FreeDrawTool {
       }
       if (!input.mouse.left) {
         // Commit
-        let pts = dedupePoints(this._points);
-        if (this.app.defaultFreeAutoShape) pts = autoShapePoints(pts);
+        const raw = dedupePoints(this._points);
+        const useAuto = !!this.app.defaultFreeAutoShape;
+        let pts = useAuto ? autoShapePoints(raw) : raw;
         this._drawing = false;
         this._points = [];
         this._lastSamplePx = null;
         this.app.hub.hide();
         if (pts.length >= 2 && this._pathLength(pts) > 1e-4) {
-          const stroke = this.app.scene.createFreeStroke(pts, this._currentStyle());
+          const stroke = this.app.scene.createFreeStroke(pts, {
+            ...this._currentStyle(),
+            autoShape: useAuto,
+            autoShapeSource: useAuto ? raw : null,
+          });
           maybeRasterize(this.app, { type: "free", obj: stroke });
           this.app.refreshLabelUI?.();
         }
+
       }
     } else {
       // Nicht aktiv zeichnen → Hub verbergen, falls noch sichtbar.
