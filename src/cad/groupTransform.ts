@@ -105,15 +105,28 @@ export function rotateGroup(app: any, refs: GroupRef[], angle: number, center: V
       continue;
     }
 
+    // Musteranker vor der Drehung merken (Weltposition der Musterphase).
+    const hatchAnchorBefore = (r.kind === "hatch")
+      ? {
+          x: (o.patternOrigin && Number.isFinite(o.patternOrigin.x)) ? o.patternOrigin.x : o.points?.[0]?.x,
+          y: (o.patternOrigin && Number.isFinite(o.patternOrigin.y)) ? o.patternOrigin.y : o.points?.[0]?.y,
+        }
+      : null;
+
     for (const p of movablePoints(r.kind, o)) rot(p, center, cos, sin);
 
     if (r.kind === "textbox" || r.kind === "sticker") {
       o.rotationRad = (o.rotationRad || 0) + angle;
     } else if (r.kind === "hatch") {
       if (o.areaLabel) o.areaLabel.rotationRad = (o.areaLabel.rotationRad || 0) + angle;
-      // Muster mitdrehen (fixiert an der Schraffur), wenn aktiviert.
       if (o.patternRotateWithShape !== false) {
+        // Muster mitdrehen: Winkel und Ankerpunkt folgen der Schraffur.
         o.patternAngleDeg = (o.patternAngleDeg || 0) + (angle * 180) / Math.PI;
+        if (o.patternOrigin && Number.isFinite(o.patternOrigin.x)) rot(o.patternOrigin, center, cos, sin);
+      } else if (hatchAnchorBefore && Number.isFinite(hatchAnchorBefore.x)) {
+        // Muster bleibt weltfest: Winkel unverändert und Anker einfrieren,
+        // damit sich die Musterphase beim Drehen nicht mitdreht.
+        o.patternOrigin = { x: hatchAnchorBefore.x, y: hatchAnchorBefore.y };
       }
     } else if (r.kind === "dimension" && o.refDir) {
       const d = { x: o.refDir.x, y: o.refDir.y };
