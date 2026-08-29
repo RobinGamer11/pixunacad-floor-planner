@@ -204,7 +204,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         thickness={thickness}
         opacity={opacity}
         style={style}
-        gap={gap}
         imageSrc={imageSrc}
         imgSpacing={imgSpacing}
         imgRotate={imgRotate}
