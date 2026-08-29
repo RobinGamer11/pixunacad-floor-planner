@@ -3347,11 +3347,12 @@ function PageCanvas({
           return (
             <div
               className="absolute inset-0 pointer-events-none overflow-hidden"
+              data-ghost-overlay="1"
               data-canvas-self-dark="1"
               style={{ opacity: overlayOpacity, zIndex: 0 }}
             >
               {/* CAD-Ebene der Hintergrundseite als read-only Ghost */}
-              <div className="absolute inset-0" style={{ pointerEvents: "none" }}>
+              <div className="absolute inset-0" data-canvas-self-dark="1" style={{ pointerEvents: "none" }}>
                 <CadOverlayLayer
                   key={`ghost-${overlayPage.id}`}
                   pageWidthMm={ofmt.w}
