@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Check, Grid2X2, Move, CheckCheck } from "lucide-react";
 import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
 import { onPatternsChanged } from "@/cad/customHatchPatterns";
+import { defaultPatternScale } from "@/cad/hatchPatterns";
 
 /** Trennt eine Maßeinheit in Klammern vom Beschriftungstext ab. */
 const splitUnit = (label: string): [string, string | null] => {
@@ -67,13 +68,19 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
   const [angleDeg, setAngleDeg] = useState(0);
   const [skewDeg, setSkewDeg] = useState(0);
   const [moveMode, setMoveMode] = useState(false);
+  const [rotateWithShape, setRotateWithShape] = useState(true);
   const [, force] = useState(0);
   const dragRef = useRef<{ wx: number; wy: number; ox: number; oy: number } | null>(null);
   const patternOptions = useHatchPatternOptions();
   useEffect(() => onPatternsChanged(() => { app?.renderer?.render?.(); app?.requestRender?.(); }), [app]);
   const selectPattern = (val: string) => {
     setPatternId(val);
-    apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
+    const ds = defaultPatternScale(val);
+    setScale(ds);
+    apply(
+      (h) => { h.patternId = val; h.patternScale = ds; },
+      () => { app.defaultHatchPatternId = val; app.defaultHatchPatternScale = ds; },
+    );
   };
 
   const sync = () => {
@@ -86,6 +93,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
       patternStretch: app.defaultHatchPatternStretch,
       patternAngleDeg: app.defaultHatchPatternAngleDeg,
       patternSkewDeg: app.defaultHatchPatternSkewDeg,
+      patternRotateWithShape: app.defaultHatchPatternRotateWithShape !== false,
     };
     setEnabled(!!src.patternEnabled);
     setPatternId(src.patternId || "mauerwerk");
@@ -93,6 +101,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
     setStretch(src.patternStretch ?? 1);
     setAngleDeg(src.patternAngleDeg ?? 0);
     setSkewDeg(src.patternSkewDeg ?? 0);
+    setRotateWithShape(src.patternRotateWithShape !== false);
   };
 
   useEffect(() => {
@@ -184,11 +193,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
       <select
         value={patternId}
         disabled={!enabled}
-        onChange={(e) => {
-          const val = e.target.value;
-          setPatternId(val);
-          apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
-        }}
+        onChange={(e) => selectPattern(e.target.value)}
         className={`w-full rounded border bg-transparent px-1.5 py-1 text-[11px] ${enabled ? "" : "opacity-50"}`}
         style={{ borderColor: hairline }}
       >
@@ -222,6 +227,34 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
         label="Verzerrung (°)" min={-70} max={70} step={0.5} decimals={1} value={skewDeg} disabled={!enabled}
         onChange={(val) => { setSkewDeg(val); apply((h) => { h.patternSkewDeg = val; }, () => { app.defaultHatchPatternSkewDeg = val; }); }}
       />
+
+      <button
+        type="button"
+        disabled={!enabled}
+        onClick={() => {
+          const next = !rotateWithShape;
+          setRotateWithShape(next);
+          apply(
+            (h) => { h.patternRotateWithShape = next; },
+            () => { app.defaultHatchPatternRotateWithShape = next; },
+          );
+        }}
+        className={`flex w-full items-center gap-2 text-[11px] ${enabled ? "" : "opacity-50"}`}
+        aria-pressed={rotateWithShape}
+        title="Muster wird beim Drehen der Schraffur exakt mitgedreht"
+      >
+        <span
+          className="flex h-4 w-4 items-center justify-center rounded border"
+          style={{
+            borderColor: hairline,
+            background: rotateWithShape ? "hsl(var(--primary) / 0.16)" : "transparent",
+            color: "hsl(var(--primary))",
+          }}
+        >
+          {rotateWithShape && <Check size={11} />}
+        </span>
+        <span>Muster mitdrehen</span>
+      </button>
 
       <div className="flex items-center gap-1.5">
         <button
