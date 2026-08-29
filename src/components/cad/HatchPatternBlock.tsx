@@ -59,7 +59,7 @@ interface Props {
  * nicht aktiviert ist. Zusätzlich lässt sich das Muster innerhalb der
  * Schraffur verschieben (Move-Modus, Bestätigung per Häkchen → Undo/Redo).
  */
-export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
+export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
   const [enabled, setEnabled] = useState(false);
   const [patternId, setPatternId] = useState("mauerwerk");
   const [scale, setScale] = useState(1);
@@ -89,7 +89,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
     };
     setEnabled(!!src.patternEnabled);
     setPatternId(src.patternId || "mauerwerk");
-    setScale(src.patternScale ?? 2);
+    setScale(src.patternScale ?? 60);
     setStretch(src.patternStretch ?? 1);
     setAngleDeg(src.patternAngleDeg ?? 0);
     setSkewDeg(src.patternSkewDeg ?? 0);

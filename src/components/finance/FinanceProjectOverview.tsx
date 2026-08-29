@@ -27,7 +27,7 @@ function collectPositions(state: FinanceState, parentId: string | null): Finance
 
 /**
  * Read-only Gesamtübersicht der Finanzen eines Projekts für die Startseite.
- * Zeigt – wie in der Finanzen-Oberfläche – archivierte und angelegte Belege getrennt.
+ * Zeigt – wie in der Finanzen-Oberfläche – erhaltene und angelegte Belege getrennt.
  */
 export function FinanceProjectOverview({
   projectId,
@@ -68,7 +68,7 @@ export function FinanceProjectOverview({
         <FinanceSummaryCard
           totals={positionTotals(archived)}
           hideEstimate
-          title="Archivierte Belege"
+          title="Erhaltene Belege"
           subtitle="Gesamtes Projekt"
           invoiceDetails={archived.filter(isInvoiceLike)}
           background={ARCHIVE_BG}

@@ -479,7 +479,7 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }} />
       </div>
 
-      {/* Übersichten ganz oben – getrennt nach archivierten und angelegten Belegen. */}
+      {/* Übersichten ganz oben – getrennt nach erhaltenen und angelegten Belegen. */}
       {!hasSplit && (
         <FinanceSummaryCard
           totals={totals}
@@ -495,7 +495,7 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
             onChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })} />
           {archived.length > 0 && (
             <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
-              title="Archivierte Belege" subtitle={node.name}
+              title="Erhaltene Belege" subtitle={node.name}
               invoiceDetails={archivedInvoices} background={ARCHIVE_BG} />
           )}
           {created.length > 0 && (
@@ -506,14 +506,14 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
         </div>
       )}
 
-      {/* Archivieren = bestehende Belege erfassen; darunter das Anlegen neuer Belege */}
+      {/* Erhalten = bestehende Belege erfassen; darunter das Anlegen neuer Belege */}
       <div className="space-y-1.5" data-export-hide>
         <div className="flex flex-wrap gap-1.5">
           {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
             <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
               className="h-9 px-3 rounded-lg border-2 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-muted"
               style={{ borderColor: "hsl(var(--hairline))" }}>
-              <Plus size={15} /> {label} archivieren
+              <Plus size={15} /> {label} erhalten
             </button>
           ))}
         </div>
@@ -535,13 +535,13 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
       </div>
 
 
-      {/* Archivierte Belege – nur Tabelle, Übersicht steht oben */}
+      {/* Erhaltene Belege – nur Tabelle, Übersicht steht oben */}
       {archived.length > 0 && (
         <div className="space-y-1.5 rounded-xl p-2.5" style={{ background: ARCHIVE_BG }}>
           <div className="text-[11px] font-semibold uppercase tracking-wider"
-               style={{ color: "hsl(var(--ink-soft))" }}>Archivierte Belege</div>
+               style={{ color: "hsl(var(--ink-soft))" }}>Erhaltene Belege</div>
           <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={archived}
-            emptyHint="Noch keine archivierten Belege." />
+            emptyHint="Noch keine erhaltenen Belege." />
         </div>
       )}
 
@@ -594,7 +594,7 @@ const parseEurLocal = (v: string): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Hintergründe zur Unterscheidung archivierter und angelegter Belege. */
+/** Hintergründe zur Unterscheidung erhaltener und angelegter Belege. */
 const ARCHIVE_BG = "hsl(var(--surface-muted))";
 const CREATED_BG = "hsl(var(--accent-gold) / 0.10)";
 
@@ -614,7 +614,7 @@ function collectPositions(state: FinanceState, parentId: string | null): Finance
   return out;
 }
 
-/** Getrennte Übersichten für archivierte und angelegte Belege. */
+/** Getrennte Übersichten für erhaltene und angelegte Belege. */
 const SplitSummaries: React.FC<{
   state: FinanceState; parentId: string | null; subtitle: string;
   estimate: number; onEstimateChange: (v: number) => void; fallback: FinanceTotals;
@@ -632,7 +632,7 @@ const SplitSummaries: React.FC<{
       <EstimateRow value={estimate} onChange={onEstimateChange} />
       {archived.length > 0 && (
         <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
-          title="Archivierte Belege" subtitle={subtitle}
+          title="Erhaltene Belege" subtitle={subtitle}
           invoiceDetails={archived.filter(isInvoiceLike)} background={ARCHIVE_BG} />
       )}
       {created.length > 0 && (
@@ -727,7 +727,7 @@ const ChildList: React.FC<{
         const cI = control(t.estimate, t.invoices);
         const kids = childrenOf(state, n.id);
         // Anlagen (Aktionen) lassen sich ebenfalls aufklappen — dort erscheinen
-        // die Belege getrennt nach „archiviert" und „angelegt".
+        // die Belege getrennt nach „erhalten" und „angelegt".
         const nodePositions = n.type === "action" ? positionsOf(state, n.id) : [];
         const canExpand = kids.length > 0 || nodePositions.length > 0;
         const isOpen = !!open[n.id];
@@ -773,7 +773,7 @@ const ChildList: React.FC<{
             {isOpen && nodePositions.length > 0 && (
               <div className="pl-6 pr-3 py-2 border-b space-y-2"
                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
-                <PositionMiniList title="Archivierte Belege" background={ARCHIVE_BG}
+                <PositionMiniList title="Erhaltene Belege" background={ARCHIVE_BG}
                   positions={nodePositions.filter((p) => !p.hasTemplate)} />
                 <PositionMiniList title="Angelegte Belege" background={CREATED_BG}
                   positions={nodePositions.filter((p) => !!p.hasTemplate)} />

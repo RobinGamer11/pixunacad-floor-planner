@@ -7,6 +7,7 @@
  */
 
 import { getCustomPatternImage, isCustomPatternId } from "./customHatchPatterns";
+import { getImagePattern, isImagePatternId } from "./builtinImagePatterns";
 
 export type BuiltinHatchPatternId =
   | "mauerwerk"
@@ -484,10 +485,14 @@ export function getPatternTile(id: HatchPatternId, sizePx: number, color: string
   const c = document.createElement("canvas");
   c.width = s; c.height = s;
   const ctx = c.getContext("2d")!;
-  if (isCustomPatternId(id)) {
-    const img = getCustomPatternImage(id);
+  if (isCustomPatternId(id) || isImagePatternId(id)) {
+    const img = isCustomPatternId(id) ? getCustomPatternImage(id) : getImagePattern(id);
     if (!img) return c; // noch nicht geladen: nicht cachen
-    ctx.drawImage(img, 0, 0, s, s);
+    // Seitenverhältnis der Vorlage erhalten (Kachel ist dann nicht quadratisch).
+    const ar = img.naturalWidth / Math.max(1, img.naturalHeight);
+    const h = Math.max(1, Math.round(s / (ar || 1)));
+    c.height = h;
+    ctx.drawImage(img, 0, 0, s, h);
   } else {
     drawTile(ctx, id as BuiltinHatchPatternId, s, color, lw);
   }

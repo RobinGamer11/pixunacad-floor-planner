@@ -247,7 +247,7 @@ export class MiniCad {
   defaultHatchAutoSmooth: boolean = true;
   defaultHatchPatternEnabled: boolean = false;
   defaultHatchPatternId: string = "mauerwerk";
-  defaultHatchPatternScale: number = 1;
+  defaultHatchPatternScale: number = 60;
   defaultHatchPatternAngleDeg: number = 0;
   defaultHatchPatternSkewDeg: number = 0;
   defaultHatchPatternStretch: number = 1;
