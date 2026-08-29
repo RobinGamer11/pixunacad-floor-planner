@@ -5,24 +5,7 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 
-type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy" | "ink" | "crayon" | "chalk";
-
-/**
- * Stiloptionen des Freihandstifts. Gestrichelt/Punkte/Strich-Punkt entfallen
- * hier bewusst — die Linienarten kommen einheitlich aus dem Linienwerkzeug
- * (StrokeEffectsSettings).
- */
-const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
-  { value: "solid", label: "Linie" },
-  { value: "pencil", label: "Bleistift" },
-  { value: "brush", label: "Pinsel" },
-  { value: "marker", label: "Marker" },
-  { value: "calligraphy", label: "Kalligrafie" },
-  { value: "crayon", label: "Wachsmal" },
-  { value: "chalk", label: "Kreide" },
-  { value: "spray", label: "Sprühdose" },
-  { value: "image", label: "Bild-Stempel" },
-];
+type FreeStyle = "solid" | "image";
 
 
 interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; projectId?: string;
