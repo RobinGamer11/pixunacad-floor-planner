@@ -2484,9 +2484,13 @@ export class SelectTool {
     const tryLoop = (hatch: any, pts: Vec2[], holeIndex: number | null) => {
       const n = pts.length;
       if (n < 2) return;
-      for (let i = 0; i < n; i++) {
+      // Offene Polygone: keine Kante letzter → erster Punkt (nur Außenkontur).
+      const openOuter = holeIndex == null && hatch?.closed === false;
+      const edgeCount = openOuter ? n - 1 : n;
+      for (let i = 0; i < edgeCount; i++) {
         const a = pts[i];
         const b = pts[(i + 1) % n];
+
         const bArr = holeIndex == null ? hatch.bulges : (hatch.holeBulges || [])[holeIndex];
         const proj = projectPointToCurvedEdge(mouseW, a, b, (Array.isArray(bArr) ? bArr[i] : 0) || 0);
         if (proj.t <= Defaults.splitEpsT || proj.t >= 1 - Defaults.splitEpsT) continue;
