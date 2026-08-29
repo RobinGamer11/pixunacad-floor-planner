@@ -1911,7 +1911,17 @@ export class Renderer {
     if (!Number.isFinite(minX)) return;
     const zero = cam.worldToScreen(0, 0);
     const pxPerMeter = Math.abs(cam.worldToScreen(1, 0).x - zero.x) || 1;
-    const origin = cam.worldToScreen(hatch.patternOffsetX ?? 0, hatch.patternOffsetY ?? 0);
+    // Objektbezogener, deterministischer Musteranker: erster Punkt der
+    // gespeicherten Originalkontur (bzw. persistenter patternOrigin).
+    // Dadurch bleibt die Musterphase beim Scrollen/Zoomen/Neuaufbau stabil und
+    // wandert beim Verschieben exakt mit der Schraffur mit.
+    const anchor = (hatch.patternOrigin && Number.isFinite(hatch.patternOrigin.x))
+      ? hatch.patternOrigin
+      : hatch.points[0];
+    const origin = cam.worldToScreen(
+      anchor.x + (hatch.patternOffsetX ?? 0),
+      anchor.y + (hatch.patternOffsetY ?? 0),
+    );
     ctx.save();
     ctx.clip("evenodd");
     fillWithHatchPattern(
