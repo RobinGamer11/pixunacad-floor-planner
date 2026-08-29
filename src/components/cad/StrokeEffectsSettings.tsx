@@ -133,6 +133,16 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
     commit();
   };
 
+  // Zusammenhängende Reglerbewegung = genau ein Undo-Schritt.
+  const dragStart = () => { if (app) (app as any).suspendHistory = true; };
+  const dragEnd = () => {
+    if (!app) return;
+    (app as any).suspendHistory = false;
+    try { (app as any).commitHistorySnapshot?.(); } catch { /* noop */ }
+    commit();
+  };
+
+
   return (
     <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
       <div>
