@@ -1558,12 +1558,17 @@ export default function ProjectWorkspace() {
               setLineToolFlyoutOpen(false);
               setHatchToolFlyoutOpen(false);
               if (activeTool !== null) {
+                // Vom Objektwerkzeug kommend: Filter bleibt zunächst erhalten.
                 setActiveTool(null);
                 setSelectToolFlyoutOpen(true);
+              } else if (selectionFilterToolRef.current) {
+                // Bereits aktives Auswahlwerkzeug + Filter → nur Filter aufheben.
+                clearSelectionFilterTool();
               } else {
                 setSelectToolFlyoutOpen((open) => !open);
               }
             }}
+
           />
           {selectToolFlyoutOpen && (
             <div
