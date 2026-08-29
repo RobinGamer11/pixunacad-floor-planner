@@ -192,7 +192,23 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
 
+    case "waermedaemmung": {
+      // Fallback-Kachel (z. B. Schraffurwerkzeug). In Wänden wird das Muster
+      // wandgebunden als exakte Vektorgeometrie erzeugt (siehe Renderer).
+      const r = s * 0.45;
+      for (let i = -1; i <= 2; i++) {
+        const cx = i * s;
+        ctx.beginPath();
+        ctx.arc(cx, r, r, Math.PI, 0);
+        ctx.lineTo(cx + s * 0.5 - r, s - r);
+        ctx.arc(cx + s * 0.5, s - r, r, Math.PI, 0, true);
+        ctx.lineTo(cx + s, r);
+        ctx.stroke();
+      }
+      break;
+    }
     case "daemmung_hart": {
+
       // Harte Dämmung: Zickzacklinien
       const rows = 3;
       const zig = s / 6;
