@@ -48,6 +48,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
   const [angleDeg, setAngleDeg] = useState(0);
   const [skewDeg, setSkewDeg] = useState(0);
   const [, force] = useState(0);
+  const patternOptions = useHatchPatternOptions();
 
   const sync = () => {
     if (!app) return;
