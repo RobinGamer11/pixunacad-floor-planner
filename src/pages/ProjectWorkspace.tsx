@@ -3051,6 +3051,29 @@ function PageCanvas({
     return sel?.kind === "table" && tableEditCtxCanvas?.editId !== selectedElementId;
   })();
 
+  // NUR für Tabellen: Ein Klick irgendwo außerhalb der ausgewählten Tabelle
+  // (freie Blattfläche, CAD-Ebene, anderes Objekt) hebt die Tabellenauswahl
+  // sofort auf. Ausgenommen sind die Tabelle selbst, ihre HUB-/Griff-Elemente
+  // und das Tabellen-Einstellungsfenster. Das Auswahlverhalten aller anderen
+  // Werkzeuge bleibt unverändert.
+  React.useEffect(() => {
+    if (!selectedIsTableObject || !selectedElementId) return;
+    const onDown = (ev: PointerEvent) => {
+      if (ev.button !== 0) return;
+      const t = ev.target as Node | null;
+      const el = t instanceof Element ? t : (t?.parentElement ?? null);
+      if (!el) return;
+      if (el.closest(`[data-marquee-id="${CSS.escape(selectedElementId)}"]`)) return;
+      if (el.closest("[data-table-settings]")) return;
+      if (el.closest("[data-hub-control]")) return;
+      onSelect(undefined);
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  }, [selectedIsTableObject, selectedElementId, onSelect]);
+
+
+
   const handlePagePointerDown = (e: React.PointerEvent) => {
     if (e.target !== e.currentTarget) return;
     if (e.button !== 0) {
