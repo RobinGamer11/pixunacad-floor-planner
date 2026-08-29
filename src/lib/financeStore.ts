@@ -273,7 +273,7 @@ export function actionTotals(state: FinanceState, node: FinanceNode): FinanceTot
   };
 }
 
-/** Summiert eine beliebige Positionsliste (z. B. nur archivierte oder nur angelegte Belege). */
+/** Summiert eine beliebige Positionsliste (z. B. nur erhaltene oder nur angelegte Belege). */
 export function positionTotals(positions: FinancePosition[], estimate = 0): FinanceTotals {
   let offers = 0, invoicesBase = 0, supplements = 0;
   for (const p of positions) {

@@ -10,7 +10,7 @@ interface Props {
   projectId: string;
   nodeId: string;
   positions: FinancePosition[];
-  /** Abweichender Tabellenhintergrund (archiviert vs. angelegt). */
+  /** Abweichender Tabellenhintergrund (erhalten vs. angelegt). */
   background?: string;
   /** Text im leeren Zustand. */
   emptyHint?: string;

@@ -11,7 +11,7 @@ interface Props {
   /** Positionen für die aufklappbare Rechnungsübersicht (optional). */
   invoiceDetails?: FinancePosition[];
   subtitle?: string;
-  /** Kostenschätzung ausblenden (z. B. Teilübersichten archiviert/angelegt). */
+  /** Kostenschätzung ausblenden (z. B. Teilübersichten erhalten/angelegt). */
   hideEstimate?: boolean;
   /** Kartentitel (Standard: „Gesamt"). */
   title?: string;
