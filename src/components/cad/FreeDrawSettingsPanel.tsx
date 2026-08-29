@@ -465,10 +465,10 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
             className="w-full" />
         </label>
 
-        {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
+        {style === "blob" && (
           <label className="block text-xs">
             <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              {style === "blob" ? `Klecks-Abstand (${units})` : `Linienskalierung (${units})`}: {units === "m" ? gap.toFixed(2) : (gap * 100).toFixed(1)}
+              Klecks-Abstand ({units}): {units === "m" ? gap.toFixed(2) : (gap * 100).toFixed(1)}
             </span>
             <input type="range"
               min={units === "m" ? 0.1 : 0.001}
@@ -483,6 +483,9 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               className="w-full" />
           </label>
         )}
+
+        <StrokeEffectsSettings app={app} kind="free" />
+
 
 
 
