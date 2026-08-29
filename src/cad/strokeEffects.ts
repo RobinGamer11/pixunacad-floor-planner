@@ -209,24 +209,29 @@ export function roughenPolyline(
   opts: RoughenOptions = {},
 ): Vec2[] {
   if (!params?.enabled || !pts || pts.length < 2) return pts;
-  const strengthM = params.strengthMm / 1000;
+  const scale = Math.min(3, Math.max(0.1, (params.scalePercent ?? 100) / 100));
+  const strengthM = (params.strengthMm / 1000) * scale;
   if (strengthM <= 0) return pts;
 
   const total = polylineLength(pts, closed);
   if (total <= 1e-6) return pts;
 
-  const stepM = Math.max(total / MAX_ROUGHEN_SAMPLES, 0.1 / Math.max(0.1, params.detailPer100Mm));
+  const stepM = Math.max(total / MAX_ROUGHEN_SAMPLES, (0.1 / Math.max(0.1, params.detailPer100Mm)) * scale);
   const count = Math.max(closed ? 4 : 2, Math.round(total / stepM));
   const step = total / count;
   const phase = opts.phaseM || 0;
 
+  // Der Cache speichert abgeleitete ABSOLUTE Weltpunkte. Der Schlüssel MUSS
+  // deshalb die vollständige aktuelle Originalgeometrie abbilden — sonst bleibt
+  // die sichtbare Kontur beim Verschieben/Drehen/Punktbearbeiten stehen.
   const cacheKey = opts.cacheKey
-    ? `${opts.cacheKey}|${closed}|${params.strengthMm}|${params.detailPer100Mm}|${params.mode}|${params.seed}|${phase.toFixed(4)}|${total.toFixed(4)}|${pts.length}`
+    ? `${opts.cacheKey}|${geometrySignature(pts)}|${closed}|${params.strengthMm}|${params.detailPer100Mm}|${params.mode}|${params.seed}|${params.scalePercent ?? 100}|${phase.toFixed(4)}|${total.toFixed(4)}|${pts.length}`
     : null;
   if (cacheKey) {
     const hit = roughenCache.get(cacheKey);
     if (hit) return hit.pts;
   }
+
 
   // Kumulierte Längen der Originalpolylinie.
   const cum: number[] = [0];
