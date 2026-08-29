@@ -571,12 +571,16 @@ export function fillWithHatchPattern(
   const tile = getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
   if (!pat) return;
+  // Bildkacheln können in Originalauflösung vorliegen → auf Kachelbreite normieren.
+  const kx = tilePx / Math.max(1, tile.width);
+  const ky = tilePx / Math.max(1, tile.width);
   try {
     const m = new DOMMatrix()
       .translateSelf(originScreen.x, originScreen.y)
       .rotateSelf(opt.angleDeg || 0)
-      .scaleSelf(k * stretch, k)
+      .scaleSelf(kx * stretch, ky)
       .skewXSelf(Math.max(-70, Math.min(70, opt.skewDeg || 0)));
+
     (pat as any).setTransform?.(m);
   } catch { /* ältere Engine: ohne Transform zeichnen */ }
 
