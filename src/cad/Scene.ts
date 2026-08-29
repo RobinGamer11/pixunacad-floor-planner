@@ -1456,7 +1456,8 @@ export class Scene {
     strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     holes?: Vec2[][];
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number; patternRotateWithShape?: boolean;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
+    patternOrigin?: { x: number; y: number } | null; patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
   } & StrokeEffectsInit = {}) {
     const hatch = new Hatch({
@@ -1469,7 +1470,7 @@ export class Scene {
       patternEnabled: style.patternEnabled, patternId: style.patternId,
       patternScale: style.patternScale, patternAngleDeg: style.patternAngleDeg,
       patternSkewDeg: style.patternSkewDeg, patternStretch: style.patternStretch, patternOffsetX: style.patternOffsetX, patternOffsetY: style.patternOffsetY,
-      patternRotateWithShape: style.patternRotateWithShape,
+      patternOrigin: style.patternOrigin, patternRotateWithShape: style.patternRotateWithShape,
     });
 
     hatch._stickerEditOwnerId = this._currentEditOwnerId;
