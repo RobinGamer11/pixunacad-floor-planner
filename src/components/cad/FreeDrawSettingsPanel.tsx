@@ -79,8 +79,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       setColor(stroke.color);
       setThickness(stroke.thicknessM);
       setOpacity(stroke.opacity);
-      setStyle(stroke.lineStyle as LineStyle);
-      setGap(stroke.gapM);
       setImageSrc(stroke.imageSrc);
       setImgSize(stroke.imageSizeM);
       setImgSpacing(stroke.imageSpacingM);
@@ -91,8 +89,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       setColor(app.defaultFreeColor);
       setThickness(app.defaultFreeThicknessM);
       setOpacity(app.defaultFreeOpacity);
-      setStyle(app.defaultFreeLineStyle);
-      setGap(app.defaultFreeGapM);
       setImageSrc(app.defaultFreeImageSrc);
       setImgSize(app.defaultFreeImageSizeM);
       setImgSpacing(app.defaultFreeImageSpacingM);
