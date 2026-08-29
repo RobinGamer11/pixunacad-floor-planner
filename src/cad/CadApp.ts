@@ -41,6 +41,7 @@ import { PlanController } from "./PlanController";
 import { drawProjection as drawPlanProjection } from "./PlanProjections";
 import { SheetPanel } from "./SheetPanel";
 import { mirrorProxy } from "./multiEdit";
+import { setStrokeAutoShape } from "./freeAutoShape";
 import { asObjectToolId, type ObjectToolId } from "./selectionTools";
 import { restoreOneScene } from "./sceneSerde";
 
@@ -1276,6 +1277,21 @@ export class CadApp {
   getSelectedFreeStroke() {
     if (!this.selection || this.selection.type !== SelectionType.FREE_STROKE) return null;
     return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
+  }
+
+  /** Auto-Form nachträglich auf alle ausgewählten Freihandlinien anwenden/lösen. */
+  setSelectedFreeAutoShape(on: boolean): boolean {
+    const targets = new Set<any>();
+    const primary = this.getSelectedFreeStroke();
+    if (primary) targets.add(primary);
+    for (const id of this._multiSelectedIds("freeStroke")) {
+      const s = this.scene.getFreeStrokeById(id);
+      if (s) targets.add(s);
+    }
+    let changed = false;
+    for (const s of targets) if (setStrokeAutoShape(s, on)) changed = true;
+    if (changed) { this.requestRender?.(); this.commitHistorySnapshot?.(); }
+    return changed;
   }
 
   /* ===== Sticker Edit Mode ("Ghost Scene") ===== */
