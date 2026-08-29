@@ -115,7 +115,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
     if (!app || units !== "m") return;
     if ((app.defaultFreeGapM ?? 0) < 0.1) {
       app.defaultFreeGapM = 1;
-      setGap(1);
     }
   }, [app, units]);
 
