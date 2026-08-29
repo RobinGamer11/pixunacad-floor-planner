@@ -2,6 +2,7 @@ import { Defaults } from "./constants";
 import { Vec2, v, clamp, lerp, splitBulgedEdge, arcFromBulge, projectPointToCurvedEdge } from "./geometry";
 import { WallTopologyGraph } from "./WallTopologyGraph";
 import { offsetPolyline } from "./wallGeom";
+import { normalizeWallPatternId } from "./hatchPatterns";
 import {
   DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, makeAppearanceSeed,
   normalizeRoughen, normalizeStrokePattern, patternFromLegacyFreeStyle,
