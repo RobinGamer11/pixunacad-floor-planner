@@ -137,9 +137,25 @@ export function seededUnit(seed: number, index: number): number {
 
 // ---------------------------------------------------------------- Roughen-Pfad
 
+/**
+ * Vollständige Geometriesignatur ALLER Punkte (0,01 mm genau). Ändert sich bei
+ * Verschieben, Drehen, Skalieren, Punkt-/Kantenbearbeitung, Bulge-Änderung,
+ * Radieren, Teilen, Einfügen und Undo/Redo — und macht damit den Cache
+ * zuverlässig ungültig.
+ */
+export function geometrySignature(pts: Vec2[]): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < pts.length; i++) {
+    h = hash32(h, Math.round(pts[i].x * 100000));
+    h = hash32(h, Math.round(pts[i].y * 100000));
+  }
+  return h >>> 0;
+}
+
 interface RoughenCacheEntry { key: string; pts: Vec2[] }
 const roughenCache = new Map<string, RoughenCacheEntry>();
 const MAX_ROUGHEN_SAMPLES = 4000;
+
 
 function polylineLength(pts: Vec2[], closed: boolean): number {
   let L = 0;
