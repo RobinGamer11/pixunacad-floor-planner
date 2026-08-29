@@ -58,8 +58,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   const [color, setColor] = useState("#111111");
   const [thickness, setThickness] = useState(0.03);
   const [opacity, setOpacity] = useState(1);
-  const [style, setStyle] = useState<LineStyle>("solid");
-  const [gap, setGap] = useState(0.08);
   const [hasRuler, setHasRuler] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imgSize, setImgSize] = useState(0.18);
