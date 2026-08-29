@@ -163,17 +163,20 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
           ))}
         </div>
         {pattern.kind !== "solid" && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <NumField
+          <div className="mt-2 space-y-2">
+            <SliderField
               label="Strichlänge" unit="mm" value={pattern.dashLengthMm} step={0.5} min={0.1} max={200}
               onChange={(v) => applyPattern({ dashLengthMm: v })}
+              onDragStart={dragStart} onDragEnd={dragEnd}
             />
-            <NumField
+            <SliderField
               label="Abstand" unit="mm" value={pattern.gapLengthMm} step={0.5} min={0.1} max={200}
               onChange={(v) => applyPattern({ gapLengthMm: v })}
+              onDragStart={dragStart} onDragEnd={dragEnd}
             />
           </div>
         )}
+
       </div>
 
       <div>
