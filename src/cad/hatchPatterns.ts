@@ -272,7 +272,7 @@ function drawTile(ctx: CanvasRenderingContext2D, id: BuiltinHatchPatternId, s: n
         const pts: [number, number][] = [];
         for (let i = 0; i < corners; i++) {
           const a = (i / corners) * Math.PI * 2 + (r() - 0.5) * 0.35;
-          const k = 0.82 + r() * 0.36;
+          const k = 0.88 + r() * 0.24;
           pts.push([cx + Math.cos(a) * rx * k, cy + Math.sin(a) * ry * k]);
         }
         ctx.beginPath();
@@ -285,8 +285,8 @@ function drawTile(ctx: CanvasRenderingContext2D, id: BuiltinHatchPatternId, s: n
         for (let j = 0; j < n; j++) {
           const cx = (i + 0.5 + (rand() - 0.5) * 0.22) * cell;
           const cy = (j + 0.5 + (rand() - 0.5) * 0.22) * cell;
-          const rx = cell * (0.50 + rand() * 0.10);
-          const ry = cell * (0.44 + rand() * 0.12);
+          const rx = cell * (0.40 + rand() * 0.07);
+          const ry = cell * (0.37 + rand() * 0.08);
           for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
             stone(cx + dx, cy + dy, rx, ry, i * 131 + j * 17 + 3);
           }
