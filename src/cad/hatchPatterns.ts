@@ -65,6 +65,11 @@ export function patternBaseAngleDeg(id: string | undefined | null): number {
   return id === "xps" ? 45 : 0;
 }
 
+/** Muster, die in Wänden immer der Wandachse folgen (unabhängig von der Option). */
+export function patternAlwaysFollowsWall(id: string | undefined | null): boolean {
+  return id === "xps" || id === "abdichtung";
+}
+
 /** Muster, die im Wandrenderer als wandgebundene Vektorgeometrie entstehen. */
 export function isWallBoundPattern(id: string | undefined | null): boolean {
   return id === "waermedaemmung";
