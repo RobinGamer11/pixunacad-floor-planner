@@ -44,11 +44,10 @@ export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
 export const WALL_PATTERNS: { id: HatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
   { id: "stahlbeton", label: "Stahlbeton" },
-  { id: "ziegelverband", label: "Ziegelverband" },
   { id: "holz", label: "Holz" },
   { id: "waermedaemmung", label: "Wärmedämmung" },
-  { id: "daemmung_hart", label: "Füllung" },
   { id: "xps", label: "XPS-Dämmung" },
+  { id: "abdichtung", label: "Abdichtung" },
 ];
 
 /**
