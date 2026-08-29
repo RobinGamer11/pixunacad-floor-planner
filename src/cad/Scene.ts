@@ -1079,6 +1079,8 @@ export class Scene {
     gapM?: number; blobSpacingM?: number; blobSizeM?: number; smoothing?: boolean; labelId?: string;
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
     sourceStartDistanceM?: number; sourceStrokeId?: string | null;
+    autoShape?: boolean; autoShapeSource?: Vec2[] | null;
+
   } & StrokeEffectsInit = {}) {
     const stroke = new FreeStroke({ id: this._makeId(), points, ...style });
 
