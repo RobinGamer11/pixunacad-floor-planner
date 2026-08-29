@@ -1340,6 +1340,9 @@ export class CadApp {
             referenceSide: it.referenceSide as any,
             corners: it.corners, color: it.color, fillColor: it.fillColor,
             priority: it.priority, labelId: it.labelId,
+            patternId: (it as any).patternId, patternScale: (it as any).patternScale,
+            patternAlignToWall: (it as any).patternAlignToWall,
+            patternAngleDeg: (it as any).patternAngleDeg ?? 0,
           });
         } else if (it.kind === "textbox") {
           this.scene.createTextBox(it.center, it.widthM, it.heightM, { ...(it.style || {}), labelId: it.labelId }, it.html || "", it.rotationRad || 0);
