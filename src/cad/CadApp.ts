@@ -1290,7 +1290,7 @@ export class CadApp {
     }
     let changed = false;
     for (const s of targets) if (setStrokeAutoShape(s, on)) changed = true;
-    if (changed) { this.requestRender?.(); this.commitHistorySnapshot?.(); }
+    if (changed) { (this as any).requestRender?.(); this.commitHistorySnapshot?.(); }
     return changed;
   }
 
