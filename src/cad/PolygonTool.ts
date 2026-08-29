@@ -37,10 +37,29 @@ export class PolygonTool extends HatchTool {
         : ("polygon" as HatchDrawMode));
   }
 
+  /**
+   * Freie Polygone sind offene Punktketten: keine automatische Kante vom
+   * letzten zum ersten Punkt, gültig bereits ab zwei Punkten.
+   */
+  protected override _polygonMinPoints(): number {
+    return this.drawMode === "polygon" ? 2 : 3;
+  }
+
+  protected override _polygonAutoCloses(): boolean {
+    return this.drawMode !== "polygon";
+  }
+
   /** Erzeugt aus der fertigen Kontur ein einzelnes Polygonobjekt. */
-  protected override _createShapeFromPoints(points: Vec2[]) {
+  protected override _createShapeFromPoints(points: Vec2[], closed = true) {
     const style = (this.app as any).getCurrentPolygonStyle?.() ?? {};
-    const poly = (this.app as any).scene.createPolygon(points, { ...style, ...((this.app as any).getStrokeEffectDefaults?.("polygon") ?? {}) });
+    const shapeMode: PolygonDrawMode =
+      this.drawMode === "rectangle" || this.drawMode === "circle" ? this.drawMode : "polygon";
+    const poly = (this.app as any).scene.createPolygon(points, {
+      ...style,
+      ...((this.app as any).getStrokeEffectDefaults?.("polygon") ?? {}),
+      shapeMode,
+      closed: shapeMode === "polygon" ? closed : true,
+    });
     maybeRasterize(this.app, { type: "hatch", obj: poly });
     (this.app as any).notifyPolygonCreated?.(poly);
   }
