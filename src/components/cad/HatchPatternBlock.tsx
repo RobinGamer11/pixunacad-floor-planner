@@ -52,6 +52,13 @@ interface Props {
   app: any | null;
   /** Basis-Skalierung des Musters für diese Oberfläche (CAD größer als Mappe). */
   scaleMax?: number;
+  /**
+   * Umrechnung UI-Wert → gespeicherter Weltwert. In der Projektmappe ist die
+   * Weltgröße einer Seite deutlich kleiner als im CAD, deshalb wird dort ein
+   * kleinerer Faktor übergeben, damit die Regler denselben Zahlenbereich
+   * (z. B. 60 / 250) mit passender Musterwirkung abbilden.
+   */
+  scaleUnit?: number;
 }
 
 /**
@@ -60,7 +67,7 @@ interface Props {
  * nicht aktiviert ist. Zusätzlich lässt sich das Muster innerhalb der
  * Schraffur verschieben (Move-Modus, Bestätigung per Häkchen → Undo/Redo).
  */
-export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
+export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600, scaleUnit = 1 }) => {
   const [enabled, setEnabled] = useState(false);
   const [patternId, setPatternId] = useState("mauerwerk");
   const [scale, setScale] = useState(1);
@@ -73,13 +80,17 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
   const dragRef = useRef<{ wx: number; wy: number; ox: number; oy: number } | null>(null);
   const patternOptions = useHatchPatternOptions();
   useEffect(() => onPatternsChanged(() => { app?.renderer?.render?.(); app?.requestRender?.(); }), [app]);
+  /** UI-Wert ⇄ gespeicherter Weltwert. */
+  const toWorld = (uiValue: number) => uiValue * scaleUnit;
+  const toUi = (worldValue: number) => worldValue / (scaleUnit || 1);
+
   const selectPattern = (val: string) => {
     setPatternId(val);
     const ds = defaultPatternScale(val);
     setScale(ds);
     apply(
-      (h) => { h.patternId = val; h.patternScale = ds; },
-      () => { app.defaultHatchPatternId = val; app.defaultHatchPatternScale = ds; },
+      (h) => { h.patternId = val; h.patternScale = toWorld(ds); },
+      () => { app.defaultHatchPatternId = val; app.defaultHatchPatternScale = toWorld(ds); },
     );
   };
 
@@ -97,7 +108,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
     };
     setEnabled(!!src.patternEnabled);
     setPatternId(src.patternId || "mauerwerk");
-    setScale(src.patternScale ?? 60);
+    setScale(toUi(src.patternScale ?? toWorld(60)));
     setStretch(src.patternStretch ?? 1);
     setAngleDeg(src.patternAngleDeg ?? 0);
     setSkewDeg(src.patternSkewDeg ?? 0);
@@ -213,7 +224,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600 }) => {
 
       <SliderRow
         label="Skalierung" min={0.05} max={scaleMax} step={0.01} decimals={2} value={scale} disabled={!enabled}
-        onChange={(val) => { setScale(val); apply((h) => { h.patternScale = val; }, () => { app.defaultHatchPatternScale = val; }); }}
+        onChange={(val) => { setScale(val); apply((h) => { h.patternScale = toWorld(val); }, () => { app.defaultHatchPatternScale = toWorld(val); }); }}
       />
       <SliderRow
         label="Streckung" min={0.1} max={10} step={0.01} decimals={2} value={stretch} disabled={!enabled}

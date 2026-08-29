@@ -162,7 +162,7 @@ export class Hatch {
     this.labelId = labelId || Defaults.defaultLabelId;
     this.patternEnabled = !!patternEnabled;
     this.patternId = patternId || "mauerwerk";
-    this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 2000) : 60;
+    this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.001, 2000) : 60;
     this.patternAngleDeg = Number.isFinite(patternAngleDeg) ? patternAngleDeg! : 0;
     this.patternSkewDeg = Number.isFinite(patternSkewDeg) ? clamp(patternSkewDeg!, -70, 70) : 0;
     this.patternStretch = Number.isFinite(patternStretch) ? clamp(patternStretch!, 0.1, 10) : 1;
