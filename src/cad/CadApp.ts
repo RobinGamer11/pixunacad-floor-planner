@@ -1275,6 +1275,18 @@ export class CadApp {
     return this.scene.getWallById(wallId);
   }
 
+  /** Alle ausgewählten Wände (führende Auswahl + Mehrfachauswahl). */
+  getSelectedWalls(): any[] {
+    const out: any[] = [];
+    const primary = this.getSelectedWall();
+    if (primary) out.push(primary);
+    for (const id of this._multiSelectedIds("wall")) {
+      const w = this.scene.getWallById(id);
+      if (w && !out.includes(w)) out.push(w);
+    }
+    return out;
+  }
+
   getSelectedFreeStroke() {
     if (!this.selection || this.selection.type !== SelectionType.FREE_STROKE) return null;
     return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
