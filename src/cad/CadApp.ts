@@ -213,6 +213,7 @@ export class CadApp {
   defaultHatchPatternScale = 60;
   defaultHatchPatternAngleDeg = 0;
   defaultHatchPatternSkewDeg = 0;
+  defaultHatchPatternRotateWithShape = true;
   defaultHatchPatternStretch = 1;
   defaultAreaShow = Defaults.areaShow;
   defaultAreaBorderEnabled = Defaults.areaBorderEnabled;
@@ -1786,7 +1787,7 @@ export class CadApp {
       patternId: this.defaultHatchPatternId,
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
-      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0, patternRotateWithShape: this.defaultHatchPatternRotateWithShape,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,

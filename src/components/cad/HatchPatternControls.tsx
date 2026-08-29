@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Check, Grid2X2 } from "lucide-react";
 import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
 import { onPatternsChanged } from "@/cad/customHatchPatterns";
+import { defaultPatternScale } from "@/cad/hatchPatterns";
 
 /** Regler + Zahlenfeld: grob per Slider, fein per Eingabe/Pfeiltasten. */
 const SliderRow: React.FC<{
@@ -89,6 +90,16 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
     force((x) => x + 1);
   };
 
+  const selectPattern = (val: string) => {
+    setPatternId(val);
+    const ds = defaultPatternScale(val);
+    setScale(ds);
+    apply(
+      (h) => { h.patternId = val; h.patternScale = ds; },
+      () => { app.defaultHatchPatternId = val; app.defaultHatchPatternScale = ds; },
+    );
+  };
+
   if (!app) return null;
 
   return (
@@ -120,11 +131,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
         <div className="space-y-2">
           <select
             value={patternId}
-            onChange={(e) => {
-              const val = e.target.value;
-              setPatternId(val);
-              apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
-            }}
+            onChange={(e) => selectPattern(e.target.value)}
             className="cad-settings-select w-full"
           >
             {patternOptions.map((p) => (
@@ -135,10 +142,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
           <HatchPatternManage
             patternId={patternId}
             borderColor="hsl(var(--border))"
-            onSelect={(val) => {
-              setPatternId(val);
-              apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
-            }}
+            onSelect={selectPattern}
           />
 
 

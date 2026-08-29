@@ -250,6 +250,7 @@ export class MiniCad {
   defaultHatchPatternScale: number = 60;
   defaultHatchPatternAngleDeg: number = 0;
   defaultHatchPatternSkewDeg: number = 0;
+  defaultHatchPatternRotateWithShape: boolean = true;
   defaultHatchPatternStretch: number = 1;
   defaultAreaShow: boolean = Defaults.areaShow;
 
@@ -2272,7 +2273,7 @@ export class MiniCad {
       patternId: this.defaultHatchPatternId,
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
-      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0,
+      patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0, patternRotateWithShape: this.defaultHatchPatternRotateWithShape,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
