@@ -185,10 +185,19 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
         className={`w-full rounded border bg-transparent px-1.5 py-1 text-[11px] ${enabled ? "" : "opacity-50"}`}
         style={{ borderColor: hairline }}
       >
-        {HATCH_PATTERNS.map((p) => (
+        {patternOptions.map((p) => (
           <option key={p.id} value={p.id}>{p.label}</option>
         ))}
       </select>
+
+      <HatchPatternManage
+        patternId={patternId}
+        disabled={!enabled}
+        borderColor={hairline}
+        onSelect={selectPattern}
+      />
+
+
 
       <SliderRow
         label="Skalierung" min={0.05} max={scaleMax} step={0.01} decimals={2} value={scale} disabled={!enabled}
