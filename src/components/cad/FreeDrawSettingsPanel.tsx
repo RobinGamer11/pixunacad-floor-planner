@@ -3,14 +3,17 @@ import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
+import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 
 type LineStyle = "solid" | "dashed" | "dotted" | "dashdot" | "blob" | "image" | "pencil" | "marker" | "brush" | "spray" | "calligraphy" | "ink" | "crayon" | "chalk";
 
+/**
+ * Stiloptionen des Freihandstifts. Gestrichelt/Punkte/Strich-Punkt entfallen
+ * hier bewusst — die Linienarten kommen einheitlich aus dem Linienwerkzeug
+ * (StrokeEffectsSettings).
+ */
 const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "solid", label: "Linie" },
-  { value: "dashed", label: "Gestrichelt" },
-  { value: "dashdot", label: "Punkt-Strich" },
-  { value: "dotted", label: "Punkte" },
   { value: "pencil", label: "Bleistift" },
   { value: "brush", label: "Pinsel" },
   { value: "marker", label: "Marker" },
@@ -18,9 +21,9 @@ const STYLE_OPTIONS: { value: LineStyle; label: string }[] = [
   { value: "crayon", label: "Wachsmal" },
   { value: "chalk", label: "Kreide" },
   { value: "spray", label: "Sprühdose" },
-  
   { value: "image", label: "Bild-Stempel" },
 ];
+
 
 interface Props { app: CadApp | MiniCad | null; units?: "cm" | "m"; projectId?: string;
   /** Bildschirm-Pixel pro Papiermillimeter (Projektmappe). */
@@ -257,7 +260,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         {sheetMode ? (
           <>
             <label className="block text-xs">
-              <span className="block mb-1 text-muted-foreground">Linienart</span>
+              <span className="block mb-1 text-muted-foreground">Stift-Stil</span>
               <select value={style}
                 onChange={(e) => {
                   const v = e.target.value as LineStyle; setStyle(v);
@@ -334,10 +337,10 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               </label>
             </div>
 
-            {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
+            {style === "blob" && (
               <label className="block text-xs">
                 <span className="block mb-1 text-muted-foreground">
-                  {style === "blob" ? "Klecks-Abstand" : "Linienskalierung"}: {(gap * 1000).toFixed(1)} mm
+                  Klecks-Abstand: {(gap * 1000).toFixed(1)} mm
                 </span>
                 <input type="range" min={0.001} max={0.02} step={0.0005} value={gap}
                   onChange={(e) => {
@@ -348,6 +351,9 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
                   className="w-full" />
               </label>
             )}
+
+            <StrokeEffectsSettings app={app} kind="free" />
+
 
             <button type="button" onClick={onPickFile} className={framedBtn} style={framedStyle}>
               <span>Bild laden</span>
@@ -425,7 +431,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         </label>
 
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Linienart</span>
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stift-Stil</span>
           <select value={style}
             onChange={(e) => {
               const v = e.target.value as LineStyle; setStyle(v);
@@ -465,10 +471,10 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
             className="w-full" />
         </label>
 
-        {(style === "dashed" || style === "dotted" || style === "dashdot" || style === "blob") && (
+        {style === "blob" && (
           <label className="block text-xs">
             <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-              {style === "blob" ? `Klecks-Abstand (${units})` : `Linienskalierung (${units})`}: {units === "m" ? gap.toFixed(2) : (gap * 100).toFixed(1)}
+              Klecks-Abstand ({units}): {units === "m" ? gap.toFixed(2) : (gap * 100).toFixed(1)}
             </span>
             <input type="range"
               min={units === "m" ? 0.1 : 0.001}
@@ -483,6 +489,9 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               className="w-full" />
           </label>
         )}
+
+        <StrokeEffectsSettings app={app} kind="free" />
+
 
 
 
