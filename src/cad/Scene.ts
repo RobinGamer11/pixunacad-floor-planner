@@ -735,6 +735,9 @@ export class Wall {
   patternScale: number;
   /** Muster an Wandrichtung ausrichten (false = einheitliche Richtung bei allen Wänden). */
   patternAlignToWall: boolean;
+  /** Zusätzliche freie Muster-Drehung in Grad (-180..180). */
+  patternAngleDeg: number;
+
   /** Kantenwölbung je Bezugs-Segment (index-parallel zu corners[i] → corners[i+1]). */
   bulges: number[];
   _stickerEditOwnerId?: string | null;
