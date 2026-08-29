@@ -124,10 +124,20 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
             }}
             className="cad-settings-select w-full"
           >
-            {HATCH_PATTERNS.map((p) => (
+            {patternOptions.map((p) => (
               <option key={p.id} value={p.id}>{p.label}</option>
             ))}
           </select>
+
+          <HatchPatternManage
+            patternId={patternId}
+            borderColor="hsl(var(--border))"
+            onSelect={(val) => {
+              setPatternId(val);
+              apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
+            }}
+          />
+
 
           <SliderRow
             label="Skalierung" min={0.05} max={20} step={0.01} decimals={2} value={scale}
