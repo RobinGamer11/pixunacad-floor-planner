@@ -374,21 +374,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         </label>
 
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stift-Stil</span>
-          <select value={style}
-            onChange={(e) => {
-              const v = e.target.value as LineStyle; setStyle(v);
-              if (selectedStrokeId) applyToStroke((s) => { s.lineStyle = v; });
-              else app.defaultFreeLineStyle = v;
-            }}
-            className="w-full h-8 rounded border bg-background px-2 text-xs">
-            {STYLE_OPTIONS.map(o => (
-              <option key={o.value} value={o.value} disabled={o.value === "image" && !imageSrc}>{o.label}{o.value === "image" && !imageSrc ? " (Bild laden)" : ""}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block text-xs">
           <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{style === "image" ? `Stempel-Größe (cm): ${(thickness * 100).toFixed(1)}` : `Liniendicke (cm): ${(thickness * 100).toFixed(2)}`}</span>
           <input type="range"
             min={style === "image" ? 0.02 : 0.0005}
