@@ -69,6 +69,8 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   const [, force] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  const style: FreeStyle = imageSrc ? "image" : "solid";
+
   const syncFromState = () => {
     if (!app) return;
     const stroke = ((app as any).getEditFreeStroke?.() ?? app.getSelectedFreeStroke?.()) || null;
