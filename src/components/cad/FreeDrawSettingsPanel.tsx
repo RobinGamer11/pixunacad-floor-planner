@@ -114,7 +114,8 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       setLabelId(app.activeDrawLabelId);
     }
     setHasRuler(!!app.scene.rulerGuide);
-    setAutoShape(app.defaultFreeAutoShape);
+    // Bei Auswahl zeigt der Schalter den Zustand des Objekts, sonst den Standard.
+    setAutoShape(stroke ? (stroke as any).autoShape === true : app.defaultFreeAutoShape);
   };
 
   useEffect(() => {
@@ -141,6 +142,13 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   const applyToStroke = (mutate: (s: any) => void) => {
     const s = selectedStroke();
     if (s) { mutate(s); }
+  };
+
+  /** Auto-Form: bei Auswahl nachträglich auf die Objekte anwenden, sonst Standard. */
+  const toggleAutoShape = (on: boolean) => {
+    const applied = (app as any).setSelectedFreeAutoShape?.(on);
+    if (!applied) app.defaultFreeAutoShape = on;
+    force((n) => n + 1);
   };
 
   if (!app) return null;
@@ -363,7 +371,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
             )}
 
             <button type="button"
-              onClick={() => { const v = !autoShape; setAutoShape(v); app.defaultFreeAutoShape = v; }}
+              onClick={() => { const v = !autoShape; setAutoShape(v); toggleAutoShape(v); }}
               className={framedBtn} style={framedStyle}
               title="Beim Loslassen werden Geraden geradegezogen und Kreise zu echten Kreisen geformt.">
               <span>Auto-Form</span>
@@ -516,7 +524,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
           onClick={() => {
             const v = !autoShape;
             setAutoShape(v);
-            app.defaultFreeAutoShape = v;
+            toggleAutoShape(v);
           }}
           className="cad-toolbar-btn w-full justify-center h-9"
           style={autoShape ? { background: "hsl(var(--cad-toolbar-active))", color: "hsl(var(--cad-toolbar-active-foreground))" } : undefined}
