@@ -1136,6 +1136,11 @@
 .pixuna-canvas-dark
   [data-page-capture]
   .page-sheet
+  > *:not([data-raster-content]):not([data-canvas-self-dark]),
+.pixuna-canvas-dark
+  [data-page-capture]
+  .page-sheet
+  [data-ghost-overlay]
   > *:not([data-raster-content]):not([data-canvas-self-dark]) {
   filter: invert(1) hue-rotate(180deg) saturate(1.7) contrast(0.82) brightness(1.12);
 }
