@@ -662,9 +662,11 @@ export class MiniCad {
         const rings: any[] = [];
         if (Array.isArray(h?.points)) rings.push(h.points);
         if (Array.isArray(h?.holes)) for (const loop of h.holes) rings.push(loop);
+        const openPoly = h?.isPolygon === true && h?.closed === false;
         for (const ring of rings) {
           if (!Array.isArray(ring) || ring.length < 2) continue;
-          for (let i = 0; i < ring.length; i++) addSeg(ring[i], ring[(i + 1) % ring.length]);
+          const n = openPoly && ring === h.points ? ring.length - 1 : ring.length;
+          for (let i = 0; i < n; i++) addSeg(ring[i], ring[(i + 1) % ring.length]);
         }
       }
     }
