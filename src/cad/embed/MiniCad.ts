@@ -247,7 +247,8 @@ export class MiniCad {
   defaultHatchAutoSmooth: boolean = true;
   defaultHatchPatternEnabled: boolean = false;
   defaultHatchPatternId: string = "mauerwerk";
-  defaultHatchPatternScale: number = 60;
+  /** Mappe-Weltmaßstab: UI-Wert 60 entspricht hier 60 * 0.02 (siehe HatchPatternBlock). */
+  defaultHatchPatternScale: number = 1.2;
   defaultHatchPatternAngleDeg: number = 0;
   defaultHatchPatternSkewDeg: number = 0;
   defaultHatchPatternRotateWithShape: boolean = true;
