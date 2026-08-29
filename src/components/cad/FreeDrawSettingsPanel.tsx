@@ -232,21 +232,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
 
         {sheetMode ? (
           <>
-            <label className="block text-xs">
-              <span className="block mb-1 text-muted-foreground">Stift-Stil</span>
-              <select value={style}
-                onChange={(e) => {
-                  const v = e.target.value as LineStyle; setStyle(v);
-                  if (selectedStrokeId) applyToStroke((s) => { s.lineStyle = v; });
-                  else app.defaultFreeLineStyle = v;
-                }}
-                className="w-full h-8 rounded-md border bg-background px-2 text-xs" style={framedStyle}>
-                {STYLE_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value} disabled={o.value === "image" && !imageSrc}>{o.label}{o.value === "image" && !imageSrc ? " (Bild laden)" : ""}</option>
-                ))}
-              </select>
-            </label>
-
             <ToolColorPicker
               label="Farbe"
               value={color}
