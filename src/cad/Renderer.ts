@@ -1762,9 +1762,10 @@ export class Renderer {
   }
 
   /**
-   * Polygonobjekt — nur Kontur, keine Füllung, kein Muster, keine
-   * Flächenbeschriftung. Die Strichbreite ist physisch (Meter) und verhält
-   * sich damit exakt wie beim Linienwerkzeug.
+   * Polygonobjekt — dieselbe effektive Konturpipeline wie die Schraffur.
+   * Die Strichbreite ist physisch (Meter) und verhält sich damit exakt wie
+   * beim Linienwerkzeug. Eine aktive Füllung (fillAlphaPct > 0) wird mit
+   * exakt demselben aufgerauten geschlossenen Pfad gezeichnet.
    */
   private _drawSinglePolygon(poly: Hatch) {
     const ctx = this.ctx;
@@ -1776,13 +1777,31 @@ export class Renderer {
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    const pts = tessellateWithBulges(poly.points, (poly as any).bulges, true, 32);
+    const geom = getEffectiveContourGeometry(poly as any);
+    const pts = geom.outer;
     // Muster läuft über die gesamte geschlossene Kontur durch (kein Neustart je Kante).
     const strokeOpts = {
-      pattern: (poly as any).strokePattern, roughen: (poly as any).roughen,
+      pattern: (poly as any).strokePattern,
       pxPerM: cam.scale, lineWidthPx: strokePx,
-      cacheKey: `poly:${poly.id}:${pts.length}:${pts[0]?.x},${pts[0]?.y}`,
     };
+
+    const fillPct = (poly as any).fillAlphaPct ?? 0;
+    if (fillPct > 0) {
+      ctx.beginPath();
+      for (const ring of geom.rings) {
+        if (ring.length < 3) continue;
+        const s0 = cam.worldToScreen(ring[0].x, ring[0].y);
+        ctx.moveTo(s0.x, s0.y);
+        for (let i = 1; i < ring.length; i++) {
+          const sp = cam.worldToScreen(ring[i].x, ring[i].y);
+          ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.closePath();
+      }
+      ctx.fillStyle = rgbaFromHex((poly as any).fillColor, fillPct / 100);
+      ctx.fill("evenodd");
+    }
+
     ctx.strokeStyle = poly.strokeColor || Defaults.lineColor;
     ctx.lineWidth = strokePx;
     ctx.lineJoin = "round";
@@ -1801,6 +1820,7 @@ export class Renderer {
 
     ctx.restore();
   }
+
 
   private _drawSingleHatch(hatch: Hatch) {
     if (hatch.points.length < 3) return;
