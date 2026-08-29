@@ -45,6 +45,7 @@ import { ptToCssPx, textStyleFontSizePt, MM_PER_PT, CSS_PX_PER_PT } from "../tex
 import { dominantRichStyle } from "../textDominantStyle";
 import { autoSizeTextBox } from "../textAutoSize";
 import { isExportMode } from "@/lib/printExport";
+import { isCanvasDark } from "@/lib/theme";
 
 
 export interface MiniCadTextEditorDom {
