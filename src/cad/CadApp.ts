@@ -701,6 +701,7 @@ export class CadApp {
         patternId: w.patternId,
         patternScale: w.patternScale,
         patternAlignToWall: !!w.patternAlignToWall,
+        patternAngleDeg: (w as any).patternAngleDeg ?? 0,
         bulges: [...((w as any).bulges || [])],
         _stickerEditOwnerId: w._stickerEditOwnerId || null,
       })),
@@ -1274,6 +1275,18 @@ export class CadApp {
     return this.scene.getWallById(wallId);
   }
 
+  /** Alle ausgewählten Wände (führende Auswahl + Mehrfachauswahl). */
+  getSelectedWalls(): any[] {
+    const out: any[] = [];
+    const primary = this.getSelectedWall();
+    if (primary) out.push(primary);
+    for (const id of this._multiSelectedIds("wall")) {
+      const w = this.scene.getWallById(id);
+      if (w && !out.includes(w)) out.push(w);
+    }
+    return out;
+  }
+
   getSelectedFreeStroke() {
     if (!this.selection || this.selection.type !== SelectionType.FREE_STROKE) return null;
     return this.scene.getFreeStrokeById((this.selection as any).freeStrokeId);
@@ -1339,6 +1352,9 @@ export class CadApp {
             referenceSide: it.referenceSide as any,
             corners: it.corners, color: it.color, fillColor: it.fillColor,
             priority: it.priority, labelId: it.labelId,
+            patternId: (it as any).patternId, patternScale: (it as any).patternScale,
+            patternAlignToWall: (it as any).patternAlignToWall,
+            patternAngleDeg: (it as any).patternAngleDeg ?? 0,
           });
         } else if (it.kind === "textbox") {
           this.scene.createTextBox(it.center, it.widthM, it.heightM, { ...(it.style || {}), labelId: it.labelId }, it.html || "", it.rotationRad || 0);

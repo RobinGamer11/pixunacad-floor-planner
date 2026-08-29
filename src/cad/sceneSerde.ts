@@ -124,6 +124,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       patternId: w.patternId,
       patternScale: w.patternScale,
       patternAlignToWall: !!w.patternAlignToWall,
+      patternAngleDeg: Number.isFinite(w.patternAngleDeg) ? w.patternAngleDeg : 0,
       bulges: Array.isArray(w.bulges) ? w.bulges : undefined,
     });
     if (w.id) (wall as any).id = w.id;

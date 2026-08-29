@@ -2,14 +2,10 @@ import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { WallToolSettings } from "@/cad/WallTool";
 import { Defaults } from "@/cad/constants";
-import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
+import { WALL_PATTERNS, normalizeWallPatternId } from "@/cad/hatchPatterns";
 import { runWallTopologyMaintenance } from "@/cad/wallTopologyMaintenance";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
-/** Typische Wand-Baustoffe (Schraffur skaliert automatisch mit der Wanddicke). */
-const WALL_PATTERNS = HATCH_PATTERNS.filter(p =>
-  ["mauerwerk", "stahlbeton", "ziegelverband", "holz", "daemmung_hart", "daemmung_weich", "xps"].includes(p.id),
-);
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -124,6 +120,16 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
     else update({ patternScale: val } as any);
   };
 
+  const setPatternAngle = (val: number) => {
+    const deg = Math.max(-180, Math.min(180, Math.round(Number.isFinite(val) ? val : 0)));
+    const walls = app.getSelectedWalls?.() ?? (selectedWall ? [selectedWall] : []);
+    if (walls.length > 0) {
+      updateSelected(() => { for (const w of walls) (w as any).patternAngleDeg = deg; });
+    } else {
+      update({ patternAngleDeg: deg } as any);
+    }
+  };
+
   const setPatternAlign = (val: boolean) => {
     if (selectedWall) updateSelected(() => { (selectedWall as any).patternAlignToWall = val; });
     else update({ patternAlignToWall: val } as any);
@@ -143,8 +149,9 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
   const color = get("color") as string;
   const fillColor = get("fillColor") as string;
   const labelId = (get("labelId") as string) || Defaults.defaultLabelId;
-  const patternId = (selectedWall ? (selectedWall as any).patternId : (s as any).patternId) || "none";
+  const patternId = normalizeWallPatternId(selectedWall ? (selectedWall as any).patternId : (s as any).patternId);
   const patternScale = (selectedWall ? (selectedWall as any).patternScale : (s as any).patternScale) ?? 1;
+  const patternAngleDeg = (selectedWall ? (selectedWall as any).patternAngleDeg : (s as any).patternAngleDeg) ?? 0;
   const patternAlign = !!(selectedWall ? (selectedWall as any).patternAlignToWall : (s as any).patternAlignToWall);
   const thicknessValue = selectedWall
     ? selectedWall.thicknessM
@@ -249,6 +256,23 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
                 value={patternScale}
                 onChange={e => setPatternScale(parseFloat(e.target.value) || 1)}
               />
+            </div>
+            <div className="mt-2">
+              <label>Muster-Drehung (°)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range" min={-180} max={180} step={1}
+                  value={patternAngleDeg}
+                  onChange={e => setPatternAngle(parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <input
+                  type="number" step="1" min="-180" max="180"
+                  value={patternAngleDeg}
+                  onChange={e => setPatternAngle(parseFloat(e.target.value) || 0)}
+                  className="w-16"
+                />
+              </div>
             </div>
             <label className="mt-2 flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={patternAlign} onChange={e => setPatternAlign(e.target.checked)} />

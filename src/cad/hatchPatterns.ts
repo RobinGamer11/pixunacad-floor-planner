@@ -17,6 +17,7 @@ export type HatchPatternId =
   | "erdreich"
   | "daemmung_weich"
   | "daemmung_hart"
+  | "waermedaemmung"
   | "xps"
   | "abdichtung";
 
@@ -31,12 +32,48 @@ export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
   { id: "erdreich", label: "Erdreich" },
   { id: "daemmung_weich", label: "Wärmedämmung weich" },
   { id: "daemmung_hart", label: "Wärmedämmung hart" },
+  { id: "waermedaemmung", label: "Wärmedämmung" },
   { id: "xps", label: "XPS-Dämmung" },
   { id: "abdichtung", label: "Abdichtung" },
 ];
 
+/**
+ * Auswählbare Baustoff-Muster des Wandwerkzeugs (eigene Bezeichnungen —
+ * das Schraffurwerkzeug bleibt davon unberührt).
+ */
+export const WALL_PATTERNS: { id: HatchPatternId; label: string }[] = [
+  { id: "mauerwerk", label: "Mauerwerk" },
+  { id: "stahlbeton", label: "Stahlbeton" },
+  { id: "ziegelverband", label: "Ziegelverband" },
+  { id: "holz", label: "Holz" },
+  { id: "waermedaemmung", label: "Wärmedämmung" },
+  { id: "daemmung_hart", label: "Füllung" },
+  { id: "xps", label: "XPS-Dämmung" },
+];
+
+/**
+ * Migration alter Wand-Muster-IDs. "daemmung_weich" wird kontrolliert auf das
+ * neue vektorielle Wandmuster "waermedaemmung" abgebildet.
+ */
+export function normalizeWallPatternId(id: string | undefined | null): string {
+  if (!id) return "none";
+  if (id === "daemmung_weich") return "waermedaemmung";
+  return id;
+}
+
+/** Feste Grunddrehung eines Musters relativ zur Wandrichtung (Grad). */
+export function patternBaseAngleDeg(id: string | undefined | null): number {
+  return id === "xps" ? 45 : 0;
+}
+
+/** Muster, die im Wandrenderer als wandgebundene Vektorgeometrie entstehen. */
+export function isWallBoundPattern(id: string | undefined | null): boolean {
+  return id === "waermedaemmung";
+}
+
 /** Basis-Kachelgröße in Metern (bei patternScale = 1). */
 export const PATTERN_BASE_TILE_M = 0.1 / 15;
+
 
 
 function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
@@ -155,7 +192,23 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
 
+    case "waermedaemmung": {
+      // Fallback-Kachel (z. B. Schraffurwerkzeug). In Wänden wird das Muster
+      // wandgebunden als exakte Vektorgeometrie erzeugt (siehe Renderer).
+      const r = s * 0.45;
+      for (let i = -1; i <= 2; i++) {
+        const cx = i * s;
+        ctx.beginPath();
+        ctx.arc(cx, r, r, Math.PI, 0);
+        ctx.lineTo(cx + s * 0.5 - r, s - r);
+        ctx.arc(cx + s * 0.5, s - r, r, Math.PI, 0, true);
+        ctx.lineTo(cx + s, r);
+        ctx.stroke();
+      }
+      break;
+    }
     case "daemmung_hart": {
+
       // Harte Dämmung: Zickzacklinien
       const rows = 3;
       const zig = s / 6;
