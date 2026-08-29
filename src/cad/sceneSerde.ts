@@ -101,7 +101,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       patternEnabled: h.patternEnabled, patternId: h.patternId,
       patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
       patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
-      patternRotateWithShape: h.patternRotateWithShape,
+      patternOrigin: h.patternOrigin, patternRotateWithShape: h.patternRotateWithShape,
       bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
       holeBulges: Array.isArray(h.holeBulges) ? h.holeBulges : undefined,
       strokePattern: h.strokePattern, roughen: h.roughen, appearanceSeed: h.appearanceSeed,

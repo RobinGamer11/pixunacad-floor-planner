@@ -6704,7 +6704,7 @@ function ToolsTab({
           <HatchModeSelect app={cadEngine} />
           <RasterModeToggle app={cadEngine} projectId={projectId} />
           <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <HatchSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} hideChrome />
+            <HatchSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} patternScaleUnit={0.02} hideChrome />
           </div>
         </>
       )}

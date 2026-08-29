@@ -247,7 +247,8 @@ export class MiniCad {
   defaultHatchAutoSmooth: boolean = true;
   defaultHatchPatternEnabled: boolean = false;
   defaultHatchPatternId: string = "mauerwerk";
-  defaultHatchPatternScale: number = 60;
+  /** Mappe-Weltmaßstab: UI-Wert 60 entspricht hier 60 * 0.02 (siehe HatchPatternBlock). */
+  defaultHatchPatternScale: number = 1.2;
   defaultHatchPatternAngleDeg: number = 0;
   defaultHatchPatternSkewDeg: number = 0;
   defaultHatchPatternRotateWithShape: boolean = true;
@@ -1383,6 +1384,8 @@ export class MiniCad {
         patternAngleDeg: h.patternAngleDeg,
         patternSkewDeg: h.patternSkewDeg,
         patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
+        patternOrigin: (h as any).patternOrigin ? { ...(h as any).patternOrigin } : null,
+        patternRotateWithShape: (h as any).patternRotateWithShape !== false,
         bulges: Array.isArray((h as any).bulges) ? [...(h as any).bulges] : undefined,
         holeBulges: Array.isArray((h as any).holeBulges) ? (h as any).holeBulges.map((l: number[]) => [...l]) : undefined,
         midpointSnap: !!(h as any).midpointSnap,

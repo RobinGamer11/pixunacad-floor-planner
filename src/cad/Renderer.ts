@@ -1915,7 +1915,11 @@ export class Renderer {
     // gespeicherten Originalkontur (bzw. persistenter patternOrigin).
     // Dadurch bleibt die Musterphase beim Scrollen/Zoomen/Neuaufbau stabil und
     // wandert beim Verschieben exakt mit der Schraffur mit.
-    const anchor = (hatch.patternOrigin && Number.isFinite(hatch.patternOrigin.x))
+    // Muster mitdrehen (Standard): Anker = erster Konturpunkt, wandert und
+    // dreht sich mit der Schraffur. Muster nicht mitdrehen: eingefrorener,
+    // weltfester Anker (patternOrigin), damit die Musterlage erhalten bleibt.
+    const anchor = (hatch.patternRotateWithShape === false
+        && hatch.patternOrigin && Number.isFinite(hatch.patternOrigin.x))
       ? hatch.patternOrigin
       : hatch.points[0];
     const origin = cam.worldToScreen(

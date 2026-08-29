@@ -61,6 +61,8 @@ interface Props {
   pxPerMm?: number;
   /** Maximale Musterskalierung (CAD nutzt größere Werte als die Mappe). */
   patternScaleMax?: number;
+  /** Umrechnung UI-Wert → Weltwert der Musterskalierung (Mappe < CAD). */
+  patternScaleUnit?: number;
   /** true = Modus & Objektart werden außerhalb (über dem Rahmen) gerendert. */
   hideChrome?: boolean;
   /** Zusatzfeld direkt unter der Strichstärke (CAD: Flächenanzeige). */
@@ -102,7 +104,7 @@ export const HatchModeSelect: React.FC<{ app: CadApp | MiniCad | null }> = ({ ap
   );
 };
 
-export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 600, hideChrome = false, afterStroke }) => {
+export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 600, patternScaleUnit = 1, hideChrome = false, afterStroke }) => {
   const [mode, setMode] = useState<HatchDrawMode>("polygon");
   const [fillColor, setFillColor] = useState("#4da3ff");
   const [strokeColor, setStrokeColor] = useState("#111111");
@@ -262,7 +264,7 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
       </div>
 
       {/* Muster ganz unten */}
-      <HatchPatternBlock app={app} scaleMax={patternScaleMax} />
+      <HatchPatternBlock app={app} scaleMax={patternScaleMax} scaleUnit={patternScaleUnit} />
     </div>
   );
 };
