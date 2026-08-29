@@ -36,22 +36,40 @@ export const HATCH_PATTERNS: { id: BuiltinHatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
   { id: "stahlbeton", label: "Stahlbeton" },
   { id: "holz", label: "Holz" },
+  { id: "sand", label: "Sand" },
   { id: "kies", label: "Kies 01" },
   { id: "kies_02", label: "Kies 02" },
   { id: "pflasterung_01", label: "Pflasterung 01" },
   { id: "naturstein", label: "Naturstein" },
-  { id: "sand", label: "Sand" },
   { id: "ziegelverband", label: "Ziegelverband" },
   { id: "holzdielen_01", label: "Holzdielen 01" },
   { id: "holzdielen", label: "Holzdielen 02" },
   { id: "erdreich", label: "Erdreich" },
-  { id: "daemmung_weich", label: "Wärmedämmung weich" },
-  { id: "daemmung_hart", label: "Wasser" },
-  { id: "waermedaemmung", label: "Kunst 01" },
+  { id: "daemmung_weich", label: "Wärmedämmung" },
   { id: "xps", label: "XPS-Dämmung" },
+  { id: "daemmung_hart", label: "Wasser" },
+  { id: "waermedaemmung", label: "Muster 01" },
   { id: "abdichtung_01", label: "Abdichtung 01" },
   { id: "abdichtung", label: "Abdichtung 02" },
 ];
+
+/** Vorgabe-Skalierung je Muster (Bildmuster brauchen deutlich mehr). */
+const DEFAULT_PATTERN_SCALE: Record<string, number> = {
+  kies_02: 250,
+  pflasterung_01: 250,
+  naturstein: 250,
+  holzdielen_01: 250,
+  daemmung_weich: 250,
+  abdichtung_01: 250,
+  holzdielen: 100,
+};
+
+/** Standard-Skalierung eines Musters (Fallback 60). */
+export function defaultPatternScale(id: string | undefined | null): number {
+  if (!id) return 60;
+  return DEFAULT_PATTERN_SCALE[id] ?? 60;
+}
+
 
 /**
  * Auswählbare Baustoff-Muster des Wandwerkzeugs (eigene Bezeichnungen —
@@ -78,8 +96,11 @@ export function normalizeWallPatternId(id: string | undefined | null): string {
 
 /** Feste Grunddrehung eines Musters relativ zur Wandrichtung (Grad). */
 export function patternBaseAngleDeg(id: string | undefined | null): number {
-  return id === "xps" ? 45 : 0;
+  if (id === "xps") return 45;
+  if (id === "daemmung_hart") return 45; // Wasser: um 45° gedreht
+  return 0;
 }
+
 
 /** Muster, die in Wänden immer der Wandachse folgen (unabhängig von der Option). */
 export function patternAlwaysFollowsWall(id: string | undefined | null): boolean {
@@ -488,14 +509,20 @@ export function getPatternTile(id: HatchPatternId, sizePx: number, color: string
   if (isCustomPatternId(id) || isImagePatternId(id)) {
     const img = isCustomPatternId(id) ? getCustomPatternImage(id) : getImagePattern(id);
     if (!img) return c; // noch nicht geladen: nicht cachen
-    // Seitenverhältnis der Vorlage erhalten (Kachel ist dann nicht quadratisch).
-    const ar = img.naturalWidth / Math.max(1, img.naturalHeight);
-    const h = Math.max(1, Math.round(s / (ar || 1)));
-    c.height = h;
-    ctx.drawImage(img, 0, 0, s, h);
+    // Bildmuster in Originalauflösung (max. 2048 px) kacheln → keine Unschärfe.
+    const nw = Math.max(1, img.naturalWidth);
+    const nh = Math.max(1, img.naturalHeight);
+    const f = Math.min(1, 2048 / Math.max(nw, nh));
+    const w = Math.max(1, Math.round(nw * f));
+    const h = Math.max(1, Math.round(nh * f));
+    c.width = w; c.height = h;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, w, h);
   } else {
     drawTile(ctx, id as BuiltinHatchPatternId, s, color, lw);
   }
+
   if (tileCache.size > 120) tileCache.clear();
   tileCache.set(key, c);
   return c;
@@ -544,12 +571,16 @@ export function fillWithHatchPattern(
   const tile = getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
   if (!pat) return;
+  // Bildkacheln können in Originalauflösung vorliegen → auf Kachelbreite normieren.
+  const kx = tilePx / Math.max(1, tile.width);
+  const ky = tilePx / Math.max(1, tile.width);
   try {
     const m = new DOMMatrix()
       .translateSelf(originScreen.x, originScreen.y)
       .rotateSelf(opt.angleDeg || 0)
-      .scaleSelf(k * stretch, k)
+      .scaleSelf(kx * stretch, ky)
       .skewXSelf(Math.max(-70, Math.min(70, opt.skewDeg || 0)));
+
     (pat as any).setTransform?.(m);
   } catch { /* ältere Engine: ohne Transform zeichnen */ }
 
