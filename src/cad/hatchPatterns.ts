@@ -96,8 +96,11 @@ export function normalizeWallPatternId(id: string | undefined | null): string {
 
 /** Feste Grunddrehung eines Musters relativ zur Wandrichtung (Grad). */
 export function patternBaseAngleDeg(id: string | undefined | null): number {
-  return id === "xps" ? 45 : 0;
+  if (id === "xps") return 45;
+  if (id === "daemmung_hart") return 45; // Wasser: um 45° gedreht
+  return 0;
 }
+
 
 /** Muster, die in Wänden immer der Wandachse folgen (unabhängig von der Option). */
 export function patternAlwaysFollowsWall(id: string | undefined | null): boolean {
