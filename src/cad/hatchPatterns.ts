@@ -509,14 +509,20 @@ export function getPatternTile(id: HatchPatternId, sizePx: number, color: string
   if (isCustomPatternId(id) || isImagePatternId(id)) {
     const img = isCustomPatternId(id) ? getCustomPatternImage(id) : getImagePattern(id);
     if (!img) return c; // noch nicht geladen: nicht cachen
-    // Seitenverhältnis der Vorlage erhalten (Kachel ist dann nicht quadratisch).
-    const ar = img.naturalWidth / Math.max(1, img.naturalHeight);
-    const h = Math.max(1, Math.round(s / (ar || 1)));
-    c.height = h;
-    ctx.drawImage(img, 0, 0, s, h);
+    // Bildmuster in Originalauflösung (max. 2048 px) kacheln → keine Unschärfe.
+    const nw = Math.max(1, img.naturalWidth);
+    const nh = Math.max(1, img.naturalHeight);
+    const f = Math.min(1, 2048 / Math.max(nw, nh));
+    const w = Math.max(1, Math.round(nw * f));
+    const h = Math.max(1, Math.round(nh * f));
+    c.width = w; c.height = h;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, w, h);
   } else {
     drawTile(ctx, id as BuiltinHatchPatternId, s, color, lw);
   }
+
   if (tileCache.size > 120) tileCache.clear();
   tileCache.set(key, c);
   return c;
