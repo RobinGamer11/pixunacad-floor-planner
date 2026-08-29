@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Grid2X2, Move, CheckCheck } from "lucide-react";
-import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
+import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
 
 /** Trennt eine Maßeinheit in Klammern vom Beschriftungstext ab. */
 const splitUnit = (label: string): [string, string | null] => {
