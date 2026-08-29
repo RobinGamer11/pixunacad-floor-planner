@@ -210,7 +210,7 @@ export class CadApp {
   defaultHatchAutoSmooth = true;
   defaultHatchPatternEnabled = false;
   defaultHatchPatternId = "mauerwerk";
-  defaultHatchPatternScale = 2;
+  defaultHatchPatternScale = 60;
   defaultHatchPatternAngleDeg = 0;
   defaultHatchPatternSkewDeg = 0;
   defaultHatchPatternStretch = 1;

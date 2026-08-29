@@ -102,7 +102,7 @@ export const HatchModeSelect: React.FC<{ app: CadApp | MiniCad | null }> = ({ ap
   );
 };
 
-export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 20, hideChrome = false, afterStroke }) => {
+export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 96 / 25.4, patternScaleMax = 600, hideChrome = false, afterStroke }) => {
   const [mode, setMode] = useState<HatchDrawMode>("polygon");
   const [fillColor, setFillColor] = useState("#4da3ff");
   const [strokeColor, setStrokeColor] = useState("#111111");
