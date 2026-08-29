@@ -64,6 +64,8 @@ export const DEFAULT_ROUGHEN: RoughenParams = {
   detailPer100Mm: 10,
   mode: "smooth",
   seed: 1,
+  scalePercent: 100,
+
 };
 
 export function makeAppearanceSeed(): number {
