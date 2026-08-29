@@ -701,6 +701,7 @@ export class CadApp {
         patternId: w.patternId,
         patternScale: w.patternScale,
         patternAlignToWall: !!w.patternAlignToWall,
+        patternAngleDeg: (w as any).patternAngleDeg ?? 0,
         bulges: [...((w as any).bulges || [])],
         _stickerEditOwnerId: w._stickerEditOwnerId || null,
       })),

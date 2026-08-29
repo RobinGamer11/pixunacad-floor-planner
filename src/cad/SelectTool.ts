@@ -1336,6 +1336,7 @@ export class SelectTool {
         labelId: wall.labelId, priority: wall.priority,
         patternId: wall.patternId, patternScale: wall.patternScale,
         patternAlignToWall: wall.patternAlignToWall,
+        patternAngleDeg: (wall as any).patternAngleDeg ?? 0,
         bulges: bulB,
       });
 

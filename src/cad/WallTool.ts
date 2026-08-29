@@ -30,6 +30,8 @@ export interface WallToolSettings {
   patternId: string;
   patternScale: number;
   patternAlignToWall: boolean;
+  /** Freie Muster-Drehung in Grad (-180..180). */
+  patternAngleDeg: number;
 }
 
 interface GuideAnchor {
@@ -99,6 +101,7 @@ export class WallTool {
     patternId: "none",
     patternScale: 1,
     patternAlignToWall: false,
+    patternAngleDeg: 0,
   };
 
   constructor(app: CadApp) {
@@ -201,6 +204,7 @@ export class WallTool {
       patternId: this.settings.patternId,
       patternScale: this.settings.patternScale,
       patternAlignToWall: this.settings.patternAlignToWall,
+      patternAngleDeg: this.settings.patternAngleDeg,
     });
     this._runConnectionPipeline(newWall);
     this.app.refreshLabelUI?.();

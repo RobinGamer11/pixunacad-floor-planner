@@ -39,6 +39,7 @@ export interface WallSnap {
   wallKind: string; thicknessM: number; referenceSide: string;
   color: string; fillColor: string; priority: number; labelId: string;
   patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
+  patternAngleDeg?: number;
 }
 
 /** Freihand-Strich (Kopie inkl. Stil). */
@@ -153,7 +154,8 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
         if (o) items.push({ kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
           wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
           color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
-          patternId: o.patternId, patternScale: o.patternScale, patternAlignToWall: o.patternAlignToWall });
+          patternId: o.patternId, patternScale: o.patternScale, patternAlignToWall: o.patternAlignToWall,
+          patternAngleDeg: (o as any).patternAngleDeg ?? 0 });
       }
     }
   }
@@ -262,6 +264,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         color: it.color, fillColor: it.fillColor,
         priority: it.priority, labelId: it.labelId,
         patternId: it.patternId, patternScale: it.patternScale, patternAlignToWall: it.patternAlignToWall,
+        patternAngleDeg: it.patternAngleDeg ?? 0,
       });
       if (o) created.push({ kind: "wall", id: o.id });
     } else if (it.kind === "free") {
