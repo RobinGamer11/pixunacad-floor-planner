@@ -36,22 +36,40 @@ export const HATCH_PATTERNS: { id: BuiltinHatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
   { id: "stahlbeton", label: "Stahlbeton" },
   { id: "holz", label: "Holz" },
+  { id: "sand", label: "Sand" },
   { id: "kies", label: "Kies 01" },
   { id: "kies_02", label: "Kies 02" },
   { id: "pflasterung_01", label: "Pflasterung 01" },
   { id: "naturstein", label: "Naturstein" },
-  { id: "sand", label: "Sand" },
   { id: "ziegelverband", label: "Ziegelverband" },
   { id: "holzdielen_01", label: "Holzdielen 01" },
   { id: "holzdielen", label: "Holzdielen 02" },
   { id: "erdreich", label: "Erdreich" },
-  { id: "daemmung_weich", label: "Wärmedämmung weich" },
-  { id: "daemmung_hart", label: "Wasser" },
-  { id: "waermedaemmung", label: "Kunst 01" },
+  { id: "daemmung_weich", label: "Wärmedämmung" },
   { id: "xps", label: "XPS-Dämmung" },
+  { id: "daemmung_hart", label: "Wasser" },
+  { id: "waermedaemmung", label: "Muster 01" },
   { id: "abdichtung_01", label: "Abdichtung 01" },
   { id: "abdichtung", label: "Abdichtung 02" },
 ];
+
+/** Vorgabe-Skalierung je Muster (Bildmuster brauchen deutlich mehr). */
+const DEFAULT_PATTERN_SCALE: Record<string, number> = {
+  kies_02: 250,
+  pflasterung_01: 250,
+  naturstein: 250,
+  holzdielen_01: 250,
+  daemmung_weich: 250,
+  abdichtung_01: 250,
+  holzdielen: 100,
+};
+
+/** Standard-Skalierung eines Musters (Fallback 60). */
+export function defaultPatternScale(id: string | undefined | null): number {
+  if (!id) return 60;
+  return DEFAULT_PATTERN_SCALE[id] ?? 60;
+}
+
 
 /**
  * Auswählbare Baustoff-Muster des Wandwerkzeugs (eigene Bezeichnungen —
