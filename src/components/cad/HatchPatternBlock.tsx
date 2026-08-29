@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Check, Grid2X2, Move, CheckCheck } from "lucide-react";
 import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
+import { onPatternsChanged } from "@/cad/customHatchPatterns";
 
 /** Trennt eine Maßeinheit in Klammern vom Beschriftungstext ab. */
 const splitUnit = (label: string): [string, string | null] => {
@@ -69,6 +70,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
   const [, force] = useState(0);
   const dragRef = useRef<{ wx: number; wy: number; ox: number; oy: number } | null>(null);
   const patternOptions = useHatchPatternOptions();
+  useEffect(() => onPatternsChanged(() => { app?.renderer?.render?.(); app?.requestRender?.(); }), [app]);
   const selectPattern = (val: string) => {
     setPatternId(val);
     apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });

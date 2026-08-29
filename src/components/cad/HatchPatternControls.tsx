@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Check, Grid2X2 } from "lucide-react";
 import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
+import { onPatternsChanged } from "@/cad/customHatchPatterns";
 
 /** Regler + Zahlenfeld: grob per Slider, fein per Eingabe/Pfeiltasten. */
 const SliderRow: React.FC<{
@@ -49,6 +50,7 @@ export const HatchPatternControls: React.FC<Props> = ({ app }) => {
   const [skewDeg, setSkewDeg] = useState(0);
   const [, force] = useState(0);
   const patternOptions = useHatchPatternOptions();
+  useEffect(() => onPatternsChanged(() => { app?.renderer?.render?.(); app?.requestRender?.(); }), [app]);
 
   const sync = () => {
     if (!app) return;
