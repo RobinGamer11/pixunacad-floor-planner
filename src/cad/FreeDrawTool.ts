@@ -151,8 +151,11 @@ export class FreeDrawTool {
       imageSpacingM: this.app.defaultFreeImageSpacingM,
       imageRotateAlongPath: this.app.defaultFreeImageRotate,
       labelId: this.app.activeDrawLabelId || Defaults.defaultLabelId,
+      // Linienart + Aufrauen wie beim Linienwerkzeug.
+      ...((this.app as any).getStrokeEffectDefaults?.("free") ?? {}),
     };
   }
+
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, _cam: any) {
     if (this._drawing && this._points.length >= 2) {
