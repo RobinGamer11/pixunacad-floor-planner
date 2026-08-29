@@ -54,8 +54,8 @@ export interface StrokeAppearance {
 
 export const DEFAULT_STROKE_PATTERN: StrokePatternParams = {
   kind: "solid",
-  dashLengthMm: 6,
-  gapLengthMm: 3,
+  dashLengthMm: 80,
+  gapLengthMm: 80,
 };
 
 export const DEFAULT_ROUGHEN: RoughenParams = {

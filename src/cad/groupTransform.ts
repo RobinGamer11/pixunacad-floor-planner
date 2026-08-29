@@ -71,6 +71,11 @@ export function translateGroup(app: any, refs: GroupRef[], dx: number, dy: numbe
     const o = getGroupObject(app, r.kind, r.id);
     if (!o) continue;
     for (const p of movablePoints(r.kind, o)) { p.x += dx; p.y += dy; }
+    // Musteranker wandert immer mit der Schraffur mit (Phase bleibt stabil).
+    if (r.kind === "hatch" && o.patternOrigin && Number.isFinite(o.patternOrigin.x)) {
+      o.patternOrigin.x += dx;
+      o.patternOrigin.y += dy;
+    }
     if (r.kind === "wall") touchedWall = true;
   }
   if (touchedWall) app.scene.markWallsDirty?.();
