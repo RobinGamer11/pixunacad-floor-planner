@@ -1565,11 +1565,15 @@ export class Renderer {
     const tileM = Math.max(0.02, wall.thicknessM / 3) * Math.max(0.1, wall.patternScale ?? 1);
     const scale = tileM / PATTERN_BASE_TILE_M;
 
-    // Ausrichtung: erste Wandachse
+    // Ausrichtung: erste Wandachse (Bildschirm-Y zeigt nach unten).
     const a = wall.corners[0], b = wall.corners[1];
-    const angleDeg = wall.patternAlignToWall
-      ? -(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI
-      : 0;
+    const wallAxisAngleDeg = -(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+    const userAngleDeg = Number.isFinite(wall.patternAngleDeg) ? wall.patternAngleDeg : 0;
+    const baseAngleDeg = patternBaseAngleDeg(wall.patternId);
+    // XPS besitzt eine feste 45°-Grunddrehung relativ zur Wand und folgt daher
+    // immer der Wandachse; sonst entscheidet patternAlignToWall.
+    const followsWall = wall.patternAlignToWall || baseAngleDeg !== 0;
+    const angleDeg = (followsWall ? wallAxisAngleDeg : 0) + baseAngleDeg + userAngleDeg;
 
     ctx.save();
     ctx.beginPath();
@@ -1577,23 +1581,96 @@ export class Renderer {
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.closePath();
     ctx.clip();
-    fillWithHatchPattern(
-      ctx,
-      { x: minX - 2, y: minY - 2, w: (maxX - minX) + 4, h: (maxY - minY) + 4 },
-      origin, pxPerMeter,
-      {
-        patternId: wall.patternId as HatchPatternId,
-        scale,
-        angleDeg,
-        skewDeg: 0,
-        stretch: 1,
-        color: wall.color || Defaults.lineColor,
-        alpha: 0.9,
-        lineWidthPx: 0.8,
-      },
-    );
+    if (isWallBoundPattern(wall.patternId)) {
+      // Wandgebundene Vektorgeometrie: Ausschläge liegen exakt auf beiden
+      // Wandkanten, unabhängig von Musterdichte und Zoom.
+      this._paintWallInsulation(wall);
+    } else {
+      fillWithHatchPattern(
+        ctx,
+        { x: minX - 2, y: minY - 2, w: (maxX - minX) + 4, h: (maxY - minY) + 4 },
+        origin, pxPerMeter,
+        {
+          patternId: wall.patternId as HatchPatternId,
+          scale,
+          angleDeg,
+          skewDeg: 0,
+          stretch: 1,
+          color: wall.color || Defaults.lineColor,
+          alpha: 0.9,
+          lineWidthPx: 0.8,
+        },
+      );
+    }
     ctx.restore();
   }
+
+  /**
+   * Zeichnet das Muster „Wärmedämmung" als echte Vektorgeometrie in lokalen
+   * Wandkoordinaten (X = Wandrichtung, Y = Wanddicke). Die oberen/unteren
+   * Scheitel liegen exakt auf +/- Wanddicke/2, also auf beiden Wandkanten.
+   */
+  private _paintWallInsulation(wall: any) {
+    const ctx = this.ctx;
+    const cam = this.camera;
+    const t = Math.max(0.001, wall.thicknessM);
+    const h = t / 2;
+    const density = Math.max(0.1, Math.min(10, wall.patternScale ?? 1));
+    const p = Math.max(0.004, t * 0.55 * density);      // Periodenlänge
+    const r = Math.min(p * 0.45, h * 0.98);             // Radius der Rundungen
+
+    const center = computeWallLines(wallRefCorners(wall), t, wall.referenceSide).helpCorners;
+    if (!center || center.length < 2) return;
+
+    ctx.save();
+    ctx.strokeStyle = wall.color || Defaults.lineColor;
+    ctx.lineWidth = 0.9;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.globalAlpha = 0.9;
+
+    const ARC_STEPS = 10;
+
+    for (let si = 0; si < center.length - 1; si++) {
+      const A = center[si], B = center[si + 1];
+      const dx = B.x - A.x, dy = B.y - A.y;
+      const L = Math.hypot(dx, dy);
+      if (!(L > 1e-9)) continue;
+      const d = { x: dx / L, y: dy / L };
+      const nrm = perpLeftScreen(d); // Einheitsnormale (Wanddicken-Achse)
+
+      const toScreen = (u: number, w: number) =>
+        cam.worldToScreen(A.x + d.x * u + nrm.x * w, A.y + d.y * u + nrm.y * w);
+
+      const pts: { x: number; y: number }[] = [];
+      const push = (u: number, w: number) => pts.push(toScreen(u, w));
+
+      const kStart = Math.floor(-p / p) - 1;
+      const kEnd = Math.ceil(L / p) + 1;
+      for (let k = kStart; k <= kEnd; k++) {
+        const ut = k * p;             // Scheitel oben
+        const ub = ut + p / 2;        // Scheitel unten
+        // Obere Halbrundung: Scheitel exakt auf +h.
+        for (let i = 0; i <= ARC_STEPS; i++) {
+          const th = Math.PI - (i / ARC_STEPS) * Math.PI;
+          push(ut + r * Math.cos(th), (h - r) + r * Math.sin(th));
+        }
+        // Untere Halbrundung: Scheitel exakt auf -h.
+        for (let i = 0; i <= ARC_STEPS; i++) {
+          const th = Math.PI - (i / ARC_STEPS) * Math.PI;
+          push(ub + r * Math.cos(th), -(h - r) - r * Math.sin(th));
+        }
+      }
+      if (pts.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+
 
 
   private _drawWallsForLabel(labelId: string) {
