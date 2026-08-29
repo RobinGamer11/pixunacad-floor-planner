@@ -192,16 +192,24 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
 
         {roughen.enabled && (
           <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <NumField
+            <div className="space-y-2">
+              <SliderField
                 label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0} max={50}
                 onChange={(v) => applyRoughen({ strengthMm: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
               />
-              <NumField
+              <SliderField
                 label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={100}
                 onChange={(v) => applyRoughen({ detailPer100Mm: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
+              />
+              <SliderField
+                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10} max={300}
+                onChange={(v) => applyRoughen({ scalePercent: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
               />
             </div>
+
             <div className="grid grid-cols-2 gap-1">
               {(["smooth", "corner"] as const).map((m) => (
                 <button
