@@ -5,6 +5,8 @@ import type { CadApp } from "./CadApp";
 import type { Snap, SnapExclusions } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { getDimensionGeometry } from "./dimensionGeometry";
+import { getEffectiveContourGeometry } from "./effectiveGeometry";
+
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
