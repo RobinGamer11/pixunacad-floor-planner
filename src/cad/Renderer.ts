@@ -18,7 +18,7 @@ import { normalizeTable, isCovered, effectiveFormat, effectiveBorders } from "@/
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
 import { strokeHatchSeal } from "./hatchSeal";
-import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
+import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, patternAlwaysFollowsWall, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
@@ -1573,7 +1573,7 @@ export class Renderer {
     const baseAngleDeg = patternBaseAngleDeg(wall.patternId);
     // XPS besitzt eine feste 45°-Grunddrehung relativ zur Wand und folgt daher
     // immer der Wandachse; sonst entscheidet patternAlignToWall.
-    const followsWall = wall.patternAlignToWall || baseAngleDeg !== 0;
+    const followsWall = wall.patternAlignToWall || baseAngleDeg !== 0 || patternAlwaysFollowsWall(wall.patternId);
     const angleDeg = (followsWall ? wallAxisAngleDeg : 0) + baseAngleDeg + userAngleDeg;
 
     ctx.save();
@@ -1911,7 +1911,17 @@ export class Renderer {
     if (!Number.isFinite(minX)) return;
     const zero = cam.worldToScreen(0, 0);
     const pxPerMeter = Math.abs(cam.worldToScreen(1, 0).x - zero.x) || 1;
-    const origin = cam.worldToScreen(hatch.patternOffsetX ?? 0, hatch.patternOffsetY ?? 0);
+    // Objektbezogener, deterministischer Musteranker: erster Punkt der
+    // gespeicherten Originalkontur (bzw. persistenter patternOrigin).
+    // Dadurch bleibt die Musterphase beim Scrollen/Zoomen/Neuaufbau stabil und
+    // wandert beim Verschieben exakt mit der Schraffur mit.
+    const anchor = (hatch.patternOrigin && Number.isFinite(hatch.patternOrigin.x))
+      ? hatch.patternOrigin
+      : hatch.points[0];
+    const origin = cam.worldToScreen(
+      anchor.x + (hatch.patternOffsetX ?? 0),
+      anchor.y + (hatch.patternOffsetY ?? 0),
+    );
     ctx.save();
     ctx.clip("evenodd");
     fillWithHatchPattern(

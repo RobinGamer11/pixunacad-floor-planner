@@ -44,11 +44,10 @@ export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
 export const WALL_PATTERNS: { id: HatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
   { id: "stahlbeton", label: "Stahlbeton" },
-  { id: "ziegelverband", label: "Ziegelverband" },
   { id: "holz", label: "Holz" },
   { id: "waermedaemmung", label: "Wärmedämmung" },
-  { id: "daemmung_hart", label: "Füllung" },
   { id: "xps", label: "XPS-Dämmung" },
+  { id: "abdichtung", label: "Abdichtung" },
 ];
 
 /**
@@ -64,6 +63,11 @@ export function normalizeWallPatternId(id: string | undefined | null): string {
 /** Feste Grunddrehung eines Musters relativ zur Wandrichtung (Grad). */
 export function patternBaseAngleDeg(id: string | undefined | null): number {
   return id === "xps" ? 45 : 0;
+}
+
+/** Muster, die in Wänden immer der Wandachse folgen (unabhängig von der Option). */
+export function patternAlwaysFollowsWall(id: string | undefined | null): boolean {
+  return id === "xps" || id === "abdichtung";
 }
 
 /** Muster, die im Wandrenderer als wandgebundene Vektorgeometrie entstehen. */

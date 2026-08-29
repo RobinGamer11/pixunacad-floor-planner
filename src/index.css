@@ -381,6 +381,70 @@
     color: hsl(var(--cad-toolbar-foreground));
   }
 
+  /* Dunkles Design: geöffnete Auswahlmenüs immer hell mit schwarzer Schrift.
+     Betrifft alle nativen <select>-Elemente (Chrome/Edge/Windows nutzen für
+     die Popup-Liste das color-scheme des Feldes). Das geschlossene Feld
+     behält sein dunkles Aussehen. */
+  .dark select {
+    color-scheme: light;
+  }
+
+  .dark select option,
+  .dark select optgroup {
+    background: #ffffff;
+    background-color: #ffffff;
+    color: #111111;
+  }
+
+  .dark select option:checked,
+  .dark select option:hover,
+  .dark select option:focus {
+    background: #e5e7eb;
+    background-color: #e5e7eb;
+    color: #111111;
+  }
+
+  .dark select option:disabled,
+  .dark select optgroup:disabled {
+    color: #6b7280;
+  }
+
+  /* Eigene Dropdown-/Portal-Menüs (Radix Select, Command, Menüs): wenn das
+     geöffnete Menü hell ist, muss die Schrift ausdrücklich schwarz sein. */
+  .dark [data-radix-select-content],
+  .dark [data-radix-dropdown-menu-content],
+  .dark [data-radix-popper-content-wrapper] [role="listbox"],
+  .dark [role="listbox"],
+  .dark [cmdk-list] {
+    background-color: #ffffff;
+    color: #111111;
+    border-color: #d1d5db;
+  }
+
+  .dark [data-radix-select-content] [role="option"],
+  .dark [data-radix-dropdown-menu-content] [role="menuitem"],
+  .dark [data-radix-dropdown-menu-content] [role="menuitemcheckbox"],
+  .dark [data-radix-dropdown-menu-content] [role="menuitemradio"],
+  .dark [role="option"],
+  .dark [cmdk-item] {
+    color: #111111;
+  }
+
+  .dark [role="option"][data-highlighted],
+  .dark [role="option"]:hover,
+  .dark [cmdk-item][data-selected="true"],
+  .dark [data-radix-dropdown-menu-content] [role="menuitem"][data-highlighted] {
+    background-color: #e5e7eb;
+    color: #111111;
+  }
+
+  .dark [role="option"][data-disabled],
+  .dark [cmdk-item][data-disabled="true"],
+  .dark [data-radix-dropdown-menu-content] [data-disabled] {
+    color: #6b7280;
+    opacity: 1;
+  }
+
 
 
   /* Icon-only Buttons (quadratisch, ohne Text): Symbol exakt mittig.
