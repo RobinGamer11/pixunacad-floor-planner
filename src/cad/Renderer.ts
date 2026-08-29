@@ -1781,13 +1781,14 @@ export class Renderer {
     ctx.globalAlpha = alpha;
     const geom = getEffectiveContourGeometry(poly as any);
     const pts = geom.outer;
+    const isClosed = geom.closed;
     // Muster läuft über die gesamte geschlossene Kontur durch (kein Neustart je Kante).
     const strokeOpts = {
       pattern: (poly as any).strokePattern,
       pxPerM: cam.scale, lineWidthPx: strokePx,
     };
 
-    const fillPct = (poly as any).fillAlphaPct ?? 0;
+    const fillPct = isClosed ? ((poly as any).fillAlphaPct ?? 0) : 0;
     if (fillPct > 0) {
       ctx.beginPath();
       for (const ring of geom.rings) {
@@ -1808,7 +1809,7 @@ export class Renderer {
     ctx.lineWidth = strokePx;
     ctx.lineJoin = "round";
     applyStrokePattern(ctx, strokeOpts);
-    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, true, strokeOpts);
+    tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, isClosed, strokeOpts);
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
@@ -1825,8 +1826,13 @@ export class Renderer {
 
 
   private _drawSingleHatch(hatch: Hatch) {
+    if ((hatch as any).isPolygon === true) {
+      // Offene Polygone sind bereits ab zwei Punkten gültig.
+      if (hatch.points.length < 2) return;
+      this._drawSinglePolygon(hatch);
+      return;
+    }
     if (hatch.points.length < 3) return;
-    if ((hatch as any).isPolygon === true) { this._drawSinglePolygon(hatch); return; }
     const ctx = this.ctx;
     const cam = this.camera;
 
