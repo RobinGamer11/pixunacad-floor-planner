@@ -57,6 +57,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
       sourceStartDistanceM: s.sourceStartDistanceM, sourceStrokeId: s.sourceStrokeId,
       strokePattern: s.strokePattern, roughen: s.roughen, appearanceSeed: s.appearanceSeed,
+      autoShape: s.autoShape, autoShapeSource: s.autoShapeSource || null,
     });
     if (s._stickerEditOwnerId) (stroke as any)._stickerEditOwnerId = s._stickerEditOwnerId;
   }

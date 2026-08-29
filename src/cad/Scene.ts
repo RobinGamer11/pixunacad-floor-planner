@@ -638,6 +638,10 @@ export class FreeStroke {
   /** Bild-Stempel: Rotation entlang Pfad-Tangente. */
   imageRotateAlongPath: boolean;
   labelId: string;
+  /** Auto-Form aktiv (Gerade/Kreis/Bogen-Erkennung auf die Punktfolge angewandt). */
+  autoShape: boolean;
+  /** Originalpunkte vor der Auto-Form (für das Zurückschalten). */
+  autoShapeSource: Vec2[] | null;
   /** Gemeinsame Kontur-Effekte (Linienart + Roughen). */
   strokePattern!: StrokePatternParams;
   roughen!: RoughenParams;
@@ -658,6 +662,7 @@ export class FreeStroke {
     smoothing?: boolean; labelId?: string;
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
     sourceStartDistanceM?: number; sourceStrokeId?: string | null;
+    autoShape?: boolean; autoShapeSource?: Vec2[] | null;
   } & StrokeEffectsInit) {
     this.id = opts.id;
     this.points = opts.points.map(p => v(p.x, p.y));
@@ -677,6 +682,8 @@ export class FreeStroke {
     this.sourceStartDistanceM = (typeof opts.sourceStartDistanceM === "number" && Number.isFinite(opts.sourceStartDistanceM))
       ? opts.sourceStartDistanceM : 0;
     this.sourceStrokeId = opts.sourceStrokeId || null;
+    this.autoShape = opts.autoShape === true;
+    this.autoShapeSource = opts.autoShapeSource ? opts.autoShapeSource.map(p => v(p.x, p.y)) : null;
     // Migrationssicher: alte Freihandobjekte übernehmen lineStyle/gapM als Muster.
     const legacy = (opts.strokePattern === undefined)
       ? patternFromLegacyFreeStyle(this.lineStyle, this.gapM)
