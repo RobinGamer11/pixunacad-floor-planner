@@ -1839,19 +1839,10 @@ export class Renderer {
 
     ctx.save();
 
-    // Füllung und Kontur MÜSSEN exakt dieselbe (ggf. aufgeraute) Geometrie
-    // nutzen — inklusive identischer Tessellierung und identischem Cache-Key.
-    // Sonst entstehen sichtbare Spalten zwischen Fläche und Umriss.
-    const roughParams = (hatch as any).roughen;
-    const roughEnabled = !!roughParams?.enabled;
-    const baseRings: Vec2[][] = [
-      hatchOuterRing(hatch as any),
-      ...hatchHoleRings(hatch as any),
-    ].filter((r) => r && r.length >= 2);
-    const ringKey = (i: number, ring: Vec2[]) => `hatch:${hatch.id}:${i}:${ring.length}`;
-    const contourRings: Vec2[][] = baseRings.map((ring, i) =>
-      roughEnabled ? roughenPolyline(ring, true, roughParams, { cacheKey: ringKey(i, ring) }) : ring,
-    );
+    // Füllung, Muster, Kontur, Hover und die blaue Auswahl nutzen EXAKT
+    // dieselbe abgeleitete Geometrie (zentrale Pipeline).
+    const contourRings: Vec2[][] = getEffectiveContourGeometry(hatch as any).rings;
+
 
     ctx.beginPath();
     for (const ring of contourRings) {
