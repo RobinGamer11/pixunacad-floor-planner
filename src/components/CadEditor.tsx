@@ -1128,14 +1128,27 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const handleToolClick = useCallback((id: string) => {
     // "Linie" Sidebar-Knopf aktiviert die zuletzt gewählte Variante
     const targetId = id === ToolIds.LINE ? lineVariant : id;
-    appRef.current?.setTool(targetId);
+    const app = appRef.current;
+
+    // Erneuter Klick auf das bereits aktive Auswahlwerkzeug hebt zuerst den
+    // Werkzeugfilter auf ("Auswahl mit Filter" → "normale Auswahl").
+    // Auswahl, Rahmenmodus und Objekte bleiben dabei unverändert.
+    if (targetId === ToolIds.SELECT && activeTool === ToolIds.SELECT && app?.selectionFilterTool) {
+      app.clearSelectionFilterTool();
+      setRightTab("sheets");
+      setGridPanelOpen(false);
+      return;
+    }
+
+    app?.setTool(targetId);
     setActiveTool(targetId);
     if (targetId === ToolIds.SELECT) setRightTab("sheets");
     else setRightTab("settings");
     setGridPanelOpen(false);
     // Flyout: erneuter Klick auf dasselbe Symbol schließt die Variantenauswahl wieder.
     setExpandedTool(prev => (TOOL_VARIANTS[id] ? (prev === id ? null : id) : null));
-  }, [lineVariant]);
+  }, [lineVariant, activeTool]);
+
 
   /**
    * Platziert importierte Seiten direkt — Maßstab kommt aus dem

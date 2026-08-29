@@ -874,10 +874,20 @@ export default function ProjectWorkspace() {
   }, [activeTool]);
 
   /**
+   * Hebt den Werkzeugfilter auf — gemeinsame Stelle für Mappe und eingebettete
+   * CAD-Engine. Auswahl, Auswahlmodus und Objekte bleiben unverändert.
+   */
+  const clearSelectionFilterTool = () => {
+    selectionFilterToolRef.current = null;
+    try { cadEngineApiRef.current?.engine.clearSelectionFilterTool(); } catch {}
+  };
+
+  /**
    * Wählt beide Auswahlquellen der aktiven Mappenseite als eine Transaktion.
    * War zuletzt ein objektbezogenes Werkzeug aktiv, werden ausschließlich
    * dessen Objekte erfasst — sonst alles.
    */
+
   const selectAllOnActiveMappePage = () => {
     if (!activePage) return false;
     pageMarqueeTxRef.current = Date.now();
@@ -1548,12 +1558,17 @@ export default function ProjectWorkspace() {
               setLineToolFlyoutOpen(false);
               setHatchToolFlyoutOpen(false);
               if (activeTool !== null) {
+                // Vom Objektwerkzeug kommend: Filter bleibt zunächst erhalten.
                 setActiveTool(null);
                 setSelectToolFlyoutOpen(true);
+              } else if (selectionFilterToolRef.current) {
+                // Bereits aktives Auswahlwerkzeug + Filter → nur Filter aufheben.
+                clearSelectionFilterTool();
               } else {
                 setSelectToolFlyoutOpen((open) => !open);
               }
             }}
+
           />
           {selectToolFlyoutOpen && (
             <div

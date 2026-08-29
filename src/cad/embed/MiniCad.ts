@@ -1773,6 +1773,10 @@ export class MiniCad {
    */
   selectionFilterTool: ObjectToolId | null = null;
 
+  /** Hebt den Werkzeugfilter auf — "Alles"/Strg+A wählt dann wieder alles aus. */
+  clearSelectionFilterTool() { this.selectionFilterTool = null; }
+
+
   selectAllObjects(filterTool: ObjectToolId | null = this.selectionFilterTool): number {
     if (this.hasActiveAction()) return 0;
     // Filter vor dem Werkzeugwechsel sichern.

@@ -41,27 +41,48 @@ function selectedTargets(app: any, kind: StrokeEffectKind): any[] {
   return out;
 }
 
-const NumField: React.FC<{
-  label: string; unit: string; value: number; step?: number; min?: number; max?: number;
-  onChange: (v: number) => void;
-}> = ({ label, unit, value, step = 0.1, min = 0, max = 999, onChange }) => (
-  <label className="min-w-0">
-    <span className="mb-1 block whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{label}</span>
-    <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE }}>
+/**
+ * Regler + frei beschreibbares Zahlenfeld, beide synchron. Während einer
+ * zusammenhängenden Reglerbewegung wird die Historie ausgesetzt, damit nur ein
+ * einziger Undo-Schritt entsteht.
+ */
+const SliderField: React.FC<{
+  label: string; unit: string; value: number; step?: number; min: number; max: number;
+  onChange: (v: number) => void; onDragStart?: () => void; onDragEnd?: () => void;
+}> = ({ label, unit, value, step = 0.1, min, max, onChange, onDragStart, onDragEnd }) => {
+  const clamp = (n: number) => Math.min(max, Math.max(min, n));
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 flex items-center justify-between gap-2">
+        <span className="whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{label}</span>
+        <span className="flex h-6 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE }}>
+          <input
+            type="number"
+            value={Number(value.toFixed(3))}
+            step={step} min={min} max={max}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isFinite(n)) onChange(clamp(n));
+            }}
+            className="h-full w-14 min-w-0 bg-transparent px-1 text-right text-[11px] tabular-nums outline-none"
+          />
+          <span className="pr-1 text-[9px] text-muted-foreground">{unit}</span>
+        </span>
+      </span>
       <input
-        type="number"
-        value={Number(value.toFixed(3))}
+        type="range"
+        value={value}
         step={step} min={min} max={max}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
-        }}
-        className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
+        onPointerDown={onDragStart}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        onChange={(e) => onChange(clamp(Number(e.target.value)))}
+        className="h-1.5 w-full cursor-pointer accent-foreground"
       />
-      <span className="pr-2 text-[9px] text-muted-foreground">{unit}</span>
-    </span>
-  </label>
-);
+    </label>
+  );
+};
+
 
 /**
  * Gemeinsame Kontur-Effekte (Linienart + nicht-destruktives „Aufrauen“) für
@@ -112,6 +133,16 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
     commit();
   };
 
+  // Zusammenhängende Reglerbewegung = genau ein Undo-Schritt.
+  const dragStart = () => { if (app) (app as any).suspendHistory = true; };
+  const dragEnd = () => {
+    if (!app) return;
+    (app as any).suspendHistory = false;
+    try { (app as any).commitHistorySnapshot?.(); } catch { /* noop */ }
+    commit();
+  };
+
+
   return (
     <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
       <div>
@@ -132,17 +163,20 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
           ))}
         </div>
         {pattern.kind !== "solid" && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <NumField
+          <div className="mt-2 space-y-2">
+            <SliderField
               label="Strichlänge" unit="mm" value={pattern.dashLengthMm} step={0.5} min={0.1} max={200}
               onChange={(v) => applyPattern({ dashLengthMm: v })}
+              onDragStart={dragStart} onDragEnd={dragEnd}
             />
-            <NumField
+            <SliderField
               label="Abstand" unit="mm" value={pattern.gapLengthMm} step={0.5} min={0.1} max={200}
               onChange={(v) => applyPattern({ gapLengthMm: v })}
+              onDragStart={dragStart} onDragEnd={dragEnd}
             />
           </div>
         )}
+
       </div>
 
       <div>
@@ -158,16 +192,24 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
 
         {roughen.enabled && (
           <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <NumField
+            <div className="space-y-2">
+              <SliderField
                 label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0} max={50}
                 onChange={(v) => applyRoughen({ strengthMm: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
               />
-              <NumField
+              <SliderField
                 label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={100}
                 onChange={(v) => applyRoughen({ detailPer100Mm: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
+              />
+              <SliderField
+                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10} max={300}
+                onChange={(v) => applyRoughen({ scalePercent: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
               />
             </div>
+
             <div className="grid grid-cols-2 gap-1">
               {(["smooth", "corner"] as const).map((m) => (
                 <button
