@@ -169,6 +169,8 @@ export class Hatch {
     this.patternOffsetX = Number.isFinite(patternOffsetX) ? patternOffsetX! : 0;
     this.patternOffsetY = Number.isFinite(patternOffsetY) ? patternOffsetY! : 0;
     this.patternRotateWithShape = patternRotateWithShape !== false;
+    this.patternOrigin = (patternOrigin && Number.isFinite(patternOrigin.x) && Number.isFinite(patternOrigin.y))
+      ? { x: patternOrigin.x, y: patternOrigin.y } : null;
 
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),
