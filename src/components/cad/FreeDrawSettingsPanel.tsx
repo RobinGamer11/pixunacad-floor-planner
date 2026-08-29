@@ -161,8 +161,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       const url = String(reader.result);
       setImageSrc(url);
       app.defaultFreeImageSrc = url;
-      // Bei Upload automatisch zur Bild-Linienart wechseln.
-      setStyle("image");
       app.defaultFreeLineStyle = "image";
     };
     reader.readAsDataURL(f);
@@ -171,10 +169,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   const clearImage = () => {
     setImageSrc(null);
     app.defaultFreeImageSrc = null;
-    if (style === "image") {
-      setStyle("solid");
-      app.defaultFreeLineStyle = "solid";
-    }
+    app.defaultFreeLineStyle = "solid";
   };
 
   // Mappen-Layout (Papier): Farbe, px/mm-Strichstärke, Transparenz, gerahmte Buttons.
