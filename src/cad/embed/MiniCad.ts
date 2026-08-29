@@ -2296,10 +2296,10 @@ export class MiniCad {
 
   private _patchRendererTransparent() {
     const r: any = this.renderer;
-    r.render = function () {
+    /** Zeichnet den kompletten Blattinhalt (ohne zu löschen). */
+    const drawBody = function (this: any) {
       const ctx: CanvasRenderingContext2D = this.ctx;
       ctx.save();
-      ctx.clearRect(0, 0, this.vw, this.vh);
       try { this._drawByLabelOrder?.(); } catch (e) { console.error(e); }
       // Im PDF-/Druckmodus bleibt nur die echte Geometrie sichtbar. Selektion,
       // Fangpunkte, Hub-Vorschauen und Werkzeug-Overlays sind reine Editorhilfen.
@@ -2335,7 +2335,35 @@ export class MiniCad {
       }
       ctx.restore();
     };
+
+    r.render = function () {
+      const ctx: CanvasRenderingContext2D = this.ctx;
+      ctx.save();
+      ctx.clearRect(0, 0, this.vw, this.vh);
+      ctx.restore();
+
+      if (!isCanvasDark()) { drawBody.call(this); return; }
+
+      // „Nur Zeichenfläche schwarz" — identisch zur CAD-Oberfläche:
+      // 1) Rasterdokumente (JPG/PNG/PDF) farbecht, ohne Invertierung.
+      this._darkPass = "docs";
+      try { this._drawByLabelOrder?.(); } catch (e) { console.error(e); }
+      this._darkPass = "all";
+
+      // 2) Alle Vektorobjekte in eine eigene Ebene, invertiert aufgeblendet.
+      const prevTransparent = this.transparentBackground;
+      this.transparentBackground = true;
+      this._darkPass = "vector";
+      try {
+        const ok = this._compositeInverted?.(() => drawBody.call(this));
+        if (!ok) drawBody.call(this);
+      } finally {
+        this._darkPass = "all";
+        this.transparentBackground = prevTransparent;
+      }
+    };
   }
+
 
   /** Override paddingPx auf 1 für eingebettete Textboxen, damit der Rahmen
    *  sehr knapp am Text sitzt, ohne Buchstaben optisch anzuschneiden. */
