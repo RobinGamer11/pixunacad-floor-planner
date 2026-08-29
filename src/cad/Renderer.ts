@@ -18,7 +18,8 @@ import { normalizeTable, isCovered, effectiveFormat, effectiveBorders } from "@/
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
 import { strokeHatchSeal } from "./hatchSeal";
-import { fillWithHatchPattern, PATTERN_BASE_TILE_M, type HatchPatternId } from "./hatchPatterns";
+import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
+import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
