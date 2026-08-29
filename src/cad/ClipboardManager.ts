@@ -74,6 +74,7 @@ function snapHatch(h: Hatch): HatchSnap {
     patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
     bulges: [...((h as any).bulges || [])], holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
     isPolygon: (h as any).isPolygon === true, thicknessM: (h as any).thicknessM, alpha: (h as any).alpha,
+    closed: (h as any).closed !== false, shapeMode: (h as any).shapeMode,
     midpointSnap: !!(h as any).midpointSnap, divisionSnap: (h as any).divisionSnap,
     ...copyStrokeEffects(h) } as any;
 }
@@ -226,6 +227,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         { color: it.strokeColor, thicknessM: (it as any).thicknessM, alpha: (it as any).alpha,
           labelId: it.labelId, bulges: (it as any).bulges,
           midpointSnap: !!(it as any).midpointSnap, divisionSnap: (it as any).divisionSnap,
+          closed: (it as any).closed !== false, shapeMode: (it as any).shapeMode,
           ...copyStrokeEffects(it) });
       if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "hatch") {

@@ -86,6 +86,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
         labelId: h.labelId, bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
         midpointSnap: !!h.midpointSnap,
         divisionSnap: typeof h.divisionSnap === "number" ? h.divisionSnap : undefined,
+        closed: h.closed !== false, shapeMode: h.shapeMode,
         strokePattern: h.strokePattern, roughen: h.roughen, appearanceSeed: h.appearanceSeed,
       });
       if (h._stickerEditOwnerId) (poly as any)._stickerEditOwnerId = h._stickerEditOwnerId;

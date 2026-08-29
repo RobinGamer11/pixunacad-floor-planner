@@ -674,6 +674,8 @@ export class CadApp {
         bulges: [...((h as any).bulges || [])],
         holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
         isPolygon: (h as any).isPolygon === true,
+        closed: (h as any).isPolygon === true ? (h as any).closed !== false : undefined,
+        shapeMode: (h as any).shapeMode,
         thicknessM: (h as any).thicknessM,
         alpha: (h as any).alpha,
         midpointSnap: !!(h as any).midpointSnap,

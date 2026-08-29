@@ -1367,6 +1367,8 @@ export class MiniCad {
         strokeWidthPx: h.strokeWidthPx,
         labelId: h.labelId,
         isPolygon: (h as any).isPolygon === true,
+        closed: (h as any).isPolygon === true ? (h as any).closed !== false : undefined,
+        shapeMode: (h as any).shapeMode,
         thicknessM: (h as any).thicknessM,
         alpha: (h as any).alpha,
         areaLabel: h.areaLabel ? { ...h.areaLabel } : undefined,
@@ -1491,6 +1493,7 @@ export class MiniCad {
               labelId: h.labelId || Defaults.defaultLabelId, bulges: h.bulges,
               midpointSnap: !!h.midpointSnap,
               divisionSnap: typeof h.divisionSnap === "number" && h.divisionSnap >= 2 ? Math.floor(h.divisionSnap) : undefined,
+              closed: h.closed !== false, shapeMode: h.shapeMode,
               ...copyStrokeEffects(h),
             });
             continue;
@@ -1981,6 +1984,7 @@ export class MiniCad {
           const n = this.scene.createPolygon(o.points.map(mv), {
             color: o.strokeColor, thicknessM: o.thicknessM, alpha: o.alpha,
             labelId: o.labelId, bulges: o.bulges,
+            closed: o.closed !== false, shapeMode: o.shapeMode,
           });
           if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "hatch") {
