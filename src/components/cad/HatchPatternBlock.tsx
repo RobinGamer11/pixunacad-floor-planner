@@ -68,6 +68,11 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 20 }) => {
   const [moveMode, setMoveMode] = useState(false);
   const [, force] = useState(0);
   const dragRef = useRef<{ wx: number; wy: number; ox: number; oy: number } | null>(null);
+  const patternOptions = useHatchPatternOptions();
+  const selectPattern = (val: string) => {
+    setPatternId(val);
+    apply((h) => { h.patternId = val; }, () => { app.defaultHatchPatternId = val; });
+  };
 
   const sync = () => {
     if (!app) return;
