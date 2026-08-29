@@ -5049,6 +5049,11 @@ function ElementView({
       ref={rootRef}
       data-marquee-id={el.id}
       data-element-kind={el.kind}
+      // „Nur Zeichenfläche schwarz“: Rasterinhalte (JPG/PNG/PDF) werden nie
+      // invertiert; CAD-Blätter regeln den Dunkelmodus in ihrem eigenen
+      // Renderer (getrennte Raster-/Vektorebene).
+      data-raster-content={(el.kind === "image" || el.kind === "pdf") ? "1" : undefined}
+      data-canvas-self-dark={(el.kind === "cad-view" || el.kind === "cad-viewport") ? "1" : undefined}
       onPointerDown={handlePointerDown}
       onDoubleClick={(e) => {
         // Doppelklick auf eine Tabelle wechselt vom Objekt- in den Tabellenmodus.
