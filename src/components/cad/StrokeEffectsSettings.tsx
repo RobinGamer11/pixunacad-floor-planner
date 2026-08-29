@@ -41,27 +41,48 @@ function selectedTargets(app: any, kind: StrokeEffectKind): any[] {
   return out;
 }
 
-const NumField: React.FC<{
-  label: string; unit: string; value: number; step?: number; min?: number; max?: number;
-  onChange: (v: number) => void;
-}> = ({ label, unit, value, step = 0.1, min = 0, max = 999, onChange }) => (
-  <label className="min-w-0">
-    <span className="mb-1 block whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{label}</span>
-    <span className="flex h-8 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE }}>
+/**
+ * Regler + frei beschreibbares Zahlenfeld, beide synchron. Während einer
+ * zusammenhängenden Reglerbewegung wird die Historie ausgesetzt, damit nur ein
+ * einziger Undo-Schritt entsteht.
+ */
+const SliderField: React.FC<{
+  label: string; unit: string; value: number; step?: number; min: number; max: number;
+  onChange: (v: number) => void; onDragStart?: () => void; onDragEnd?: () => void;
+}> = ({ label, unit, value, step = 0.1, min, max, onChange, onDragStart, onDragEnd }) => {
+  const clamp = (n: number) => Math.min(max, Math.max(min, n));
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1 flex items-center justify-between gap-2">
+        <span className="whitespace-nowrap text-[9px] leading-tight text-muted-foreground">{label}</span>
+        <span className="flex h-6 items-center overflow-hidden rounded-md border" style={{ borderColor: HAIRLINE }}>
+          <input
+            type="number"
+            value={Number(value.toFixed(3))}
+            step={step} min={min} max={max}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              if (Number.isFinite(n)) onChange(clamp(n));
+            }}
+            className="h-full w-14 min-w-0 bg-transparent px-1 text-right text-[11px] tabular-nums outline-none"
+          />
+          <span className="pr-1 text-[9px] text-muted-foreground">{unit}</span>
+        </span>
+      </span>
       <input
-        type="number"
-        value={Number(value.toFixed(3))}
+        type="range"
+        value={value}
         step={step} min={min} max={max}
-        onChange={(e) => {
-          const n = Number(e.target.value);
-          if (Number.isFinite(n)) onChange(Math.min(max, Math.max(min, n)));
-        }}
-        className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
+        onPointerDown={onDragStart}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        onChange={(e) => onChange(clamp(Number(e.target.value)))}
+        className="h-1.5 w-full cursor-pointer accent-foreground"
       />
-      <span className="pr-2 text-[9px] text-muted-foreground">{unit}</span>
-    </span>
-  </label>
-);
+    </label>
+  );
+};
+
 
 /**
  * Gemeinsame Kontur-Effekte (Linienart + nicht-destruktives „Aufrauen“) für
