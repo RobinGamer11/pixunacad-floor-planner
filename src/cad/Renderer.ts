@@ -2099,8 +2099,9 @@ export class Renderer {
     const scaledStrokePx = this._scaledStrokePx(hatch.strokeWidthPx);
 
     ctx.save();
-    if (hatch.points.length >= 3) {
-      const outer = tessellateWithBulges(hatch.points, (hatch as any).bulges, true, 32);
+    const selClosed = (hatch as any).closed !== false;
+    if (hatch.points.length >= 3 || !selClosed) {
+      const outer = tessellateWithBulges(hatch.points, (hatch as any).bulges, selClosed, 32);
       const holesRaw = hatch.holes || [];
       const holeLoops = holesRaw.map((loop: any, hi: number) =>
         (loop && loop.length >= 3) ? tessellateWithBulges(loop, (hatch as any).holeBulges?.[hi], true, 32) : null);
@@ -2112,7 +2113,7 @@ export class Renderer {
           const sp = cam.worldToScreen(outer[i].x, outer[i].y);
           ctx.lineTo(sp.x, sp.y);
         }
-        ctx.closePath();
+        if (selClosed) ctx.closePath();
       };
       const traceHoles = () => {
         for (const loop of holeLoops) {
@@ -2127,11 +2128,13 @@ export class Renderer {
         }
       };
 
-      // Blue fill: outer minus holes (evenodd)
-      tracePath();
-      traceHoles();
-      ctx.fillStyle = "rgba(77,163,255,0.12)";
-      ctx.fill("evenodd");
+      // Blue fill: outer minus holes (evenodd) — nur bei geschlossener Kontur.
+      if (selClosed) {
+        tracePath();
+        traceHoles();
+        ctx.fillStyle = "rgba(77,163,255,0.12)";
+        ctx.fill("evenodd");
+      }
 
       // Outer outline
       tracePath();
@@ -2153,6 +2156,7 @@ export class Renderer {
         ctx.stroke();
       }
     }
+
 
     const drawHandle = (sp: Vec2, isActive: boolean) => {
       ctx.fillStyle = "rgba(77,163,255,0.12)";
