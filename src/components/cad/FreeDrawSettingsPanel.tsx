@@ -260,7 +260,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         {sheetMode ? (
           <>
             <label className="block text-xs">
-              <span className="block mb-1 text-muted-foreground">Linienart</span>
+              <span className="block mb-1 text-muted-foreground">Stift-Stil</span>
               <select value={style}
                 onChange={(e) => {
                   const v = e.target.value as LineStyle; setStyle(v);
@@ -431,7 +431,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
         </label>
 
         <label className="block text-xs">
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Linienart</span>
+          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stift-Stil</span>
           <select value={style}
             onChange={(e) => {
               const v = e.target.value as LineStyle; setStyle(v);
