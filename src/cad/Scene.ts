@@ -748,6 +748,7 @@ export class Wall {
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
     patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
+    patternAngleDeg?: number;
     bulges?: number[];
   }) {
     this.id = opts.id;
@@ -766,9 +767,11 @@ export class Wall {
       || (opts.kind === "outer" ? Defaults.wallFillColorOuter : Defaults.wallFillColorInner);
     this.labelId = opts.labelId || Defaults.defaultLabelId;
     this.priority = opts.priority ?? (opts.kind === "outer" ? 200 : 100);
-    this.patternId = opts.patternId || "none";
+    this.patternId = normalizeWallPatternId(opts.patternId);
     this.patternScale = Math.max(0.1, Math.min(10, opts.patternScale ?? 2));
     this.patternAlignToWall = !!opts.patternAlignToWall;
+    this.patternAngleDeg = Number.isFinite(opts.patternAngleDeg as number)
+      ? Math.max(-180, Math.min(180, opts.patternAngleDeg as number)) : 0;
     this.bulges = Array.isArray(opts.bulges) ? opts.bulges.map(b => (Number.isFinite(b) ? b : 0)) : [];
     this._stickerEditOwnerId = null;
   }
@@ -1604,6 +1607,7 @@ export class Scene {
     priority?: number; hiddenCornerIndices?: number[];
     cornerAnchors?: (WallCornerAnchor | null)[];
     patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
+    patternAngleDeg?: number;
     bulges?: number[];
   }) {
     const w = new Wall({ id: this._makeId(), ...opts });
