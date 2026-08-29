@@ -202,9 +202,20 @@ export class PolygonShape extends Hatch {
   midpointSnap: boolean;
   /** Teilungs-Snap N je Polygonkante (analog Linienwerkzeug). */
   divisionSnap?: number;
+  /**
+   * Geschlossene Kontur? Freie Polygone (Modus "polygon") sind standardmäßig
+   * offen — es entsteht keine automatische Kante vom letzten zum ersten Punkt.
+   * Rechteck und Kreis sind immer geschlossen.
+   */
+  closed: boolean;
+  /** Erzeugungsmodus der Kontur. */
+  shapeMode: "polygon" | "rectangle" | "circle";
 
   constructor(args: any) {
     super(args);
+    this.shapeMode = (args?.shapeMode === "rectangle" || args?.shapeMode === "circle")
+      ? args.shapeMode : "polygon";
+    this.closed = this.shapeMode === "polygon" ? (args?.closed !== false) : true;
     this.midpointSnap = !!args?.midpointSnap;
     this.divisionSnap = (typeof args?.divisionSnap === "number" && args.divisionSnap >= 2)
       ? Math.floor(args.divisionSnap) : undefined;
@@ -1449,6 +1460,7 @@ export class Scene {
   createPolygon(points: Vec2[], style: {
     color?: string; thicknessM?: number; alpha?: number; labelId?: string; bulges?: number[];
     midpointSnap?: boolean; divisionSnap?: number;
+    closed?: boolean; shapeMode?: "polygon" | "rectangle" | "circle";
   } & StrokeEffectsInit = {}) {
     const poly = new PolygonShape({
       id: this._makeId(), points,
@@ -1461,6 +1473,8 @@ export class Scene {
       alpha: style.alpha,
       midpointSnap: style.midpointSnap,
       divisionSnap: style.divisionSnap,
+      closed: style.closed,
+      shapeMode: style.shapeMode,
     });
     poly._stickerEditOwnerId = this._currentEditOwnerId;
     this.hatches.push(poly);
