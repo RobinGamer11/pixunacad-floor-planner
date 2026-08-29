@@ -123,6 +123,8 @@ export class Hatch {
   patternStretch: number;
   patternOffsetX: number;
   patternOffsetY: number;
+  /** true = Muster dreht sich beim Drehen der Schraffur exakt mit. */
+  patternRotateWithShape: boolean;
   /** Signierte Kanten-Wölbungen der Außenkontur (Index = Kante i→i+1). */
   bulges: number[];
   /** Signierte Kanten-Wölbungen der Löcher. */
@@ -135,11 +137,12 @@ export class Hatch {
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
     patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch,
-    patternOffsetX, patternOffsetY, bulges, holeBulges, strokePattern, roughen, appearanceSeed }: {
+    patternOffsetX, patternOffsetY, patternRotateWithShape, bulges, holeBulges, strokePattern, roughen, appearanceSeed }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number; patternRotateWithShape?: boolean;
+    patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
   } & StrokeEffectsInit) {
 
@@ -157,12 +160,13 @@ export class Hatch {
     this.labelId = labelId || Defaults.defaultLabelId;
     this.patternEnabled = !!patternEnabled;
     this.patternId = patternId || "mauerwerk";
-    this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 20) : 2;
+    this.patternScale = Number.isFinite(patternScale) ? clamp(patternScale!, 0.05, 2000) : 60;
     this.patternAngleDeg = Number.isFinite(patternAngleDeg) ? patternAngleDeg! : 0;
     this.patternSkewDeg = Number.isFinite(patternSkewDeg) ? clamp(patternSkewDeg!, -70, 70) : 0;
     this.patternStretch = Number.isFinite(patternStretch) ? clamp(patternStretch!, 0.1, 10) : 1;
     this.patternOffsetX = Number.isFinite(patternOffsetX) ? patternOffsetX! : 0;
     this.patternOffsetY = Number.isFinite(patternOffsetY) ? patternOffsetY! : 0;
+    this.patternRotateWithShape = patternRotateWithShape !== false;
 
     this.areaLabel = {
       show: !!(areaLabel?.show ?? Defaults.areaShow),
@@ -1448,7 +1452,7 @@ export class Scene {
     strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     holes?: Vec2[][];
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
-    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
+    patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number; patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
   } & StrokeEffectsInit = {}) {
     const hatch = new Hatch({
@@ -1461,6 +1465,7 @@ export class Scene {
       patternEnabled: style.patternEnabled, patternId: style.patternId,
       patternScale: style.patternScale, patternAngleDeg: style.patternAngleDeg,
       patternSkewDeg: style.patternSkewDeg, patternStretch: style.patternStretch, patternOffsetX: style.patternOffsetX, patternOffsetY: style.patternOffsetY,
+      patternRotateWithShape: style.patternRotateWithShape,
     });
 
     hatch._stickerEditOwnerId = this._currentEditOwnerId;

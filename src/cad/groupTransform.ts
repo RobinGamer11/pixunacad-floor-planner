@@ -104,8 +104,12 @@ export function rotateGroup(app: any, refs: GroupRef[], angle: number, center: V
 
     if (r.kind === "textbox" || r.kind === "sticker") {
       o.rotationRad = (o.rotationRad || 0) + angle;
-    } else if (r.kind === "hatch" && o.areaLabel) {
-      o.areaLabel.rotationRad = (o.areaLabel.rotationRad || 0) + angle;
+    } else if (r.kind === "hatch") {
+      if (o.areaLabel) o.areaLabel.rotationRad = (o.areaLabel.rotationRad || 0) + angle;
+      // Muster mitdrehen (fixiert an der Schraffur), wenn aktiviert.
+      if (o.patternRotateWithShape !== false) {
+        o.patternAngleDeg = (o.patternAngleDeg || 0) + (angle * 180) / Math.PI;
+      }
     } else if (r.kind === "dimension" && o.refDir) {
       const d = { x: o.refDir.x, y: o.refDir.y };
       o.refDir = { x: d.x * cos - d.y * sin, y: d.x * sin + d.y * cos };
