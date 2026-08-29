@@ -6,42 +6,57 @@
  * Scherung (Verzerrung) werden per DOMMatrix auf das Pattern angewendet.
  */
 
-export type HatchPatternId =
+import { getCustomPatternImage, isCustomPatternId } from "./customHatchPatterns";
+
+export type BuiltinHatchPatternId =
   | "mauerwerk"
   | "stahlbeton"
   | "holz"
   | "kies"
+  | "kies_02"
+  | "pflasterung_01"
+  | "naturstein"
   | "sand"
   | "ziegelverband"
   | "holzdielen"
+  | "holzdielen_01"
   | "erdreich"
   | "daemmung_weich"
   | "daemmung_hart"
   | "waermedaemmung"
   | "xps"
-  | "abdichtung";
+  | "abdichtung"
+  | "abdichtung_01";
 
-export const HATCH_PATTERNS: { id: HatchPatternId; label: string }[] = [
+/** Eingebaute IDs plus benutzerdefinierte Muster (`custom:...`). */
+export type HatchPatternId = BuiltinHatchPatternId | (string & {});
+
+export const HATCH_PATTERNS: { id: BuiltinHatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
   { id: "stahlbeton", label: "Stahlbeton" },
   { id: "holz", label: "Holz" },
-  { id: "kies", label: "Kies" },
+  { id: "kies", label: "Kies 01" },
+  { id: "kies_02", label: "Kies 02" },
+  { id: "pflasterung_01", label: "Pflasterung 01" },
+  { id: "naturstein", label: "Naturstein" },
   { id: "sand", label: "Sand" },
   { id: "ziegelverband", label: "Ziegelverband" },
-  { id: "holzdielen", label: "Holzdielen" },
+  { id: "holzdielen_01", label: "Holzdielen 01" },
+  { id: "holzdielen", label: "Holzdielen 02" },
   { id: "erdreich", label: "Erdreich" },
   { id: "daemmung_weich", label: "Wärmedämmung weich" },
-  { id: "daemmung_hart", label: "Wärmedämmung hart" },
-  { id: "waermedaemmung", label: "Wärmedämmung" },
+  { id: "daemmung_hart", label: "Wasser" },
+  { id: "waermedaemmung", label: "Kunst 01" },
   { id: "xps", label: "XPS-Dämmung" },
-  { id: "abdichtung", label: "Abdichtung" },
+  { id: "abdichtung_01", label: "Abdichtung 01" },
+  { id: "abdichtung", label: "Abdichtung 02" },
 ];
 
 /**
  * Auswählbare Baustoff-Muster des Wandwerkzeugs (eigene Bezeichnungen —
  * das Schraffurwerkzeug bleibt davon unberührt).
  */
-export const WALL_PATTERNS: { id: HatchPatternId; label: string }[] = [
+export const WALL_PATTERNS: { id: BuiltinHatchPatternId; label: string }[] = [
   { id: "mauerwerk", label: "Mauerwerk" },
   { id: "stahlbeton", label: "Stahlbeton" },
   { id: "holz", label: "Holz" },
@@ -78,7 +93,14 @@ export function isWallBoundPattern(id: string | undefined | null): boolean {
 /** Basis-Kachelgröße in Metern (bei patternScale = 1). */
 export const PATTERN_BASE_TILE_M = 0.1 / 15;
 
-
+/** Deterministischer Zufallsgenerator (stabil über Zoom/Export hinweg). */
+function rng(seed: number): () => number {
+  let t = seed >>> 0;
+  return () => {
+    t = (t * 1664525 + 1013904223) >>> 0;
+    return t / 4294967296;
+  };
+}
 
 function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
   ctx.beginPath();
@@ -93,12 +115,41 @@ function dot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
   ctx.fill();
 }
 
+/** Geschlossene, leicht unregelmäßige Rundform (Stein/Kiesel), kachelbar. */
+function blob(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number, rx: number, ry: number,
+  rot: number, rand: () => number, wobble = 0.18, corners = 9,
+) {
+  const pts: [number, number][] = [];
+  for (let i = 0; i < corners; i++) {
+    const a = (i / corners) * Math.PI * 2;
+    const k = 1 + (rand() - 0.5) * 2 * wobble;
+    const x = Math.cos(a) * rx * k;
+    const y = Math.sin(a) * ry * k;
+    pts.push([cx + x * Math.cos(rot) - y * Math.sin(rot), cy + x * Math.sin(rot) + y * Math.cos(rot)]);
+  }
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const m: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    if (i === 0) ctx.moveTo(m[0], m[1]);
+    const c = pts[(i + 1) % pts.length];
+    const n = pts[(i + 2) % pts.length];
+    ctx.quadraticCurveTo(c[0], c[1], (c[0] + n[0]) / 2, (c[1] + n[1]) / 2);
+  }
+  ctx.closePath();
+  ctx.stroke();
+}
+
 /** Zeichnet ein Muster in eine Kachel der Kantenlänge `s` (px). */
-function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, color: string, lw: number) {
+function drawTile(ctx: CanvasRenderingContext2D, id: BuiltinHatchPatternId, s: number, color: string, lw: number) {
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = lw;
   ctx.lineCap = "round";
+  ctx.lineJoin = "round";
 
   switch (id) {
     case "mauerwerk": {
@@ -143,6 +194,99 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       }
       break;
     }
+    case "kies_02": {
+      // Dicht gepackte Kiesel unterschiedlicher Größe (nahtlos gekachelt)
+      const rand = rng(20260829);
+      ctx.lineWidth = lw * 0.9;
+      const n = 5;
+      const cell = s / n;
+      const draw = (cx: number, cy: number, rx: number, ry: number, rot: number, r: () => number) => {
+        for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
+          if (cx + dx < -rx * 1.6 || cx + dx > s + rx * 1.6) continue;
+          if (cy + dy < -ry * 1.6 || cy + dy > s + ry * 1.6) continue;
+          blob(ctx, cx + dx, cy + dy, rx, ry, rot, rng(Math.floor(cx * 91 + cy * 37 + rx * 13)), 0.16, 9);
+        }
+        void r;
+      };
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          const cx = (i + 0.5 + (rand() - 0.5) * 0.45) * cell;
+          const cy = (j + 0.5 + (rand() - 0.5) * 0.45) * cell;
+          const rx = cell * (0.30 + rand() * 0.22);
+          const ry = rx * (0.72 + rand() * 0.28);
+          draw(cx, cy, rx, ry, rand() * Math.PI, rand);
+        }
+      }
+      // Kleine Füllkiesel in den Lücken
+      ctx.lineWidth = lw * 0.7;
+      for (let k = 0; k < 14; k++) {
+        const cx = rand() * s;
+        const cy = rand() * s;
+        const rx = cell * (0.08 + rand() * 0.08);
+        for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
+          blob(ctx, cx + dx, cy + dy, rx, rx * 0.85, rand() * Math.PI, rng(k * 7919 + 13), 0.2, 7);
+        }
+      }
+      break;
+    }
+    case "pflasterung_01": {
+      // Pflasterverband: versetzte Rechtecke unterschiedlicher Größe
+      ctx.lineWidth = lw * 1.6;
+      const h = s / 4;
+      const rows: [number, number][][] = [
+        [[0, 0.55], [0.55, 0.45]],
+        [[0, 0.3], [0.3, 0.4], [0.7, 0.3]],
+        [[0, 0.45], [0.45, 0.55]],
+        [[0, 0.35], [0.35, 0.3], [0.65, 0.35]],
+      ];
+      for (let r = 0; r < 4; r++) {
+        const y = r * h;
+        line(ctx, 0, y, s, y);
+        for (const [x0] of rows[r]) {
+          if (x0 <= 0) continue;
+          line(ctx, x0 * s, y, x0 * s, y + h);
+        }
+        line(ctx, 0, y, 0, y + h);
+      }
+      line(ctx, 0, s, s, s);
+      // feine Kratzer als Steintextur
+      ctx.save();
+      ctx.lineWidth = lw * 0.5;
+      const rand = rng(7717);
+      for (let k = 0; k < 12; k++) {
+        const x = rand() * s, y = rand() * s, l = s * 0.05;
+        line(ctx, x, y, x + l, y - l);
+      }
+      ctx.restore();
+      break;
+    }
+    case "naturstein": {
+      // Bruchsteinmauerwerk: große unregelmäßige Steine mit kräftiger Fuge
+      const rand = rng(48271);
+      ctx.lineWidth = lw * 2.0;
+      const n = 3;
+      const cell = s / n;
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          const cx = (i + 0.5 + (rand() - 0.5) * 0.3) * cell;
+          const cy = (j + 0.5 + (rand() - 0.5) * 0.3) * cell;
+          const rx = cell * (0.40 + rand() * 0.08);
+          const ry = cell * (0.36 + rand() * 0.1);
+          for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
+            blob(ctx, cx + dx, cy + dy, rx, ry, (rand() - 0.5) * 0.4, rng(i * 131 + j * 17), 0.14, 8);
+          }
+        }
+      }
+      // kleine Zwickelsteine
+      ctx.lineWidth = lw * 1.2;
+      for (let k = 0; k < 6; k++) {
+        const cx = rand() * s, cy = rand() * s, r = cell * 0.1;
+        for (const dx of [-s, 0, s]) for (const dy of [-s, 0, s]) {
+          blob(ctx, cx + dx, cy + dy, r, r * 0.8, rand(), rng(k * 613 + 5), 0.25, 6);
+        }
+      }
+      break;
+    }
     case "sand": {
       const pts: [number, number][] = [
         [0.12, 0.18], [0.42, 0.1], [0.72, 0.24], [0.9, 0.6],
@@ -165,6 +309,45 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       for (let i = 0; i < 5; i++) line(ctx, (i / 5) * s, 0, (i / 5) * s, s);
       break;
     }
+    case "holzdielen_01": {
+      // Liegende Dielen mit versetzten Stößen und feiner Maserung
+      const rows = 4;
+      const h = s / rows;
+      const joints = [0.62, 0.18, 0.8, 0.4];
+      const rand = rng(90210);
+      for (let r = 0; r < rows; r++) {
+        const y = r * h;
+        ctx.lineWidth = lw * 1.3;
+        line(ctx, 0, y, s, y);
+        line(ctx, joints[r] * s, y, joints[r] * s, y + h);
+        // Maserung
+        ctx.lineWidth = lw * 0.45;
+        for (let g = 1; g <= 5; g++) {
+          const gy = y + (g / 6) * h;
+          const amp = h * 0.06 * (0.4 + rand());
+          const ph = rand() * Math.PI * 2;
+          ctx.beginPath();
+          for (let i = 0; i <= 32; i++) {
+            const x = (i / 32) * s;
+            const yy = gy + Math.sin((x / s) * Math.PI * 4 + ph) * amp;
+            if (i === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+          }
+          ctx.stroke();
+        }
+        // Astauge
+        ctx.lineWidth = lw * 0.45;
+        const kx = (0.2 + rand() * 0.6) * s;
+        const ky = y + h * 0.5;
+        for (let e = 1; e <= 3; e++) {
+          ctx.beginPath();
+          ctx.ellipse(kx, ky, h * 0.06 * e, h * 0.03 * e, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      ctx.lineWidth = lw * 1.3;
+      line(ctx, 0, s, s, s);
+      break;
+    }
     case "erdreich": {
       // Diagonale Bänder mit senkrechten Sprossen (klassische Erdreich-Schraffur)
       const d = s;              // Bandraster (Y-Achsenabschnitt)
@@ -183,14 +366,15 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "daemmung_weich": {
-      // Weiche Dämmung: aneinandergereihte, bauchige Schlaufen
-      const w = s / 2;
+      // Wärmedämmung weich: Schlaufenkette wie im Wandmuster
+      const r = s * 0.45;
       for (let i = -1; i <= 2; i++) {
-        const cx = i * w;
+        const cx = i * s;
         ctx.beginPath();
-        ctx.moveTo(cx, s);
-        ctx.bezierCurveTo(cx + w * 0.02, s * 0.4, cx + w * 0.12, 0, cx + w * 0.5, 0);
-        ctx.bezierCurveTo(cx + w * 0.88, 0, cx + w * 0.98, s * 0.4, cx + w, s);
+        ctx.arc(cx, r, r, Math.PI, 0);
+        ctx.lineTo(cx + s * 0.5 - r, s - r);
+        ctx.arc(cx + s * 0.5, s - r, r, Math.PI, 0, true);
+        ctx.lineTo(cx + s, r);
         ctx.stroke();
       }
       break;
@@ -212,16 +396,15 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       break;
     }
     case "daemmung_hart": {
-
-      // Harte Dämmung: Zickzacklinien
-      const rows = 3;
-      const zig = s / 6;
-      for (let r = 0; r <= rows; r++) {
-        const y0 = (r / rows) * s;
+      // Wasser: liegende Wellenlinien
+      const rows = 4;
+      for (let r = 0; r < rows; r++) {
+        const y0 = ((r + 0.5) / rows) * s;
+        const amp = s * 0.06;
         ctx.beginPath();
-        for (let i = 0; i <= 6; i++) {
-          const x = i * zig;
-          const y = y0 + (i % 2 === 0 ? 0 : zig * 0.8);
+        for (let i = 0; i <= 40; i++) {
+          const x = (i / 40) * s;
+          const y = y0 + Math.sin((x / s) * Math.PI * 2 + (r % 2 ? Math.PI : 0)) * amp;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.stroke();
@@ -249,6 +432,24 @@ function drawTile(ctx: CanvasRenderingContext2D, id: HatchPatternId, s: number, 
       ctx.restore();
       break;
     }
+    case "abdichtung_01": {
+      // Durchgehendes Band aus abwechselnd gefüllten und leeren Feldern
+      const h = s * 0.34;
+      const y = (s - h) / 2;
+      const n = 4;
+      const w = s / n;
+      ctx.save();
+      ctx.lineWidth = lw * 0.9;
+      ctx.lineJoin = "miter";
+      ctx.strokeRect(0, y, s, h);
+      for (let i = 0; i < n; i++) {
+        const x = i * w;
+        if (i % 2 === 0) ctx.fillRect(x, y, w, h);
+        else line(ctx, x, y, x, y + h);
+      }
+      ctx.restore();
+      break;
+    }
   }
 
 }
@@ -264,7 +465,13 @@ export function getPatternTile(id: HatchPatternId, sizePx: number, color: string
   const c = document.createElement("canvas");
   c.width = s; c.height = s;
   const ctx = c.getContext("2d")!;
-  drawTile(ctx, id, s, color, lw);
+  if (isCustomPatternId(id)) {
+    const img = getCustomPatternImage(id);
+    if (!img) return c; // noch nicht geladen: nicht cachen
+    ctx.drawImage(img, 0, 0, s, s);
+  } else {
+    drawTile(ctx, id as BuiltinHatchPatternId, s, color, lw);
+  }
   if (tileCache.size > 120) tileCache.clear();
   tileCache.set(key, c);
   return c;
