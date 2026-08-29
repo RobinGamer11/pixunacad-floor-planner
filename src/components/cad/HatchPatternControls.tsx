@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Check, Grid2X2 } from "lucide-react";
-import { HATCH_PATTERNS } from "@/cad/hatchPatterns";
+import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
 
 /** Regler + Zahlenfeld: grob per Slider, fein per Eingabe/Pfeiltasten. */
 const SliderRow: React.FC<{
