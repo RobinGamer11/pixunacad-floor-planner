@@ -3,7 +3,11 @@ import {
   DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN,
   type RoughenParams, type StrokePatternKind, type StrokePatternParams,
 } from "@/cad/strokeEffects";
-import { BRUSH_PRESETS, brushPresetInfo, renderBrushPreview, type BrushPresetId } from "@/cad/brushStrokes";
+import {
+  BRUSH_PRESETS, brushPresetInfo, renderBrushPreview, isBrushPreviewCalm, setBrushPreviewCalm,
+  type BrushPresetId,
+} from "@/cad/brushStrokes";
+import { applyBrushSizeDefaults } from "@/cad/brushSizeDefaults";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
