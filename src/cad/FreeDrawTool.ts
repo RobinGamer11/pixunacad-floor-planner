@@ -112,14 +112,24 @@ export class FreeDrawTool {
       }
       if (!input.mouse.left) {
         // Commit
-        const rawPressures = this._pressures.slice();
+        const srcPts = this._points.slice();
+        const srcPressures = this._pressures.slice();
         const raw = dedupePoints(this._points);
         const useAuto = !!this.app.defaultFreeAutoShape;
         let pts = useAuto ? autoShapePoints(raw) : raw;
-        // Druckwerte auf die tatsächlich gespeicherten Punkte abbilden.
-        const pressures = (!useAuto && rawPressures.length >= raw.length)
-          ? mapPressures(this._pointsBeforeDedupe, rawPressures, raw)
+        // Druckwerte auf die tatsächlich gespeicherten Punkte abbilden
+        // (nächstgelegener Originalpunkt).
+        const pressures = srcPressures.length
+          ? pts.map((p) => {
+              let best = 0, bestD = Infinity;
+              for (let i = 0; i < srcPts.length; i++) {
+                const dd = (srcPts[i].x - p.x) ** 2 + (srcPts[i].y - p.y) ** 2;
+                if (dd < bestD) { bestD = dd; best = i; }
+              }
+              return srcPressures[best] ?? 0.55;
+            })
           : null;
+
         this._drawing = false;
         this._points = [];
         this._pressures = [];
