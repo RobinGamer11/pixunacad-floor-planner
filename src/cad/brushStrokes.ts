@@ -544,7 +544,7 @@ function renderBrushLive(
   st.lctx.setTransform(a, 0, 0, d, e, f);
 
   const sampler = new PathSampler(m.worldPts, m.closed, req.project, m.refPerWorld, req.pressures);
-  const bc = makeBrushCtx(style, info, m.P, m.phaseRef);
+  const bc = makeBrushCtx(style, info, m.P, m.phaseRef, m.sizePx);
   st.done = paintBrush(st.lctx, sampler, style.preset, bc, m.closed, st.done, fullRepaint, st.paint);
   st.count = m.worldPts.length;
 
