@@ -661,7 +661,8 @@ function paintMarker(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx,
 function stampSpray(ctx: CanvasRenderingContext2D, p: { x: number; y: number; pressure: number },
                     o: BrushCtx, rng: () => number) {
   const radius = o.size * 0.5;
-  const dots = Math.ceil(3 + o.size * 0.07 * lerp(0.6, 1.35, p.pressure));
+  const base = Math.ceil(3 + o.size * 0.07 * lerp(0.6, 1.35, p.pressure));
+  const dots = Math.max(2, Math.round(base * o.detail));
   for (let i = 0; i < dots; i++) {
     const angle = rng() * Math.PI * 2;
     const r = radius * Math.sqrt(rng());
@@ -669,7 +670,7 @@ function stampSpray(ctx: CanvasRenderingContext2D, p: { x: number; y: number; pr
     ctx.arc(
       p.x + Math.cos(angle) * r * o.P,
       p.y + Math.sin(angle) * r * o.P,
-      Math.max(0.2, (0.35 + rng() * 1.3) * o.P),
+      Math.max(o.minPx, (0.35 + rng() * 1.3) * o.P),
       0, Math.PI * 2,
     );
     ctx.fillStyle = rgba(o.col, o.opacity * (0.08 + rng() * 0.28));
