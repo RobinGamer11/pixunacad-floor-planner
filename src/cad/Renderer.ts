@@ -3125,7 +3125,13 @@ export class Renderer {
 
   private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null, liveKey?: string) {
     if (!s.points || s.points.length < 2) return;
-    if (s.lineStyle === "blob" && colorOverride === null) {
+    // Ein aktiver Stift (gemeinsame Linienart) hat Vorrang vor den alten
+    // Freihand-Sonderstilen. Sonst würden Bestandsobjekte mit z. B.
+    // lineStyle "brush"/"spray" weiterhin im Legacy-Zweig landen und der
+    // eingestellte Stift bliebe wirkungslos.
+    const brushPattern = (s as any).strokePattern?.kind === "brush";
+    if (!brushPattern && s.lineStyle === "blob" && colorOverride === null) {
+
       this._drawFreeStrokeBlobs(s);
       return;
     }
