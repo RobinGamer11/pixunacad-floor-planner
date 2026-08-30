@@ -3,7 +3,11 @@ import {
   DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN,
   type RoughenParams, type StrokePatternKind, type StrokePatternParams,
 } from "@/cad/strokeEffects";
-import { BRUSH_PRESETS, brushPresetInfo, renderBrushPreview, type BrushPresetId } from "@/cad/brushStrokes";
+import {
+  BRUSH_PRESETS, brushPresetInfo, renderBrushPreview, isBrushPreviewCalm, setBrushPreviewCalm,
+  type BrushPresetId,
+} from "@/cad/brushStrokes";
+import { applyBrushSizeDefaults } from "@/cad/brushSizeDefaults";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -196,10 +200,15 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
     applyPattern({
       kind: "brush",
       brushPreset: id as BrushPresetId,
-      // Farbe, Stärke und Deckkraft bleiben unangetastet.
       brushCharacter: pattern.brushPreset === id ? brushCharacter : (info?.character ?? 50),
     });
+    // Stift-Standardgrößen: Mappe 400 px, CAD 50 cm, Marker 30 % Deckkraft.
+    applyBrushSizeDefaults(app, kind, id, targets);
+    commit();
   };
+
+  const [calm, setCalm] = useState(() => isBrushPreviewCalm());
+  const toggleCalm = () => { const next = !calm; setBrushPreviewCalm(next); setCalm(next); commit(); };
 
   return (
     <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
@@ -264,6 +273,10 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
                   onDragStart={dragStart} onDragEnd={dragEnd}
                 />
               )}
+              <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <input type="checkbox" checked={calm} onChange={toggleCalm} className="accent-foreground" />
+                Ruhige Vorschau beim Zeichnen (Stift erst beim Loslassen)
+              </label>
               <div className="text-[11px] text-muted-foreground">
                 Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
               </div>

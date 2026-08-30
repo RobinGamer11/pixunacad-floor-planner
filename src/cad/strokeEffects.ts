@@ -11,7 +11,7 @@
  */
 
 import type { Vec2 } from "./geometry";
-import { isBrushPresetId, brushPresetInfo, renderBrushStroke, type BrushPresetId } from "./brushStrokes";
+import { isBrushPresetId, brushPresetInfo, renderBrushStroke, type BrushPresetId , isBrushPreviewCalm } from "./brushStrokes";
 
 // ---------------------------------------------------------------- Typen
 
@@ -419,6 +419,8 @@ export function strokeWithBrushIfActive(
   const preset = pattern.brushPreset;
   if (!isBrushPresetId(preset)) return false;
   if (!worldPts || worldPts.length < 1) return true;
+  // Ruhige Vorschau: laufende Live-Vorschau ohne Stempel zeichnen.
+  if (opts.liveKey && isBrushPreviewCalm()) return false;
 
   const roughened = !!opts.roughen?.enabled;
   const pts = roughened
