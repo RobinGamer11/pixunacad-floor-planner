@@ -380,10 +380,15 @@ function paintSpray(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx) 
 
 // ---------------------------------------------------------------- Halftone
 // Referenz: halftoneBrush() / stampHalftone()
-const HALFTONE_CFG = {
+interface HalftoneCfg {
+  spacingFactor: number; stampRadius: number; grid: number; dotMax: number;
+  density: number; alphaMin: number; alphaMax: number;
+}
+
+const HALFTONE_CFG: Record<"halftoneFine" | "halftoneBold", HalftoneCfg> = {
   halftoneFine: { spacingFactor: .15, stampRadius: .32, grid: 4, dotMax: 1.35, density: .92, alphaMin: .10, alphaMax: .34 },
   halftoneBold: { spacingFactor: .26, stampRadius: .46, grid: 6, dotMax: 2.85, density: .84, alphaMin: .10, alphaMax: .42 },
-} as const;
+};
 
 function paintHalftone(ctx: CanvasRenderingContext2D, S: PathSampler,
                        variant: "halftoneFine" | "halftoneBold", o: BrushCtx) {
@@ -398,7 +403,7 @@ function paintHalftone(ctx: CanvasRenderingContext2D, S: PathSampler,
 }
 
 function stampHalftone(ctx: CanvasRenderingContext2D, point: { x: number; y: number; pressure: number },
-                       cfg: typeof HALFTONE_CFG["halftoneFine"], o: BrushCtx, rng: () => number) {
+                       cfg: HalftoneCfg, o: BrushCtx, rng: () => number) {
   const pressure = point.pressure || NEUTRAL_PRESSURE;
   const radius = o.size * cfg.stampRadius * lerp(.7, 1.25, pressure);
   const grid = cfg.grid;
@@ -531,7 +536,7 @@ function makeBristles(variant: keyof typeof BRISTLE_CFG, seed: number, character
   const rng = makeRng(seed, 0);
   const out: Bristle[] = [];
   for (let i = 0; i < cfg.count; i++) {
-    const u = cfg.count === 1 ? 0 : i / (cfg.count - 1);
+    const u = i / Math.max(1, cfg.count - 1);
     let across = lerp(-.5, .5, u);
     across += randomNormal(rng) * (variant === "bristleCoarse" ? .018 : .010);
     const edge = Math.pow(Math.abs(across) * 2, 1.8);
