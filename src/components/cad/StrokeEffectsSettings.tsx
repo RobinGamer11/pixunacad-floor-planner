@@ -3,6 +3,7 @@ import {
   DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN,
   type RoughenParams, type StrokePatternKind, type StrokePatternParams,
 } from "@/cad/strokeEffects";
+import { BRUSH_PRESETS, brushPresetInfo, type BrushPresetId } from "@/cad/brushStrokes";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
