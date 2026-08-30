@@ -557,17 +557,6 @@ const HALFTONE_CFG: Record<"halftoneFine" | "halftoneBold", HalftoneCfg> = {
   halftoneBold: { spacingFactor: .26, stampRadius: .46, grid: 6, dotMax: 2.85, density: .84, alphaMin: .10, alphaMax: .42 },
 };
 
-function paintHalftone(ctx: CanvasRenderingContext2D, S: PathSampler,
-                       variant: "halftoneFine" | "halftoneBold", o: BrushCtx) {
-  const cfg = HALFTONE_CFG[variant];
-  const spacing = Math.max(5, o.size * cfg.spacingFactor);
-  ctx.save();
-  for (let d = 0; d <= S.total + 1e-6; d += spacing) {
-    const gi = Math.round((o.phase + d) / spacing);
-    stampHalftone(ctx, S.at(d), cfg, o, makeRng(o.seed, gi));
-  }
-  ctx.restore();
-}
 
 function stampHalftone(ctx: CanvasRenderingContext2D, point: { x: number; y: number; pressure: number },
                        cfg: HalftoneCfg, o: BrushCtx, rng: () => number) {
