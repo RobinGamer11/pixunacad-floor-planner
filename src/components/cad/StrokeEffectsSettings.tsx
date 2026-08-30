@@ -243,7 +243,9 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
               label={b.label}
               active={activeBrush === b.id}
               onClick={() => selectBrush(activeBrush === b.id ? "" : b.id)}
+              character={activeBrush === b.id ? brushCharacter : undefined}
             />
+
           ))}
         </div>
 
