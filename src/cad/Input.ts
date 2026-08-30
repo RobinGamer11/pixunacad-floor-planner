@@ -55,9 +55,23 @@ export function setLmbHint(on: boolean) {
 
 
 
+/**
+ * Pointer-Druck wie in der Stift-Referenz: echter Druck nur bei Stiften,
+ * sonst der neutrale Ersatzwert.
+ */
+function readPointerPressure(e: PointerEvent): number {
+  if (e.pointerType === "pen" && typeof e.pressure === "number" && e.pressure > 0) {
+    return Math.max(0.01, Math.min(1, e.pressure));
+  }
+  if (e.pointerType === "touch" && typeof e.pressure === "number" && e.pressure > 0 && e.pressure !== 0.5) {
+    return Math.max(0.01, Math.min(1, e.pressure));
+  }
+  return 0.55;
+}
+
 export class Input {
   canvas: HTMLCanvasElement;
-  mouse = { sx: 0, sy: 0, wx: 0, wy: 0, left: false, mid: false, right: false };
+  mouse = { sx: 0, sy: 0, wx: 0, wy: 0, left: false, mid: false, right: false, pressure: 0.55 };
   private _keys = { shift: false, space: false };
   /** Shift/Space — das Tablet-Hilfsrad kann Shift sticky halten (globales Flag). */
   get keys() {
@@ -126,6 +140,7 @@ export class Input {
       const r = c.getBoundingClientRect();
       this.mouse.sx = e.clientX - r.left;
       this.mouse.sy = e.clientY - r.top;
+      this.mouse.pressure = readPointerPressure(e);
 
       // Multi-Touch: Pinch/Two-Finger-Pan
       if (e.pointerType === "touch" && this._touches.has(e.pointerId)) {
@@ -212,6 +227,7 @@ export class Input {
         const r = c.getBoundingClientRect();
         this.mouse.sx = e.clientX - r.left;
         this.mouse.sy = e.clientY - r.top;
+        this.mouse.pressure = readPointerPressure(e);
       }
 
       // ---- Touch (Finger) ----
