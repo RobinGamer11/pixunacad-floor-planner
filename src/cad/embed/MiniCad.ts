@@ -1361,6 +1361,13 @@ export class MiniCad {
         imageSizeM: s.imageSizeM,
         imageSpacingM: s.imageSpacingM,
         imageRotateAlongPath: s.imageRotateAlongPath,
+        // Stift-relevante Objektdaten: Druckverlauf, Phase nach dem Radieren
+        // und Herkunft. Ohne sie wuerde ein geladener Strich mit anderer
+        // Stempelphase neu gezeichnet.
+        pressures: Array.isArray(s.pressures) ? s.pressures.slice() : undefined,
+        sourceStartDistanceM: s.sourceStartDistanceM,
+        sourceStrokeId: s.sourceStrokeId,
+        autoShape: (s as any).autoShape,
         ...copyStrokeEffects(s),
       })),
 
@@ -1489,6 +1496,10 @@ export class MiniCad {
             smoothing: s.smoothing, labelId: s.labelId || Defaults.defaultLabelId,
             imageSrc: s.imageSrc || null, imageSizeM: s.imageSizeM,
             imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
+            pressures: Array.isArray(s.pressures) ? s.pressures.slice() : null,
+            sourceStartDistanceM: s.sourceStartDistanceM ?? 0,
+            sourceStrokeId: s.sourceStrokeId,
+            autoShape: s.autoShape,
             ...copyStrokeEffects(s),
           });
         } catch (e) { console.error("MiniCad restore freeStroke:", e); }
