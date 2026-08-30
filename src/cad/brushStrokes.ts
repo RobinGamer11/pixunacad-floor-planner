@@ -341,7 +341,16 @@ interface BrushCtx {
   P: number;
   /** Phase in Referenz-Pixeln. */
   phase: number;
+  /**
+   * Detailgrad 0.1–1 (LOD). Bei sehr dünn dargestellten Linien wird die Anzahl
+   * der Stempel, Partikel und Borsten reduziert, damit charakteristische
+   * Lücken sichtbar bleiben statt zu einer Vollfläche zu verschmelzen.
+   */
+  detail: number;
+  /** Kleinste sinnvolle Strukturgröße in Ausgabepixeln. */
+  minPx: number;
 }
+
 
 /** Fortgeschriebener Zustand eines Stiftes (Borsten-Farbverbrauch, Weglänge). */
 interface PaintState { bristles?: Bristle[]; travel?: number }
