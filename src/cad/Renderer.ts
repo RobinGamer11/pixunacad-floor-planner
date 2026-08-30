@@ -3123,7 +3123,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null) {
+  private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null, liveKey?: string) {
     if (!s.points || s.points.length < 2) return;
     if (s.lineStyle === "blob" && colorOverride === null) {
       this._drawFreeStrokeBlobs(s);
