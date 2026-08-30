@@ -196,10 +196,15 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
     applyPattern({
       kind: "brush",
       brushPreset: id as BrushPresetId,
-      // Farbe, Stärke und Deckkraft bleiben unangetastet.
       brushCharacter: pattern.brushPreset === id ? brushCharacter : (info?.character ?? 50),
     });
+    // Stift-Standardgrößen: Mappe 400 px, CAD 50 cm, Marker 30 % Deckkraft.
+    applyBrushSizeDefaults(app, kind, id, targets);
+    commit();
   };
+
+  const [calm, setCalm] = useState(() => isBrushPreviewCalm());
+  const toggleCalm = () => { const next = !calm; setBrushPreviewCalm(next); setCalm(next); commit(); };
 
   return (
     <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
