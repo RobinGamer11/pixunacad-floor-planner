@@ -806,6 +806,7 @@ export class CadApp {
         imageSpacingM: s.imageSpacingM, imageRotateAlongPath: s.imageRotateAlongPath,
         sourceStartDistanceM: (s as any).sourceStartDistanceM || 0,
         sourceStrokeId: (s as any).sourceStrokeId || null,
+        pressures: (s as any).pressures ? [...(s as any).pressures] : null,
         ...copyStrokeEffects(s),
         _stickerEditOwnerId: s._stickerEditOwnerId || null,
       })),

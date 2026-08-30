@@ -18,6 +18,8 @@ export class FreeDrawTool {
 
   private _drawing = false;
   private _points: Vec2[] = [];
+  /** Pointer-Druck je gesammeltem Punkt (0–1). */
+  private _pressures: number[] = [];
   private _lastSamplePx: { x: number; y: number } | null = null;
   private _rulerDrag!: RulerDragController;
 
@@ -29,6 +31,7 @@ export class FreeDrawTool {
   activate() {
     this._drawing = false;
     this._points = [];
+    this._pressures = [];
     this._lastSamplePx = null;
     this._rulerDrag.reset();
     this.app.hub.hide();
@@ -40,6 +43,7 @@ export class FreeDrawTool {
   cancel() {
     this._drawing = false;
     this._points = [];
+    this._pressures = [];
     this._lastSamplePx = null;
   }
 
@@ -57,7 +61,7 @@ export class FreeDrawTool {
     // Ruler-Manipulation hat Vorrang vor dem Zeichnen.
     if (this._rulerDrag.update(input)) {
       // Sicherheit: laufendes Drawing abbrechen
-      if (this._drawing) { this._drawing = false; this._points = []; this._lastSamplePx = null; }
+      if (this._drawing) { this._drawing = false; this._points = []; this._pressures = []; this._lastSamplePx = null; }
       return;
     }
     const ruler = this.app.scene.rulerGuide;
@@ -79,6 +83,7 @@ export class FreeDrawTool {
     if (!this._drawing && input.mouse.left && input.clicked) {
       this._drawing = true;
       this._points = [v(projW.x, projW.y)];
+      this._pressures = [(input.mouse as any).pressure ?? 0.55];
       this._lastSamplePx = { x: input.mouse.sx, y: input.mouse.sy };
       return;
     }
@@ -89,6 +94,7 @@ export class FreeDrawTool {
       if (!this._lastSamplePx ||
           Math.hypot(input.mouse.sx - this._lastSamplePx.x, input.mouse.sy - this._lastSamplePx.y) >= minPx) {
         this._points.push(v(projW.x, projW.y));
+        this._pressures.push((input.mouse as any).pressure ?? 0.55);
         this._lastSamplePx = { x: input.mouse.sx, y: input.mouse.sy };
       }
       // Distanz-Hub: Pfadlänge ab Stroke-Start + aktueller Vektorwinkel
@@ -106,16 +112,33 @@ export class FreeDrawTool {
       }
       if (!input.mouse.left) {
         // Commit
+        const srcPts = this._points.slice();
+        const srcPressures = this._pressures.slice();
         const raw = dedupePoints(this._points);
         const useAuto = !!this.app.defaultFreeAutoShape;
         let pts = useAuto ? autoShapePoints(raw) : raw;
+        // Druckwerte auf die tatsächlich gespeicherten Punkte abbilden
+        // (nächstgelegener Originalpunkt).
+        const pressures = srcPressures.length
+          ? pts.map((p) => {
+              let best = 0, bestD = Infinity;
+              for (let i = 0; i < srcPts.length; i++) {
+                const dd = (srcPts[i].x - p.x) ** 2 + (srcPts[i].y - p.y) ** 2;
+                if (dd < bestD) { bestD = dd; best = i; }
+              }
+              return srcPressures[best] ?? 0.55;
+            })
+          : null;
+
         this._drawing = false;
         this._points = [];
+        this._pressures = [];
         this._lastSamplePx = null;
         this.app.hub.hide();
         if (pts.length >= 2 && this._pathLength(pts) > 1e-4) {
           const stroke = this.app.scene.createFreeStroke(pts, {
             ...this._currentStyle(),
+            pressures,
             autoShape: useAuto,
             autoShapeSource: useAuto ? raw : null,
           });
@@ -160,7 +183,7 @@ export class FreeDrawTool {
   private _drawOverlay(ctx: CanvasRenderingContext2D, _cam: any) {
     if (this._drawing && this._points.length >= 2) {
       const style = this._currentStyle();
-      this.app.renderer.drawFreeStrokePreview(this._points, style);
+      this.app.renderer.drawFreeStrokePreview(this._points, style, this._pressures);
     }
   }
 }

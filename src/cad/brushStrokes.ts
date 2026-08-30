@@ -4,19 +4,18 @@
  *
  * Grundsätze
  * ----------
- * - Rein additiv: Ohne gesetztes `brushPreset` bleibt der bisherige Renderer
- *   vollständig unverändert.
- * - Kein `Math.random()` beim Rendern. Jede Verteilung stammt aus einem
- *   deterministischen, am Objekt gespeicherten Seed (`brushSeed`) und der
- *   Bogenlänge des Pfades — dadurch stabil bei Zoom, Pan, Auswahl, Export,
- *   Radieren und beim Wechsel zwischen CAD und Projektmappe.
- * - Physische Größe: Die Pinselbreite folgt immer der Linienstärke in
- *   Bildschirm-Pixeln (also der projizierten Welt-/Papierbreite).
- * - Aquarell, Spray und Halftone werden objektweise in einer transparenten
- *   Offscreen-Ebene erzeugt; `destination-out` (Blüten) wirkt ausschließlich
- *   dort und kann keine fremden CAD-Objekte löschen.
- *
- * Der Charakter der acht Pinsel folgt der Referenzdatei „Brush Lab Mobile v7“.
+ * - Die Algorithmen, Konstanten und Abläufe stammen 1:1 aus der Referenzdatei
+ *   „brush_lab_mobile_v7_nur_deine_favoriten.html“ (BrushEngine).
+ *   Zulässige technische Abweichungen sind ausschließlich:
+ *     1. fester Zufalls-Seed pro Objekt statt `Math.random()`,
+ *     2. Umrechnung der Referenz-Pixel in CAD-/Papierkoordinaten,
+ *     3. Einbindung in das gemeinsame Kontur-Modell (`strokeEffects.ts`).
+ * - Alle Stempel-/Borstenpositionen werden aus der kumulierten Pfadlänge in
+ *   Objekt-/Weltkoordinaten abgeleitet (zzgl. Phase `sourceStartDistanceM`).
+ *   Dadurch bleibt ein bereits gezeichneter Abschnitt beim Weiterzeichnen,
+ *   Zoomen, Scrollen, Speichern, Radieren und Exportieren unverändert.
+ * - Aquarell nutzt eine transparente Offscreen-Ebene; `destination-out`
+ *   (Blüten) wirkt ausschließlich dort und kann keine fremden Objekte löschen.
  */
 
 export type BrushPresetId =
@@ -34,19 +33,21 @@ export interface BrushPresetInfo {
   label: string;
   /** Standard-Charakter (0–100) aus der Referenzdatei. */
   character: number;
+  /** Referenzgröße (`size`) der Vorlage — Basis der Konstanten-Umrechnung. */
+  refSize: number;
   /** Nutzt der Quellalgorithmus einen Federwinkel? (bei allen acht: nein) */
   usesAngle: boolean;
 }
 
 export const BRUSH_PRESETS: BrushPresetInfo[] = [
-  { id: "watercolorSpatterBloom", label: "Aqua Blüten-Spritzer", character: 68, usesAngle: false },
-  { id: "bristleFine", label: "Borste fein", character: 42, usesAngle: false },
-  { id: "bristleDry", label: "Borste trocken", character: 72, usesAngle: false },
-  { id: "bristleCoarse", label: "Borste grob", character: 60, usesAngle: false },
-  { id: "marker", label: "Marker", character: 40, usesAngle: false },
-  { id: "spray", label: "Spray", character: 55, usesAngle: false },
-  { id: "halftoneFine", label: "Halftone fein", character: 52, usesAngle: false },
-  { id: "halftoneBold", label: "Halftone grob", character: 60, usesAngle: false },
+  { id: "watercolorSpatterBloom", label: "Aqua Blüten-Spritzer", character: 68, refSize: 46, usesAngle: false },
+  { id: "bristleFine", label: "Borste fein", character: 42, refSize: 58, usesAngle: false },
+  { id: "bristleDry", label: "Borste trocken", character: 72, refSize: 62, usesAngle: false },
+  { id: "bristleCoarse", label: "Borste grob", character: 60, refSize: 64, usesAngle: false },
+  { id: "marker", label: "Marker", character: 40, refSize: 36, usesAngle: false },
+  { id: "spray", label: "Spray", character: 55, refSize: 46, usesAngle: false },
+  { id: "halftoneFine", label: "Halftone fein", character: 52, refSize: 30, usesAngle: false },
+  { id: "halftoneBold", label: "Halftone grob", character: 60, refSize: 42, usesAngle: false },
 ];
 
 export const BRUSH_IDS = BRUSH_PRESETS.map((b) => b.id);
@@ -59,6 +60,9 @@ export function brushPresetInfo(id: any): BrushPresetInfo | null {
   return BRUSH_PRESETS.find((b) => b.id === id) || null;
 }
 
+/** Neutraler Ersatzdruck der Referenz, wenn kein Stiftdruck vorliegt. */
+export const NEUTRAL_PRESSURE = 0.55;
+
 // ------------------------------------------------------------------ Zufall
 
 function hash32(a: number, b: number): number {
@@ -68,7 +72,11 @@ function hash32(a: number, b: number): number {
   return (h ^ (h >>> 15)) >>> 0;
 }
 
-/** Deterministischer Zufallsstrom für eine Stempelposition. */
+/**
+ * Deterministischer Zufallsstrom. `index` ist immer ein GLOBALER Index, der
+ * ausschließlich aus der Pfaddistanz (inkl. Phase) abgeleitet wird — deshalb
+ * bleibt jeder bereits erzeugte Abschnitt identisch.
+ */
 function makeRng(seed: number, index: number): () => number {
   let s = hash32(seed >>> 0, index | 0) || 1;
   return () => {
@@ -79,7 +87,8 @@ function makeRng(seed: number, index: number): () => number {
   };
 }
 
-function normalFrom(rng: () => number): number {
+/** Referenz: randomNormal() */
+function randomNormal(rng: () => number): number {
   let u = rng(); let v = rng();
   if (u <= 0) u = 1e-6;
   if (v <= 0) v = 1e-6;
@@ -110,6 +119,7 @@ function parseColor(input: string): Rgb {
   return { r: 0, g: 0, b: 0, a: 1 };
 }
 
+/** Referenz: rgba(hex,a) */
 function rgba(c: Rgb, a: number): string {
   return `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${clamp(a * c.a, 0, 1)})`;
 }
@@ -117,29 +127,55 @@ function rgba(c: Rgb, a: number): string {
 // ------------------------------------------------------------------ Pfad
 
 export interface ScreenPoint { x: number; y: number }
+interface WorldPoint { x: number; y: number }
 
-function resample(pts: ScreenPoint[], closed: boolean, spacing: number): ScreenPoint[] {
-  const src = closed && pts.length > 2 ? [...pts, pts[0]] : pts;
-  if (src.length < 2) return src.slice();
-  const step = Math.max(0.5, spacing);
-  const out: ScreenPoint[] = [{ x: src[0].x, y: src[0].y }];
-  let carry = 0;
-  for (let i = 1; i < src.length; i++) {
-    const a = src[i - 1], b = src[i];
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    if (len < 1e-9) continue;
-    let d = step - carry;
-    while (d <= len) {
-      const t = d / len;
-      out.push({ x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) });
-      d += step;
+/**
+ * Abtastung des Pfades entlang der Referenz-Distanz.
+ *
+ * Distanzen werden in „Referenz-Pixeln“ geführt: 1 Referenz-Pixel entspricht
+ * `sizePx / refSize` Bildschirmpixeln bzw. dem gleichen physischen Anteil der
+ * Linienstärke. Dadurch gelten alle Konstanten der Vorlage unverändert und die
+ * Struktur ist zoom-, pan- und exportstabil.
+ */
+class PathSampler {
+  screen: ScreenPoint[] = [];
+  press: number[] = [];
+  cum: number[] = [0];
+  total = 0;
+
+  constructor(worldPts: WorldPoint[], closed: boolean, project: (p: WorldPoint) => ScreenPoint,
+              refPerWorld: number, pressures?: number[]) {
+    const src = closed && worldPts.length > 2 ? [...worldPts, worldPts[0]] : worldPts;
+    for (let i = 0; i < src.length; i++) {
+      this.screen.push(project(src[i]));
+      const pr = pressures && pressures.length
+        ? pressures[Math.min(pressures.length - 1, i)]
+        : NEUTRAL_PRESSURE;
+      this.press.push(Number.isFinite(pr) && pr > 0 ? clamp(pr, 0.01, 1) : NEUTRAL_PRESSURE);
     }
-    carry = (len - (d - step));
+    for (let i = 1; i < src.length; i++) {
+      const d = Math.hypot(src[i].x - src[i - 1].x, src[i].y - src[i - 1].y) * refPerWorld;
+      this.cum.push(this.cum[i - 1] + d);
+    }
+    this.total = this.cum[this.cum.length - 1] || 0;
   }
-  const last = src[src.length - 1];
-  const tail = out[out.length - 1];
-  if (Math.hypot(last.x - tail.x, last.y - tail.y) > step * 0.25) out.push({ x: last.x, y: last.y });
-  return out;
+
+  /** Punkt (Bildschirm) + Druck an einer Referenz-Distanz. */
+  at(d: number): { x: number; y: number; pressure: number } {
+    const dist = clamp(d, 0, this.total);
+    let i = 1;
+    while (i < this.cum.length && this.cum[i] < dist) i++;
+    const i0 = Math.max(0, i - 1);
+    const i1 = Math.min(this.cum.length - 1, i);
+    const seg = this.cum[i1] - this.cum[i0] || 1e-9;
+    const t = clamp((dist - this.cum[i0]) / seg, 0, 1);
+    const a = this.screen[i0], b = this.screen[i1];
+    return {
+      x: lerp(a.x, b.x, t),
+      y: lerp(a.y, b.y, t),
+      pressure: lerp(this.press[i0], this.press[i1], t),
+    };
+  }
 }
 
 // ------------------------------------------------------------------ Rendering
@@ -149,7 +185,7 @@ export interface BrushRenderStyle {
   /** 0–100 */
   character: number;
   seed: number;
-  /** Sichtbare Gesamtbreite in Bildschirm-Pixeln. */
+  /** Sichtbare Gesamtbreite in Bildschirm-Pixeln (projizierte Linienstärke). */
   sizePx: number;
   /** CSS-Farbe (hex oder rgba). */
   color: string;
@@ -158,9 +194,20 @@ export interface BrushRenderStyle {
   closed: boolean;
 }
 
-interface CacheEntry { canvas: HTMLCanvasElement; ox: number; oy: number }
-const brushCache = new Map<string, CacheEntry>();
-const MAX_CACHE = 80;
+export interface BrushRenderRequest {
+  worldPts: WorldPoint[];
+  closed: boolean;
+  project: (p: WorldPoint) => ScreenPoint;
+  style: BrushRenderStyle;
+  /** Startdistanz des Abschnitts auf dem Originalpfad (Weltmeter). */
+  phaseM?: number;
+  /** Pointer-Druck je Pfadpunkt (optional). */
+  pressures?: number[];
+  cacheKey?: string;
+}
+
+const brushCache = new Map<string, HTMLCanvasElement>();
+const MAX_CACHE = 60;
 
 function pathSignature(pts: ScreenPoint[], ox: number, oy: number): string {
   let h = 0x811c9dc5;
@@ -171,115 +218,159 @@ function pathSignature(pts: ScreenPoint[], ox: number, oy: number): string {
   return `${pts.length}:${h.toString(36)}`;
 }
 
-/**
- * Zeichnet einen Pinselstrich entlang bereits projizierter Bildschirmpunkte.
- * Das Ergebnis wird pro Objekt und Darstellungsmaßstab zwischengespeichert.
- */
-export function renderBrushStroke(
-  ctx: CanvasRenderingContext2D,
-  screenPts: ScreenPoint[],
-  style: BrushRenderStyle,
-  cacheKey?: string,
-) {
-  if (!screenPts || screenPts.length < 1) return;
-  const size = Math.max(1.5, style.sizePx);
+interface BrushCtx {
+  col: Rgb;
+  opacity: number;
+  /** Referenzgröße des Stiftes (this.size in der Vorlage). */
+  size: number;
+  /** Charakter 0–1 (Vorlage: this.character). */
+  character: number;
+  seed: number;
+  /** Bildschirmpixel je Referenz-Pixel. */
+  P: number;
+  /** Phase in Referenz-Pixeln. */
+  phase: number;
+}
+
+/** Zeichnet den Pinselstrich entlang der Weltgeometrie (mit Offscreen-Cache). */
+export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingContext2D) {
+  const { style } = req;
+  const info = brushPresetInfo(style.preset);
+  if (!info) return;
+  const worldPts = req.worldPts;
+  if (!worldPts || worldPts.length < 1) return;
+
+  const sizePx = Math.max(1.2, style.sizePx);
+  const P = sizePx / info.refSize;                 // Bildschirm-px je Referenz-px
+  const closed = !!style.closed && worldPts.length > 2;
+
+  const screenAll = worldPts.map((p) => req.project(p));
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of screenPts) {
+  for (const p of screenAll) {
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
     minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
   }
-  const pad = Math.ceil(size * 3 + 8);
+  const pad = Math.ceil(sizePx * 3 + 8);
   const ox = Math.floor(minX) - pad;
   const oy = Math.floor(minY) - pad;
   const w = Math.ceil(maxX - minX) + pad * 2;
   const h = Math.ceil(maxY - minY) + pad * 2;
-  // Sicherheitsgrenze: sehr große Flächen nicht offscreen puffern.
   if (w <= 0 || h <= 0 || w * h > 36_000_000) return;
 
-  const key = cacheKey
-    ? `${cacheKey}|${style.preset}|${style.character}|${style.seed}|${size.toFixed(2)}|${style.color}|${style.opacity.toFixed(3)}|${style.closed}|${w}x${h}|${pathSignature(screenPts, minX, minY)}`
+  // Weltlänge → Referenz-Pixel. Die Linienstärke ist physisch, daher ist der
+  // Faktor zoomunabhängig.
+  const worldLen = polyWorldLength(worldPts, closed);
+  const screenLen = polyScreenLength(screenAll, closed);
+  const pxPerWorld = worldLen > 1e-9 ? screenLen / worldLen : 1;
+  const refPerWorld = pxPerWorld / P;
+  const phaseRef = (req.phaseM || 0) * refPerWorld;
+
+  const key = req.cacheKey
+    ? `${req.cacheKey}|${style.preset}|${style.character}|${style.seed}|${sizePx.toFixed(2)}|${style.color}|${style.opacity.toFixed(3)}|${closed}|${phaseRef.toFixed(2)}|${w}x${h}|${pathSignature(screenAll, minX, minY)}`
     : null;
 
-  let entry = key ? brushCache.get(key) : undefined;
-  if (!entry) {
-    const canvas = document.createElement("canvas");
+  let canvas = key ? brushCache.get(key) : undefined;
+  if (!canvas) {
+    canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
     const bctx = canvas.getContext("2d");
     if (!bctx) return;
-    const local = screenPts.map((p) => ({ x: p.x - ox, y: p.y - oy }));
-    paintBrush(bctx, local, style);
-    entry = { canvas, ox, oy };
+    const sampler = new PathSampler(
+      worldPts, closed,
+      (p) => { const s = req.project(p); return { x: s.x - ox, y: s.y - oy }; },
+      refPerWorld, req.pressures,
+    );
+    const bc: BrushCtx = {
+      col: parseColor(style.color),
+      opacity: clamp(style.opacity ?? 1, 0, 1),
+      size: info.refSize,
+      character: clamp((style.character ?? info.character) / 100, 0, 1),
+      seed: (style.seed || 1) >>> 0,
+      P,
+      phase: phaseRef,
+    };
+    paintBrush(bctx, sampler, style.preset, bc, closed);
     if (key) {
       if (brushCache.size > MAX_CACHE) brushCache.clear();
-      brushCache.set(key, entry);
+      brushCache.set(key, canvas);
     }
   }
   ctx.save();
   ctx.setLineDash([]);
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
-  ctx.drawImage(entry.canvas, entry.ox, entry.oy);
+  ctx.drawImage(canvas, ox, oy);
   ctx.restore();
+}
+
+function polyWorldLength(pts: WorldPoint[], closed: boolean): number {
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  if (closed && pts.length > 2) L += Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y);
+  return L;
+}
+function polyScreenLength(pts: ScreenPoint[], closed: boolean): number {
+  return polyWorldLength(pts as WorldPoint[], closed);
 }
 
 /** Leert den Pinsel-Cache (z. B. bei Themenwechsel). */
 export function clearBrushCache() { brushCache.clear(); }
 
-function paintBrush(ctx: CanvasRenderingContext2D, pts: ScreenPoint[], style: BrushRenderStyle) {
-  const col = parseColor(style.color);
-  const character = clamp((style.character ?? 50) / 100, 0, 1);
-  const opacity = clamp(style.opacity ?? 1, 0, 1);
-  const size = Math.max(1.5, style.sizePx);
-  const seed = (style.seed || 1) >>> 0;
-  const closed = !!style.closed && pts.length > 2;
-
-  switch (style.preset) {
-    case "marker": return paintMarker(ctx, pts, { col, opacity, size, closed });
-    case "spray": return paintSpray(ctx, pts, { col, opacity, size, seed, character });
+function paintBrush(ctx: CanvasRenderingContext2D, S: PathSampler, preset: BrushPresetId, o: BrushCtx, closed: boolean) {
+  switch (preset) {
+    case "marker": return paintMarker(ctx, S, o, closed);
+    case "spray": return paintSpray(ctx, S, o);
     case "halftoneFine":
-    case "halftoneBold": return paintHalftone(ctx, pts, style.preset, { col, opacity, size, seed, character, closed });
-    case "watercolorSpatterBloom": return paintWaterSpatter(ctx, pts, { col, opacity, size, seed, character, closed });
+    case "halftoneBold": return paintHalftone(ctx, S, preset, o);
+    case "watercolorSpatterBloom": return paintWaterSpatter(ctx, S, o);
     case "bristleFine":
     case "bristleDry":
-    case "bristleCoarse": return paintBristle(ctx, pts, style.preset, { col, opacity, size, seed, character, closed });
+    case "bristleCoarse": return paintBristle(ctx, S, preset, o);
     default: return;
   }
 }
 
-// ---- Marker: breite gleichmäßige Bahn, eckige Enden, runde Verbindungen ----
-function paintMarker(ctx: CanvasRenderingContext2D, pts: ScreenPoint[], o: { col: Rgb; opacity: number; size: number; closed: boolean }) {
+// ---------------------------------------------------------------- Marker
+// Referenz: markerPreview() — durchgehende Bahn, eckige Enden, runde Ecken.
+function paintMarker(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx, closed: boolean) {
+  const pts = S.screen;
   if (pts.length < 2) return;
   ctx.save();
   ctx.globalAlpha = clamp(o.opacity * o.col.a, 0, 1);
   ctx.strokeStyle = rgba(o.col, 1);
-  ctx.lineWidth = o.size;
+  ctx.lineWidth = o.size * o.P;
   ctx.lineCap = "square";
   ctx.lineJoin = "round";
   ctx.beginPath();
   ctx.moveTo(pts[0].x, pts[0].y);
   for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-  if (o.closed) ctx.closePath();
+  if (closed) ctx.closePath();
   ctx.stroke();
   ctx.restore();
 }
 
-// ---- Spray ----
-function paintSpray(ctx: CanvasRenderingContext2D, pts: ScreenPoint[], o: { col: Rgb; opacity: number; size: number; seed: number; character: number }) {
+// ---------------------------------------------------------------- Spray
+// Referenz: spray(a,b) — Schrittweite 3 px, Radius size*.5.
+function paintSpray(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx) {
+  const step = 3;
   const radius = o.size * 0.5;
-  const samples = resample(pts, false, 3);
-  const densityScale = lerp(0.5, 1.6, o.character);
   ctx.save();
-  for (let i = 0; i < samples.length; i++) {
-    const rng = makeRng(o.seed, i * 7 + 1);
-    const p = samples[i];
-    const dots = Math.ceil((3 + o.size * 0.07 * 1.05) * densityScale);
-    for (let k = 0; k < dots; k++) {
+  for (let d = 0; d <= S.total + 1e-6; d += step) {
+    const gi = Math.round((o.phase + d) / step);
+    const rng = makeRng(o.seed, gi);
+    const p = S.at(d);
+    const dots = Math.ceil(3 + o.size * 0.07 * lerp(0.6, 1.35, p.pressure));
+    for (let i = 0; i < dots; i++) {
       const angle = rng() * Math.PI * 2;
       const r = radius * Math.sqrt(rng());
       ctx.beginPath();
-      ctx.arc(p.x + Math.cos(angle) * r, p.y + Math.sin(angle) * r,
-        (0.35 + rng() * 1.3) * Math.max(0.6, o.size / 46), 0, Math.PI * 2);
+      ctx.arc(
+        p.x + Math.cos(angle) * r * o.P,
+        p.y + Math.sin(angle) * r * o.P,
+        Math.max(0.2, (0.35 + rng() * 1.3) * o.P),
+        0, Math.PI * 2,
+      );
       ctx.fillStyle = rgba(o.col, o.opacity * (0.08 + rng() * 0.28));
       ctx.fill();
     }
@@ -287,54 +378,71 @@ function paintSpray(ctx: CanvasRenderingContext2D, pts: ScreenPoint[], o: { col:
   ctx.restore();
 }
 
-// ---- Halftone ----
-function paintHalftone(
-  ctx: CanvasRenderingContext2D, pts: ScreenPoint[], variant: "halftoneFine" | "halftoneBold",
-  o: { col: Rgb; opacity: number; size: number; seed: number; character: number; closed: boolean },
-) {
-  const cfg = variant === "halftoneFine"
-    ? { spacingFactor: 0.15, stampRadius: 0.32, grid: 4, dotMax: 1.35, density: 0.92, alphaMin: 0.10, alphaMax: 0.34 }
-    : { spacingFactor: 0.26, stampRadius: 0.46, grid: 6, dotMax: 2.85, density: 0.84, alphaMin: 0.10, alphaMax: 0.42 };
-  const k = o.size / 42;
-  const pressure = 0.55;
-  const spacing = Math.max(5 * k, o.size * cfg.spacingFactor);
-  const samples = resample(pts, o.closed, spacing);
-  const radius = o.size * cfg.stampRadius * lerp(0.7, 1.25, pressure);
-  const grid = Math.max(1.2, cfg.grid * k);
-  const density = clamp(cfg.density * lerp(0.7, 1.25, o.character), 0.05, 1);
-  const ca = Math.cos(Math.PI / 4), sa = Math.sin(Math.PI / 4);
+// ---------------------------------------------------------------- Halftone
+// Referenz: halftoneBrush() / stampHalftone()
+interface HalftoneCfg {
+  spacingFactor: number; stampRadius: number; grid: number; dotMax: number;
+  density: number; alphaMin: number; alphaMax: number;
+}
 
+const HALFTONE_CFG: Record<"halftoneFine" | "halftoneBold", HalftoneCfg> = {
+  halftoneFine: { spacingFactor: .15, stampRadius: .32, grid: 4, dotMax: 1.35, density: .92, alphaMin: .10, alphaMax: .34 },
+  halftoneBold: { spacingFactor: .26, stampRadius: .46, grid: 6, dotMax: 2.85, density: .84, alphaMin: .10, alphaMax: .42 },
+};
+
+function paintHalftone(ctx: CanvasRenderingContext2D, S: PathSampler,
+                       variant: "halftoneFine" | "halftoneBold", o: BrushCtx) {
+  const cfg = HALFTONE_CFG[variant];
+  const spacing = Math.max(5, o.size * cfg.spacingFactor);
   ctx.save();
-  for (let i = 0; i < samples.length; i++) {
-    const rng = makeRng(o.seed, i * 13 + 3);
-    const p = samples[i];
-    for (let gx = -radius; gx <= radius; gx += grid) {
-      for (let gy = -radius; gy <= radius; gy += grid) {
-        const rx = gx * ca - gy * sa;
-        const ry = gx * sa + gy * ca;
-        const distNorm = Math.hypot(rx, ry) / radius;
-        if (distNorm > 1) continue;
-        const intensity = Math.max(0, 1 - distNorm);
-        if (rng() > density * (0.55 + intensity * 0.45)) continue;
-        const dotRadius = Math.max(0.18, cfg.dotMax * k * intensity * lerp(0.55, 1.15, pressure));
-        ctx.beginPath();
-        ctx.arc(p.x + rx, p.y + ry, dotRadius, 0, Math.PI * 2);
-        ctx.fillStyle = rgba(o.col, o.opacity * (cfg.alphaMin + rng() * (cfg.alphaMax - cfg.alphaMin)));
-        ctx.fill();
-      }
-    }
+  for (let d = 0; d <= S.total + 1e-6; d += spacing) {
+    const gi = Math.round((o.phase + d) / spacing);
+    stampHalftone(ctx, S.at(d), cfg, o, makeRng(o.seed, gi));
   }
   ctx.restore();
 }
 
-// ---- Aqua Blüten-Spritzer ----
-function blobPath(ctx: CanvasRenderingContext2D, rng: () => number, x: number, y: number, r: number, rough: number, sx: number, sy: number) {
+function stampHalftone(ctx: CanvasRenderingContext2D, point: { x: number; y: number; pressure: number },
+                       cfg: HalftoneCfg, o: BrushCtx, rng: () => number) {
+  const pressure = point.pressure || NEUTRAL_PRESSURE;
+  const radius = o.size * cfg.stampRadius * lerp(.7, 1.25, pressure);
+  const grid = cfg.grid;
+  const angle = Math.PI / 4;
+  const ca = Math.cos(angle);
+  const sa = Math.sin(angle);
+
+  for (let gx = -radius; gx <= radius; gx += grid) {
+    for (let gy = -radius; gy <= radius; gy += grid) {
+      const rx = gx * ca - gy * sa;
+      const ry = gx * sa + gy * ca;
+      const distNorm = Math.hypot(rx, ry) / radius;
+      if (distNorm > 1) continue;
+      const intensity = Math.max(0, 1 - distNorm);
+      if (rng() > cfg.density * (0.55 + intensity * .45)) continue;
+      const dotRadius = Math.max(.18, cfg.dotMax * intensity * lerp(.55, 1.15, pressure));
+      ctx.beginPath();
+      ctx.arc(point.x + rx * o.P, point.y + ry * o.P, Math.max(0.15, dotRadius * o.P), 0, Math.PI * 2);
+      ctx.fillStyle = rgba(o.col, o.opacity * (cfg.alphaMin + rng() * (cfg.alphaMax - cfg.alphaMin)));
+      ctx.fill();
+    }
+  }
+}
+
+// ---------------------------------------------------------------- Aquarell
+// Referenz: blobPath(), watercolorSpatterBrush("watercolorSpatterBloom"), stampWaterSpatter()
+const AQUA_CFG = {
+  spacingFactor: .30, baseRadius: .28, countBase: 5, countSize: .10,
+  bloomChance: .42, haloAlpha: .040, edgeAlpha: .06,
+};
+
+function blobPath(ctx: CanvasRenderingContext2D, rng: () => number,
+                  x: number, y: number, r: number, rough: number, sx: number, sy: number) {
   const count = 20;
   const rotation = rng() * Math.PI * 2;
   ctx.beginPath();
   for (let i = 0; i <= count; i++) {
     const angle = rotation + (i % count) / count * Math.PI * 2;
-    const radius = r * (1 + normalFrom(rng) * rough);
+    const radius = r * (1 + randomNormal(rng) * rough);
     const px = x + Math.cos(angle) * radius * sx;
     const py = y + Math.sin(angle) * radius * sy;
     if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
@@ -342,86 +450,95 @@ function blobPath(ctx: CanvasRenderingContext2D, rng: () => number, x: number, y
   ctx.closePath();
 }
 
-function paintWaterSpatter(
-  ctx: CanvasRenderingContext2D, pts: ScreenPoint[],
-  o: { col: Rgb; opacity: number; size: number; seed: number; character: number; closed: boolean },
-) {
-  const cfg = { spacingFactor: 0.30, baseRadius: 0.28, countBase: 5, countSize: 0.10, bloomChance: 0.42, haloAlpha: 0.040, edgeAlpha: 0.06 };
-  const k = o.size / 46;
-  const spacing = Math.max(6 * k, o.size * cfg.spacingFactor);
-  const samples = resample(pts, o.closed, spacing);
-  const pressure = 0.55;
-  const radius = o.size * cfg.baseRadius * lerp(0.7, 1.35, pressure);
-  const count = Math.ceil((cfg.countBase + o.size * cfg.countSize) * lerp(0.6, 1.5, o.character));
-  const bloomChance = clamp(cfg.bloomChance * lerp(0.5, 1.4, o.character), 0, 1);
-
+function paintWaterSpatter(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx) {
+  const spacing = Math.max(6, o.size * AQUA_CFG.spacingFactor);
   ctx.save();
-  for (let s = 0; s < samples.length; s++) {
-    const rng = makeRng(o.seed, s * 17 + 5);
-    const point = samples[s];
-    for (let i = 0; i < count; i++) {
-      const angle = rng() * Math.PI * 2;
-      const distOut = radius * (0.2 + rng() * 2.1);
-      const cx = point.x + Math.cos(angle) * distOut;
-      const cy = point.y + Math.sin(angle) * distOut;
-      const r = radius * (0.12 + rng() * 0.36);
-
-      ctx.fillStyle = rgba(o.col, o.opacity * (0.035 + rng() * 0.06));
-      blobPath(ctx, rng, cx, cy, r, 0.18 + rng() * 0.12, 0.9 + rng() * 0.5, 0.9 + rng() * 0.5);
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(cx + normalFrom(rng) * r * 0.10, cy + normalFrom(rng) * r * 0.10, r * (0.18 + rng() * 0.28), 0, Math.PI * 2);
-      ctx.fillStyle = rgba(o.col, o.opacity * (0.06 + rng() * 0.11));
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * (1.2 + rng() * 0.8), 0, Math.PI * 2);
-      ctx.fillStyle = rgba(o.col, o.opacity * (cfg.haloAlpha * (0.6 + rng() * 0.9)));
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(cx, cy, r * (0.95 + rng() * 0.35), 0, Math.PI * 2);
-      ctx.lineWidth = Math.max(0.25, r * 0.08);
-      ctx.strokeStyle = rgba(o.col, o.opacity * (cfg.edgeAlpha * (0.6 + rng() * 0.8)));
-      ctx.stroke();
-
-      // Blüte: wirkt ausschließlich in dieser Offscreen-Ebene.
-      if (rng() < bloomChance) {
-        ctx.save();
-        ctx.globalCompositeOperation = "destination-out";
-        ctx.beginPath();
-        ctx.arc(cx + normalFrom(rng) * r * 0.14, cy + normalFrom(rng) * r * 0.14, r * (0.18 + rng() * 0.22), 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(0,0,0,.03)";
-        ctx.fill();
-        ctx.restore();
-      }
-    }
+  for (let d = 0; d <= S.total + 1e-6; d += spacing) {
+    const gi = Math.round((o.phase + d) / spacing);
+    stampWaterSpatter(ctx, S.at(d), o, makeRng(o.seed, gi));
   }
   ctx.restore();
 }
 
-// ---- Borstenpinsel ----
+function stampWaterSpatter(ctx: CanvasRenderingContext2D, point: { x: number; y: number; pressure: number },
+                           o: BrushCtx, rng: () => number) {
+  const cfg = AQUA_CFG;
+  const pressure = point.pressure || NEUTRAL_PRESSURE;
+  const radius = o.size * cfg.baseRadius * lerp(.7, 1.35, pressure);
+  const count = Math.ceil(cfg.countBase + o.size * cfg.countSize);
+  const P = o.P;
+
+  for (let i = 0; i < count; i++) {
+    const angle = rng() * Math.PI * 2;
+    const distOut = radius * (.2 + rng() * 2.1);
+    const cx = point.x + Math.cos(angle) * distOut * P;
+    const cy = point.y + Math.sin(angle) * distOut * P;
+    const r = radius * (.12 + rng() * 0.36) * P;
+
+    /* weicher Körper */
+    ctx.fillStyle = rgba(o.col, o.opacity * (.035 + rng() * .06));
+    blobPath(ctx, rng, cx, cy, r, .18 + rng() * .12, .9 + rng() * .5, .9 + rng() * .5);
+    ctx.fill();
+
+    /* Pigmentierter Kern */
+    ctx.beginPath();
+    ctx.arc(cx + randomNormal(rng) * r * .10, cy + randomNormal(rng) * r * .10,
+      Math.max(0.1, r * (.18 + rng() * .28)), 0, Math.PI * 2);
+    ctx.fillStyle = rgba(o.col, o.opacity * (.06 + rng() * .11));
+    ctx.fill();
+
+    /* Wasserhof */
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(0.1, r * (1.2 + rng() * .8)), 0, Math.PI * 2);
+    ctx.fillStyle = rgba(o.col, o.opacity * (cfg.haloAlpha * (.6 + rng() * .9)));
+    ctx.fill();
+
+    /* Randpigment */
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(0.1, r * (.95 + rng() * .35)), 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(.25, r * .08);
+    ctx.strokeStyle = rgba(o.col, o.opacity * (cfg.edgeAlpha * (.6 + rng() * .8)));
+    ctx.stroke();
+
+    /* gelegentliche Blüte (nur in der Offscreen-Ebene) */
+    if (rng() < cfg.bloomChance) {
+      ctx.save();
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.beginPath();
+      ctx.arc(cx + randomNormal(rng) * r * .14, cy + randomNormal(rng) * r * .14,
+        Math.max(0.1, r * (.18 + rng() * .22)), 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,.03)";
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+// ---------------------------------------------------------------- Borsten
+// Referenz: makeReferenceBristles() / referenceBristle()
 interface Bristle {
   across: number; thickness: number; alpha: number; paint: number; permanentGap: boolean;
   gapFrequency: number; gapPhase: number; microFrequency: number; microPhase: number;
   dry: number; waviness: number; wavePhase: number; edge: number;
 }
 
-function makeBristles(variant: "bristleFine" | "bristleDry" | "bristleCoarse", seed: number, character: number): Bristle[] {
-  const configs = {
-    bristleFine: { count: 86, dry: .34, thicknessMin: .25, thicknessMax: .92, inactiveChance: .07, edgeLoss: .18, waviness: .010, longGap: .16, paintMin: .58, paintMax: 1.00 },
-    bristleDry: { count: 68, dry: .66, thicknessMin: .28, thicknessMax: 1.12, inactiveChance: .19, edgeLoss: .30, waviness: .015, longGap: .30, paintMin: .30, paintMax: .82 },
-    bristleCoarse: { count: 42, dry: .50, thicknessMin: .55, thicknessMax: 2.05, inactiveChance: .14, edgeLoss: .27, waviness: .020, longGap: .24, paintMin: .40, paintMax: .92 },
-  } as const;
-  const cfg = configs[variant];
+const BRISTLE_CFG = {
+  bristleFine: { count: 86, dry: .34, thicknessMin: .25, thicknessMax: .92, inactiveChance: .07, edgeLoss: .18, waviness: .010, longGap: .16, paintMin: .58, paintMax: 1.00 },
+  bristleDry: { count: 68, dry: .66, thicknessMin: .28, thicknessMax: 1.12, inactiveChance: .19, edgeLoss: .30, waviness: .015, longGap: .30, paintMin: .30, paintMax: .82 },
+  bristleCoarse: { count: 42, dry: .50, thicknessMin: .55, thicknessMax: 2.05, inactiveChance: .14, edgeLoss: .27, waviness: .020, longGap: .24, paintMin: .40, paintMax: .92 },
+} as const;
+
+function makeBristles(variant: keyof typeof BRISTLE_CFG, seed: number, character: number): Bristle[] {
+  const cfg = BRISTLE_CFG[variant];
   const characterDry = (character - .5) * .34;
+  // Ein einziger fortlaufender Zufallsstrom je Objekt — entspricht der
+  // sequenziellen Math.random()-Kette der Vorlage.
+  const rng = makeRng(seed, 0);
   const out: Bristle[] = [];
   for (let i = 0; i < cfg.count; i++) {
-    const rng = makeRng(seed, i * 31 + 11);
     const u = i / Math.max(1, cfg.count - 1);
     let across = lerp(-.5, .5, u);
-    across += normalFrom(rng) * (variant === "bristleCoarse" ? .018 : .010);
+    across += randomNormal(rng) * (variant === "bristleCoarse" ? .018 : .010);
     const edge = Math.pow(Math.abs(across) * 2, 1.8);
     const permanentGap = rng() < (cfg.inactiveChance + edge * cfg.edgeLoss * .20 + Math.max(0, characterDry) * .12);
     const channelSeed = Math.sin(across * 41.7 + rng() * 3.0);
@@ -436,8 +553,8 @@ function makeBristles(variant: "bristleFine" | "bristleDry" | "bristleCoarse", s
       gapPhase: rng() * Math.PI * 2,
       microFrequency: .10 + rng() * .18,
       microPhase: rng() * Math.PI * 2,
-      dry: clamp(cfg.dry + characterDry + normalFrom(rng) * .07, .05, .92),
-      waviness: normalFrom(rng) * cfg.waviness,
+      dry: clamp(cfg.dry + characterDry + randomNormal(rng) * .07, .05, .92),
+      waviness: randomNormal(rng) * cfg.waviness,
       wavePhase: rng() * Math.PI * 2,
       edge,
     });
@@ -445,63 +562,129 @@ function makeBristles(variant: "bristleFine" | "bristleDry" | "bristleCoarse", s
   return out;
 }
 
-function paintBristle(
-  ctx: CanvasRenderingContext2D, pts: ScreenPoint[],
-  variant: "bristleFine" | "bristleDry" | "bristleCoarse",
-  o: { col: Rgb; opacity: number; size: number; seed: number; character: number; closed: boolean },
-) {
-  const samples = resample(pts, o.closed, Math.max(1.2, o.size * 0.06));
-  if (samples.length < 2) return;
+function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
+                      variant: keyof typeof BRISTLE_CFG, o: BrushCtx) {
+  if (S.total <= 1e-6) return;
   const bristles = makeBristles(variant, o.seed, o.character);
-  const pressure = 0.55;
-  const width = o.size * lerp(.76, 1.12, pressure);
-  const k = o.size / 60;
-  let travel = 0;
+  // Schrittweite in Referenz-Pixeln: entspricht dem typischen Pointer-Abstand
+  // der Vorlage und ist unabhängig von Zoom und Punktdichte.
+  const step = 2;
+  const P = o.P;
 
+  // Ein geteilter Abschnitt startet mit der bereits verbrauchten Farbe.
+  if (o.phase > 0) {
+    for (const b of bristles) {
+      b.paint = Math.max(.10, b.paint - o.phase * (.00012 + b.dry * .00030));
+    }
+  }
+
+  let travel = o.phase;
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
-  ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  for (let i = 1; i < samples.length; i++) {
-    const a = samples[i - 1], b = samples[i];
-    const d = Math.max(.25, Math.hypot(b.x - a.x, b.y - a.y));
-    travel += d;
-    const dx = (b.x - a.x) / d, dy = (b.y - a.y) / d;
+  for (let d = 0; d < S.total - 1e-6; d += step) {
+    const dEnd = Math.min(S.total, d + step);
+    const a = S.at(d);
+    const b = S.at(dEnd);
+    const segLenPx = Math.hypot(b.x - a.x, b.y - a.y);
+    if (segLenPx < 1e-6) continue;
+    const dRef = Math.max(.25, dEnd - d);
+    const pressure = (a.pressure + b.pressure) * .5;
+    travel += dRef;
+
+    const dx = (b.x - a.x) / segLenPx;
+    const dy = (b.y - a.y) / segLenPx;
     const nx = -dy, ny = dx;
-    const segRng = makeRng(o.seed, i * 97 + 7);
+    const width = o.size * lerp(.76, 1.12, pressure);
 
     for (const bristle of bristles) {
       if (bristle.permanentGap) continue;
-      const longNoise = (Math.sin(travel * bristle.gapFrequency + bristle.gapPhase) + 1) * .5;
-      const microNoise = (Math.sin(travel * bristle.microFrequency + bristle.microPhase) + 1) * .5;
-      const threshold = clamp(bristle.dry * lerp(1.22, .78, pressure) * lerp(1.08, .82, bristle.paint), .05, .94);
+
+      const longNoise = ((Math.sin(travel * bristle.gapFrequency + bristle.gapPhase) + 1) * .5);
+      const microNoise = ((Math.sin(travel * bristle.microFrequency + bristle.microPhase) + 1) * .5);
+      const threshold = clamp(
+        bristle.dry * lerp(1.22, .78, pressure) * lerp(1.08, .82, bristle.paint),
+        .05, .94,
+      );
       const contact = longNoise * .78 + microNoise * .22 - bristle.edge * .08;
       if (contact < threshold) continue;
 
+      // Fortlaufender Farbverbrauch wie in der Vorlage.
+      bristle.paint = Math.max(.10, bristle.paint - dRef * (.00012 + bristle.dry * .00030));
+
       const waveA = Math.sin(bristle.wavePhase + travel * .022) * width * bristle.waviness;
-      const waveB = Math.sin(bristle.wavePhase + (travel + d) * .022) * width * bristle.waviness;
+      const waveB = Math.sin(bristle.wavePhase + (travel + dRef) * .022) * width * bristle.waviness;
       const offset = bristle.across * width;
       const localAlpha = o.opacity * bristle.alpha * lerp(.55, 1.0, contact) * lerp(.55, 1.0, bristle.paint);
 
-      ctx.beginPath();
-      ctx.moveTo(a.x + nx * (offset + waveA), a.y + ny * (offset + waveA));
-      ctx.lineTo(b.x + nx * (offset + waveB), b.y + ny * (offset + waveB));
-      ctx.lineWidth = Math.max(.24, bristle.thickness * k * lerp(.78, 1.28, pressure));
-      ctx.strokeStyle = rgba(o.col, localAlpha);
-      ctx.stroke();
+      drawRefLine(ctx,
+        { x: a.x + nx * (offset + waveA) * P, y: a.y + ny * (offset + waveA) * P },
+        { x: b.x + nx * (offset + waveB) * P, y: b.y + ny * (offset + waveB) * P },
+        Math.max(.24, bristle.thickness * lerp(.78, 1.28, pressure)) * P,
+        rgba(o.col, localAlpha), "round");
     }
 
-    // Feine Randverluste / trockene Körnung.
-    const grains = Math.min(16, Math.ceil(d * 1.1));
-    for (let g = 0; g < grains; g++) {
-      const t = segRng();
-      const x = lerp(a.x, b.x, t) + normalFrom(segRng) * width * .6;
-      const y = lerp(a.y, b.y, t) + normalFrom(segRng) * width * .6;
-      const s = (.2 + segRng() * .7) * Math.max(.5, k);
-      ctx.fillStyle = rgba(o.col, o.opacity * (.06 + segRng() * .15));
-      ctx.fillRect(x, y, s, s);
+    // Gelegentlicher Borstenrand (Referenz: Math.random()<.22).
+    const gi = Math.round((travel) / step);
+    const rng = makeRng(o.seed ^ 0x5bf03635, gi);
+    if (rng() < .22) {
+      const side = rng() < .5 ? -1 : 1;
+      const edgeOffset = side * width * (.47 + rng() * .055);
+      drawRefLine(ctx,
+        { x: a.x + nx * edgeOffset * P, y: a.y + ny * edgeOffset * P },
+        { x: b.x + nx * edgeOffset * P, y: b.y + ny * edgeOffset * P },
+        (.28 + rng() * .80) * P,
+        rgba(o.col, o.opacity * (.10 + rng() * .18)), "round");
     }
   }
   ctx.restore();
+}
+
+/** Referenz: drawLine() */
+function drawRefLine(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoint,
+                     width: number, color: string, cap: CanvasLineCap = "round") {
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.lineWidth = Math.max(.2, width);
+  ctx.lineCap = cap;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = color;
+  ctx.stroke();
+}
+
+// ---------------------------------------------------------------- Vorschau
+
+/**
+ * Kleine Linienvorschau für die Auswahl-Buttons — nutzt exakt denselben
+ * Generator wie das Zeichnen.
+ */
+export function renderBrushPreview(canvas: HTMLCanvasElement, preset: BrushPresetId, color: string) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = canvas.clientWidth || 60;
+  const h = canvas.clientHeight || 16;
+  canvas.width = Math.max(1, Math.round(w * dpr));
+  canvas.height = Math.max(1, Math.round(h * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const info = brushPresetInfo(preset);
+  if (!info) return;
+  const pts: WorldPoint[] = [];
+  const n = 24;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    pts.push({ x: 4 + t * (w - 8), y: h / 2 + Math.sin(t * Math.PI * 1.6) * (h * 0.16) });
+  }
+  renderBrushStroke({
+    worldPts: pts,
+    closed: false,
+    project: (p) => p,
+    style: {
+      preset, character: info.character, seed: 1,
+      sizePx: Math.max(3, h * 0.5), color, opacity: 0.9, closed: false,
+    },
+  }, ctx);
 }

@@ -3188,6 +3188,7 @@ export class Renderer {
     const strokeOpts = {
       pattern: (s as any).strokePattern, roughen: (s as any).roughen,
       pxPerM: cam.scale, lineWidthPx: strokeWidth, phaseM,
+      pressures: (s as any).pressures || undefined,
       cacheKey: `free:${s.id}:${pts.length}`,
     };
     if ((s as any).strokePattern && (s as any).strokePattern.kind !== "solid") applyStrokePattern(ctx, strokeOpts);
@@ -3509,9 +3510,9 @@ export class Renderer {
     color: string; thicknessM: number; opacity: number; lineStyle: import("./Scene").FreeLineStyle;
     gapM: number; blobSpacingM: number; blobSizeM: number; smoothing: boolean;
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
-  }) {
+  }, pressures?: number[]) {
     if (!points || points.length < 2) return;
-    const tmp = new FreeStroke({ id: "_preview", points, ...style });
+    const tmp = new FreeStroke({ id: "_preview", points, ...style, pressures: pressures || null });
     this._drawSingleFreeStroke(tmp);
   }
 
