@@ -150,9 +150,13 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
     commit();
   };
 
-  // Strich-/Abstandsregler: Freihand arbeitet mit deutlich feineren Werten.
-  const dashMax = kind === "free" ? 20 : 200;
-  const dashStep = kind === "free" ? 0.1 : 0.5;
+  // Strich-/Abstandsregler: Freihand arbeitet in der Projektmappe (eingebetteter
+  // MiniCad) mit deutlich feineren Werten; in der CAD-Oberfläche bleibt der
+  // volle Bereich wie bei Linie/Polygon/Schraffur.
+  const isEmbedded = !!(app && (app as any).isEmbeddedMiniCad);
+  const fineFree = kind === "free" && isEmbedded;
+  const dashMax = fineFree ? 20 : 200;
+  const dashStep = fineFree ? 0.1 : 0.5;
 
   const activeBrush = pattern.kind === "brush" ? (pattern.brushPreset as BrushPresetId | undefined) : undefined;
   const brushInfo = brushPresetInfo(activeBrush);
