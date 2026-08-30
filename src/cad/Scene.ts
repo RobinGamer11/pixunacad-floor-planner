@@ -1152,13 +1152,23 @@ export class Scene {
     const src = stroke.points;
     const cum: number[] = [0];
     for (let i = 1; i < src.length; i++) cum.push(cum[i - 1] + Math.hypot(src[i].x - src[i - 1].x, src[i].y - src[i - 1].y));
+    // Exakte Distanz entlang des Originalpfads: Der Punkt wird auf das
+    // nächstgelegene Segment projiziert (nicht nur auf den nächsten Stützpunkt).
+    // Nur so setzt ein geteilter Abschnitt die Stempel-/Musterphase des Stiftes
+    // lückenlos fort, auch wenn der Schnitt mitten in einem Segment liegt.
     const startDistanceOf = (p: Vec2): number => {
-      let best = 0, bestD = Infinity;
-      for (let i = 0; i < src.length; i++) {
-        const d = (src[i].x - p.x) ** 2 + (src[i].y - p.y) ** 2;
-        if (d < bestD) { bestD = d; best = i; }
+      let bestDist = 0, bestErr = Infinity;
+      for (let i = 1; i < src.length; i++) {
+        const ax = src[i - 1].x, ay = src[i - 1].y;
+        const vx = src[i].x - ax, vy = src[i].y - ay;
+        const len2 = vx * vx + vy * vy;
+        let t = len2 > 1e-18 ? ((p.x - ax) * vx + (p.y - ay) * vy) / len2 : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const qx = ax + vx * t, qy = ay + vy * t;
+        const err = (qx - p.x) ** 2 + (qy - p.y) ** 2;
+        if (err < bestErr) { bestErr = err; bestDist = cum[i - 1] + Math.sqrt(len2) * t; }
       }
-      return cum[best] || 0;
+      return bestDist;
     };
     const baseStart = stroke.sourceStartDistanceM || 0;
     const originId = stroke.sourceStrokeId || stroke.id;
