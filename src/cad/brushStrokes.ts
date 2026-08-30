@@ -850,9 +850,14 @@ function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
                       from: number, final: boolean, state: PaintState | null): number {
   if (S.total <= 1e-6) return S.total;
   // Schrittweite in Referenz-Pixeln: entspricht dem typischen Pointer-Abstand
-  // der Vorlage und ist unabhängig von Zoom und Punktdichte.
-  const step = 2;
+  // der Vorlage. LOD hebt sie an, wenn ein Schritt im Ausgabebild kleiner als
+  // ein Pixel wäre; zusätzlich begrenzt ein Arbeitsbudget die Schrittzahl.
   const P = o.P;
+  let step = Math.max(2, (o.minPx * 3) / Math.max(1e-6, P));
+  if (final && from <= 1e-9) {
+    const maxSteps = 4000;
+    if (S.total / step > maxSteps) step = S.total / maxSteps;
+  }
 
   // Borstenzustand (Farbverbrauch, Weglänge) wird über inkrementelle Läufe
   // hinweg fortgeschrieben — sonst würde jeder Teillauf neu „nass“ starten.
@@ -865,8 +870,20 @@ function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
         b.paint = Math.max(.10, b.paint - o.phase * (.00012 + b.dry * .00030));
       }
     }
+    // LOD: bei kleiner Darstellung nur eine gleichmäßig verteilte Teilmenge
+    // der Borsten zeichnen — die Streuung bleibt erhalten, die Last sinkt.
+    if (o.detail < 0.999) {
+      const keep = Math.max(8, Math.round(bristles.length * o.detail));
+      if (keep < bristles.length) {
+        const stride = bristles.length / keep;
+        const sub: Bristle[] = [];
+        for (let i = 0; i < keep; i++) sub.push(bristles[Math.min(bristles.length - 1, Math.floor(i * stride))]);
+        bristles = sub;
+      }
+    }
     if (state) { state.bristles = bristles; state.travel = o.phase; }
   }
+
 
   let travel = state?.travel ?? (o.phase + from);
   const start = Math.max(0, Math.ceil((from - 1e-9) / step) * step);
