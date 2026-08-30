@@ -933,7 +933,7 @@ function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
       drawRefLine(ctx,
         { x: a.x + nx * (offset + waveA) * P, y: a.y + ny * (offset + waveA) * P },
         { x: b.x + nx * (offset + waveB) * P, y: b.y + ny * (offset + waveB) * P },
-        Math.max(.24, bristle.thickness * lerp(.78, 1.28, pressure)) * P,
+        Math.max(o.minPx, Math.max(.24, bristle.thickness * lerp(.78, 1.28, pressure)) * P),
         rgba(o.col, localAlpha), "round");
     }
 
