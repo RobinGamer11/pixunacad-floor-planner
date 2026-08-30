@@ -419,7 +419,7 @@ function makeBristles(variant: "bristleFine" | "bristleDry" | "bristleCoarse", s
   const out: Bristle[] = [];
   for (let i = 0; i < cfg.count; i++) {
     const rng = makeRng(seed, i * 31 + 11);
-    const u = cfg.count === 1 ? 0 : i / (cfg.count - 1);
+    const u = i / Math.max(1, cfg.count - 1);
     let across = lerp(-.5, .5, u);
     across += normalFrom(rng) * (variant === "bristleCoarse" ? .018 : .010);
     const edge = Math.pow(Math.abs(across) * 2, 1.8);
