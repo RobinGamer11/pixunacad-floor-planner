@@ -168,6 +168,8 @@ function _sameObject(a: Selection, b: Selection): boolean {
 
 
 export class MiniCad {
+  /** Kennzeichnet den eingebetteten Editor (Projektmappe) gegenüber der CAD-Oberfläche. */
+  readonly isEmbeddedMiniCad = true;
   readonly dom: MiniCadDom;
   readonly scene: Scene;
   readonly camera: Camera;
