@@ -434,6 +434,8 @@ export function strokeWithBrushIfActive(
     // überein — dann gilt der neutrale Ersatzdruck.
     pressures: roughened ? undefined : opts.pressures,
     cacheKey: opts.cacheKey,
+    liveKey: opts.liveKey,
+
     style: {
       preset,
       character: pattern.brushCharacter ?? info?.character ?? 50,
