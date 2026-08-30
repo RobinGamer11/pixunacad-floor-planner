@@ -3190,7 +3190,9 @@ export class Renderer {
       pxPerM: cam.scale, lineWidthPx: strokeWidth, phaseM,
       pressures: (s as any).pressures || undefined,
       cacheKey: `free:${s.id}:${pts.length}`,
+      liveKey,
     };
+
     if ((s as any).strokePattern && (s as any).strokePattern.kind !== "solid") applyStrokePattern(ctx, strokeOpts);
     tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts);
     if (!strokeWithBrushIfActive(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts)) {
