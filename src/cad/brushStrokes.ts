@@ -509,7 +509,8 @@ function paintMarker(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx,
   const pts = S.screen;
   if (pts.length < 2) return;
   ctx.save();
-  ctx.globalAlpha = clamp(o.opacity * o.col.a, 0, 1);
+  // Deckkraft genau einmal anwenden — `rgba()` bringt bereits das Farb-Alpha mit.
+  ctx.globalAlpha = clamp(o.opacity, 0, 1);
   ctx.strokeStyle = rgba(o.col, 1);
   ctx.lineWidth = o.size * o.P;
   ctx.lineCap = "square";
@@ -524,31 +525,25 @@ function paintMarker(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx,
 
 // ---------------------------------------------------------------- Spray
 // Referenz: spray(a,b) — Schrittweite 3 px, Radius size*.5.
-function paintSpray(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx) {
-  const step = 3;
+function stampSpray(ctx: CanvasRenderingContext2D, p: { x: number; y: number; pressure: number },
+                    o: BrushCtx, rng: () => number) {
   const radius = o.size * 0.5;
-  ctx.save();
-  for (let d = 0; d <= S.total + 1e-6; d += step) {
-    const gi = Math.round((o.phase + d) / step);
-    const rng = makeRng(o.seed, gi);
-    const p = S.at(d);
-    const dots = Math.ceil(3 + o.size * 0.07 * lerp(0.6, 1.35, p.pressure));
-    for (let i = 0; i < dots; i++) {
-      const angle = rng() * Math.PI * 2;
-      const r = radius * Math.sqrt(rng());
-      ctx.beginPath();
-      ctx.arc(
-        p.x + Math.cos(angle) * r * o.P,
-        p.y + Math.sin(angle) * r * o.P,
-        Math.max(0.2, (0.35 + rng() * 1.3) * o.P),
-        0, Math.PI * 2,
-      );
-      ctx.fillStyle = rgba(o.col, o.opacity * (0.08 + rng() * 0.28));
-      ctx.fill();
-    }
+  const dots = Math.ceil(3 + o.size * 0.07 * lerp(0.6, 1.35, p.pressure));
+  for (let i = 0; i < dots; i++) {
+    const angle = rng() * Math.PI * 2;
+    const r = radius * Math.sqrt(rng());
+    ctx.beginPath();
+    ctx.arc(
+      p.x + Math.cos(angle) * r * o.P,
+      p.y + Math.sin(angle) * r * o.P,
+      Math.max(0.2, (0.35 + rng() * 1.3) * o.P),
+      0, Math.PI * 2,
+    );
+    ctx.fillStyle = rgba(o.col, o.opacity * (0.08 + rng() * 0.28));
+    ctx.fill();
   }
-  ctx.restore();
 }
+
 
 // ---------------------------------------------------------------- Halftone
 // Referenz: halftoneBrush() / stampHalftone()
