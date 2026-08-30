@@ -230,17 +230,104 @@ export interface BrushRenderRequest {
   liveKey?: string;
 }
 
-const brushCache = new Map<string, HTMLCanvasElement>();
-const MAX_CACHE = 24;
+// ---------------------------------------------------------------- Cache
+/**
+ * Rein temporärer Arbeitsspeicher-Cache. Er enthält ausschließlich abgeleitete
+ * Rasterdaten und wird niemals am Objekt, im Projekt, im Local Storage oder in
+ * der Datenbank gespeichert. Dauerhaft bleiben nur Originalpfad,
+ * Stiftparameter und Seed — daraus lässt sich der Cache jederzeit verlustfrei
+ * neu erzeugen.
+ */
+interface CacheEntry { canvas: HTMLCanvasElement; px: number }
 
-function pathSignature(pts: ScreenPoint[], ox: number, oy: number): string {
-  let h = 0x811c9dc5;
-  for (const p of pts) {
-    h = hash32(h, Math.round((p.x - ox) * 8));
-    h = hash32(h, Math.round((p.y - oy) * 8));
-  }
-  return `${pts.length}:${h.toString(36)}`;
+const brushCache = new Map<string, CacheEntry>();
+const MAX_CACHE_ENTRIES = 400;
+/** Speicherbudget in Pixeln (~4 Byte je Pixel). */
+const MAX_CACHE_PIXELS = 24_000_000;
+let cachePixels = 0;
+
+function cacheGet(key: string): HTMLCanvasElement | undefined {
+  const hit = brushCache.get(key);
+  if (!hit) return undefined;
+  brushCache.delete(key);
+  brushCache.set(key, hit);          // LRU: Treffer ans Ende
+  return hit.canvas;
 }
+
+function cachePut(key: string, canvas: HTMLCanvasElement) {
+  const px = canvas.width * canvas.height;
+  if (px > MAX_CACHE_PIXELS) return; // zu groß zum Behalten
+  brushCache.set(key, { canvas, px });
+  cachePixels += px;
+  while (brushCache.size > MAX_CACHE_ENTRIES || cachePixels > MAX_CACHE_PIXELS) {
+    const oldest = brushCache.keys().next().value as string | undefined;
+    if (oldest === undefined || oldest === key) break;
+    const e = brushCache.get(oldest);
+    brushCache.delete(oldest);
+    if (e) cachePixels -= e.px;
+  }
+}
+
+/** Gezielt alle Rasterdaten eines Objekts verwerfen (Änderung/Löschen). */
+export function invalidateBrushCacheFor(objectKey: string) {
+  if (!objectKey) return;
+  const prefix = `${objectKey}|`;
+  for (const key of [...brushCache.keys()]) {
+    if (key.startsWith(prefix)) {
+      const e = brushCache.get(key);
+      brushCache.delete(key);
+      if (e) cachePixels -= e.px;
+    }
+  }
+}
+
+/**
+ * Signatur der Weltgeometrie (Stichprobe). Sie ändert sich ausschließlich mit
+ * der Objektgeometrie — Kamera, Pan und exakte Bildschirmkoordinaten haben
+ * keinen Einfluss.
+ */
+function worldSignature(pts: WorldPoint[], closed: boolean, pressures?: number[]): string {
+  let h = 0x811c9dc5;
+  const n = pts.length;
+  const stride = Math.max(1, Math.floor(n / 64));
+  for (let i = 0; i < n; i += stride) {
+    h = hash32(h, Math.round(pts[i].x * 4096));
+    h = hash32(h, Math.round(pts[i].y * 4096));
+  }
+  const last = pts[n - 1];
+  h = hash32(h, Math.round(last.x * 4096));
+  h = hash32(h, Math.round(last.y * 4096));
+  h = hash32(h, n);
+  h = hash32(h, closed ? 1 : 0);
+  if (pressures && pressures.length) {
+    h = hash32(h, pressures.length);
+    const ps = Math.max(1, Math.floor(pressures.length / 16));
+    for (let i = 0; i < pressures.length; i += ps) h = hash32(h, Math.round(pressures[i] * 1000));
+  }
+  return h.toString(36);
+}
+
+/** Affine Abbildung Welt → Ausgabekoordinaten, aus drei Stützpunkten. */
+interface Affine { a: number; b: number; c: number; d: number; e: number; f: number }
+
+function affineFromProject(project: (p: WorldPoint) => ScreenPoint): Affine | null {
+  const o = project({ x: 0, y: 0 });
+  const px = project({ x: 1, y: 0 });
+  const py = project({ x: 0, y: 1 });
+  const m: Affine = { a: px.x - o.x, b: px.y - o.y, c: py.x - o.x, d: py.y - o.y, e: o.x, f: o.y };
+  const det = m.a * m.d - m.b * m.c;
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  for (const v of [m.a, m.b, m.c, m.d, m.e, m.f]) if (!Number.isFinite(v)) return null;
+  return m;
+}
+
+/** Zoomstufe auf wenige Buckets (√2-Schritte) runden. */
+function zoomBucket(pxPerWorld: number): number {
+  if (!Number.isFinite(pxPerWorld) || pxPerWorld <= 0) return 1;
+  const e = Math.round(Math.log2(pxPerWorld) * 2) / 2;
+  return Math.pow(2, e);
+}
+
 
 interface BrushCtx {
   col: Rgb;
