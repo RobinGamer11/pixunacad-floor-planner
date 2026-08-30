@@ -373,7 +373,8 @@ const liveStates = new Map<string, LiveState>();
 export function endLiveBrush(key: string) { liveStates.delete(key); }
 export function clearLiveBrushes() { liveStates.clear(); }
 
-function makeBrushCtx(style: BrushRenderStyle, info: BrushPresetInfo, P: number, phaseRef: number): BrushCtx {
+function makeBrushCtx(style: BrushRenderStyle, info: BrushPresetInfo, P: number, phaseRef: number,
+                      sizeOutPx: number): BrushCtx {
   return {
     col: parseColor(style.color),
     opacity: clamp(style.opacity ?? 1, 0, 1),
@@ -382,10 +383,21 @@ function makeBrushCtx(style: BrushRenderStyle, info: BrushPresetInfo, P: number,
     seed: (style.seed || 1) >>> 0,
     P,
     phase: phaseRef,
+    // Volles Detail ab ca. 12 px sichtbarer Strichbreite, darunter LOD.
+    detail: clamp(sizeOutPx / 12, 0.1, 1),
+    minPx: 0.42,
   };
 }
 
-/** Zeichnet den Pinselstrich entlang der Weltgeometrie (mit Offscreen-Cache). */
+/**
+ * Zeichnet den Pinselstrich.
+ *
+ * Der Strich wird in einem **weltbezogenen** Zwischenraster gestempelt: Die
+ * Rasterauflösung folgt einem gerundeten Zoom-Bucket, nicht der exakten
+ * Kamera. Verschieben ändert den Cache-Eintrag daher nie, Zoomen nur beim
+ * Wechsel des Buckets; dazwischen wird das vorhandene Raster skaliert
+ * weiterverwendet.
+ */
 export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingContext2D) {
   const { style } = req;
   const info = brushPresetInfo(style.preset);
@@ -394,48 +406,58 @@ export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingC
   if (!worldPts || worldPts.length < 1) return;
 
   const sizePx = Math.max(1.2, style.sizePx);
-  const P = sizePx / info.refSize;                 // Bildschirm-px je Referenz-px
   const closed = !!style.closed && worldPts.length > 2;
 
-  const screenAll = worldPts.map((p) => req.project(p));
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of screenAll) {
-    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
-    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-  }
-
-  // Weltlänge → Referenz-Pixel. Die Linienstärke ist physisch, daher ist der
-  // Faktor zoomunabhängig.
-  const worldLen = polyWorldLength(worldPts, closed);
-  const screenLen = polyScreenLength(screenAll, closed);
-  const pxPerWorld = worldLen > 1e-9 ? screenLen / worldLen : 1;
-  const refPerWorld = pxPerWorld / P;
-  const phaseRef = (req.phaseM || 0) * refPerWorld;
-
   if (req.liveKey) {
+    const P = sizePx / info.refSize;
+    const screenAll = worldPts.map((p) => req.project(p));
+    for (const p of screenAll) if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+    const worldLen = polyWorldLength(worldPts, closed);
+    const screenLen = polyWorldLength(screenAll, closed);
+    const pxPerWorld = worldLen > 1e-9 ? screenLen / worldLen : 1;
+    const refPerWorld = pxPerWorld / P;
     renderBrushLive(req, ctx, info, {
-      P, closed, refPerWorld, phaseRef, sizePx, worldPts,
+      P, closed, refPerWorld, phaseRef: (req.phaseM || 0) * refPerWorld, sizePx, worldPts,
     });
     return;
   }
 
-  const pad = Math.ceil(sizePx * 3 + 8);
+  const affine = affineFromProject(req.project);
+  if (!affine) return;
+  const pxPerWorld = Math.sqrt(Math.abs(affine.a * affine.d - affine.b * affine.c));
+  if (!Number.isFinite(pxPerWorld) || pxPerWorld <= 0) return;
+
+  // Physische Strichbreite in Weltmetern — zoomunabhängig.
+  const widthWorld = sizePx / pxPerWorld;
+  const S = zoomBucket(pxPerWorld);                 // Rasterauflösung (px je Welt)
+  const sizeRaster = Math.max(1.2, widthWorld * S); // Strichbreite im Raster
+  const P = sizeRaster / info.refSize;              // Rasterpixel je Referenz-px
+  const refPerWorld = S / P;
+  const phaseRef = (req.phaseM || 0) * refPerWorld;
+
+  // Lokale Rasterkoordinaten: l = (welt − origin) · S
+  const originW = worldPts[0];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of worldPts) {
+    const lx = (p.x - originW.x) * S, ly = (p.y - originW.y) * S;
+    if (!Number.isFinite(lx) || !Number.isFinite(ly)) return;
+    if (lx < minX) minX = lx; if (lx > maxX) maxX = lx;
+    if (ly < minY) minY = ly; if (ly > maxY) maxY = ly;
+  }
+  const pad = Math.ceil(sizeRaster * 3 + 8);
   const ox = Math.floor(minX) - pad;
   const oy = Math.floor(minY) - pad;
   const w = Math.ceil(maxX - minX) + pad * 2;
   const h = Math.ceil(maxY - minY) + pad * 2;
   if (w <= 0 || h <= 0 || w * h > 36_000_000) return;
 
+  // Schlüssel: Objekt, Weltgeometrie, Stiftparameter, Seed, Zoom-Bucket.
+  // Weder Kamera-Offset noch exakte Bildschirmkoordinaten gehen ein.
   const key = req.cacheKey
-    ? `${req.cacheKey}|${style.preset}|${style.character}|${style.seed}|${sizePx.toFixed(2)}|${style.color}|${style.opacity.toFixed(3)}|${closed}|${phaseRef.toFixed(2)}|${w}x${h}|${pathSignature(screenAll, minX, minY)}`
+    ? `${req.cacheKey}|${worldSignature(worldPts, closed, req.pressures)}|${style.preset}|${style.character}|${style.seed}|${widthWorld.toFixed(6)}|${style.color}|${style.opacity.toFixed(3)}|${closed}|${(req.phaseM || 0).toFixed(4)}|${S.toExponential(4)}`
     : null;
 
-  let canvas = key ? brushCache.get(key) : undefined;
-  if (canvas && key) {
-    // LRU: bei Treffer ans Ende sortieren.
-    brushCache.delete(key); brushCache.set(key, canvas);
-  }
+  let canvas = key ? cacheGet(key) : undefined;
   if (!canvas) {
     canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
@@ -443,28 +465,30 @@ export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingC
     if (!bctx) return;
     const sampler = new PathSampler(
       worldPts, closed,
-      (p) => { const s = req.project(p); return { x: s.x - ox, y: s.y - oy }; },
+      (p) => ({ x: (p.x - originW.x) * S - ox, y: (p.y - originW.y) * S - oy }),
       refPerWorld, req.pressures,
     );
-    const bc = makeBrushCtx(style, info, P, phaseRef);
+    const bc = makeBrushCtx(style, info, P, phaseRef, sizePx);
     paintBrush(bctx, sampler, style.preset, bc, closed, 0, true, null);
-    if (key) {
-      // Einzelne älteste Einträge verwerfen statt den ganzen Cache zu leeren.
-      while (brushCache.size >= MAX_CACHE) {
-        const oldest = brushCache.keys().next().value as string | undefined;
-        if (oldest === undefined) break;
-        brushCache.delete(oldest);
-      }
-      brushCache.set(key, canvas);
-    }
+    if (key) cachePut(key, canvas);
   }
+
+  // Raster in die aktuelle Ausgabe transformieren: Rasterpixel → Welt → Ausgabe.
+  const worldTileX = originW.x + ox / S;
+  const worldTileY = originW.y + oy / S;
+  const tx = affine.a * worldTileX + affine.c * worldTileY + affine.e;
+  const ty = affine.b * worldTileX + affine.d * worldTileY + affine.f;
   ctx.save();
   ctx.setLineDash([]);
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
-  ctx.drawImage(canvas, ox, oy);
+  ctx.imageSmoothingEnabled = true;
+  try { (ctx as any).imageSmoothingQuality = "high"; } catch { /* noop */ }
+  ctx.transform(affine.a / S, affine.b / S, affine.c / S, affine.d / S, tx, ty);
+  ctx.drawImage(canvas, 0, 0);
   ctx.restore();
 }
+
 
 /**
  * Inkrementeller Live-Render: genau ein Puffer je Strich, pro Bewegung wird
