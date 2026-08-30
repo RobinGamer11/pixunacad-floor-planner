@@ -3,6 +3,7 @@ import {
   DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN,
   type RoughenParams, type StrokePatternKind, type StrokePatternParams,
 } from "@/cad/strokeEffects";
+import { BRUSH_PRESETS, brushPresetInfo, type BrushPresetId } from "@/cad/brushStrokes";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -117,7 +118,14 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
       const d = app.strokeEffectDefaults?.[kind];
       if (d) d.strokePattern = { ...d.strokePattern, ...patch };
     } else {
-      for (const o of targets) o.strokePattern = { ...(o.strokePattern || DEFAULT_STROKE_PATTERN), ...patch };
+      for (const o of targets) {
+        const next: StrokePatternParams = { ...(o.strokePattern || DEFAULT_STROKE_PATTERN), ...patch };
+        // Seed dauerhaft am Objekt verankern — Darstellung bleibt stabil.
+        if (next.brushPreset && !next.brushSeed) {
+          next.brushSeed = (typeof o.appearanceSeed === "number" && o.appearanceSeed > 0) ? o.appearanceSeed : 1;
+        }
+        o.strokePattern = next;
+      }
     }
     commit();
   };
@@ -142,6 +150,24 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
     commit();
   };
 
+  // Strich-/Abstandsregler: Freihand arbeitet mit deutlich feineren Werten.
+  const dashMax = kind === "free" ? 20 : 200;
+  const dashStep = kind === "free" ? 0.1 : 0.5;
+
+  const activeBrush = pattern.kind === "brush" ? (pattern.brushPreset as BrushPresetId | undefined) : undefined;
+  const brushInfo = brushPresetInfo(activeBrush);
+  const brushCharacter = pattern.brushCharacter ?? brushInfo?.character ?? 50;
+
+  const selectBrush = (id: string) => {
+    if (!id) { applyPattern({ kind: "solid" }); return; }
+    const info = brushPresetInfo(id);
+    applyPattern({
+      kind: "brush",
+      brushPreset: id as BrushPresetId,
+      // Farbe, Stärke und Deckkraft bleiben unangetastet.
+      brushCharacter: pattern.brushPreset === id ? brushCharacter : (info?.character ?? 50),
+    });
+  };
 
   return (
     <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
@@ -162,22 +188,57 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
             </button>
           ))}
         </div>
-        {pattern.kind !== "solid" && (
+        {pattern.kind !== "solid" && pattern.kind !== "brush" && (
           <div className="mt-2 space-y-2">
             <SliderField
-              label="Strichlänge" unit="mm" value={pattern.dashLengthMm} step={0.5} min={0.1} max={200}
+              label="Strichlänge" unit="mm" value={pattern.dashLengthMm} step={dashStep} min={0.1} max={dashMax}
               onChange={(v) => applyPattern({ dashLengthMm: v })}
               onDragStart={dragStart} onDragEnd={dragEnd}
             />
             <SliderField
-              label="Abstand" unit="mm" value={pattern.gapLengthMm} step={0.5} min={0.1} max={200}
+              label="Abstand" unit="mm" value={pattern.gapLengthMm} step={dashStep} min={0.1} max={dashMax}
               onChange={(v) => applyPattern({ gapLengthMm: v })}
               onDragStart={dragStart} onDragEnd={dragEnd}
             />
           </div>
         )}
 
+        <div className="mt-3">
+          <div className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground">STIFTE</div>
+          <select
+            value={activeBrush ?? ""}
+            onChange={(e) => selectBrush(e.target.value)}
+            className="h-8 w-full rounded-md border bg-background px-2 text-[11px] outline-none"
+            style={{ borderColor: HAIRLINE }}
+          >
+            <option value="">Kein Stift</option>
+            {BRUSH_PRESETS.map((b) => (
+              <option key={b.id} value={b.id}>{b.label}</option>
+            ))}
+          </select>
+          {activeBrush && (
+            <div className="mt-2 space-y-2">
+              <SliderField
+                label="Charakter" unit="" value={brushCharacter} step={1} min={0} max={100}
+                onChange={(v) => applyPattern({ brushCharacter: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
+              />
+              {brushInfo?.usesAngle && (
+                <SliderField
+                  label="Federwinkel" unit="°" value={pattern.brushAngleDeg ?? 38} step={1} min={-180} max={180}
+                  onChange={(v) => applyPattern({ brushAngleDeg: v })}
+                  onDragStart={dragStart} onDragEnd={dragEnd}
+                />
+              )}
+              <div className="text-[11px] text-muted-foreground">
+                Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
+
 
       <div>
         <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</div>

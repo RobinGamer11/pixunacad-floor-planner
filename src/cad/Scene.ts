@@ -21,6 +21,10 @@ export function initStrokeEffects(target: any, init: StrokeEffectsInit | undefin
     ? Math.floor(init.appearanceSeed) : makeAppearanceSeed();
   target.appearanceSeed = seed;
   target.strokePattern = normalizeStrokePattern(init?.strokePattern);
+  // Pinsel-Seed dauerhaft am Objekt verankern (Kopien behalten ihren Seed).
+  if (target.strokePattern.brushPreset && !target.strokePattern.brushSeed) {
+    target.strokePattern.brushSeed = seed;
+  }
   target.roughen = normalizeRoughen(init?.roughen, seed);
 }
 

@@ -11,10 +11,11 @@
  */
 
 import type { Vec2 } from "./geometry";
+import { isBrushPresetId, brushPresetInfo, renderBrushStroke, type BrushPresetId } from "./brushStrokes";
 
 // ---------------------------------------------------------------- Typen
 
-export type StrokePatternKind = "solid" | "dashed" | "dash-dot" | "dotted";
+export type StrokePatternKind = "solid" | "dashed" | "dash-dot" | "dotted" | "brush";
 
 export interface StrokePatternParams {
   kind: StrokePatternKind;
@@ -22,6 +23,14 @@ export interface StrokePatternParams {
   dashLengthMm: number;
   /** Abstand in mm (dashed / dash-dot / dotted → Punktabstand). */
   gapLengthMm: number;
+  /** Pinsel-Linienart („Stifte“) — nur wirksam bei kind === "brush". */
+  brushPreset?: BrushPresetId;
+  /** Charakter des Pinsels (0–100). */
+  brushCharacter?: number;
+  /** Federwinkel — nur bei Pinseln, deren Algorithmus ihn nutzt. */
+  brushAngleDeg?: number;
+  /** Persistenter Zufalls-Seed des Pinsels. */
+  brushSeed?: number;
 }
 
 export type RoughenMode = "smooth" | "corner";
@@ -72,18 +81,33 @@ export function makeAppearanceSeed(): number {
   return (Math.floor(Math.random() * 0x7fffffff) + 1) >>> 0;
 }
 
-const KINDS: StrokePatternKind[] = ["solid", "dashed", "dash-dot", "dotted"];
+const KINDS: StrokePatternKind[] = ["solid", "dashed", "dash-dot", "dotted", "brush"];
 
 /** Migrationssichere Normalisierung (alte Objekte bleiben „solid“ / Roughen aus). */
 export function normalizeStrokePattern(raw: any): StrokePatternParams {
   const kind: StrokePatternKind = KINDS.includes(raw?.kind) ? raw.kind : "solid";
   const num = (x: any, fb: number, min: number) =>
     (typeof x === "number" && Number.isFinite(x) && x >= min) ? x : fb;
-  return {
+  const out: StrokePatternParams = {
     kind,
     dashLengthMm: num(raw?.dashLengthMm, DEFAULT_STROKE_PATTERN.dashLengthMm, 0.01),
     gapLengthMm: num(raw?.gapLengthMm, DEFAULT_STROKE_PATTERN.gapLengthMm, 0.01),
   };
+  // Pinseleinstellungen bleiben am Objekt erhalten, auch wenn gerade eine
+  // klassische Linienart aktiv ist (bewusst kein `||`-Fallback).
+  if (isBrushPresetId(raw?.brushPreset)) out.brushPreset = raw.brushPreset;
+  if (typeof raw?.brushCharacter === "number" && Number.isFinite(raw.brushCharacter)) {
+    out.brushCharacter = Math.min(100, Math.max(0, raw.brushCharacter));
+  }
+  if (typeof raw?.brushAngleDeg === "number" && Number.isFinite(raw.brushAngleDeg)) {
+    out.brushAngleDeg = raw.brushAngleDeg;
+  }
+  if (typeof raw?.brushSeed === "number" && Number.isFinite(raw.brushSeed) && raw.brushSeed > 0) {
+    out.brushSeed = Math.floor(raw.brushSeed);
+  }
+  // Ohne gültigen Pinsel darf "brush" nie aktiv werden (Altdaten-Sicherheit).
+  if (out.kind === "brush" && !out.brushPreset) out.kind = "solid";
+  return out;
 }
 
 export function normalizeRoughen(raw: any, fallbackSeed?: number): RoughenParams {
@@ -362,4 +386,44 @@ export function applyStrokePattern(ctx: CanvasRenderingContext2D, opts: StrokeRe
   ctx.setLineDash(dashArrayPx(pattern, opts.pxPerM, opts.lineWidthPx ?? ctx.lineWidth));
   ctx.lineDashOffset = dashOffsetPx(opts.phaseM || 0, opts.pxPerM);
   ctx.lineCap = lineCapForPattern(pattern);
+}
+
+
+// ---------------------------------------------------------------- Pinsel-Linienarten
+
+/**
+ * Zeichnet den Pfad als Pinselstrich, wenn die Linienart auf einen Stift
+ * gesetzt ist. Gibt `true` zurück, wenn der Pinsel gezeichnet hat — der
+ * Aufrufer überspringt dann seinen normalen `ctx.stroke()`.
+ *
+ * Ohne `kind === "brush"` verhält sich der Renderer exakt wie bisher.
+ */
+export function strokeWithBrushIfActive(
+  ctx: CanvasRenderingContext2D,
+  project: (p: Vec2) => { x: number; y: number },
+  worldPts: Vec2[],
+  closed: boolean,
+  opts: StrokeRenderOptions,
+): boolean {
+  const pattern = opts.pattern;
+  if (!pattern || pattern.kind !== "brush") return false;
+  const preset = pattern.brushPreset;
+  if (!isBrushPresetId(preset)) return false;
+  if (!worldPts || worldPts.length < 1) return true;
+
+  const pts = opts.roughen?.enabled
+    ? roughenPolyline(worldPts, closed, opts.roughen, { phaseM: opts.phaseM, cacheKey: opts.cacheKey })
+    : worldPts;
+  const screen = pts.map((p) => project(p));
+  const info = brushPresetInfo(preset);
+  renderBrushStroke(ctx, screen, {
+    preset,
+    character: pattern.brushCharacter ?? info?.character ?? 50,
+    seed: pattern.brushSeed ?? 1,
+    sizePx: opts.lineWidthPx ?? ctx.lineWidth ?? 1,
+    color: typeof ctx.strokeStyle === "string" ? ctx.strokeStyle : "#000000",
+    opacity: ctx.globalAlpha,
+    closed,
+  }, opts.cacheKey);
+  return true;
 }
