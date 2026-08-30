@@ -3163,7 +3163,14 @@ export class Renderer {
     }
     const ctx = this.ctx;
     const cam = this.camera;
-    const pts = this._renderPointsForFreeStroke(s);
+    // Die Referenzstifte arbeiten direkt auf der fortlaufend aufgenommenen
+    // Punktfolge. Chaikin veraendert beim Anhaengen neuer Punkte rueckwirkend
+    // das bereits gerenderte Pfadende und widerspricht damit dem
+    // inkrementellen Live-Puffer. Fuer normale Freihand-Linien bleibt die
+    // bestehende Glaettung unveraendert; Stifte verwenden roh gespeicherte
+    // Punkte in Live-Vorschau, Objekt-Render und Export identisch.
+    const usesReferenceBrush = (s as any).strokePattern?.kind === "brush";
+    const pts = usesReferenceBrush ? s.points : this._renderPointsForFreeStroke(s);
     ctx.save();
     // Stil-spezifische Overrides für Marker/Bleistift.
     let strokeColor = colorOverride || rgbaFromHex(s.color, s.opacity);

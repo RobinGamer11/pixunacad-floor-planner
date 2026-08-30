@@ -490,16 +490,19 @@ function paintStamped(
 ): number {
   if (spacing <= 1e-6) return S.total;
   const limit = S.total + (final ? 1e-6 : -1e-6);
-  let painted = from;
+  // `from` bezeichnet immer den NAECHSTEN noch nicht gemalten Rasterpunkt.
+  // Zuvor wurde hier die zuletzt gemalte Distanz zurueckgegeben. Dadurch
+  // wurde derselbe Spray-/Halftone-/Aquarell-Stempel in jedem Render-Frame
+  // erneut aufgetragen und der Live-Strich wurde zunehmend dunkler.
+  let next = Math.max(0, Math.ceil((from - 1e-9) / spacing) * spacing);
   ctx.save();
-  for (let k = Math.max(0, Math.ceil((from - 1e-9) / spacing)); k * spacing <= limit; k++) {
-    const dist = k * spacing;
+  for (let dist = next; dist <= limit; dist += spacing) {
     const gi = Math.round((o.phase + dist) / spacing);
     stamp(ctx, S.at(dist), makeRng(o.seed, gi));
-    painted = dist;
+    next = dist + spacing;
   }
   ctx.restore();
-  return final ? S.total : Math.max(from, painted);
+  return final ? S.total : next;
 }
 
 
