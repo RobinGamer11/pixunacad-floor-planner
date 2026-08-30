@@ -563,12 +563,9 @@ function polyWorldLength(pts: WorldPoint[], closed: boolean): number {
   if (closed && pts.length > 2) L += Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y);
   return L;
 }
-function polyScreenLength(pts: ScreenPoint[], closed: boolean): number {
-  return polyWorldLength(pts as WorldPoint[], closed);
-}
 
-/** Leert den Pinsel-Cache (z. B. bei Themenwechsel). */
-export function clearBrushCache() { brushCache.clear(); liveStates.clear(); }
+/** Leert den Pinsel-Cache vollständig (z. B. bei Themenwechsel). */
+export function clearBrushCache() { brushCache.clear(); cachePixels = 0; liveStates.clear(); }
 
 /**
  * Malt den Abschnitt [`from`, Pfadende] und liefert die neue, bereits
