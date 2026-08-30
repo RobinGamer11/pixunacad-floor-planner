@@ -4,7 +4,7 @@ import { Camera } from "./Camera";
 import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
-import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx } from "./strokeEffects";
+import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx, strokeWithBrushIfActive } from "./strokeEffects";
 import { getEffectiveContourGeometry } from "./effectiveGeometry";
 import { isCanvasDark } from "@/lib/theme";
 
@@ -1480,7 +1480,9 @@ export class Renderer {
     };
     if (!seg.isGuide) applyStrokePattern(ctx, strokeOpts);
     const drawPts = tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), worldPts, false, strokeOpts);
-    ctx.stroke();
+    if (seg.isGuide || !strokeWithBrushIfActive(ctx, (p) => cam.worldToScreen(p.x, p.y), worldPts, false, strokeOpts)) {
+      ctx.stroke();
+    }
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
 
@@ -1993,7 +1995,9 @@ export class Renderer {
     ctx.lineJoin = "round";
     applyStrokePattern(ctx, strokeOpts);
     tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, isClosed, strokeOpts);
-    ctx.stroke();
+    if (!strokeWithBrushIfActive(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, isClosed, strokeOpts)) {
+      ctx.stroke();
+    }
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
 
@@ -2065,7 +2069,9 @@ export class Renderer {
     const strokeContours = () => {
       for (const ring of contourRings) {
         tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), ring, true, contourOpts);
-        ctx.stroke();
+        if (!strokeWithBrushIfActive(ctx, (p) => cam.worldToScreen(p.x, p.y), ring, true, contourOpts)) {
+          ctx.stroke();
+        }
       }
     };
 
@@ -3184,7 +3190,9 @@ export class Renderer {
     };
     if ((s as any).strokePattern && (s as any).strokePattern.kind !== "solid") applyStrokePattern(ctx, strokeOpts);
     tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts);
-    ctx.stroke();
+    if (!strokeWithBrushIfActive(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts)) {
+      ctx.stroke();
+    }
     ctx.setLineDash([]);
     ctx.lineDashOffset = 0;
 
