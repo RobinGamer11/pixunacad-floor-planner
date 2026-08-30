@@ -414,19 +414,30 @@ export function strokeWithBrushIfActive(
   if (!isBrushPresetId(preset)) return false;
   if (!worldPts || worldPts.length < 1) return true;
 
-  const pts = opts.roughen?.enabled
-    ? roughenPolyline(worldPts, closed, opts.roughen, { phaseM: opts.phaseM, cacheKey: opts.cacheKey })
+  const roughened = !!opts.roughen?.enabled;
+  const pts = roughened
+    ? roughenPolyline(worldPts, closed, opts.roughen!, { phaseM: opts.phaseM, cacheKey: opts.cacheKey })
     : worldPts;
-  const screen = pts.map((p) => project(p));
   const info = brushPresetInfo(preset);
-  renderBrushStroke(ctx, screen, {
-    preset,
-    character: pattern.brushCharacter ?? info?.character ?? 50,
-    seed: pattern.brushSeed ?? 1,
-    sizePx: opts.lineWidthPx ?? ctx.lineWidth ?? 1,
-    color: typeof ctx.strokeStyle === "string" ? ctx.strokeStyle : "#000000",
-    opacity: ctx.globalAlpha,
+  renderBrushStroke({
+    worldPts: pts,
     closed,
-  }, opts.cacheKey);
+    project,
+    phaseM: opts.phaseM,
+    // Nach dem Aufrauen stimmt die Punktzahl nicht mehr mit den Druckwerten
+    // überein — dann gilt der neutrale Ersatzdruck.
+    pressures: roughened ? undefined : opts.pressures,
+    cacheKey: opts.cacheKey,
+    style: {
+      preset,
+      character: pattern.brushCharacter ?? info?.character ?? 50,
+      seed: pattern.brushSeed ?? 1,
+      sizePx: opts.lineWidthPx ?? ctx.lineWidth ?? 1,
+      color: typeof ctx.strokeStyle === "string" ? ctx.strokeStyle : "#000000",
+      opacity: ctx.globalAlpha,
+      closed,
+    },
+  }, ctx);
   return true;
+
 }
