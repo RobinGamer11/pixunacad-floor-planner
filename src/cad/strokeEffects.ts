@@ -349,8 +349,14 @@ export interface StrokeRenderOptions {
   /** Distanzversatz auf dem Originalpfad (geteilte Konturen). */
   phaseM?: number;
   cacheKey?: string;
+  /**
+   * Live-Puffer-Schlüssel während des Zeichnens: der Pinsel stempelt dann nur
+   * den neu hinzugekommenen Abschnitt statt den ganzen Pfad neu zu rendern.
+   */
+  liveKey?: string;
   /** Pointer-Druck je Pfadpunkt (nur Freihand). */
   pressures?: number[];
+
 }
 
 
