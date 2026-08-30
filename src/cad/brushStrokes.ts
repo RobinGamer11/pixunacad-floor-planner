@@ -160,23 +160,41 @@ class PathSampler {
     this.total = this.cum[this.cum.length - 1] || 0;
   }
 
+  /** Fortlaufender Segmentzeiger — verhindert lineare Suche je Stempel. */
+  private _cursor = 1;
+
   /** Punkt (Bildschirm) + Druck an einer Referenz-Distanz. */
   at(d: number): { x: number; y: number; pressure: number } {
+    const cum = this.cum;
+    if (cum.length < 2) {
+      const p = this.screen[0] || { x: 0, y: 0 };
+      return { x: p.x, y: p.y, pressure: this.press[0] ?? NEUTRAL_PRESSURE };
+    }
     const dist = clamp(d, 0, this.total);
-    let i = 1;
-    while (i < this.cum.length && this.cum[i] < dist) i++;
-    const i0 = Math.max(0, i - 1);
-    const i1 = Math.min(this.cum.length - 1, i);
-    const seg = this.cum[i1] - this.cum[i0] || 1e-9;
-    const t = clamp((dist - this.cum[i0]) / seg, 0, 1);
-    const a = this.screen[i0], b = this.screen[i1];
+    let i = this._cursor;
+    if (i < 1) i = 1;
+    if (i > cum.length - 1) i = cum.length - 1;
+    if (cum[i - 1] > dist) {
+      // Rücksprung (z. B. neue Abtastreihe) → binäre Suche statt Neustart.
+      let lo = 1, hi = cum.length - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < dist) lo = mid + 1; else hi = mid; }
+      i = lo;
+    } else {
+      while (i < cum.length - 1 && cum[i] < dist) i++;
+    }
+    this._cursor = i;
+    const i0 = i - 1;
+    const seg = cum[i] - cum[i0] || 1e-9;
+    const t = clamp((dist - cum[i0]) / seg, 0, 1);
+    const a = this.screen[i0], b = this.screen[i];
     return {
       x: lerp(a.x, b.x, t),
       y: lerp(a.y, b.y, t),
-      pressure: lerp(this.press[i0], this.press[i1], t),
+      pressure: lerp(this.press[i0], this.press[i], t),
     };
   }
 }
+
 
 // ------------------------------------------------------------------ Rendering
 
