@@ -710,35 +710,47 @@ function makeBristles(variant: keyof typeof BRISTLE_CFG, seed: number, character
 }
 
 function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
-                      variant: keyof typeof BRISTLE_CFG, o: BrushCtx) {
-  if (S.total <= 1e-6) return;
-  const bristles = makeBristles(variant, o.seed, o.character);
+                      variant: keyof typeof BRISTLE_CFG, o: BrushCtx,
+                      from: number, final: boolean, state: PaintState | null): number {
+  if (S.total <= 1e-6) return S.total;
   // Schrittweite in Referenz-Pixeln: entspricht dem typischen Pointer-Abstand
   // der Vorlage und ist unabhängig von Zoom und Punktdichte.
   const step = 2;
   const P = o.P;
 
-  // Ein geteilter Abschnitt startet mit der bereits verbrauchten Farbe.
-  if (o.phase > 0) {
-    for (const b of bristles) {
-      b.paint = Math.max(.10, b.paint - o.phase * (.00012 + b.dry * .00030));
+  // Borstenzustand (Farbverbrauch, Weglänge) wird über inkrementelle Läufe
+  // hinweg fortgeschrieben — sonst würde jeder Teillauf neu „nass“ starten.
+  let bristles = state?.bristles;
+  if (!bristles || from <= 1e-9) {
+    bristles = makeBristles(variant, o.seed, o.character);
+    // Ein geteilter Abschnitt startet mit der bereits verbrauchten Farbe.
+    if (o.phase > 0) {
+      for (const b of bristles) {
+        b.paint = Math.max(.10, b.paint - o.phase * (.00012 + b.dry * .00030));
+      }
     }
+    if (state) { state.bristles = bristles; state.travel = o.phase; }
   }
 
-  let travel = o.phase;
+  let travel = state?.travel ?? (o.phase + from);
+  const start = Math.max(0, Math.ceil((from - 1e-9) / step) * step);
+  const limit = final ? S.total : Math.max(0, S.total - step);
+  let painted = from;
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
   ctx.lineJoin = "round";
 
-  for (let d = 0; d < S.total - 1e-6; d += step) {
+  for (let d = start; d < limit - 1e-6; d += step) {
     const dEnd = Math.min(S.total, d + step);
     const a = S.at(d);
     const b = S.at(dEnd);
     const segLenPx = Math.hypot(b.x - a.x, b.y - a.y);
+    painted = dEnd;
     if (segLenPx < 1e-6) continue;
     const dRef = Math.max(.25, dEnd - d);
     const pressure = (a.pressure + b.pressure) * .5;
     travel += dRef;
+
 
     const dx = (b.x - a.x) / segLenPx;
     const dy = (b.y - a.y) / segLenPx;
