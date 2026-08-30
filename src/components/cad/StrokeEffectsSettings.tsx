@@ -273,6 +273,10 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
                   onDragStart={dragStart} onDragEnd={dragEnd}
                 />
               )}
+              <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <input type="checkbox" checked={calm} onChange={toggleCalm} className="accent-foreground" />
+                Ruhige Vorschau beim Zeichnen (Stift erst beim Loslassen)
+              </label>
               <div className="text-[11px] text-muted-foreground">
                 Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
               </div>
