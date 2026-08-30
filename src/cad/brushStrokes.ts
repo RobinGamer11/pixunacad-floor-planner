@@ -606,15 +606,6 @@ function blobPath(ctx: CanvasRenderingContext2D, rng: () => number,
   ctx.closePath();
 }
 
-function paintWaterSpatter(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx) {
-  const spacing = Math.max(6, o.size * AQUA_CFG.spacingFactor);
-  ctx.save();
-  for (let d = 0; d <= S.total + 1e-6; d += spacing) {
-    const gi = Math.round((o.phase + d) / spacing);
-    stampWaterSpatter(ctx, S.at(d), o, makeRng(o.seed, gi));
-  }
-  ctx.restore();
-}
 
 function stampWaterSpatter(ctx: CanvasRenderingContext2D, point: { x: number; y: number; pressure: number },
                            o: BrushCtx, rng: () => number) {
