@@ -3,7 +3,7 @@ import {
   DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN,
   type RoughenParams, type StrokePatternKind, type StrokePatternParams,
 } from "@/cad/strokeEffects";
-import { BRUSH_PRESETS, brushPresetInfo, type BrushPresetId } from "@/cad/brushStrokes";
+import { BRUSH_PRESETS, brushPresetInfo, renderBrushPreview, type BrushPresetId } from "@/cad/brushStrokes";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -84,6 +84,33 @@ const SliderField: React.FC<{
   );
 };
 
+
+/** Stift-Button mit gerenderter Strichvorschau (echter Pinsel-Algorithmus). */
+const BrushButton: React.FC<{
+  id: BrushPresetId; label: string; active: boolean; onClick: () => void;
+}> = ({ id, label, active, onClick }) => {
+  const ref = React.useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const cv = ref.current;
+    if (!cv) return;
+    const color = getComputedStyle(cv).color || "#111111";
+    try { renderBrushPreview(cv, id, color); } catch { /* noop */ }
+  }, [id, active]);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className={`flex flex-col items-stretch gap-1 rounded border px-1.5 py-1 text-[9px] leading-tight transition-colors ${
+        active ? "bg-accent" : "hover:bg-muted"
+      }`}
+      style={{ borderColor: HAIRLINE }}
+    >
+      <canvas ref={ref} className="h-4 w-full text-foreground" />
+      <span className="truncate text-muted-foreground">{label}</span>
+    </button>
+  );
+};
 
 /**
  * Gemeinsame Kontur-Effekte (Linienart + nicht-destruktives „Aufrauen“) für
@@ -207,19 +234,19 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
           </div>
         )}
 
-        <div className="mt-3">
-          <div className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground">STIFTE</div>
-          <select
-            value={activeBrush ?? ""}
-            onChange={(e) => selectBrush(e.target.value)}
-            className="h-8 w-full rounded-md border bg-background px-2 text-[11px] outline-none"
-            style={{ borderColor: HAIRLINE }}
-          >
-            <option value="">Kein Stift</option>
-            {BRUSH_PRESETS.map((b) => (
-              <option key={b.id} value={b.id}>{b.label}</option>
-            ))}
-          </select>
+        <div className="mt-2 grid grid-cols-2 gap-1">
+          {BRUSH_PRESETS.map((b) => (
+            <BrushButton
+              key={b.id}
+              id={b.id}
+              label={b.label}
+              active={activeBrush === b.id}
+              onClick={() => selectBrush(activeBrush === b.id ? "" : b.id)}
+            />
+          ))}
+        </div>
+
+        <div className="mt-2">
           {activeBrush && (
             <div className="mt-2 space-y-2">
               <SliderField
