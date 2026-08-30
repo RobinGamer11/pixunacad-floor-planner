@@ -3125,39 +3125,45 @@ export class Renderer {
 
   private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null, liveKey?: string) {
     if (!s.points || s.points.length < 2) return;
-    if (s.lineStyle === "blob" && colorOverride === null) {
+    // Ein aktiver Stift (gemeinsame Linienart) hat Vorrang vor den alten
+    // Freihand-Sonderstilen. Sonst würden Bestandsobjekte mit z. B.
+    // lineStyle "brush"/"spray" weiterhin im Legacy-Zweig landen und der
+    // eingestellte Stift bliebe wirkungslos.
+    const brushPattern = (s as any).strokePattern?.kind === "brush";
+    if (!brushPattern && s.lineStyle === "blob" && colorOverride === null) {
+
       this._drawFreeStrokeBlobs(s);
       return;
     }
-    if (s.lineStyle === "image" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "image" && colorOverride === null) {
       this._drawFreeStrokeImage(s);
       return;
     }
-    if (s.lineStyle === "spray" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "spray" && colorOverride === null) {
       this._drawFreeStrokeSpray(s);
       return;
     }
-    if (s.lineStyle === "brush" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "brush" && colorOverride === null) {
       this._drawFreeStrokeBrush(s);
       return;
     }
-    if (s.lineStyle === "calligraphy" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "calligraphy" && colorOverride === null) {
       this._drawFreeStrokeCalligraphy(s);
       return;
     }
-    if (s.lineStyle === "ink" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "ink" && colorOverride === null) {
       this._drawFreeStrokeInk(s);
       return;
     }
-    if (s.lineStyle === "crayon" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "crayon" && colorOverride === null) {
       this._drawFreeStrokeCrayon(s);
       return;
     }
-    if (s.lineStyle === "chalk" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "chalk" && colorOverride === null) {
       this._drawFreeStrokeChalk(s);
       return;
     }
-    if (s.lineStyle === "pencil" && colorOverride === null) {
+    if (!brushPattern && s.lineStyle === "pencil" && colorOverride === null) {
       this._drawFreeStrokePencil(s);
       return;
     }
@@ -3175,7 +3181,7 @@ export class Renderer {
     // Stil-spezifische Overrides für Marker/Bleistift.
     let strokeColor = colorOverride || rgbaFromHex(s.color, s.opacity);
     let strokeWidth = widthOverridePx != null ? widthOverridePx : this.segStrokePx(s.thicknessM);
-    if (colorOverride === null && s.lineStyle === "marker") {
+    if (!brushPattern && colorOverride === null && s.lineStyle === "marker") {
       // Textmarker: dick, flach, halbtransparent (multiply).
       strokeColor = rgbaFromHex(s.color, Math.min(s.opacity, 0.4));
       (ctx as any).globalCompositeOperation = "multiply";
