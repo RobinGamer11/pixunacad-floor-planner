@@ -20,7 +20,7 @@ Ziel: Linie, Freihand, Polygon und Schraffur nutzen in CAD **und** Projektmappe 
 - **Geometriecache (Weltkoordinaten):** deterministische Stempel-/Borstenliste in Objekt-/Weltkoordinaten, Schlüssel ausschließlich aus Objekt-ID, Geometrie-Revision, Stiftparametern und Seed. Kamera, Pan und exakte Bildschirmkoordinaten machen ihn nie ungültig.
 - **Rastercache:** gerendertes Bild pro Objekt und Zoom-Bucket (wenige Stufen). Während Zoom/Pan wird ein vorhandenes Raster übergangsweise skaliert weiterverwendet; die hochauflösende Neuberechnung erfolgt nach Ende der Interaktion oder beim Bucketwechsel.
 - Verwaltung nach Pixel-/Speicherbudget und pro Objekt statt globalem Limit von 24. Gezielte Invalidierung bei Geometrie-, Stift- und Farbänderung sowie beim Löschen.
-- Beide Caches bleiben rein temporär im Arbeitsspeicher. Dauerhaft gespeichert werden ausschließlich Originalpfad, Stiftparameter und Seed; der Cache muss jederzeit verlustfrei neu erzeugbar sein.
+- **Nur RAM, nie Persistenz:** Stempel- und Borsteninformationen werden bei Bedarf aus Originalpfad, Stiftparametern und Seed neu erzeugt und ausschließlich in einem begrenzten Arbeitsspeicher-Cache gehalten. Sie werden weder am Objekt noch im Projekt, in Local Storage oder in der Datenbank gespeichert. Dauerhaft bleiben nur Originalgeometrie, Stiftparameter und Seed. Der Cache lässt sich jederzeit verlustfrei verwerfen und identisch neu aufbauen.
 
 ### 3. LOD und Arbeitsbudget
 - Skalierungsabhängiges Level-of-Detail: Stempelabstand, Partikelzahl und Borstenzahl richten sich nach der **sichtbaren** Pfadlänge und Strichbreite, mit festem Arbeitslimit pro sichtbarer Länge. Der Aufwand darf nicht umgekehrt proportional zur Strichbreite wachsen.
