@@ -667,6 +667,8 @@ export class FreeStroke {
   sourceStartDistanceM: number;
   /** ID des ursprünglichen Strokes (Herkunft nach dem Radieren). */
   sourceStrokeId: string | null;
+  /** Pointer-Druck je Pfadpunkt (0–1). Leer = neutraler Ersatzwert. */
+  pressures: number[] | null;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -676,6 +678,7 @@ export class FreeStroke {
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
     sourceStartDistanceM?: number; sourceStrokeId?: string | null;
     autoShape?: boolean; autoShapeSource?: Vec2[] | null;
+    pressures?: number[] | null;
   } & StrokeEffectsInit) {
     this.id = opts.id;
     this.points = opts.points.map(p => v(p.x, p.y));
@@ -695,6 +698,9 @@ export class FreeStroke {
     this.sourceStartDistanceM = (typeof opts.sourceStartDistanceM === "number" && Number.isFinite(opts.sourceStartDistanceM))
       ? opts.sourceStartDistanceM : 0;
     this.sourceStrokeId = opts.sourceStrokeId || null;
+    this.pressures = (Array.isArray(opts.pressures) && opts.pressures.length === this.points.length)
+      ? opts.pressures.map((x) => (Number.isFinite(x) && x > 0 ? Math.min(1, x) : 0.55))
+      : null;
     this.autoShape = opts.autoShape === true;
     this.autoShapeSource = opts.autoShapeSource ? opts.autoShapeSource.map(p => v(p.x, p.y)) : null;
     // Migrationssicher: alte Freihandobjekte übernehmen lineStyle/gapM als Muster.
@@ -1099,6 +1105,7 @@ export class Scene {
     imageSrc?: string | null; imageSizeM?: number; imageSpacingM?: number; imageRotateAlongPath?: boolean;
     sourceStartDistanceM?: number; sourceStrokeId?: string | null;
     autoShape?: boolean; autoShapeSource?: Vec2[] | null;
+    pressures?: number[] | null;
 
   } & StrokeEffectsInit = {}) {
     const stroke = new FreeStroke({ id: this._makeId(), points, ...style });
@@ -1162,7 +1169,20 @@ export class Scene {
       if (!ch || ch.length < 2) continue;
       const explicit = Array.isArray(raw) ? undefined : raw?.sourceStartDistanceM;
       const startM = baseStart + (typeof explicit === "number" ? explicit : startDistanceOf(ch[0]));
+      // Druckwerte des verbleibenden Abschnitts übernehmen (nächstgelegener
+      // Originalpunkt je Teilstückpunkt).
+      const chunkPressures = stroke.pressures
+        ? ch.map((p) => {
+            let best = 0, bestD = Infinity;
+            for (let i = 0; i < src.length; i++) {
+              const dd = (src[i].x - p.x) ** 2 + (src[i].y - p.y) ** 2;
+              if (dd < bestD) { bestD = dd; best = i; }
+            }
+            return stroke.pressures![best] ?? 0.55;
+          })
+        : null;
       this.createFreeStroke(ch, {
+        pressures: chunkPressures,
         color: stroke.color, thicknessM: stroke.thicknessM, opacity: stroke.opacity,
         lineStyle: stroke.lineStyle, gapM: stroke.gapM,
         blobSpacingM: stroke.blobSpacingM, blobSizeM: stroke.blobSizeM,
