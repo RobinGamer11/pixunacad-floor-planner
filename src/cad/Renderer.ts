@@ -1971,6 +1971,7 @@ export class Renderer {
     const strokeOpts = {
       pattern: (poly as any).strokePattern,
       pxPerM: cam.scale, lineWidthPx: strokePx,
+      cacheKey: poly.id ? `poly:${poly.id}` : undefined,
     };
 
     const fillPct = isClosed ? ((poly as any).fillAlphaPct ?? 0) : 0;
@@ -2065,6 +2066,7 @@ export class Renderer {
     const contourOpts = {
       pattern: (hatch as any).strokePattern,
       pxPerM: cam.scale, lineWidthPx: strokePx,
+      cacheKey: hatch.id ? `hatch:${hatch.id}` : undefined,
     };
     const strokeContours = () => {
       for (const ring of contourRings) {
