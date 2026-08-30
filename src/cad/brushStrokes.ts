@@ -748,7 +748,7 @@ function stampWaterSpatter(ctx: CanvasRenderingContext2D, point: { x: number; y:
   const cfg = AQUA_CFG;
   const pressure = point.pressure || NEUTRAL_PRESSURE;
   const radius = o.size * cfg.baseRadius * lerp(.7, 1.35, pressure);
-  const count = Math.ceil(cfg.countBase + o.size * cfg.countSize);
+  const count = Math.max(2, Math.round(Math.ceil(cfg.countBase + o.size * cfg.countSize) * o.detail));
   const P = o.P;
 
   for (let i = 0; i < count; i++) {
