@@ -798,7 +798,10 @@ function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
     }
   }
   ctx.restore();
+  if (state) state.travel = travel;
+  return final ? S.total : Math.max(from, painted);
 }
+
 
 /** Referenz: drawLine() */
 function drawRefLine(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoint,
