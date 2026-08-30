@@ -1679,7 +1679,8 @@ export class CadApp {
     line: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
     polygon: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
     hatch: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
-    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    // Freihand: mittlere Strich-/Abstandswerte (5 mm) als Werkzeugstandard.
+    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN, dashLengthMm: 5, gapLengthMm: 5 }, roughen: { ...DEFAULT_ROUGHEN } },
   };
 
   getStrokeEffectDefaults(kind: "line" | "polygon" | "hatch" | "free") {
