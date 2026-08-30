@@ -696,7 +696,9 @@ function stampHalftone(ctx: CanvasRenderingContext2D, point: { x: number; y: num
                        cfg: HalftoneCfg, o: BrushCtx, rng: () => number) {
   const pressure = point.pressure || NEUTRAL_PRESSURE;
   const radius = o.size * cfg.stampRadius * lerp(.7, 1.25, pressure);
-  const grid = cfg.grid;
+  // LOD: Rasterweite so anheben, dass benachbarte Punkte im Ausgabebild noch
+  // getrennt bleiben (sonst wirkt das Halftone-Muster wie eine Volllinie).
+  const grid = Math.max(cfg.grid, (o.minPx * 3.2) / Math.max(1e-6, o.P));
   const angle = Math.PI / 4;
   const ca = Math.cos(angle);
   const sa = Math.sin(angle);
@@ -711,7 +713,7 @@ function stampHalftone(ctx: CanvasRenderingContext2D, point: { x: number; y: num
       if (rng() > cfg.density * (0.55 + intensity * .45)) continue;
       const dotRadius = Math.max(.18, cfg.dotMax * intensity * lerp(.55, 1.15, pressure));
       ctx.beginPath();
-      ctx.arc(point.x + rx * o.P, point.y + ry * o.P, Math.max(0.15, dotRadius * o.P), 0, Math.PI * 2);
+      ctx.arc(point.x + rx * o.P, point.y + ry * o.P, Math.max(o.minPx, dotRadius * o.P), 0, Math.PI * 2);
       ctx.fillStyle = rgba(o.col, o.opacity * (cfg.alphaMin + rng() * (cfg.alphaMax - cfg.alphaMin)));
       ctx.fill();
     }
