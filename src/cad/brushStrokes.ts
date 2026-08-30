@@ -609,6 +609,16 @@ function paintStamped(
   stamp: (ctx: CanvasRenderingContext2D, pt: { x: number; y: number; pressure: number }, rng: () => number) => void,
 ): number {
   if (spacing <= 1e-6) return S.total;
+  // LOD: Mindestabstand in Ausgabepixeln — sonst überlappen sich die Stempel
+  // bei kleinem Maßstab so stark, dass der Stift zur Vollfläche wird.
+  spacing = Math.max(spacing, (o.minPx * 3.2) / Math.max(1e-6, o.P));
+  // Arbeitsbudget je sichtbarer Länge (nur beim vollständigen Neuaufbau, damit
+  // inkrementelle Live-Läufe ihre Stempelrasterung beibehalten).
+  if (final && from <= 1e-9) {
+    const outLen = S.total * o.P;
+    const maxStamps = clamp(Math.round(outLen / 2), 64, 6000);
+    if (S.total / spacing > maxStamps) spacing = S.total / maxStamps;
+  }
   const limit = S.total + (final ? 1e-6 : -1e-6);
   // `from` bezeichnet immer den NAECHSTEN noch nicht gemalten Rasterpunkt.
   // Zuvor wurde hier die zuletzt gemalte Distanz zurueckgegeben. Dadurch
