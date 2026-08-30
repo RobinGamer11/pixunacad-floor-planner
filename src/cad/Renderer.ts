@@ -3515,7 +3515,9 @@ export class Renderer {
   }, pressures?: number[]) {
     if (!points || points.length < 2) return;
     const tmp = new FreeStroke({ id: "_preview", points, ...style, pressures: pressures || null });
-    this._drawSingleFreeStroke(tmp);
+    // Live-Puffer: beim Zeichnen wird nur der neue Abschnitt gestempelt.
+    this._drawSingleFreeStroke(tmp, null, null, "free:_preview");
+
   }
 
   // ---- Ruler Guide ----
