@@ -88,14 +88,15 @@ const SliderField: React.FC<{
 /** Stift-Button mit gerenderter Strichvorschau (echter Pinsel-Algorithmus). */
 const BrushButton: React.FC<{
   id: BrushPresetId; label: string; active: boolean; onClick: () => void;
-}> = ({ id, label, active, onClick }) => {
+  character?: number; opacity?: number;
+}> = ({ id, label, active, onClick, character, opacity }) => {
   const ref = React.useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
     const color = getComputedStyle(cv).color || "#111111";
-    try { renderBrushPreview(cv, id, color); } catch { /* noop */ }
-  }, [id, active]);
+    try { renderBrushPreview(cv, id, color, character, opacity); } catch { /* noop */ }
+  }, [id, active, character, opacity]);
   return (
     <button
       type="button"
@@ -242,7 +243,9 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
               label={b.label}
               active={activeBrush === b.id}
               onClick={() => selectBrush(activeBrush === b.id ? "" : b.id)}
+              character={activeBrush === b.id ? brushCharacter : undefined}
             />
+
           ))}
         </div>
 

@@ -6,6 +6,7 @@ import type { FreeLineStyle } from "./Scene";
 import { dedupePoints, projectPointToInfiniteLineFromTwoPoints, autoShapePoints } from "./freeGeom";
 import { RulerDragController } from "./rulerInteraction";
 import { maybeRasterize } from "./rasterize";
+import { endLiveBrush } from "./brushStrokes";
 
 /**
  * Freihand-Zeichenwerkzeug (Hotkey: F).
@@ -29,6 +30,7 @@ export class FreeDrawTool {
   }
 
   activate() {
+    endLiveBrush("free:_preview");
     this._drawing = false;
     this._points = [];
     this._pressures = [];
@@ -41,6 +43,7 @@ export class FreeDrawTool {
   }
 
   cancel() {
+    endLiveBrush("free:_preview");
     this._drawing = false;
     this._points = [];
     this._pressures = [];
@@ -61,7 +64,8 @@ export class FreeDrawTool {
     // Ruler-Manipulation hat Vorrang vor dem Zeichnen.
     if (this._rulerDrag.update(input)) {
       // Sicherheit: laufendes Drawing abbrechen
-      if (this._drawing) { this._drawing = false; this._points = []; this._pressures = []; this._lastSamplePx = null; }
+      if (this._drawing) { endLiveBrush("free:_preview");
+    this._drawing = false; this._points = []; this._pressures = []; this._lastSamplePx = null; }
       return;
     }
     const ruler = this.app.scene.rulerGuide;
@@ -130,7 +134,8 @@ export class FreeDrawTool {
             })
           : null;
 
-        this._drawing = false;
+        endLiveBrush("free:_preview");
+    this._drawing = false;
         this._points = [];
         this._pressures = [];
         this._lastSamplePx = null;

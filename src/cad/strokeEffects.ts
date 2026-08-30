@@ -349,8 +349,14 @@ export interface StrokeRenderOptions {
   /** Distanzversatz auf dem Originalpfad (geteilte Konturen). */
   phaseM?: number;
   cacheKey?: string;
+  /**
+   * Live-Puffer-Schlüssel während des Zeichnens: der Pinsel stempelt dann nur
+   * den neu hinzugekommenen Abschnitt statt den ganzen Pfad neu zu rendern.
+   */
+  liveKey?: string;
   /** Pointer-Druck je Pfadpunkt (nur Freihand). */
   pressures?: number[];
+
 }
 
 
@@ -428,6 +434,8 @@ export function strokeWithBrushIfActive(
     // überein — dann gilt der neutrale Ersatzdruck.
     pressures: roughened ? undefined : opts.pressures,
     cacheKey: opts.cacheKey,
+    liveKey: opts.liveKey,
+
     style: {
       preset,
       character: pattern.brushCharacter ?? info?.character ?? 50,

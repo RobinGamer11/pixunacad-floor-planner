@@ -160,23 +160,41 @@ class PathSampler {
     this.total = this.cum[this.cum.length - 1] || 0;
   }
 
+  /** Fortlaufender Segmentzeiger — verhindert lineare Suche je Stempel. */
+  private _cursor = 1;
+
   /** Punkt (Bildschirm) + Druck an einer Referenz-Distanz. */
   at(d: number): { x: number; y: number; pressure: number } {
+    const cum = this.cum;
+    if (cum.length < 2) {
+      const p = this.screen[0] || { x: 0, y: 0 };
+      return { x: p.x, y: p.y, pressure: this.press[0] ?? NEUTRAL_PRESSURE };
+    }
     const dist = clamp(d, 0, this.total);
-    let i = 1;
-    while (i < this.cum.length && this.cum[i] < dist) i++;
-    const i0 = Math.max(0, i - 1);
-    const i1 = Math.min(this.cum.length - 1, i);
-    const seg = this.cum[i1] - this.cum[i0] || 1e-9;
-    const t = clamp((dist - this.cum[i0]) / seg, 0, 1);
-    const a = this.screen[i0], b = this.screen[i1];
+    let i = this._cursor;
+    if (i < 1) i = 1;
+    if (i > cum.length - 1) i = cum.length - 1;
+    if (cum[i - 1] > dist) {
+      // Rücksprung (z. B. neue Abtastreihe) → binäre Suche statt Neustart.
+      let lo = 1, hi = cum.length - 1;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (cum[mid] < dist) lo = mid + 1; else hi = mid; }
+      i = lo;
+    } else {
+      while (i < cum.length - 1 && cum[i] < dist) i++;
+    }
+    this._cursor = i;
+    const i0 = i - 1;
+    const seg = cum[i] - cum[i0] || 1e-9;
+    const t = clamp((dist - cum[i0]) / seg, 0, 1);
+    const a = this.screen[i0], b = this.screen[i];
     return {
       x: lerp(a.x, b.x, t),
       y: lerp(a.y, b.y, t),
-      pressure: lerp(this.press[i0], this.press[i1], t),
+      pressure: lerp(this.press[i0], this.press[i], t),
     };
   }
 }
+
 
 // ------------------------------------------------------------------ Rendering
 
@@ -204,10 +222,16 @@ export interface BrushRenderRequest {
   /** Pointer-Druck je Pfadpunkt (optional). */
   pressures?: number[];
   cacheKey?: string;
+  /**
+   * Live-Puffer-Schlüssel (nur während des Zeichnens). Ist er gesetzt, wird
+   * ausschließlich der neu hinzugekommene Pfadabschnitt in einen persistenten
+   * Puffer gerendert — bereits gezeichnete Abschnitte bleiben unberührt.
+   */
+  liveKey?: string;
 }
 
 const brushCache = new Map<string, HTMLCanvasElement>();
-const MAX_CACHE = 60;
+const MAX_CACHE = 24;
 
 function pathSignature(pts: ScreenPoint[], ox: number, oy: number): string {
   let h = 0x811c9dc5;
@@ -232,6 +256,39 @@ interface BrushCtx {
   phase: number;
 }
 
+/** Fortgeschriebener Zustand eines Stiftes (Borsten-Farbverbrauch, Weglänge). */
+interface PaintState { bristles?: Bristle[]; travel?: number }
+
+// ---------------------------------------------------------------- Live-Puffer
+
+interface LiveState {
+  canvas: HTMLCanvasElement;
+  lctx: CanvasRenderingContext2D;
+  sig: string;
+  /** Bereits gerenderte Referenz-Distanz (lokal, ohne Phase). */
+  done: number;
+  count: number;
+  paint: PaintState;
+}
+
+const liveStates = new Map<string, LiveState>();
+
+/** Live-Puffer eines beendeten Striches freigeben. */
+export function endLiveBrush(key: string) { liveStates.delete(key); }
+export function clearLiveBrushes() { liveStates.clear(); }
+
+function makeBrushCtx(style: BrushRenderStyle, info: BrushPresetInfo, P: number, phaseRef: number): BrushCtx {
+  return {
+    col: parseColor(style.color),
+    opacity: clamp(style.opacity ?? 1, 0, 1),
+    size: info.refSize,
+    character: clamp((style.character ?? info.character) / 100, 0, 1),
+    seed: (style.seed || 1) >>> 0,
+    P,
+    phase: phaseRef,
+  };
+}
+
 /** Zeichnet den Pinselstrich entlang der Weltgeometrie (mit Offscreen-Cache). */
 export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingContext2D) {
   const { style } = req;
@@ -251,12 +308,6 @@ export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingC
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
     minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
   }
-  const pad = Math.ceil(sizePx * 3 + 8);
-  const ox = Math.floor(minX) - pad;
-  const oy = Math.floor(minY) - pad;
-  const w = Math.ceil(maxX - minX) + pad * 2;
-  const h = Math.ceil(maxY - minY) + pad * 2;
-  if (w <= 0 || h <= 0 || w * h > 36_000_000) return;
 
   // Weltlänge → Referenz-Pixel. Die Linienstärke ist physisch, daher ist der
   // Faktor zoomunabhängig.
@@ -266,11 +317,29 @@ export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingC
   const refPerWorld = pxPerWorld / P;
   const phaseRef = (req.phaseM || 0) * refPerWorld;
 
+  if (req.liveKey) {
+    renderBrushLive(req, ctx, info, {
+      P, closed, refPerWorld, phaseRef, sizePx, worldPts,
+    });
+    return;
+  }
+
+  const pad = Math.ceil(sizePx * 3 + 8);
+  const ox = Math.floor(minX) - pad;
+  const oy = Math.floor(minY) - pad;
+  const w = Math.ceil(maxX - minX) + pad * 2;
+  const h = Math.ceil(maxY - minY) + pad * 2;
+  if (w <= 0 || h <= 0 || w * h > 36_000_000) return;
+
   const key = req.cacheKey
     ? `${req.cacheKey}|${style.preset}|${style.character}|${style.seed}|${sizePx.toFixed(2)}|${style.color}|${style.opacity.toFixed(3)}|${closed}|${phaseRef.toFixed(2)}|${w}x${h}|${pathSignature(screenAll, minX, minY)}`
     : null;
 
   let canvas = key ? brushCache.get(key) : undefined;
+  if (canvas && key) {
+    // LRU: bei Treffer ans Ende sortieren.
+    brushCache.delete(key); brushCache.set(key, canvas);
+  }
   if (!canvas) {
     canvas = document.createElement("canvas");
     canvas.width = w; canvas.height = h;
@@ -281,18 +350,15 @@ export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingC
       (p) => { const s = req.project(p); return { x: s.x - ox, y: s.y - oy }; },
       refPerWorld, req.pressures,
     );
-    const bc: BrushCtx = {
-      col: parseColor(style.color),
-      opacity: clamp(style.opacity ?? 1, 0, 1),
-      size: info.refSize,
-      character: clamp((style.character ?? info.character) / 100, 0, 1),
-      seed: (style.seed || 1) >>> 0,
-      P,
-      phase: phaseRef,
-    };
-    paintBrush(bctx, sampler, style.preset, bc, closed);
+    const bc = makeBrushCtx(style, info, P, phaseRef);
+    paintBrush(bctx, sampler, style.preset, bc, closed, 0, true, null);
     if (key) {
-      if (brushCache.size > MAX_CACHE) brushCache.clear();
+      // Einzelne älteste Einträge verwerfen statt den ganzen Cache zu leeren.
+      while (brushCache.size >= MAX_CACHE) {
+        const oldest = brushCache.keys().next().value as string | undefined;
+        if (oldest === undefined) break;
+        brushCache.delete(oldest);
+      }
       brushCache.set(key, canvas);
     }
   }
@@ -301,6 +367,73 @@ export function renderBrushStroke(req: BrushRenderRequest, ctx: CanvasRenderingC
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
   ctx.drawImage(canvas, ox, oy);
+  ctx.restore();
+}
+
+/**
+ * Inkrementeller Live-Render: genau ein Puffer je Strich, pro Bewegung wird
+ * nur der neue Abschnitt gestempelt. Die Stempelpositionen hängen weiterhin
+ * ausschließlich von Seed, globaler Pfaddistanz und Phase ab — das Ergebnis
+ * ist deshalb identisch mit dem späteren, endgültigen Rendern.
+ */
+function renderBrushLive(
+  req: BrushRenderRequest,
+  ctx: CanvasRenderingContext2D,
+  info: BrushPresetInfo,
+  m: { P: number; closed: boolean; refPerWorld: number; phaseRef: number; sizePx: number; worldPts: WorldPoint[] },
+) {
+  const style = req.style;
+  const key = req.liveKey!;
+  const target = ctx.canvas;
+  if (!target.width || !target.height) return;
+  const tf = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
+  const a = tf ? tf.a : 1, d = tf ? tf.d : 1, e = tf ? tf.e : 0, f = tf ? tf.f : 0;
+  const p0 = req.project({ x: 0, y: 0 });
+  const p1 = req.project({ x: 1, y: 1 });
+
+  // Signatur: Stil, Kamera/Transform und Puffergröße. Ändert sich etwas davon,
+  // wird der Puffer einmalig komplett neu aufgebaut.
+  const sig = [
+    style.preset, style.character, style.seed, m.sizePx.toFixed(2), style.color,
+    (style.opacity ?? 1).toFixed(3), m.closed, m.phaseRef.toFixed(2),
+    a, d, e, f, target.width, target.height,
+    p0.x.toFixed(2), p0.y.toFixed(2), p1.x.toFixed(2), p1.y.toFixed(2),
+  ].join("|");
+
+  // Der Marker ist eine einfache Bahn — dort ist ein Vollrender billiger als
+  // jede Zustandsführung.
+  const fullRepaint = style.preset === "marker";
+
+  let st = liveStates.get(key);
+  if (!st || st.sig !== sig || m.worldPts.length < st.count || fullRepaint) {
+    let canvas = st?.canvas;
+    if (!canvas || canvas.width !== target.width || canvas.height !== target.height) {
+      canvas = document.createElement("canvas");
+      canvas.width = target.width;
+      canvas.height = target.height;
+    }
+    const lctx = canvas.getContext("2d");
+    if (!lctx) return;
+    lctx.setTransform(1, 0, 0, 1, 0, 0);
+    lctx.clearRect(0, 0, canvas.width, canvas.height);
+    st = { canvas, lctx, sig, done: 0, count: 0, paint: {} };
+    liveStates.set(key, st);
+  }
+
+  // Gleiche Koordinaten wie der Aufrufer (CSS-Pixel inkl. DPR-Transform).
+  st.lctx.setTransform(a, 0, 0, d, e, f);
+
+  const sampler = new PathSampler(m.worldPts, m.closed, req.project, m.refPerWorld, req.pressures);
+  const bc = makeBrushCtx(style, info, m.P, m.phaseRef);
+  st.done = paintBrush(st.lctx, sampler, style.preset, bc, m.closed, st.done, fullRepaint, st.paint);
+  st.count = m.worldPts.length;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setLineDash([]);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.globalAlpha = 1;
+  ctx.drawImage(st.canvas, 0, 0);
   ctx.restore();
 }
 
@@ -315,21 +448,60 @@ function polyScreenLength(pts: ScreenPoint[], closed: boolean): number {
 }
 
 /** Leert den Pinsel-Cache (z. B. bei Themenwechsel). */
-export function clearBrushCache() { brushCache.clear(); }
+export function clearBrushCache() { brushCache.clear(); liveStates.clear(); }
 
-function paintBrush(ctx: CanvasRenderingContext2D, S: PathSampler, preset: BrushPresetId, o: BrushCtx, closed: boolean) {
+/**
+ * Malt den Abschnitt [`from`, Pfadende] und liefert die neue, bereits
+ * gerenderte Distanz zurück. Ist `final` false, endet der Lauf am letzten
+ * vollständigen Raster-Schritt, damit der nächste Aufruf lückenlos anschließt.
+ */
+function paintBrush(ctx: CanvasRenderingContext2D, S: PathSampler, preset: BrushPresetId,
+                    o: BrushCtx, closed: boolean, from: number, final: boolean,
+                    state: PaintState | null): number {
   switch (preset) {
-    case "marker": return paintMarker(ctx, S, o, closed);
-    case "spray": return paintSpray(ctx, S, o);
+    case "marker": paintMarker(ctx, S, o, closed); return S.total;
+    case "spray": return paintStamped(ctx, S, o, from, final, 3, (c, pt, rng) => stampSpray(c, pt, o, rng));
     case "halftoneFine":
-    case "halftoneBold": return paintHalftone(ctx, S, preset, o);
-    case "watercolorSpatterBloom": return paintWaterSpatter(ctx, S, o);
+    case "halftoneBold": {
+      const cfg = HALFTONE_CFG[preset];
+      const spacing = Math.max(5, o.size * cfg.spacingFactor);
+      return paintStamped(ctx, S, o, from, final, spacing, (c, pt, rng) => stampHalftone(c, pt, cfg, o, rng));
+    }
+    case "watercolorSpatterBloom": {
+      const spacing = Math.max(6, o.size * AQUA_CFG.spacingFactor);
+      return paintStamped(ctx, S, o, from, final, spacing, (c, pt, rng) => stampWaterSpatter(c, pt, o, rng));
+    }
     case "bristleFine":
     case "bristleDry":
-    case "bristleCoarse": return paintBristle(ctx, S, preset, o);
-    default: return;
+    case "bristleCoarse": return paintBristle(ctx, S, preset, o, from, final, state);
+    default: return S.total;
   }
 }
+
+/**
+ * Gemeinsame Stempelschleife (Spray, Halftone, Aquarell). Der Stempelindex
+ * leitet sich aus Phase + Rasterdistanz ab und ist damit unabhängig davon,
+ * in wie vielen Teilstücken gerendert wurde.
+ */
+function paintStamped(
+  ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx,
+  from: number, final: boolean, spacing: number,
+  stamp: (ctx: CanvasRenderingContext2D, pt: { x: number; y: number; pressure: number }, rng: () => number) => void,
+): number {
+  if (spacing <= 1e-6) return S.total;
+  const limit = S.total + (final ? 1e-6 : -1e-6);
+  let painted = from;
+  ctx.save();
+  for (let k = Math.max(0, Math.ceil((from - 1e-9) / spacing)); k * spacing <= limit; k++) {
+    const dist = k * spacing;
+    const gi = Math.round((o.phase + dist) / spacing);
+    stamp(ctx, S.at(dist), makeRng(o.seed, gi));
+    painted = dist;
+  }
+  ctx.restore();
+  return final ? S.total : Math.max(from, painted);
+}
+
 
 // ---------------------------------------------------------------- Marker
 // Referenz: markerPreview() — durchgehende Bahn, eckige Enden, runde Ecken.
@@ -337,7 +509,8 @@ function paintMarker(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx,
   const pts = S.screen;
   if (pts.length < 2) return;
   ctx.save();
-  ctx.globalAlpha = clamp(o.opacity * o.col.a, 0, 1);
+  // Deckkraft genau einmal anwenden — `rgba()` bringt bereits das Farb-Alpha mit.
+  ctx.globalAlpha = clamp(o.opacity, 0, 1);
   ctx.strokeStyle = rgba(o.col, 1);
   ctx.lineWidth = o.size * o.P;
   ctx.lineCap = "square";
@@ -352,31 +525,25 @@ function paintMarker(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx,
 
 // ---------------------------------------------------------------- Spray
 // Referenz: spray(a,b) — Schrittweite 3 px, Radius size*.5.
-function paintSpray(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx) {
-  const step = 3;
+function stampSpray(ctx: CanvasRenderingContext2D, p: { x: number; y: number; pressure: number },
+                    o: BrushCtx, rng: () => number) {
   const radius = o.size * 0.5;
-  ctx.save();
-  for (let d = 0; d <= S.total + 1e-6; d += step) {
-    const gi = Math.round((o.phase + d) / step);
-    const rng = makeRng(o.seed, gi);
-    const p = S.at(d);
-    const dots = Math.ceil(3 + o.size * 0.07 * lerp(0.6, 1.35, p.pressure));
-    for (let i = 0; i < dots; i++) {
-      const angle = rng() * Math.PI * 2;
-      const r = radius * Math.sqrt(rng());
-      ctx.beginPath();
-      ctx.arc(
-        p.x + Math.cos(angle) * r * o.P,
-        p.y + Math.sin(angle) * r * o.P,
-        Math.max(0.2, (0.35 + rng() * 1.3) * o.P),
-        0, Math.PI * 2,
-      );
-      ctx.fillStyle = rgba(o.col, o.opacity * (0.08 + rng() * 0.28));
-      ctx.fill();
-    }
+  const dots = Math.ceil(3 + o.size * 0.07 * lerp(0.6, 1.35, p.pressure));
+  for (let i = 0; i < dots; i++) {
+    const angle = rng() * Math.PI * 2;
+    const r = radius * Math.sqrt(rng());
+    ctx.beginPath();
+    ctx.arc(
+      p.x + Math.cos(angle) * r * o.P,
+      p.y + Math.sin(angle) * r * o.P,
+      Math.max(0.2, (0.35 + rng() * 1.3) * o.P),
+      0, Math.PI * 2,
+    );
+    ctx.fillStyle = rgba(o.col, o.opacity * (0.08 + rng() * 0.28));
+    ctx.fill();
   }
-  ctx.restore();
 }
+
 
 // ---------------------------------------------------------------- Halftone
 // Referenz: halftoneBrush() / stampHalftone()
@@ -390,17 +557,6 @@ const HALFTONE_CFG: Record<"halftoneFine" | "halftoneBold", HalftoneCfg> = {
   halftoneBold: { spacingFactor: .26, stampRadius: .46, grid: 6, dotMax: 2.85, density: .84, alphaMin: .10, alphaMax: .42 },
 };
 
-function paintHalftone(ctx: CanvasRenderingContext2D, S: PathSampler,
-                       variant: "halftoneFine" | "halftoneBold", o: BrushCtx) {
-  const cfg = HALFTONE_CFG[variant];
-  const spacing = Math.max(5, o.size * cfg.spacingFactor);
-  ctx.save();
-  for (let d = 0; d <= S.total + 1e-6; d += spacing) {
-    const gi = Math.round((o.phase + d) / spacing);
-    stampHalftone(ctx, S.at(d), cfg, o, makeRng(o.seed, gi));
-  }
-  ctx.restore();
-}
 
 function stampHalftone(ctx: CanvasRenderingContext2D, point: { x: number; y: number; pressure: number },
                        cfg: HalftoneCfg, o: BrushCtx, rng: () => number) {
@@ -450,15 +606,6 @@ function blobPath(ctx: CanvasRenderingContext2D, rng: () => number,
   ctx.closePath();
 }
 
-function paintWaterSpatter(ctx: CanvasRenderingContext2D, S: PathSampler, o: BrushCtx) {
-  const spacing = Math.max(6, o.size * AQUA_CFG.spacingFactor);
-  ctx.save();
-  for (let d = 0; d <= S.total + 1e-6; d += spacing) {
-    const gi = Math.round((o.phase + d) / spacing);
-    stampWaterSpatter(ctx, S.at(d), o, makeRng(o.seed, gi));
-  }
-  ctx.restore();
-}
 
 function stampWaterSpatter(ctx: CanvasRenderingContext2D, point: { x: number; y: number; pressure: number },
                            o: BrushCtx, rng: () => number) {
@@ -563,35 +710,47 @@ function makeBristles(variant: keyof typeof BRISTLE_CFG, seed: number, character
 }
 
 function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
-                      variant: keyof typeof BRISTLE_CFG, o: BrushCtx) {
-  if (S.total <= 1e-6) return;
-  const bristles = makeBristles(variant, o.seed, o.character);
+                      variant: keyof typeof BRISTLE_CFG, o: BrushCtx,
+                      from: number, final: boolean, state: PaintState | null): number {
+  if (S.total <= 1e-6) return S.total;
   // Schrittweite in Referenz-Pixeln: entspricht dem typischen Pointer-Abstand
   // der Vorlage und ist unabhängig von Zoom und Punktdichte.
   const step = 2;
   const P = o.P;
 
-  // Ein geteilter Abschnitt startet mit der bereits verbrauchten Farbe.
-  if (o.phase > 0) {
-    for (const b of bristles) {
-      b.paint = Math.max(.10, b.paint - o.phase * (.00012 + b.dry * .00030));
+  // Borstenzustand (Farbverbrauch, Weglänge) wird über inkrementelle Läufe
+  // hinweg fortgeschrieben — sonst würde jeder Teillauf neu „nass“ starten.
+  let bristles = state?.bristles;
+  if (!bristles || from <= 1e-9) {
+    bristles = makeBristles(variant, o.seed, o.character);
+    // Ein geteilter Abschnitt startet mit der bereits verbrauchten Farbe.
+    if (o.phase > 0) {
+      for (const b of bristles) {
+        b.paint = Math.max(.10, b.paint - o.phase * (.00012 + b.dry * .00030));
+      }
     }
+    if (state) { state.bristles = bristles; state.travel = o.phase; }
   }
 
-  let travel = o.phase;
+  let travel = state?.travel ?? (o.phase + from);
+  const start = Math.max(0, Math.ceil((from - 1e-9) / step) * step);
+  const limit = final ? S.total : Math.max(0, S.total - step);
+  let painted = from;
   ctx.save();
   ctx.globalCompositeOperation = "source-over";
   ctx.lineJoin = "round";
 
-  for (let d = 0; d < S.total - 1e-6; d += step) {
+  for (let d = start; d < limit - 1e-6; d += step) {
     const dEnd = Math.min(S.total, d + step);
     const a = S.at(d);
     const b = S.at(dEnd);
     const segLenPx = Math.hypot(b.x - a.x, b.y - a.y);
+    painted = dEnd;
     if (segLenPx < 1e-6) continue;
     const dRef = Math.max(.25, dEnd - d);
     const pressure = (a.pressure + b.pressure) * .5;
     travel += dRef;
+
 
     const dx = (b.x - a.x) / segLenPx;
     const dy = (b.y - a.y) / segLenPx;
@@ -639,7 +798,10 @@ function paintBristle(ctx: CanvasRenderingContext2D, S: PathSampler,
     }
   }
   ctx.restore();
+  if (state) state.travel = travel;
+  return final ? S.total : Math.max(from, painted);
 }
+
 
 /** Referenz: drawLine() */
 function drawRefLine(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoint,
@@ -660,7 +822,8 @@ function drawRefLine(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoi
  * Kleine Linienvorschau für die Auswahl-Buttons — nutzt exakt denselben
  * Generator wie das Zeichnen.
  */
-export function renderBrushPreview(canvas: HTMLCanvasElement, preset: BrushPresetId, color: string) {
+export function renderBrushPreview(canvas: HTMLCanvasElement, preset: BrushPresetId, color: string,
+                                   character?: number, opacity?: number) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -683,8 +846,8 @@ export function renderBrushPreview(canvas: HTMLCanvasElement, preset: BrushPrese
     closed: false,
     project: (p) => p,
     style: {
-      preset, character: info.character, seed: 1,
-      sizePx: Math.max(3, h * 0.5), color, opacity: 0.9, closed: false,
+      preset, character: character ?? info.character, seed: 1,
+      sizePx: Math.max(3, h * 0.5), color, opacity: opacity ?? 0.9, closed: false,
     },
   }, ctx);
 }

@@ -3123,7 +3123,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null) {
+  private _drawSingleFreeStroke(s: FreeStroke, colorOverride: string | null = null, widthOverridePx: number | null = null, liveKey?: string) {
     if (!s.points || s.points.length < 2) return;
     if (s.lineStyle === "blob" && colorOverride === null) {
       this._drawFreeStrokeBlobs(s);
@@ -3190,7 +3190,9 @@ export class Renderer {
       pxPerM: cam.scale, lineWidthPx: strokeWidth, phaseM,
       pressures: (s as any).pressures || undefined,
       cacheKey: `free:${s.id}:${pts.length}`,
+      liveKey,
     };
+
     if ((s as any).strokePattern && (s as any).strokePattern.kind !== "solid") applyStrokePattern(ctx, strokeOpts);
     tracePathWithEffects(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts);
     if (!strokeWithBrushIfActive(ctx, (p) => cam.worldToScreen(p.x, p.y), pts, false, strokeOpts)) {
@@ -3513,7 +3515,9 @@ export class Renderer {
   }, pressures?: number[]) {
     if (!points || points.length < 2) return;
     const tmp = new FreeStroke({ id: "_preview", points, ...style, pressures: pressures || null });
-    this._drawSingleFreeStroke(tmp);
+    // Live-Puffer: beim Zeichnen wird nur der neue Abschnitt gestempelt.
+    this._drawSingleFreeStroke(tmp, null, null, "free:_preview");
+
   }
 
   // ---- Ruler Guide ----
