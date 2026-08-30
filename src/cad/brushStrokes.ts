@@ -822,7 +822,8 @@ function drawRefLine(ctx: CanvasRenderingContext2D, a: ScreenPoint, b: ScreenPoi
  * Kleine Linienvorschau für die Auswahl-Buttons — nutzt exakt denselben
  * Generator wie das Zeichnen.
  */
-export function renderBrushPreview(canvas: HTMLCanvasElement, preset: BrushPresetId, color: string) {
+export function renderBrushPreview(canvas: HTMLCanvasElement, preset: BrushPresetId, color: string,
+                                   character?: number, opacity?: number) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -845,8 +846,8 @@ export function renderBrushPreview(canvas: HTMLCanvasElement, preset: BrushPrese
     closed: false,
     project: (p) => p,
     style: {
-      preset, character: info.character, seed: 1,
-      sizePx: Math.max(3, h * 0.5), color, opacity: 0.9, closed: false,
+      preset, character: character ?? info.character, seed: 1,
+      sizePx: Math.max(3, h * 0.5), color, opacity: opacity ?? 0.9, closed: false,
     },
   }, ctx);
 }
