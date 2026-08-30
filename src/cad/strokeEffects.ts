@@ -349,7 +349,10 @@ export interface StrokeRenderOptions {
   /** Distanzversatz auf dem Originalpfad (geteilte Konturen). */
   phaseM?: number;
   cacheKey?: string;
+  /** Pointer-Druck je Pfadpunkt (nur Freihand). */
+  pressures?: number[];
 }
+
 
 /**
  * Gemeinsame Stroke-Pipeline:
