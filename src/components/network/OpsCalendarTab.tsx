@@ -8,7 +8,7 @@
  * Zusätzlich lassen sich hier die eigenen Abwesenheiten pflegen.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import {
   ABSENCE_LABEL,
@@ -50,6 +50,8 @@ export function OpsCalendarTab({
   onSelectDate,
   hiddenProjects,
   onToggleProject,
+  allowAbsenceEntry = true,
+  projectFilterAsDropdown = false,
 }: {
   projectIds: string[];
   projectNames: Map<string, string>;
@@ -60,7 +62,12 @@ export function OpsCalendarTab({
   /** Optional: Projekt-Sichtbarkeit kontrolliert von außen führen. */
   hiddenProjects?: Set<string>;
   onToggleProject?: (id: string) => void;
+  /** Abwesenheiten hier eintragen/pflegen (Projektbereich). */
+  allowAbsenceEntry?: boolean;
+  /** Projekte als Auswahlliste in der Filterzeile statt als Schaltflächenreihe. */
+  projectFilterAsDropdown?: boolean;
 }) {
+
   /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
   const [hiddenState, setHidden] = useState<Set<string>>(() => new Set());
   const hidden = hiddenProjects ?? hiddenState;
@@ -83,6 +90,7 @@ export function OpsCalendarTab({
   const [fromFilter, setFromFilter] = useState("");
   const [toFilter, setToFilter] = useState("");
 
+  const [projectMenu, setProjectMenu] = useState(false);
   const [form, setForm] = useState(false);
   const [kind, setKind] = useState<AbsenceKind>("vacation");
   const [from, setFrom] = useState(() => isoDate(new Date()));
@@ -247,13 +255,15 @@ export function OpsCalendarTab({
           </button>
         ))}
         <div className="flex-1" />
-        <button onClick={() => setForm((v) => !v)} className="flex items-center gap-1 h-9 px-2.5 rounded-md border" style={{ borderColor: LINE }}>
-          <Plus size={11} /> Abwesenheit eintragen
-        </button>
+        {allowAbsenceEntry && (
+          <button onClick={() => setForm((v) => !v)} className="flex items-center gap-1 h-9 px-2.5 rounded-md border" style={{ borderColor: LINE }}>
+            <Plus size={11} /> Abwesenheit eintragen
+          </button>
+        )}
       </div>
 
-      {/* Projekte ein-/ausblenden */}
-      {projectIds.length > 1 && (
+      {/* Projekte ein-/ausblenden (Schaltflächenreihe) */}
+      {!projectFilterAsDropdown && projectIds.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           {projectIds.map((id) => {
             const on = !hidden.has(id);
@@ -267,10 +277,36 @@ export function OpsCalendarTab({
         </div>
       )}
 
-      {/* Filter: Zeitraum, Person, Gerät */}
+      {/* Filter: Zeitraum, Projekte, Person, Gerät */}
       <div className="flex flex-wrap items-center gap-2">
         <input type="date" className={inputCls} value={fromFilter} onChange={(e) => setFromFilter(e.target.value)} title="Von" />
         <input type="date" className={inputCls} value={toFilter} onChange={(e) => setToFilter(e.target.value)} title="Bis" />
+        {projectFilterAsDropdown && projectIds.length > 0 && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setProjectMenu((v) => !v)}
+              className={`${inputCls} flex items-center gap-1.5`}
+              title="Projekte ein-/ausblenden"
+            >
+              Projekte ({projectIds.length - projectIds.filter((id) => hidden.has(id)).length}/{projectIds.length})
+              <ChevronDown size={12} />
+            </button>
+            {projectMenu && (
+              <div
+                className="absolute z-30 mt-1 min-w-[220px] max-h-64 overflow-y-auto rounded-md border p-1.5 shadow-lg"
+                style={{ borderColor: LINE, background: "hsl(var(--surface-card))" }}
+              >
+                {projectIds.map((id) => (
+                  <label key={id} className="flex items-center gap-2 px-1.5 py-1 text-[11px] cursor-pointer">
+                    <input type="checkbox" checked={!hidden.has(id)} onChange={() => toggleProject(id)} />
+                    <span className="truncate">{projectNames.get(id) ?? "Projekt"}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <select className={inputCls} value={personFilter} onChange={(e) => setPersonFilter(e.target.value)}>
           <option value="">Alle Personen</option>
           {people.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
@@ -280,6 +316,7 @@ export function OpsCalendarTab({
           {devices.devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
       </div>
+
 
       {form && (
         <div className="rounded-lg p-2.5 flex flex-wrap items-end gap-2" style={{ border: `1px solid ${LINE}` }}>
@@ -305,7 +342,7 @@ export function OpsCalendarTab({
         </div>
       )}
 
-      {!!mine.length && (
+      {allowAbsenceEntry && !!mine.length && (
         <div className="rounded-lg p-2.5" style={{ border: `1px solid ${LINE}` }}>
           <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: SOFT }}>Meine Abwesenheiten</div>
           <div className="flex flex-col gap-1">
