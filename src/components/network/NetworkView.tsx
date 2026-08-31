@@ -556,17 +556,60 @@ export function NetworkView({
                       <span className="text-sm font-semibold truncate">{p.name} ({list.length})</span>
                       <ChatButton
                         unread={unread[`p:${p.id}`]}
-                        onClick={() => openProject(p)}
+                        active={projectPanel?.id === p.id && projectPanel.kind === "chat"}
+                        onClick={() => {
+                          toggleProjectPanel(p.id, "chat");
+                          setTimeout(() => void refreshUnread(), 800);
+                        }}
                         title="Projektchat öffnen"
                       />
-                      <CommentsButton onClick={() => openComments(p.id)} title="Kommentare des Projekts" />
+                      <CommentsButton
+                        active={projectPanel?.id === p.id && projectPanel.kind === "comments"}
+                        onClick={() => toggleProjectPanel(p.id, "comments")}
+                        title="Kommentare des Projekts"
+                      />
                       <div className="ml-auto flex items-center gap-1">
                         <span className="text-[11px] text-muted-foreground">
                           Besitzer: {ownerOf(p.id).label}
                         </span>
                       </div>
                     </div>
+
+                    {/* Chat bzw. Kommentare dieses Projekts – direkt unter dem Namen. */}
+                    {projectPanel?.id === p.id && projectPanel.kind === "chat" && (
+                      <div className="mt-2">
+                        <ChatPanel
+                          target={{ kind: "project", projectId: p.id, title: p.name }}
+                          people={peopleById}
+                          onClose={() => { setProjectPanel(null); void refreshUnread(); }}
+                        />
+                      </div>
+                    )}
+                    {projectPanel?.id === p.id && projectPanel.kind === "comments" && (
+                      <div
+                        className="mt-2 rounded-xl border p-3"
+                        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                      >
+                        <div className="mb-2 flex items-center gap-2">
+                          <StickyNote size={14} />
+                          <span className="text-sm font-semibold truncate">Kommentare · {p.name}</span>
+                          <button
+                            onClick={() => setProjectPanel(null)}
+                            className="ml-auto h-7 w-7 rounded-md grid place-items-center hover:bg-[hsl(var(--surface-muted))]"
+                            title="Schließen"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <CommentsTab
+                          projects={[{ id: p.id, name: p.name }]}
+                          peopleById={peopleNameMap}
+                          initialProjectId={p.id}
+                        />
+                      </div>
+                    )}
                     <ProjectTimeSummary projectId={p.id} peopleById={peopleNameMap} />
+
                     <div className="mt-1.5">
                       {list.length === 0 && (
                         <div className="px-2 py-3 text-[11px] text-muted-foreground border border-dashed rounded-md text-center"
