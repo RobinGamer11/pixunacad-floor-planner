@@ -64,13 +64,16 @@ export function ChatPanel({
   target,
   people,
   onClose,
+  onRead,
 }: {
   target: ChatTarget;
   /** Bekannte Personen für Name/Avatar der Absender. */
   people: Map<string, NetworkPerson>;
   onClose: () => void;
+  /** Wird nach tatsächlich gespeichertem Lesestand aufgerufen. */
+  onRead?: () => void;
 }) {
-  const chat = useConversation(target);
+  const chat = useConversation(target, onRead);
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -82,6 +85,7 @@ export function ChatPanel({
   useEffect(() => {
     inputRef.current?.focus();
   }, [target.kind, chat.conversationId]);
+
 
   const rows = useMemo(() => {
     return chat.messages.map((m, i) => {
