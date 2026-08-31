@@ -17,6 +17,13 @@ import {
 import { useProjectMemberOptions } from "@/lib/projectTeam";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
+import {
+  ContributionTimePanel,
+  ContributionDevicesPanel,
+  ContributionAttachmentsPanel,
+} from "@/components/board/ContributionOpsPanels";
+import { useProjectAccess } from "@/lib/projectAccess";
+import { ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices } from "@/lib/opsStore";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
