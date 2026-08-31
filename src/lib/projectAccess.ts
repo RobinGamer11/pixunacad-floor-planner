@@ -97,6 +97,18 @@ const LOCAL_OWNER: Omit<ProjectAccess, "projectId"> = {
   deviations: [],
 };
 
+/** Referenzstabile Ersatzobjekte für rein lokale Projekte. */
+const localAccessCache = new Map<string, ProjectAccess>();
+function localAccessFor(projectId: string): ProjectAccess {
+  let hit = localAccessCache.get(projectId);
+  if (!hit) {
+    hit = { projectId, ...LOCAL_OWNER };
+    localAccessCache.set(projectId, hit);
+  }
+  return hit;
+}
+
+
 /* ------------------------------------------------------------------ Store */
 
 interface AccessState {
@@ -212,13 +224,16 @@ export const projectAccessStore = {
   /**
    * Zugriff auf ein einzelnes Projekt.
    * Unbekannte Projekt-IDs sind persönliche lokale Projekte → volle Rechte.
+   * Die Ersatzobjekte werden zwischengespeichert, damit `getSnapshot` bei
+   * gleichem Zustand referenzstabil bleibt (sonst Endlos-Renderschleife).
    */
   accessFor(projectId: string | undefined): ProjectAccess {
-    if (!projectId) return { projectId: "", ...LOCAL_OWNER };
+    if (!projectId) return localAccessFor("");
     const known = state.byProject.get(projectId);
     if (known) return known;
-    return { projectId, ...LOCAL_OWNER };
+    return localAccessFor(projectId);
   },
+
   /** Schreibrecht – wird auch als Schreibschutz-Wächter im Projektstore genutzt. */
   canEdit(projectId: string | undefined): boolean {
     return projectAccessStore.accessFor(projectId).permissions.canEdit;
