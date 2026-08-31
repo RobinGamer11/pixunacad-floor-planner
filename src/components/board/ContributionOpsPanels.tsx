@@ -79,6 +79,8 @@ export function ContributionTimePanel({
     [time.entries, itemId],
   );
   const total = entries.reduce((s, e) => s + netMinutes(e), 0);
+  const actual = time.actualsByItem.get(itemId);
+  const overlapIds = time.overlapIds;
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? (id === mine ? "Ich" : "Unbekannt");
 
   const submit = async () => {
@@ -111,6 +113,12 @@ export function ContributionTimePanel({
           Soll aus Zeitraum: {formatMinutes(plannedMinutes)} · Ist: {formatMinutes(total)}
         </Hint>
       ) : null}
+      {/* Ist-Werte werden ausschließlich aus den Zeiteinträgen abgeleitet. */}
+      {actual ? (
+        <Hint>
+          Tatsächlich: {fmtSpan(actual.startedAt, actual.endedAt)} · Aufwand {formatMinutes(actual.minutes)}
+        </Hint>
+      ) : null}
 
       {time.unavailable ? (
         <Hint>Zeiterfassung steht erst für geteilte Projekte mit Anmeldung zur Verfügung.</Hint>
@@ -119,7 +127,13 @@ export function ContributionTimePanel({
           <div className="flex flex-col gap-1 mt-1.5">
             {entries.map((e) => (
               <div key={e.id} className="flex items-center gap-2 text-[11px]">
-                <span className="truncate flex-1">
+                <span
+                  className="truncate flex-1"
+                  title={overlapIds.has(e.id) ? "Überschneidet sich mit einer anderen Zeit derselben Person." : undefined}
+                >
+                  {overlapIds.has(e.id) && (
+                    <AlertTriangle size={10} className="inline mr-1" style={{ color: "#d97706" }} />
+                  )}
                   {nameOf(e.user_id)} · {fmtSpan(e.started_at, e.ended_at)}
                   {e.break_minutes ? ` · ${e.break_minutes} min Pause` : ""}
                   {e.note ? ` · ${e.note}` : ""}

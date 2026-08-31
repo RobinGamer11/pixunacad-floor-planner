@@ -1,9 +1,11 @@
 /**
  * Paket 06 – projektübergreifender Kalender im Netzwerkbereich.
  *
- * Zeigt Abwesenheiten (fremde bewusst ohne Art/Bemerkung) und
- * Gerätebuchungen aller Projekte, an denen man beteiligt ist. Zusätzlich
- * lassen sich hier die eigenen Abwesenheiten pflegen.
+ * Vier Ebenen aus den Originaldaten: Beiträge bleiben im Projektkalender,
+ * hier werden Arbeitszeiten, Abwesenheiten und Gerätebuchungen aller
+ * Projekte gezeigt, an denen man beteiligt ist. Fremde Abwesenheiten
+ * bleiben ohne Art und Bemerkung (Maskierung kommt serverseitig).
+ * Zusätzlich lassen sich hier die eigenen Abwesenheiten pflegen.
  */
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
@@ -11,13 +13,16 @@ import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalenda
 import {
   ABSENCE_LABEL,
   datesInRange,
+  formatMinutes,
   isoDate,
+  netMinutes,
   useAbsences,
   useDevices,
+  useTimeEntriesForProjects,
   type AbsenceKind,
 } from "@/lib/opsStore";
 
-const inputCls = "h-8 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring";
+const inputCls = "h-9 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring";
 const LINE = "hsl(var(--hairline))";
 const SOFT = "hsl(var(--ink-soft))";
 
@@ -30,15 +35,30 @@ export function OpsCalendarTab({
   projectNames: Map<string, string>;
   peopleById: Map<string, string>;
 }) {
-  const absences = useAbsences(projectIds);
+  /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const activeProjects = useMemo(
+    () => projectIds.filter((id) => !hidden.has(id)),
+    [projectIds, hidden],
+  );
+
+  const absences = useAbsences(activeProjects);
   const devices = useDevices(undefined);
+  const times = useTimeEntriesForProjects(activeProjects);
 
   const [showAbsences, setShowAbsences] = useState(true);
   const [showBookings, setShowBookings] = useState(true);
+  const [showTimes, setShowTimes] = useState(true);
+  const [personFilter, setPersonFilter] = useState("");
+  const [deviceFilter, setDeviceFilter] = useState("");
+  const [fromFilter, setFromFilter] = useState("");
+  const [toFilter, setToFilter] = useState("");
+
   const [form, setForm] = useState(false);
   const [kind, setKind] = useState<AbsenceKind>("vacation");
   const [from, setFrom] = useState(() => isoDate(new Date()));
   const [to, setTo] = useState(() => isoDate(new Date()));
+  const [status, setStatus] = useState("planned");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -47,12 +67,38 @@ export function OpsCalendarTab({
     [absences.absences, absences.myId],
   );
 
+  const inRange = (day: string) => (!fromFilter || day >= fromFilter) && (!toFilter || day <= toFilter);
+
   const entries: CalEntry[] = useMemo(() => {
     const out: CalEntry[] = [];
-    if (showAbsences) {
+    const seenAbsence = new Set<string>();
+
+    if (showTimes && !deviceFilter) {
+      for (const e of times.entries) {
+        if (personFilter && e.user_id !== personFilter) continue;
+        const who = e.user_id === times.myId ? "Ich" : peopleById.get(e.user_id) ?? "Teammitglied";
+        for (const day of datesInRange(isoDate(new Date(e.started_at)), isoDate(new Date(e.ended_at)))) {
+          if (!inRange(day)) continue;
+          out.push({
+            id: `time-${e.id}-${day}`,
+            date: day,
+            title: `${who}: ${formatMinutes(netMinutes(e))}`,
+            sub: projectNames.get(e.project_id) ?? "Projekt",
+            color: "#3f9c6a",
+          });
+        }
+      }
+    }
+
+    if (showAbsences && !deviceFilter) {
       for (const a of absences.absences) {
+        if (personFilter && a.user_id !== personFilter) continue;
+        // Dieselbe personenbezogene Abwesenheit nur einmal darstellen.
+        if (seenAbsence.has(a.id)) continue;
+        seenAbsence.add(a.id);
         const who = a.user_id === absences.myId ? "Ich" : peopleById.get(a.user_id) ?? "Teammitglied";
         for (const day of datesInRange(a.starts_on, a.ends_on)) {
+          if (!inRange(day)) continue;
           out.push({
             id: `abs-${a.id}-${day}`,
             date: day,
@@ -62,28 +108,36 @@ export function OpsCalendarTab({
         }
       }
     }
+
     if (showBookings) {
       for (const b of devices.bookings) {
+        if (deviceFilter && b.device_id !== deviceFilter) continue;
+        if (personFilter && b.responsible_id !== personFilter) continue;
+        if (b.project_id && hidden.has(b.project_id)) continue;
         const name = devices.devices.find((d) => d.id === b.device_id)?.name ?? "Gerät";
         for (const day of datesInRange(isoDate(new Date(b.starts_at)), isoDate(new Date(b.ends_at)))) {
+          if (!inRange(day)) continue;
           out.push({
             id: `dev-${b.id}-${day}`,
             date: day,
             title: name,
-            sub: projectNames.get(b.project_id) ?? "Projekt",
+            sub: projectNames.get(b.project_id ?? "") ?? "Projekt",
             color: "#4da3ff",
           });
         }
       }
     }
     return out;
-  }, [absences.absences, absences.myId, devices.bookings, devices.devices, peopleById, projectNames, showAbsences, showBookings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [absences.absences, absences.myId, devices.bookings, devices.devices, times.entries, times.myId,
+      peopleById, projectNames, showAbsences, showBookings, showTimes, personFilter, deviceFilter,
+      fromFilter, toFilter, hidden]);
 
   const save = async () => {
     setError(null);
     if (!from || !to || to < from) { setError("Bitte einen gültigen Zeitraum wählen."); return; }
     try {
-      await absences.add({ kind, startsOn: from, endsOn: to, note });
+      await absences.add({ kind, startsOn: from, endsOn: to, note, status });
       setNote("");
       setForm(false);
     } catch (err) {
@@ -91,7 +145,7 @@ export function OpsCalendarTab({
     }
   };
 
-  if (absences.unavailable && devices.unavailable) {
+  if (absences.unavailable && devices.unavailable && times.unavailable) {
     return (
       <div className="text-xs" style={{ color: SOFT }}>
         Gemeinsame Kalender stehen zur Verfügung, sobald du angemeldet bist und die Projektfreigabe eingerichtet ist.
@@ -99,23 +153,63 @@ export function OpsCalendarTab({
     );
   }
 
+  const toggleProject = (id: string) =>
+    setHidden((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+
+  const people = Array.from(peopleById.entries());
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
+      {/* Datenebenen */}
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         {([
+          ["Arbeitszeiten", showTimes, () => setShowTimes((v) => !v), "#3f9c6a"],
           ["Abwesenheiten", showAbsences, () => setShowAbsences((v) => !v), "#8b8178"],
           ["Gerätebuchungen", showBookings, () => setShowBookings((v) => !v), "#4da3ff"],
         ] as [string, boolean, () => void, string][]).map(([label, on, toggle, color]) => (
-          <button key={label} onClick={toggle} className="flex items-center gap-1.5 h-7 px-2.5 rounded-md border"
+          <button key={label} onClick={toggle} className="flex items-center gap-1.5 h-9 px-2.5 rounded-md border"
                   style={{ borderColor: on ? color : LINE, color: on ? "hsl(var(--ink))" : SOFT }}>
             <span className="h-2 w-2 rounded-full" style={{ background: on ? color : "transparent", border: `1px solid ${color}` }} />
             {label}
           </button>
         ))}
         <div className="flex-1" />
-        <button onClick={() => setForm((v) => !v)} className="flex items-center gap-1 h-7 px-2.5 rounded-md border" style={{ borderColor: LINE }}>
+        <button onClick={() => setForm((v) => !v)} className="flex items-center gap-1 h-9 px-2.5 rounded-md border" style={{ borderColor: LINE }}>
           <Plus size={11} /> Abwesenheit eintragen
         </button>
+      </div>
+
+      {/* Projekte ein-/ausblenden */}
+      {projectIds.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          {projectIds.map((id) => {
+            const on = !hidden.has(id);
+            return (
+              <button key={id} onClick={() => toggleProject(id)} className="h-8 px-2.5 rounded-md border"
+                      style={{ borderColor: on ? "hsl(var(--accent-gold))" : LINE, color: on ? "hsl(var(--ink))" : SOFT }}>
+                {projectNames.get(id) ?? "Projekt"}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Filter: Zeitraum, Person, Gerät */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input type="date" className={inputCls} value={fromFilter} onChange={(e) => setFromFilter(e.target.value)} title="Von" />
+        <input type="date" className={inputCls} value={toFilter} onChange={(e) => setToFilter(e.target.value)} title="Bis" />
+        <select className={inputCls} value={personFilter} onChange={(e) => setPersonFilter(e.target.value)}>
+          <option value="">Alle Personen</option>
+          {people.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
+        <select className={inputCls} value={deviceFilter} onChange={(e) => setDeviceFilter(e.target.value)}>
+          <option value="">Alle Geräte</option>
+          {devices.devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
       </div>
 
       {form && (
@@ -127,9 +221,14 @@ export function OpsCalendarTab({
           </select>
           <input type="date" className={inputCls} value={from} onChange={(e) => setFrom(e.target.value)} />
           <input type="date" className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
+          <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="planned">Geplant</option>
+            <option value="confirmed">Bestätigt</option>
+            <option value="cancelled">Abgesagt</option>
+          </select>
           <input className={`${inputCls} min-w-[180px] flex-1`} value={note} onChange={(e) => setNote(e.target.value)}
                  placeholder="Bemerkung (nur für dich sichtbar)" />
-          <button onClick={() => void save()} className="h-8 px-3 rounded-md border text-xs"
+          <button onClick={() => void save()} className="h-9 px-3 rounded-md border text-xs"
                   style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}>
             Speichern
           </button>
@@ -147,8 +246,18 @@ export function OpsCalendarTab({
                   {ABSENCE_LABEL[a.kind ?? "other"]} · {a.starts_on} – {a.ends_on}
                   {a.note ? ` · ${a.note}` : ""}
                 </span>
-                <button className="opacity-60 hover:opacity-100" title="Löschen" onClick={() => void absences.remove(a.id)}>
-                  <Trash2 size={11} />
+                <select
+                  className="h-8 rounded-md border bg-background px-1 text-[11px]"
+                  value={a.status ?? "planned"}
+                  onChange={(e) => void absences.update(a.id, { status: e.target.value })}
+                >
+                  <option value="planned">Geplant</option>
+                  <option value="confirmed">Bestätigt</option>
+                  <option value="cancelled">Abgesagt</option>
+                </select>
+                <button className="h-8 w-8 flex items-center justify-center opacity-60 hover:opacity-100"
+                        title="Löschen" onClick={() => void absences.remove(a.id)}>
+                  <Trash2 size={12} />
                 </button>
               </div>
             ))}

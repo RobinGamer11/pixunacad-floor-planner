@@ -13,6 +13,7 @@ import {
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
   ListChecks, CalendarRange,
+  Clock,
 } from "lucide-react";
 import { useProjectMemberOptions } from "@/lib/projectTeam";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
@@ -23,7 +24,11 @@ import {
   ContributionAttachmentsPanel,
 } from "@/components/board/ContributionOpsPanels";
 import { useProjectAccess } from "@/lib/projectAccess";
-import { ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices } from "@/lib/opsStore";
+import {
+  ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices, useTimeEntries,
+  formatMinutes, netMinutes,
+} from "@/lib/opsStore";
+import { TimeEntryDialog } from "@/components/board/TimeEntryDialog";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
@@ -246,15 +251,34 @@ export default function BoardPage() {
     return out;
   }, [state.items, state.categories, now, selectItem]);
 
-  /* Gemeinsamer Kalender: Abwesenheiten und Gerätebuchungen als eigene Ebenen. */
+  /* Gemeinsamer Kalender: Arbeitszeiten, Abwesenheiten und Geräte als Ebenen. */
   const absenceProjects = useMemo(() => (projectId ? [projectId] : []), [projectId]);
   const absences = useAbsences(absenceProjects);
   const deviceData = useDevices(projectId);
+  const timeData = useTimeEntries(projectId);
   const [showAbsences, setShowAbsences] = useState(true);
   const [showDevices, setShowDevices] = useState(true);
+  const [showTimes, setShowTimes] = useState(true);
+  const [showItems, setShowItems] = useState(true);
+  const [timeDialog, setTimeDialog] = useState(false);
 
   const opsEntries: CalEntry[] = useMemo(() => {
     const out: CalEntry[] = [];
+    if (showTimes) {
+      for (const e of timeData.entries) {
+        const item = state.items.find((i) => i.id === e.item_id);
+        for (const day of datesInRange(isoDate(new Date(e.started_at)), isoDate(new Date(e.ended_at)))) {
+          out.push({
+            id: `time-${e.id}-${day}`,
+            date: day,
+            title: `${formatMinutes(netMinutes(e))} · ${item?.title ?? "Beitrag"}`,
+            sub: "Arbeitszeit",
+            color: "#3f9c6a",
+            onOpen: item ? () => selectItem(item.id) : undefined,
+          });
+        }
+      }
+    }
     if (showAbsences) {
       for (const a of absences.absences) {
         const who = a.user_id === absences.myId ? "Ich" : "Teammitglied";
@@ -280,7 +304,10 @@ export default function BoardPage() {
       }
     }
     return out;
-  }, [absences.absences, absences.myId, deviceData.bookings, deviceData.devices, showAbsences, showDevices]);
+  }, [absences.absences, absences.myId, deviceData.bookings, deviceData.devices, showAbsences, showDevices,
+      showTimes, timeData.entries, state.items, selectItem]);
+
+
 
 
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
@@ -541,6 +568,15 @@ export default function BoardPage() {
             <div className="flex flex-wrap items-center gap-2 rounded-xl p-3"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
               <BigAddButton kind="contribution" onClick={() => add("contribution")} />
+              {/* Paket 04: Einstieg für Arbeitszeiten und Abwesenheiten. */}
+              <button
+                onClick={() => setTimeDialog(true)}
+                className="h-10 px-3 rounded-lg border text-xs flex items-center gap-1.5"
+                style={{ borderColor: PANEL_LINE, color: INK }}
+                title="Arbeitszeit oder Abwesenheit erfassen"
+              >
+                <Clock size={14} /> + Zeiterfassung
+              </button>
               <ProjectPeriodBar
                 projectId={projectId}
                 period={state.period}
@@ -574,6 +610,8 @@ export default function BoardPage() {
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
               <div className="flex flex-wrap items-center gap-2 mb-2 text-[11px]">
                 {([
+                  ["Beiträge", showItems, () => setShowItems((v) => !v), "hsl(var(--accent-gold))"],
+                  ["Arbeitszeiten", showTimes, () => setShowTimes((v) => !v), "#3f9c6a"],
                   ["Abwesenheiten", showAbsences, () => setShowAbsences((v) => !v), "#8b8178"],
                   ["Geräte", showDevices, () => setShowDevices((v) => !v), "#4da3ff"],
                 ] as [string, boolean, () => void, string][]).map(([label, on, toggle, color]) => (
@@ -589,7 +627,7 @@ export default function BoardPage() {
                 ))}
               </div>
               <RangeCalendar
-                entries={[...calEntries, ...opsEntries]}
+                entries={[...(showItems ? calEntries : []), ...opsEntries]}
                 selectedDates={[]}
                 onSelectDate={() => {}}
               />
@@ -937,6 +975,15 @@ export default function BoardPage() {
         )}
       </div>
       {tabletAidOn && <TabletAidWheel />}
+      {timeDialog && projectId && (
+        <TimeEntryDialog
+          projectId={projectId}
+          items={state.items.map((i) => ({ id: i.id, title: i.title }))}
+          members={teamMembers}
+          defaultItemId={selectedId ?? undefined}
+          onClose={() => { setTimeDialog(false); timeData.reload(); }}
+        />
+      )}
     </div>
 
   );
