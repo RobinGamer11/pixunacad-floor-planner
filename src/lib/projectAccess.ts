@@ -164,9 +164,8 @@ async function loadAccess(): Promise<void> {
     const byProject = new Map<string, ProjectAccess>();
     for (const row of (memberships ?? []) as { project_id: string; user_id: string; role: string; permissions?: unknown }[]) {
       if (row.user_id !== myId) continue;
-      const role = (["admin", "member", "viewer"] as const).includes(row.role as ProjectRole)
-        ? (row.role as ProjectRole)
-        : "member";
+      const role: ProjectRole =
+        row.role === "admin" || row.role === "viewer" ? row.role : "member";
       byProject.set(row.project_id, buildAccess(row.project_id, role, parseOverrides(row.permissions)));
     }
     // Ownership hat immer Vorrang und wird nie von Overrides berührt.
