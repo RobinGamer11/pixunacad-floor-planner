@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
 import { DevicesTab } from "@/components/network/DevicesTab";
+import { CommentsTab } from "@/components/network/CommentsTab";
 import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
 import {
   useNetwork,
@@ -169,7 +170,7 @@ function Group({
   );
 }
 
-type TabId = "contacts" | "teams" | "requests" | "calendar" | "devices";
+type TabId = "contacts" | "teams" | "requests" | "calendar" | "devices" | "comments";
 
 export function NetworkView({
   projects,
@@ -342,6 +343,7 @@ export function NetworkView({
     { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
     { id: "calendar", label: "Kalender", icon: CalendarDays },
     { id: "devices", label: "Geräte", icon: Wrench },
+    { id: "comments", label: "Kommentare", icon: MessageSquare },
   ];
 
   return (
@@ -383,7 +385,7 @@ export function NetworkView({
         style={{
           gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)",
           // Kalender und Geräte brauchen mehr Breite als die Personenlisten.
-          maxWidth: chat ? 1040 : tab === "calendar" || tab === "devices" ? 880 : 576,
+          maxWidth: chat ? 1040 : tab === "calendar" || tab === "devices" || tab === "comments" ? 880 : 576,
         }}
       >
         <div className="rounded-xl border p-3" style={surface}>
@@ -713,6 +715,13 @@ export function NetworkView({
 
           {!net.loading && tab === "devices" && (
             <DevicesTab projectNames={projectNameMap} peopleById={peopleNameMap} />
+          )}
+
+          {!net.loading && tab === "comments" && (
+            <CommentsTab
+              projects={Array.from(projectNameMap.entries()).map(([id, name]) => ({ id, name }))}
+              peopleById={peopleNameMap}
+            />
           )}
         </div>
 
