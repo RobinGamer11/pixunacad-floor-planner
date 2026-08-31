@@ -246,6 +246,43 @@ export default function BoardPage() {
     return out;
   }, [state.items, state.categories, now, selectItem]);
 
+  /* Gemeinsamer Kalender: Abwesenheiten und Gerätebuchungen als eigene Ebenen. */
+  const absenceProjects = useMemo(() => (projectId ? [projectId] : []), [projectId]);
+  const absences = useAbsences(absenceProjects);
+  const deviceData = useDevices(projectId);
+  const [showAbsences, setShowAbsences] = useState(true);
+  const [showDevices, setShowDevices] = useState(true);
+
+  const opsEntries: CalEntry[] = useMemo(() => {
+    const out: CalEntry[] = [];
+    if (showAbsences) {
+      for (const a of absences.absences) {
+        const who = a.user_id === absences.myId ? "Ich" : "Teammitglied";
+        for (const day of datesInRange(a.starts_on, a.ends_on)) {
+          out.push({
+            id: `abs-${a.id}-${day}`,
+            date: day,
+            // Fremde Abwesenheiten bleiben ohne Art und Bemerkung.
+            title: a.masked ? `${who}: abwesend` : `${who}: ${ABSENCE_LABEL[a.kind ?? "other"]}`,
+            color: "#8b8178",
+          });
+        }
+      }
+    }
+    if (showDevices) {
+      for (const b of deviceData.bookings) {
+        const name = deviceData.devices.find((d) => d.id === b.device_id)?.name ?? "Gerät";
+        const start = new Date(b.starts_at);
+        const end = new Date(b.ends_at);
+        for (const day of datesInRange(isoDate(start), isoDate(end))) {
+          out.push({ id: `dev-${b.id}-${day}`, date: day, title: name, sub: "Gerät", color: "#4da3ff" });
+        }
+      }
+    }
+    return out;
+  }, [absences.absences, absences.myId, deviceData.bookings, deviceData.devices, showAbsences, showDevices]);
+
+
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const statusMap = useMemo(() => new Map(state.statuses.map((s) => [s.id, s])), [state.statuses]);
 
