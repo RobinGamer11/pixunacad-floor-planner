@@ -4,6 +4,14 @@ import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects } from "./Scene";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "./strokeEffects";
+
+/** Aufrauen-Werkzeugstandards in CAD: Regler jeweils auf 50 (= Detail 4, 400 %). */
+const CAD_ROUGHEN_DEFAULT: RoughenParams = {
+  ...DEFAULT_ROUGHEN,
+  strengthMm: 50,
+  detailPer100Mm: 4,
+  scalePercent: 400,
+};
 import { autoSizeTextBox } from "./textAutoSize";
 import { textStyleFontSizePt, ptToCssPx, ANNOTATION_M_PER_MM } from "./textTypography";
 import { TableTool } from "./TableTool";
@@ -1677,11 +1685,11 @@ export class CadApp {
    * Neue Objekte erhalten stets einen frischen Seed (kein appearanceSeed hier).
    */
   strokeEffectDefaults: Record<string, { strokePattern: StrokePatternParams; roughen: RoughenParams }> = {
-    line: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
-    polygon: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
-    hatch: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    line: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...CAD_ROUGHEN_DEFAULT } },
+    polygon: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...CAD_ROUGHEN_DEFAULT } },
+    hatch: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...CAD_ROUGHEN_DEFAULT } },
     // Freihand nutzt in der CAD-Oberfläche die gemeinsamen 80-mm-Standards.
-    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...CAD_ROUGHEN_DEFAULT } },
   };
 
   getStrokeEffectDefaults(kind: "line" | "polygon" | "hatch" | "free") {
