@@ -77,7 +77,9 @@ import { setExternalContentConsent, useExternalContentConsent } from "@/lib/exte
 import { NetworkView } from "@/components/network/NetworkView";
 import { OpsActionBar } from "@/components/ops/OpsActionBar";
 import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
-import { useProjectsMemberOptions } from "@/lib/projectTeam";
+import { useProjectsMemberOptions, useProjectMemberOptions } from "@/lib/projectTeam";
+import { Collapsible, TimeInsights, DeviceInsights } from "@/components/ops/OpsInsights";
+import { formatMinutes, useDevices, useTimeEntries } from "@/lib/opsStore";
 import { ProjectTeamTab } from "@/components/project/ProjectTeamTab";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
@@ -2948,16 +2950,6 @@ function AllTasksView({ projects }: { projects: Project[] }) {
 
   return (
     <div className="px-10 py-7">
-      <ProjectCarousel
-        projects={projects}
-        onOpen={(id) => {
-          setPreviewId(id);
-          window.requestAnimationFrame(() =>
-            document.getElementById(`projektstand-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }),
-          );
-        }}
-      />
-
       <div className="flex items-center gap-3 mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">Organisation</h1>
         <span className="text-sm text-muted-foreground">projektübergreifend</span>
@@ -2989,123 +2981,88 @@ function AllTasksView({ projects }: { projects: Project[] }) {
       </div>
 
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        {/* Aufgaben-Liste */}
-        <div className="space-y-6">
-          <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-            <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <span>BEITRÄGE {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
-              {selectedDate && (
-                <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
-              )}
-            </div>
-            {visible.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground">Keine offenen Beiträge.</div>
-            ) : (
-              <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
-                {visible.map((t) => (
-                  <li
-                    key={`${t.projectId}:${t.id}`}
-                    className="px-4 py-3 flex items-center gap-3"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={t.done}
-                      title="Erledigt"
-                      onChange={() => {
-                        timelineStore.updateItem(t.projectId, t.id, {
-                          statusId: t.done ? "open" : "done",
-                          done: !t.done,
-                          statusManual: true,
-                        });
-                        timelineStore.markFresh(t.projectId, t.id);
-                      }}
-                      className="accent-foreground"
-                    />
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm truncate flex items-center gap-2 ${t.done ? "line-through text-muted-foreground" : ""}`}>
-                        {t.title}
-                        <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-                              style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
-                          {t.kind === "task" ? "Beitrag" : t.kind === "event" ? "Termin" : "Notiz"}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-muted-foreground truncate">
-                        {t.projectName}{t.category ? ` · ${t.category}` : ""}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => navigate(`/project/${t.projectId}/board?item=${t.id}`)}
-                      title="In Orga öffnen"
-                      className="text-muted-foreground hover:text-foreground shrink-0"
-                    >
-                      <ExternalLink size={14} />
-                    </button>
-                    {t.alert && !t.done && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full"
-                            style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
-                        Überfällig
+      <div className="space-y-6">
+        {/* Beiträge – standardmäßig eingeklappt */}
+        <Collapsible
+          title={`BEITRÄGE${selectedDate ? ` · ${selectedDate}` : ` · ${visible.length}`}`}
+          right={selectedDate ? (
+            <button onClick={() => setSelectedDate(undefined)} className="text-[11px] text-muted-foreground hover:text-foreground">
+              Filter zurücksetzen
+            </button>
+          ) : undefined}
+        >
+          {visible.length === 0 ? (
+            <div className="py-3 text-sm text-muted-foreground">Keine offenen Beiträge.</div>
+          ) : (
+            <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
+              {visible.map((t) => (
+                <li key={`${t.projectId}:${t.id}`} className="py-2.5 flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={t.done}
+                    title="Erledigt"
+                    onChange={() => {
+                      timelineStore.updateItem(t.projectId, t.id, {
+                        statusId: t.done ? "open" : "done",
+                        done: !t.done,
+                        statusManual: true,
+                      });
+                      timelineStore.markFresh(t.projectId, t.id);
+                    }}
+                    className="accent-foreground"
+                  />
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm truncate flex items-center gap-2 ${t.done ? "line-through text-muted-foreground" : ""}`}>
+                      {t.title}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                            style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
+                        {t.kind === "task" ? "Beitrag" : t.kind === "event" ? "Termin" : "Notiz"}
                       </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {/* Projekte mit Kreisdiagramm + Board-Vorschau */}
-          <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-            <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
-            <div className="space-y-2">
-              {projects.map((p) => (
-                <div key={p.id} id={`projektstand-${p.id}`}>
-                  <button
-                    onClick={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
-                    className="w-full flex items-center gap-4 rounded-lg px-3 py-2 hover:bg-muted/40 text-left"
-                    style={{ border: "1px solid hsl(var(--hairline))" }}
-                  >
-                    <ProjectDonut projectId={p.id} size={64} />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{p.name}</div>
-                      <div className="text-[11px] text-muted-foreground truncate">
-                        {p.ort || "Ohne Ort"} · {previewId === p.id ? "Vorschau schließen" : "Orga-Vorschau öffnen"}
-                      </div>
                     </div>
-                    <ChevronRight
-                      size={16}
-                      className="text-muted-foreground shrink-0 transition-transform"
-                      style={{ transform: previewId === p.id ? "rotate(90deg)" : undefined }}
-                    />
+                    <div className="text-[11px] text-muted-foreground truncate">
+                      {t.projectName}{t.category ? ` · ${t.category}` : ""}{t.date ? ` · ${t.date}` : ""}{t.time ? ` · ${t.time}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate(`/project/${t.projectId}/board?item=${t.id}`)}
+                    title="In Orga öffnen"
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    <ExternalLink size={14} />
                   </button>
-                  {previewId === p.id && <BoardPreview project={p} />}
-                </div>
+                  {t.alert && !t.done && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full"
+                          style={{ background: "hsl(0 70% 50% / 0.15)", color: "hsl(0 70% 40%)" }}>
+                      Überfällig
+                    </span>
+                  )}
+                </li>
               ))}
-              {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
-            </div>
-          </div>
-        </div>
+            </ul>
+          )}
+        </Collapsible>
 
-        {/* Kalender + Projekt-Filter */}
-        <div className="space-y-4">
-          <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-            <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTE</div>
-            <div className="space-y-1.5">
-              {projects.map((p) => {
-                const color = projectColor(p.id);
-                const active = activeIds.has(p.id);
-                return (
-                  <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={active} onChange={() => toggle(p.id)} className="accent-current" />
-                    <span className="w-3 h-3 rounded-sm" style={{ background: color }} />
-                    <span className={`truncate ${active ? "" : "text-muted-foreground"}`}>{p.name}</span>
-                  </label>
-                );
-              })}
-              {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
-            </div>
-          </div>
+        {/* Allgemeines: alle Geräte/Werkzeuge und ihre Gesamtnutzung über alle Projekte */}
+        <Collapsible title="ALLGEMEINES">
+          <DeviceInsights projectNames={opsProjectNames} peopleById={opsPeople} />
+        </Collapsible>
 
+        {/* Projektstände */}
+        <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+          <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
+          <div className="space-y-2">
+            {projects.map((p) => (
+              <ProjectStandRow
+                key={p.id}
+                project={p}
+                open={previewId === p.id}
+                onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
+                peopleById={opsPeople}
+              />
+            ))}
+            {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+          </div>
         </div>
       </div>
     </div>
