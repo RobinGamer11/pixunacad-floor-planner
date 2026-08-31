@@ -308,6 +308,22 @@ export function CommentPopover({
 }
 
 /**
+ * Genau ein Kommentar-Schalter je Oberfläche, auch wenn mehrere Seiten
+ * (Doppelseiten-Layout) gleichzeitig einen Kommentar-Layer einbinden.
+ */
+const fabMounted: { id: symbol | null } = { id: null };
+function useSingleFab(): boolean {
+  const self = React.useRef(Symbol("fab"));
+  const [primary, setPrimary] = React.useState(false);
+  React.useEffect(() => {
+    const me = self.current;
+    if (!fabMounted.id) { fabMounted.id = me; setPrimary(true); }
+    return () => { if (fabMounted.id === me) { fabMounted.id = null; } };
+  }, []);
+  return primary;
+}
+
+/**
  * Kommentar-Schalter (in CAD und Mappe identisch): Modus an/aus, Pins
  * ein-/ausblenden und Statusfilter – ohne eigene Verwaltungsoberfläche.
  */
@@ -327,6 +343,8 @@ export function CommentFab({
 }) {
   const ui = useCommentUi();
   const [open, setOpen] = React.useState(false);
+  const primary = useSingleFab();
+  if (!primary) return null;
   return (
     <div
       className={`${fixed ? "fixed" : "absolute"} z-30 flex flex-col items-end gap-1 pixuna-comments ${className ?? ""}`}
