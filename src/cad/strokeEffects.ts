@@ -419,15 +419,11 @@ export function strokeWithBrushIfActive(
   const preset = pattern.brushPreset;
   if (!isBrushPresetId(preset)) return false;
   if (!worldPts || worldPts.length < 1) return true;
-  // Ruhige Live-Vorschau: Während des Zeichnens wird der Pfad als einfache
-  // Kontur in Stiftfarbe, -deckkraft und -breite gezeichnet (kein Stempeln).
-  // Damit „wandert“ der bereits gesetzte Teil nicht mehr sichtbar mit; der
-  // endgültige Pinselstrich erscheint beim Loslassen.
-  if (opts.liveKey) {
-    ctx.setLineDash([]);
-    ctx.lineDashOffset = 0;
-    return false;
-  }
+  // Live-Vorschau: Während des Zeichnens wird der echte Pinselstrich
+  // inkrementell über den Live-Puffer (`liveKey`) gerendert. Die Stempel sind
+  // weltkoordinaten-verankert (fester Seed pro Stempelindex), sodass der
+  // bereits gesetzte Teil stabil liegen bleibt und nicht mitwandert.
+
 
 
 
