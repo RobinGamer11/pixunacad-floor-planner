@@ -957,6 +957,16 @@ function ItemEditor({
 }) {
   const set = (patch: Partial<TlItem>) => timelineStore.updateItem(projectId, item.id, patch);
   const prio = priorities.find((p) => p.id === item.priorityId);
+  /* Rechte kommen zentral aus dem Projektzugriff (Paket 01). */
+  const canEdit = useProjectAccess(projectId).permissions.canEdit;
+  const members = useProjectMemberOptions(projectId);
+  /** Soll-Dauer aus dem Beitragszeitraum – nur zur Einordnung der Ist-Zeiten. */
+  const plannedMinutes = useMemo(() => {
+    const start = Date.parse(`${item.startDate}T${item.startTime || "00:00"}:00`);
+    const end = Date.parse(`${item.endDate || item.startDate}T${item.endTime || item.startTime || "00:00"}:00`);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return undefined;
+    return Math.round((end - start) / 60000);
+  }, [item.startDate, item.startTime, item.endDate, item.endTime]);
 
   return (
     <aside className="w-[340px] shrink-0 border-l overflow-y-auto"
