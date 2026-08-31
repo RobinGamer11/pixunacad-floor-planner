@@ -129,13 +129,11 @@ create policy "project_members_select_related" on public.project_members
   using (user_id = auth.uid() or public.project_role_of(project_id, auth.uid()) is not null);
 
 drop policy if exists "project_members_insert_owner" on public.project_members;
-create policy "project_members_insert_manager" on public.project_members
-  for insert to authenticated
-  with check (public.project_can_manage_members(project_id, auth.uid()));
 drop policy if exists "project_members_insert_manager" on public.project_members;
 create policy "project_members_insert_manager" on public.project_members
   for insert to authenticated
   with check (public.project_can_manage_members(project_id, auth.uid()));
+
 
 drop policy if exists "project_members_update_owner" on public.project_members;
 drop policy if exists "project_members_update_manager" on public.project_members;
