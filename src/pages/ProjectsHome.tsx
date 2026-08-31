@@ -903,7 +903,7 @@ export default function ProjectsHome() {
 
 
         {/* Center */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto slim-scroll">
           {hub === "home" ? (
             <div className="relative min-h-full overflow-hidden">
               <AuroraBackground />

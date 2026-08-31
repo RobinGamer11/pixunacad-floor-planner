@@ -578,7 +578,7 @@ export default function BoardPage() {
 
 
       <div className="flex-1 min-h-0 flex">
-        <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: "hsl(var(--background))" }}>
+        <div className="flex-1 min-w-0 overflow-y-auto slim-scroll" style={{ background: "hsl(var(--background))" }}>
           {/* Werkzeugleiste – helles Kartenfeld */}
           <div className="p-4 pb-0">
             <div className="rounded-xl p-3 flex flex-col gap-2"
