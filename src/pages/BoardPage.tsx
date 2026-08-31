@@ -705,7 +705,7 @@ export default function BoardPage() {
                         {fmtDate(p.item.startDate, p.item.startTime)}
                         {p.item.endDate ? ` – ${fmtDate(p.item.endDate, p.item.endTime)}` : ""}
                       </div>
-                      {p.item.responsible && <div className="mt-1 opacity-70">👤 {p.item.responsible}</div>}
+                      {!!responsibleLabel(p.item) && <div className="mt-1 opacity-70">👤 {responsibleLabel(p.item)}</div>}
                       {p.item.description && <p className="mt-1.5 whitespace-pre-wrap">{p.item.description}</p>}
                     </div>
                   )}
@@ -848,7 +848,7 @@ export default function BoardPage() {
                       <span className="truncate opacity-80">
                         {fmtDate(i.startDate)}{i.endDate ? ` – ${fmtDate(i.endDate)}` : ""}
                       </span>
-                      <span className="truncate">{i.responsible || "—"}</span>
+                      <span className="truncate">{responsibleLabel(i) || "—"}</span>
                     </button>
                   );
                 })}
