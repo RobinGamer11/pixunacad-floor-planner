@@ -567,6 +567,15 @@ export default function BoardPage() {
             <div className="flex flex-wrap items-center gap-2 rounded-xl p-3"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
               <BigAddButton kind="contribution" onClick={() => add("contribution")} />
+              {/* Paket 04: Einstieg für Arbeitszeiten und Abwesenheiten. */}
+              <button
+                onClick={() => setTimeDialog(true)}
+                className="h-10 px-3 rounded-lg border text-xs flex items-center gap-1.5"
+                style={{ borderColor: PANEL_LINE, color: INK }}
+                title="Arbeitszeit oder Abwesenheit erfassen"
+              >
+                <Clock size={14} /> + Zeiterfassung
+              </button>
               <ProjectPeriodBar
                 projectId={projectId}
                 period={state.period}
