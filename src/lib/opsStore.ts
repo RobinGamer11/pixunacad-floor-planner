@@ -607,6 +607,21 @@ export function useDevices(projectId: string | undefined) {
     devicesState.reload();
   }, [devicesState]);
 
+  /**
+   * Gerät löschen. RLS erlaubt das nur dem Besitzer und nur, solange keine
+   * Buchung existiert – Geräte mit Historie werden stattdessen archiviert.
+   */
+  const removeDevice = useCallback(async (id: string) => {
+    const { client } = ctx();
+    if (!client) return;
+    const { data, error: err } = await client.from("devices").delete().eq("id", id).select("id");
+    if (err) throw err;
+    if (!data || data.length === 0) {
+      throw new Error("Löschen nicht möglich: Es bestehen Buchungen oder es fehlt die Berechtigung. Bitte archivieren.");
+    }
+    devicesState.reload();
+  }, [devicesState]);
+
   /** Konflikte gegen alle Buchungen des Geräts – auch aus fremden Projekten. */
   const checkConflicts = useCallback(
     (deviceId: string, startsAt: string, endsAt: string, excludeId?: string) =>
@@ -651,6 +666,7 @@ export function useDevices(projectId: string | undefined) {
     reload: () => { devicesState.reload(); bookingsState.reload(); },
     addDevice,
     updateDevice,
+    removeDevice,
     checkConflicts,
     book,
     removeBooking,

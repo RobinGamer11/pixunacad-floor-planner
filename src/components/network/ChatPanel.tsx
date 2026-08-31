@@ -64,13 +64,16 @@ export function ChatPanel({
   target,
   people,
   onClose,
+  onRead,
 }: {
   target: ChatTarget;
   /** Bekannte Personen für Name/Avatar der Absender. */
   people: Map<string, NetworkPerson>;
   onClose: () => void;
+  /** Wird nach tatsächlich gespeichertem Lesestand aufgerufen. */
+  onRead?: () => void;
 }) {
-  const chat = useConversation(target);
+  const chat = useConversation(target, onRead);
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -82,6 +85,7 @@ export function ChatPanel({
   useEffect(() => {
     inputRef.current?.focus();
   }, [target.kind, chat.conversationId]);
+
 
   const rows = useMemo(() => {
     return chat.messages.map((m, i) => {
@@ -129,10 +133,18 @@ export function ChatPanel({
       <div className="flex-1 overflow-y-auto px-3 py-2">
         {chat.loading && <div className="p-6 text-center text-sm text-muted-foreground">Chat wird geladen …</div>}
         {chat.error && (
-          <div className="rounded-lg border p-3 text-xs" style={{ borderColor: "hsl(0 70% 55% / 0.4)" }}>
-            {chat.error}
+          <div className="rounded-lg border p-3 text-xs flex flex-col gap-2" style={{ borderColor: "hsl(0 70% 55% / 0.4)" }}>
+            <span>{chat.error}</span>
+            <button
+              onClick={() => chat.retry()}
+              className="self-start h-7 px-2 rounded-md border text-[11px]"
+              style={{ borderColor: "hsl(var(--accent-gold))" }}
+            >
+              Erneut versuchen
+            </button>
           </div>
         )}
+
         {!chat.loading && !chat.error && rows.length === 0 && (
           <div className="p-6 text-center text-sm text-muted-foreground">Noch keine Nachrichten.</div>
         )}

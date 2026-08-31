@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getNetworkClient, isMissingSchemaError, networkConfigured } from "@/lib/networkClient";
+import { ensureSharedProject } from "@/lib/projectRegistration";
 import { supabase as authClient } from "@/lib/supabase";
 import type { ProjectPermissionOverrides, ProjectRole } from "@/lib/projectAccess";
 
@@ -309,27 +310,30 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
     };
   }, [state.ready]);
 
-  /* ---------------- Lokale Projekte als Netzwerk-Projekte ---------------- */
+  /* ---------------- Lokale Projekte als Netzwerk-Projekte ----------------
+   * Einheitlich über die zentrale Registrierung (`ensureSharedProject`):
+   * Es wird ausschließlich eingefügt, wenn das Projekt serverseitig noch nicht
+   * existiert. Bestehende Eigentümer werden niemals überschrieben.
+   */
   useEffect(() => {
     const client = getNetworkClient();
     const session = authClient.getSession();
     if (!client || !session || !state.ready || localProjects.length === 0) return;
-    const payload = localProjects.map((p) => ({
-      id: p.id,
-      owner_id: session.user.id,
-      name: p.name,
-      updated_at: new Date().toISOString(),
-    }));
-    void client
-      .from("network_projects")
-      .upsert(payload, { onConflict: "id" })
-      .then(({ error }) => {
-        if (error && !isMissingSchemaError(error)) {
-          // Fremde Projekte (anderer Owner) werden von RLS abgelehnt – das ist gewollt.
-        }
-      });
+    let cancelled = false;
+    void (async () => {
+      let registeredNew = false;
+      for (const p of localProjects) {
+        if (cancelled) return;
+        const known = state.sharedProjects.some((s) => s.id === p.id);
+        const res = await ensureSharedProject(p.id, p.name);
+        if (res.ok && !known) registeredNew = true;
+      }
+      if (!cancelled && registeredNew) reloadRef.current();
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectsKey, state.ready]);
+
 
   /* ------------------------------- Aktionen ----------------------------- */
   const run = useCallback(async (fn: (client: NonNullable<ReturnType<typeof getNetworkClient>>) => Promise<void>) => {

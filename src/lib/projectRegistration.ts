@@ -32,6 +32,20 @@ function fail(message: string): EnsureProjectResult {
   return { ok: false, message };
 }
 
+/**
+ * Supabase-Fehler sind einfache Objekte (kein `Error`) – Meldung, Details und
+ * Fehlercode müssen ausgewertet werden, damit die Ursache sichtbar bleibt.
+ */
+function describe(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err === "string") return err;
+  const e = err as { message?: string; details?: string; hint?: string; code?: string };
+  const parts = [e.message, e.details, e.hint].map((p) => (p ?? "").trim()).filter(Boolean);
+  const code = e.code ? ` (Fehlercode ${e.code})` : "";
+  return parts.length ? `${parts.join(" – ")}${code}` : `${fallback}${code}`;
+}
+
+
 async function run(projectId: string, name: string | undefined): Promise<EnsureProjectResult> {
   if (!networkConfigured) return fail("Die gemeinsame Datenbasis ist nicht eingerichtet.");
   const client = getNetworkClient();
@@ -67,15 +81,14 @@ async function run(projectId: string, name: string | undefined): Promise<EnsureP
       if (isMissingSchemaError(insErr)) {
         return fail("Die Datenbank-Einrichtung fehlt. Bitte die SQL-Migrationen einspielen.");
       }
-      throw insErr;
+      return fail(`Projektzuordnung fehlgeschlagen: ${describe(insErr, "Unbekannter Fehler")}`);
     }
 
     verified.add(projectId);
     await projectAccessStore.reload();
     return { ok: true };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "";
-    return fail(msg ? `Projektzuordnung fehlgeschlagen: ${msg}` : "Projektzuordnung fehlgeschlagen.");
+    return fail(`Projektzuordnung fehlgeschlagen: ${describe(error, "Unbekannter Fehler")}`);
   }
 }
 
