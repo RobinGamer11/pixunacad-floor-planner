@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { WorkspaceSyncProvider } from "@/lib/workspaceSync";
+import { ProjectAccessProvider } from "@/lib/projectAccessProvider";
 import LegalGearButton from "@/components/legal/LegalMenu";
 import ProjectsHome from "./pages/ProjectsHome";
 import Login from "./pages/Login";
