@@ -79,6 +79,8 @@ export function ContributionTimePanel({
     [time.entries, itemId],
   );
   const total = entries.reduce((s, e) => s + netMinutes(e), 0);
+  const actual = time.actualsByItem.get(itemId);
+  const overlapIds = time.overlapIds;
   const nameOf = (id: string) => members.find((m) => m.id === id)?.name ?? (id === mine ? "Ich" : "Unbekannt");
 
   const submit = async () => {
