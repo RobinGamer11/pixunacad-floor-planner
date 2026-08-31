@@ -975,6 +975,15 @@ export default function BoardPage() {
         )}
       </div>
       {tabletAidOn && <TabletAidWheel />}
+      {timeDialog && projectId && (
+        <TimeEntryDialog
+          projectId={projectId}
+          items={state.items.map((i) => ({ id: i.id, title: i.title }))}
+          members={teamMembers}
+          defaultItemId={selectedId ?? undefined}
+          onClose={() => { setTimeDialog(false); timeData.reload(); }}
+        />
+      )}
     </div>
 
   );
