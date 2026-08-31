@@ -195,11 +195,35 @@ create policy "conversation_members_insert_self" on public.conversation_members
   for insert to authenticated
   with check (user_id = auth.uid() and public.can_access_conversation(conversation_id, auth.uid()));
 
+-- Aktualisieren darf man ausschließlich den eigenen Lesestand – und die Zeile
+-- darf dabei weder auf eine fremde Unterhaltung noch auf eine fremde Person
+-- oder eine andere Rolle umgestellt werden.
 drop policy if exists "conversation_members_update_self" on public.conversation_members;
 create policy "conversation_members_update_self" on public.conversation_members
   for update to authenticated
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+  using (user_id = auth.uid() and public.can_access_conversation(conversation_id, auth.uid()))
+  with check (user_id = auth.uid() and public.can_access_conversation(conversation_id, auth.uid()));
+
+create or replace function public.conversation_members_guard()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  if new.conversation_id is distinct from old.conversation_id
+     or new.user_id is distinct from old.user_id
+     or new.role is distinct from old.role
+     or new.created_at is distinct from old.created_at then
+    raise exception 'PIXUNA_FORBIDDEN: nur der eigene Lesestand ist änderbar';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists conversation_members_guard_trg on public.conversation_members;
+create trigger conversation_members_guard_trg
+  before update on public.conversation_members
+  for each row execute function public.conversation_members_guard();
 
 -- Nachrichten
 drop policy if exists "messages_select_participants" on public.messages;
