@@ -1149,6 +1149,19 @@
 .tabs-scroll::-webkit-scrollbar-thumb { background: hsl(var(--hairline)); border-radius: 2px; }
 .tabs-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--accent-gold) / 0.4); }
 
+/* Moderne, dezente vertikale Scrollleiste (Organisation & große Inhaltsflächen) */
+.slim-scroll { scrollbar-width: thin; scrollbar-color: hsl(var(--hairline)) transparent; }
+.slim-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.slim-scroll::-webkit-scrollbar-track { background: transparent; }
+.slim-scroll::-webkit-scrollbar-thumb {
+  background: hsl(var(--ink-soft) / 0.22);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.slim-scroll::-webkit-scrollbar-thumb:hover { background: hsl(var(--ink-soft) / 0.4); background-clip: content-box; }
+.slim-scroll::-webkit-scrollbar-corner { background: transparent; }
+
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .scrollbarless-panel,
