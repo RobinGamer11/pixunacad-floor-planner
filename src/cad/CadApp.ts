@@ -3898,6 +3898,13 @@ export class CadApp {
     this.hub.destroy();
     this.textEditor?.destroy();
     this.planController?.destroy();
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
+    if (this._orientationHandler) {
+      window.removeEventListener("orientationchange", this._orientationHandler);
+      window.visualViewport?.removeEventListener("resize", this._orientationHandler);
+      this._orientationHandler = null;
+    }
     if (this._keydownHandler) window.removeEventListener("keydown", this._keydownHandler);
   }
 }
