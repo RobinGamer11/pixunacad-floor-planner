@@ -378,7 +378,14 @@ export function NetworkView({
         </div>
       )}
 
-      <div className="mt-4 grid gap-4" style={{ gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)", maxWidth: chat ? 1040 : 576 }}>
+      <div
+        className="mt-4 grid gap-4"
+        style={{
+          gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)",
+          // Kalender und Geräte brauchen mehr Breite als die Personenlisten.
+          maxWidth: chat ? 1040 : tab === "calendar" || tab === "devices" ? 880 : 576,
+        }}
+      >
         <div className="rounded-xl border p-3" style={surface}>
           {net.loading && <div className="p-6 text-center text-sm text-muted-foreground">Netzwerk wird geladen …</div>}
 
