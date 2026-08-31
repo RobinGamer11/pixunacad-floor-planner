@@ -11,10 +11,8 @@ import {
   Search,
   UserMinus,
   GripVertical,
-  CalendarDays,
   Wrench,
 } from "lucide-react";
-import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
 import { DevicesTab } from "@/components/network/DevicesTab";
 import { CommentsTab } from "@/components/network/CommentsTab";
 import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
@@ -472,18 +470,9 @@ export function NetworkView({
 
           {!net.loading && tab === "teams" && (
             <div className="space-y-4">
-              {/* Zentrale projektübergreifende Übersicht – Projekte einzeln ein-/ausschaltbar. */}
-              <div className="rounded-lg border p-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <CalendarDays size={14} className="text-muted-foreground" />
-                  <span className="text-sm font-semibold">Projektübergreifender Kalender</span>
-                </div>
-                <OpsCalendarTab
-                  projectIds={projects.map((p) => p.id)}
-                  projectNames={projectNameMap}
-                  peopleById={peopleNameMap}
-                />
-              </div>
+              {/* Verwaltungsebene: Projekte, Teams, Rollen. Der projektübergreifende
+                  Kalender liegt in Startseite → Organisation. */}
+
 
               <div className="text-[11px] text-muted-foreground px-1">
                 Personen per Drag &amp; Drop zwischen Projekten und „Allgemein“ verschieben – oder die Auswahl unten

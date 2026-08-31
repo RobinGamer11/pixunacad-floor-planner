@@ -75,6 +75,9 @@ import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 import { NetworkView } from "@/components/network/NetworkView";
+import { OpsActionBar } from "@/components/ops/OpsActionBar";
+import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
+import { useProjectsMemberOptions } from "@/lib/projectTeam";
 import { ProjectTeamTab } from "@/components/project/ProjectTeamTab";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
@@ -2995,6 +2998,14 @@ function BoardPreview({ project }: { project: Project }) {
 
 function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
+  // Gemeinsame Organisationsdaten (Kalender/Aktionen) neu laden, wenn etwas erfasst wurde.
+  const [opsNonce, setOpsNonce] = useState(0);
+  const opsProjectIds = useMemo(() => projects.map((p) => p.id), [projects]);
+  const opsProjectNames = useMemo(
+    () => new Map(projects.map((p) => [p.id, p.name])),
+    [projects],
+  );
+  const { namesById: opsPeople } = useProjectsMemberOptions(opsProjectIds);
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
   const [previewId, setPreviewId] = useState<string | null>(null);
   // Board-Änderungen aller Projekte live übernehmen.
@@ -3078,10 +3089,31 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         }}
       />
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">Organisation</h1>
         <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
+
+      {/* Aktionen – dieselben Daten wie im Projektbereich, nur ohne Projektfilter. */}
+      <div className="mb-4">
+        <OpsActionBar
+          projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+          showContribution
+          onChanged={() => setOpsNonce((n) => n + 1)}
+        />
+      </div>
+
+      {/* Projektübergreifender Kalender: Beiträge, Arbeitszeiten, Abwesenheiten, Buchungen. */}
+      <div className="mb-6 rounded-xl border p-3"
+           style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+        <OpsCalendarTab
+          key={opsNonce}
+          projectIds={projects.map((p) => p.id)}
+          projectNames={opsProjectNames}
+          peopleById={opsPeople}
+        />
+      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* Aufgaben-Liste */}

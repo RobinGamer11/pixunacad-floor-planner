@@ -13,7 +13,6 @@ import {
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
   ListChecks, CalendarRange,
-  Clock,
 } from "lucide-react";
 import { useProjectMemberOptions } from "@/lib/projectTeam";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
@@ -28,7 +27,7 @@ import {
   ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices, useTimeEntries,
   formatMinutes, netMinutes,
 } from "@/lib/opsStore";
-import { TimeEntryDialog } from "@/components/board/TimeEntryDialog";
+import { OpsActionBar } from "@/components/ops/OpsActionBar";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
@@ -260,7 +259,6 @@ export default function BoardPage() {
   const [showDevices, setShowDevices] = useState(true);
   const [showTimes, setShowTimes] = useState(true);
   const [showItems, setShowItems] = useState(true);
-  const [timeDialog, setTimeDialog] = useState(false);
 
   const opsEntries: CalEntry[] = useMemo(() => {
     const out: CalEntry[] = [];
@@ -600,18 +598,16 @@ export default function BoardPage() {
                 )}
               </div>
 
-              {/* 3. Erfassen */}
+              {/* 3. Erfassen – dieselben Aktionen wie in der Startseiten-Organisation,
+                     hier mit fest vorausgewähltem Projekt. */}
               <div className="flex flex-wrap items-center gap-2">
-                <BigAddButton kind="contribution" onClick={() => add("contribution")} />
-                {/* Paket 04: Einstieg für Arbeitszeiten und Abwesenheiten. */}
-                <button
-                  onClick={() => setTimeDialog(true)}
-                  className="h-10 px-3 rounded-lg border text-xs flex items-center gap-1.5"
-                  style={{ borderColor: PANEL_LINE, color: INK }}
-                  title="Arbeitszeit oder Abwesenheit erfassen"
-                >
-                  <Clock size={14} /> + Zeiterfassung
-                </button>
+                <OpsActionBar
+                  projects={projectId ? [{ id: projectId, name: project?.name ?? "Projekt" }] : []}
+                  fixedProjectId={projectId}
+                  defaultItemId={selectedId ?? undefined}
+                  onChanged={() => { timeData.reload(); deviceData.reload(); absences.reload(); }}
+                  extra={<BigAddButton kind="contribution" onClick={() => add("contribution")} />}
+                />
               </div>
             </div>
 
@@ -991,15 +987,6 @@ export default function BoardPage() {
 
       </div>
       {tabletAidOn && <TabletAidWheel />}
-      {timeDialog && projectId && (
-        <TimeEntryDialog
-          projectId={projectId}
-          items={state.items.map((i) => ({ id: i.id, title: i.title }))}
-          members={teamMembers}
-          defaultItemId={selectedId ?? undefined}
-          onClose={() => { setTimeDialog(false); timeData.reload(); }}
-        />
-      )}
     </div>
 
   );

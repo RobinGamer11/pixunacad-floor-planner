@@ -252,6 +252,7 @@ function useAsyncList<T>(load: (signal: { cancelled: boolean }) => Promise<T[]>,
 /* ------------------------------------------------------ Schritt 04: Zeit */
 
 export interface TimeEntryInput {
+  /** Leer = ohne Beitragsbezug (Spalte ist NOT NULL, daher leerer Text). */
   itemId: string;
   userId: string;
   startedAt: string;
@@ -259,6 +260,94 @@ export interface TimeEntryInput {
   breakMinutes: number;
   note?: string;
 }
+
+/**
+ * Arbeitszeit für ein beliebiges Projekt anlegen – dieselbe Tabelle wie im
+ * Projektbereich, nur ohne festen Projektfilter (Startseite → Organisation).
+ */
+export async function addTimeEntryFor(projectId: string, input: TimeEntryInput) {
+  const { client, session } = ctx();
+  if (!client || !session) throw new Error("Zeiterfassung benötigt eine Anmeldung.");
+  if (!projectId) throw new Error("Bitte ein Projekt wählen.");
+  const { error: err } = await client.from("time_entries").insert({
+    project_id: projectId,
+    item_id: input.itemId ?? "",
+    user_id: input.userId || session.user.id,
+    started_at: input.startedAt,
+    ended_at: input.endedAt,
+    break_minutes: Math.max(0, Math.round(input.breakMinutes || 0)),
+    note: input.note?.trim() || null,
+    created_by: session.user.id,
+  });
+  if (err) throw err;
+}
+
+/** Eigene Abwesenheit anlegen – projektunabhängig (personenbezogen). */
+export async function addAbsenceEntry(input: {
+  kind: AbsenceKind; startsOn: string; endsOn: string; note?: string; status?: string;
+}) {
+  const { client, session } = ctx();
+  if (!client || !session) throw new Error("Abwesenheiten benötigen eine Anmeldung.");
+  const { error: err } = await client.from("absences").insert({
+    user_id: session.user.id,
+    kind: input.kind,
+    starts_on: input.startsOn,
+    ends_on: input.endsOn,
+    status: input.status ?? "planned",
+    note: input.note?.trim() || null,
+  });
+  if (err) throw err;
+}
+
+export interface DeviceBookingInput {
+  deviceId: string;
+  itemId?: string | null;
+  responsibleId?: string | null;
+  startsAt: string;
+  endsAt: string;
+  overrideReason?: string;
+}
+
+/** Konflikte eines Geräts – auch aus Projekten ohne eigene Sicht (maskiert). */
+export async function checkDeviceConflicts(
+  deviceId: string,
+  startsAt: string,
+  endsAt: string,
+  excludeId?: string,
+): Promise<DeviceConflict[]> {
+  const { client } = ctx();
+  if (!client) return [];
+  const { data, error: err } = await client.rpc("device_booking_conflicts", {
+    _device_id: deviceId,
+    _starts_at: startsAt,
+    _ends_at: endsAt,
+    _exclude_id: excludeId ?? null,
+  });
+  if (err) throw err;
+  return (data ?? []) as DeviceConflict[];
+}
+
+/** Gerätebuchung für ein beliebiges Projekt – zentrale Geräteverwaltung. */
+export async function bookDeviceFor(projectId: string, input: DeviceBookingInput) {
+  const { client, session } = ctx();
+  if (!client || !session) throw new Error("Buchungen benötigen eine Anmeldung.");
+  if (!projectId) throw new Error("Bitte ein Projekt wählen.");
+  const reason = input.overrideReason?.trim() || null;
+  const { error: err } = await client.from("device_bookings").insert({
+    device_id: input.deviceId,
+    project_id: projectId,
+    item_id: input.itemId || null,
+    responsible_id: input.responsibleId ?? null,
+    starts_at: input.startsAt,
+    ends_at: input.endsAt,
+    override_reason: reason,
+    override_by: reason ? session.user.id : null,
+    override_at: reason ? new Date().toISOString() : null,
+    created_by: session.user.id,
+  });
+  if (err) throw err;
+}
+
 
 export function useTimeEntries(projectId: string | undefined) {
   const { rows, loading, status, unavailable, error, reload } = useAsyncList<TimeEntry>(async () => {
@@ -276,21 +365,11 @@ export function useTimeEntries(projectId: string | undefined) {
   const myId = ctx().session?.user.id ?? null;
 
   const add = useCallback(async (input: TimeEntryInput) => {
-    const { client, session } = ctx();
-    if (!client || !session || !projectId) throw new Error("Zeiterfassung benötigt eine Anmeldung.");
-    const { error: err } = await client.from("time_entries").insert({
-      project_id: projectId,
-      item_id: input.itemId,
-      user_id: input.userId,
-      started_at: input.startedAt,
-      ended_at: input.endedAt,
-      break_minutes: Math.max(0, Math.round(input.breakMinutes || 0)),
-      note: input.note?.trim() || null,
-      created_by: session.user.id,
-    });
-    if (err) throw err;
+    if (!projectId) throw new Error("Zeiterfassung benötigt eine Anmeldung.");
+    await addTimeEntryFor(projectId, input);
     reload();
   }, [projectId, reload]);
+
 
   const update = useCallback(async (id: string, patch: Partial<TimeEntryInput>) => {
     const { client } = ctx();
@@ -430,19 +509,10 @@ export function useAbsences(projectIds: string[]) {
   const add = useCallback(async (input: {
     kind: AbsenceKind; startsOn: string; endsOn: string; note?: string; status?: string;
   }) => {
-    const { client, session } = ctx();
-    if (!client || !session) throw new Error("Abwesenheiten benötigen eine Anmeldung.");
-    const { error: err } = await client.from("absences").insert({
-      user_id: session.user.id,
-      kind: input.kind,
-      starts_on: input.startsOn,
-      ends_on: input.endsOn,
-      status: input.status ?? "planned",
-      note: input.note?.trim() || null,
-    });
-    if (err) throw err;
+    await addAbsenceEntry(input);
     reload();
   }, [reload]);
+
 
   /** Eigene Abwesenheit anpassen (Status/Zeitraum/Bemerkung). */
   const update = useCallback(async (id: string, patch: {
@@ -538,49 +608,19 @@ export function useDevices(projectId: string | undefined) {
   }, [devicesState]);
 
   /** Konflikte gegen alle Buchungen des Geräts – auch aus fremden Projekten. */
-  const checkConflicts = useCallback(async (
-    deviceId: string,
-    startsAt: string,
-    endsAt: string,
-    excludeId?: string,
-  ): Promise<DeviceConflict[]> => {
-    const { client } = ctx();
-    if (!client) return [];
-    const { data, error: err } = await client.rpc("device_booking_conflicts", {
-      _device_id: deviceId,
-      _starts_at: startsAt,
-      _ends_at: endsAt,
-      _exclude_id: excludeId ?? null,
-    });
-    if (err) throw err;
-    return (data ?? []) as DeviceConflict[];
-  }, []);
+  const checkConflicts = useCallback(
+    (deviceId: string, startsAt: string, endsAt: string, excludeId?: string) =>
+      checkDeviceConflicts(deviceId, startsAt, endsAt, excludeId),
+    [],
+  );
 
-  const book = useCallback(async (input: {
-    deviceId: string;
-    itemId?: string | null;
-    responsibleId?: string | null;
-    startsAt: string;
-    endsAt: string;
-    overrideReason?: string;
-  }) => {
-    const { client, session } = ctx();
-    if (!client || !session || !projectId) throw new Error("Buchungen benötigen ein geteiltes Projekt.");
-    const { error: err } = await client.from("device_bookings").insert({
-      device_id: input.deviceId,
-      project_id: projectId,
-      item_id: input.itemId ?? null,
-      responsible_id: input.responsibleId ?? null,
-      starts_at: input.startsAt,
-      ends_at: input.endsAt,
-      override_reason: input.overrideReason?.trim() || null,
-      override_by: input.overrideReason?.trim() ? session.user.id : null,
-      override_at: input.overrideReason?.trim() ? new Date().toISOString() : null,
-      created_by: session.user.id,
-    });
-    if (err) throw err;
+
+  const book = useCallback(async (input: DeviceBookingInput) => {
+    if (!projectId) throw new Error("Buchungen benötigen ein geteiltes Projekt.");
+    await bookDeviceFor(projectId, input);
     bookingsState.reload();
   }, [projectId, bookingsState]);
+
 
   const removeBooking = useCallback(async (id: string) => {
     const { client } = ctx();
