@@ -32,6 +32,20 @@ function fail(message: string): EnsureProjectResult {
   return { ok: false, message };
 }
 
+/**
+ * Supabase-Fehler sind einfache Objekte (kein `Error`) – Meldung, Details und
+ * Fehlercode müssen ausgewertet werden, damit die Ursache sichtbar bleibt.
+ */
+function describe(err: unknown, fallback: string): string {
+  if (!err) return fallback;
+  if (typeof err === "string") return err;
+  const e = err as { message?: string; details?: string; hint?: string; code?: string };
+  const parts = [e.message, e.details, e.hint].map((p) => (p ?? "").trim()).filter(Boolean);
+  const code = e.code ? ` (Fehlercode ${e.code})` : "";
+  return parts.length ? `${parts.join(" – ")}${code}` : `${fallback}${code}`;
+}
+
+
 async function run(projectId: string, name: string | undefined): Promise<EnsureProjectResult> {
   if (!networkConfigured) return fail("Die gemeinsame Datenbasis ist nicht eingerichtet.");
   const client = getNetworkClient();
