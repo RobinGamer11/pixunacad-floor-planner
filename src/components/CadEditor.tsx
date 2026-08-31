@@ -47,7 +47,8 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
-import { LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
@@ -2032,7 +2033,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {/* Ebenen-Button oben links: runder Button mit Icon + Anzahl. */}
         {!presenting && (
-          <LayerFab count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />
+          <CanvasFabBar>
+            <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />
+            <CommentModeButton disabled={!projectId} />
+          </CanvasFabBar>
         )}
 
 

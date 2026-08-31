@@ -148,7 +148,8 @@ import { TextSpanAllPages } from "@/components/workspace/TextSpanAllPages";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
-import { LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
 
 // Papierformate: kanonische Quelle ist src/lib/paper.ts.
@@ -2500,10 +2501,14 @@ export default function ProjectWorkspace() {
               />
             )}
             {!presenting && !printMode && (
-              <LayerFab
-                count={mappeLayerCount}
-                onClick={() => { setRightOpen(true); setRightTab("layers"); }}
-              />
+              <CanvasFabBar>
+                <LayerFab
+                  bare
+                  count={mappeLayerCount}
+                  onClick={() => { setRightOpen(true); setRightTab("layers"); }}
+                />
+                <CommentModeButton disabled={!projectId} />
+              </CanvasFabBar>
             )}
 
             <ZoomBar zoom={zoom} setZoom={setZoomClamped} onResetZoom={resetZoomAndCenter} />
