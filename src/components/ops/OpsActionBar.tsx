@@ -20,7 +20,7 @@ import {
   type AbsenceKind,
   type DeviceConflict,
 } from "@/lib/opsStore";
-import { addQuickItem, subscribeTimeline, timelineStore } from "@/lib/timelineStore";
+import { addQuickItem, subscribeTimeline, timelineStore, QUICK_CATEGORY_ID } from "@/lib/timelineStore";
 import { useProjectsMemberOptions } from "@/lib/projectTeam";
 
 const inputCls =
@@ -53,6 +53,25 @@ function useItems(projectId: string) {
         : [],
     [projectId, tick],
   );
+}
+
+/** Kategorien eines Projekts – dieselbe Board-Datenbasis wie in der Orga. */
+function useCategories(projectId: string) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!projectId) return;
+    return subscribeTimeline(projectId, () => setTick((t) => t + 1));
+  }, [projectId]);
+  return useMemo(() => {
+    if (!projectId) return [] as { id: string; label: string }[];
+    try {
+      timelineStore.ensureDefaults(projectId);
+      return timelineStore.getState(projectId).categories.map((c) => ({ id: c.id, label: c.label }));
+    } catch {
+      return [] as { id: string; label: string }[];
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, tick]);
 }
 
 export function OpsActionBar({
@@ -503,6 +522,12 @@ function ContributionDialog({
   const [projectId, setProjectId] = useState(fixedProjectId ?? projects[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  /** Kategorie des Projekts – Vorauswahl ist immer die „Schnellablage“. */
+  const [categoryId, setCategoryId] = useState<string>(QUICK_CATEGORY_ID);
+  const categories = useCategories(projectId);
+  useEffect(() => {
+    if (!categories.some((c) => c.id === categoryId)) setCategoryId(QUICK_CATEGORY_ID);
+  }, [categories, categoryId]);
   const [date, setDate] = useState(() => isoDate(new Date()));
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -512,7 +537,7 @@ function ContributionDialog({
     if (!projectId) { setError("Bitte ein Projekt wählen."); return; }
     if (!title.trim()) { setError("Bitte einen Namen angeben."); return; }
     // Bestehende Board-Datenbasis – keine zweite Speicherung.
-    addQuickItem(projectId, "task", { title: title.trim(), description, date });
+    addQuickItem(projectId, "task", { title: title.trim(), description, date, categoryId });
     setTitle("");
     setDescription("");
     setDone("Beitrag gespeichert.");
@@ -527,6 +552,12 @@ function ContributionDialog({
         </Field>
         <Field label="Beschreibung">
           <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
+        </Field>
+        <Field label="Kategorie">
+          <select className={inputCls} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            {!categories.length && <option value={QUICK_CATEGORY_ID}>Schnellablage</option>}
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
         </Field>
         <Field label="Datum">
           <input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />

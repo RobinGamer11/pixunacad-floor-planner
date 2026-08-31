@@ -87,8 +87,6 @@ export function OpsCalendarTab({
   const [showItems, setShowItems] = useState(true);
   const [personFilter, setPersonFilter] = useState("");
   const [deviceFilter, setDeviceFilter] = useState("");
-  const [fromFilter, setFromFilter] = useState("");
-  const [toFilter, setToFilter] = useState("");
 
   const [projectMenu, setProjectMenu] = useState(false);
   const [form, setForm] = useState(false);
@@ -104,7 +102,8 @@ export function OpsCalendarTab({
     [absences.absences, absences.myId],
   );
 
-  const inRange = (day: string) => (!fromFilter || day >= fromFilter) && (!toFilter || day <= toFilter);
+  /** Zeitraumfilter entfällt – der Kalender selbst führt die Zeitachse. */
+  const inRange = (_day: string) => true;
 
   const entries: CalEntry[] = useMemo(() => {
     const out: CalEntry[] = [];
@@ -188,7 +187,7 @@ export function OpsCalendarTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [absences.absences, absences.myId, devices.bookings, devices.devices, times.entries, times.myId,
       peopleById, projectNames, showAbsences, showBookings, showTimes, personFilter, deviceFilter,
-      fromFilter, toFilter, hidden, boards, showItems]);
+      hidden, boards, showItems]);
 
   const save = async () => {
     setError(null);
@@ -279,8 +278,6 @@ export function OpsCalendarTab({
 
       {/* Filter: Zeitraum, Projekte, Person, Gerät */}
       <div className="flex flex-wrap items-center gap-2">
-        <input type="date" className={inputCls} value={fromFilter} onChange={(e) => setFromFilter(e.target.value)} title="Von" />
-        <input type="date" className={inputCls} value={toFilter} onChange={(e) => setToFilter(e.target.value)} title="Bis" />
         {projectFilterAsDropdown && projectIds.length > 0 && (
           <div className="relative">
             <button
