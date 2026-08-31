@@ -8,12 +8,7 @@
  * Projektdokument nicht und erscheinen nicht im Export.
  */
 import React from "react";
-import {
-  CommentDraft,
-  CommentFab,
-  CommentPin,
-  CommentPopover,
-} from "@/components/comments/CommentLayerUi";
+import { CommentDraft, CommentPin, CommentThread } from "@/components/comments/CommentLayerUi";
 import {
   commentUi,
   useCommentAuthors,
@@ -22,24 +17,38 @@ import {
   useSheetComments,
 } from "@/lib/commentsStore";
 import { useProjectAccess } from "@/lib/projectAccess";
+import { useProjectMemberOptions } from "@/lib/projectTeam";
 
-export function CommentLayer({ projectId, pageId }: { projectId: string; pageId: string }) {
+export function CommentLayer({
+  projectId,
+  pageId,
+  projectName,
+  bookId = null,
+}: {
+  projectId: string;
+  pageId: string;
+  projectName?: string;
+  bookId?: string | null;
+}) {
   const ui = useCommentUi();
   const access = useProjectAccess(projectId);
+  const members = useProjectMemberOptions(projectId);
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState<{ x: number; y: number } | null>(null);
 
-  const { comments, error, myId, create, updateBody, setStatus, remove } = useSheetComments({
+  const { comments, error, myId, create, updateBody, setStatus, remove, clearError } = useSheetComments({
     projectId,
     context: "mappe",
     sheetId: pageId,
+    bookId,
     canModerate: access.permissions.canManageMembers,
+    projectName,
   });
 
   const authors = useCommentAuthors(React.useMemo(() => comments.map((c) => c.author_id), [comments]));
 
-  React.useEffect(() => { setOpenId(null); setDraft(null); }, [pageId]);
+  React.useEffect(() => { setOpenId(null); setDraft(null); }, [pageId, bookId]);
 
   React.useEffect(() => {
     if (!ui.mode) return;
@@ -57,17 +66,22 @@ export function CommentLayer({ projectId, pageId }: { projectId: string; pageId:
     setOpenId(target.commentId);
   }, [target, pageId]);
 
-  const visible = React.useMemo(
-    () => comments.filter((c) => ui.filter === "all" || c.status === ui.filter),
+  const roots = React.useMemo(
+    () => comments.filter((c) => !c.parent_id && (ui.filter === "all" || c.status === ui.filter)),
     [comments, ui.filter],
   );
-  const openCount = comments.filter((c) => c.status === "open").length;
+  const repliesOf = React.useCallback(
+    (id: string) => comments.filter((c) => c.parent_id === id),
+    [comments],
+  );
 
   const place = (e: React.PointerEvent) => {
-    if (!ui.mode || !access.permissions.canComment) return;
+    if (!ui.mode) return;
+    if (access.shared && !access.permissions.canComment) return;
     const r = hostRef.current?.getBoundingClientRect();
     if (!r || r.width <= 0 || r.height <= 0) return;
     e.stopPropagation();
+    clearError();
     setOpenId(null);
     setDraft({
       x: ((e.clientX - r.left) / r.width) * 100,
@@ -76,67 +90,68 @@ export function CommentLayer({ projectId, pageId }: { projectId: string; pageId:
   };
 
   return (
-    <>
-      <div
-        ref={hostRef}
-        data-comment-layer
-        className="pixuna-comments absolute inset-0"
-        style={{
-          pointerEvents: ui.mode ? "auto" : "none",
-          cursor: ui.mode ? "crosshair" : undefined,
-          zIndex: 40,
-        }}
-        onPointerDown={place}
-      >
-        {ui.visible &&
-          visible.map((c) => (
-            <React.Fragment key={c.id}>
-              <CommentPin
+    <div
+      ref={hostRef}
+      data-comment-layer
+      className="pixuna-comments absolute inset-0"
+      style={{
+        pointerEvents: ui.mode ? "auto" : "none",
+        cursor: ui.mode ? "crosshair" : undefined,
+        zIndex: 40,
+      }}
+      onPointerDown={place}
+    >
+      {ui.visible &&
+        roots.map((c) => (
+          <React.Fragment key={c.id}>
+            <CommentPin
+              comment={c}
+              author={authors.get(c.author_id)}
+              active={openId === c.id}
+              onClick={() => { setDraft(null); clearError(); setOpenId(openId === c.id ? null : c.id); }}
+              style={{ left: `${c.pos_x}%`, top: `${c.pos_y}%` }}
+            />
+            {openId === c.id && (
+              <CommentThread
                 comment={c}
-                author={authors.get(c.author_id)}
-                active={openId === c.id}
-                onClick={() => { setDraft(null); setOpenId(openId === c.id ? null : c.id); }}
-                style={{ left: `${c.pos_x}%`, top: `${c.pos_y}%` }}
+                replies={repliesOf(c.id)}
+                authors={authors}
+                members={members}
+                myId={myId}
+                canModerate={access.permissions.canManageMembers}
+                canComment={access.permissions.canComment}
+                error={error}
+                style={{ left: `${c.pos_x}%`, top: `${c.pos_y}%`, marginLeft: 20, pointerEvents: "auto" }}
+                onClose={() => setOpenId(null)}
+                onSaveBody={(id, text) => updateBody(id, text)}
+                onStatus={(s) => void setStatus(c.id, s)}
+                onDelete={(id) => { void remove(id); if (id === c.id) setOpenId(null); }}
+                onDirty={clearError}
+                onReply={async ({ text, mentions }) => {
+                  const row = await create({ posX: c.pos_x, posY: c.pos_y, body: text, mentions, parentId: c.id });
+                  return !!row;
+                }}
               />
-              {openId === c.id && (
-                <CommentPopover
-                  comment={c}
-                  author={authors.get(c.author_id)}
-                  myId={myId}
-                  canModerate={access.permissions.canManageMembers}
-                  error={error}
-                  style={{ left: `${c.pos_x}%`, top: `${c.pos_y}%`, marginLeft: 20 }}
-                  onClose={() => setOpenId(null)}
-                  onSaveBody={(text) => updateBody(c.id, text)}
-                  onStatus={(s) => void setStatus(c.id, s)}
-                  onDelete={() => { void remove(c.id); setOpenId(null); }}
-                />
-              )}
-            </React.Fragment>
-          ))}
+            )}
+          </React.Fragment>
+        ))}
 
-        {draft && (
-          <CommentDraft
-            style={{ left: `${draft.x}%`, top: `${draft.y}%`, marginLeft: 12 }}
-            error={error}
-            onCancel={() => setDraft(null)}
-            onSave={async (text) => {
-              const row = await create({ posX: draft.x, posY: draft.y, body: text });
-              if (!row) return false;
-              setDraft(null);
-              setOpenId(row.id);
-              return true;
-            }}
-          />
-        )}
-      </div>
-
-      <CommentFab
-        fixed
-        count={openCount}
-        disabled={!access.permissions.canComment}
-        style={{ right: 20, bottom: 20 }}
-      />
-    </>
+      {draft && (
+        <CommentDraft
+          style={{ left: `${draft.x}%`, top: `${draft.y}%`, marginLeft: 12, pointerEvents: "auto" }}
+          members={members}
+          error={error}
+          onDirty={clearError}
+          onCancel={() => setDraft(null)}
+          onSave={async ({ text, mentions }) => {
+            const row = await create({ posX: draft.x, posY: draft.y, body: text, mentions });
+            if (!row) return false;
+            setDraft(null);
+            setOpenId(row.id);
+            return true;
+          }}
+        />
+      )}
+    </div>
   );
 }
