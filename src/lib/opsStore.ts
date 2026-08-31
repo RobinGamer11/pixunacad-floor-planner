@@ -280,7 +280,83 @@ export function useTimeEntries(projectId: string | undefined) {
     return map;
   }, [rows]);
 
-  return { entries: rows, loading, unavailable, error, reload, add, update, remove, minutesByItem, minutesByUser, myId };
+  /** Tatsächlicher Zeitraum + Aufwand je Beitrag – rein abgeleitet. */
+  const actualsByItem = useMemo(() => deriveActuals(rows), [rows]);
+
+  /** IDs von Einträgen, die sich bei derselben Person zeitlich überschneiden. */
+  const overlapIds = useMemo(() => overlappingEntryIds(rows), [rows]);
+
+  return {
+    entries: rows, loading, unavailable, error, reload, add, update, remove,
+    minutesByItem, minutesByUser, actualsByItem, overlapIds, myId,
+  };
+}
+
+export interface ItemActuals {
+  /** Frühester Start aller Arbeitszeiteinträge (ISO). */
+  startedAt: string;
+  /** Spätestes Ende aller Arbeitszeiteinträge (ISO). */
+  endedAt: string;
+  /** Summe der Nettoarbeitszeiten aller Personen (Minuten). */
+  minutes: number;
+}
+
+/** Ist-Werte je Beitrag aus den Zeiteinträgen ableiten (keine eigenen Felder). */
+export function deriveActuals(entries: TimeEntry[]): Map<string, ItemActuals> {
+  const map = new Map<string, ItemActuals>();
+  for (const e of entries) {
+    const cur = map.get(e.item_id);
+    const minutes = (cur?.minutes ?? 0) + netMinutes(e);
+    const startedAt = !cur || Date.parse(e.started_at) < Date.parse(cur.startedAt) ? e.started_at : cur.startedAt;
+    const endedAt = !cur || Date.parse(e.ended_at) > Date.parse(cur.endedAt) ? e.ended_at : cur.endedAt;
+    map.set(e.item_id, { startedAt, endedAt, minutes });
+  }
+  return map;
+}
+
+/** Überschneidungen derselben Person – nur Hinweis, keine Sperre. */
+export function overlappingEntryIds(entries: TimeEntry[]): Set<string> {
+  const out = new Set<string>();
+  const byUser = new Map<string, TimeEntry[]>();
+  for (const e of entries) {
+    if (!byUser.has(e.user_id)) byUser.set(e.user_id, []);
+    byUser.get(e.user_id)!.push(e);
+  }
+  for (const list of byUser.values()) {
+    const sorted = [...list].sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at));
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const cur = sorted[i];
+      if (Date.parse(cur.started_at) < Date.parse(prev.ended_at)) {
+        out.add(prev.id);
+        out.add(cur.id);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Projektübergreifende Arbeitszeiten (nur lesen) – für den Netzwerkkalender.
+ * RLS begrenzt die Antwort bereits auf zugängliche Projekte.
+ */
+export function useTimeEntriesForProjects(projectIds: string[]) {
+  const key = useMemo(() => projectIds.slice().sort().join("|"), [projectIds]);
+  const { rows, loading, unavailable, reload } = useAsyncList<TimeEntry>(async () => {
+    const { client, session } = ctx();
+    const ids = key ? key.split("|") : [];
+    if (!client || !session || !ids.length) return [];
+    const { data, error: err } = await client
+      .from("time_entries")
+      .select("id,project_id,item_id,user_id,started_at,ended_at,break_minutes,note")
+      .in("project_id", ids)
+      .order("started_at", { ascending: false });
+    if (err) throw err;
+    return (data ?? []) as TimeEntry[];
+  }, [key]);
+
+  const myId = ctx().session?.user.id ?? null;
+  return { entries: rows, loading, unavailable, reload, myId };
 }
 
 /* ----------------------------------------------- Schritt 04: Abwesenheit */
