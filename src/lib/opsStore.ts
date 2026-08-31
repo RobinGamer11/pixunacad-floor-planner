@@ -375,7 +375,9 @@ export function useAbsences(projectIds: string[]) {
 
   const myId = ctx().session?.user.id ?? null;
 
-  const add = useCallback(async (input: { kind: AbsenceKind; startsOn: string; endsOn: string; note?: string }) => {
+  const add = useCallback(async (input: {
+    kind: AbsenceKind; startsOn: string; endsOn: string; note?: string; status?: string;
+  }) => {
     const { client, session } = ctx();
     if (!client || !session) throw new Error("Abwesenheiten benötigen eine Anmeldung.");
     const { error: err } = await client.from("absences").insert({
@@ -383,8 +385,26 @@ export function useAbsences(projectIds: string[]) {
       kind: input.kind,
       starts_on: input.startsOn,
       ends_on: input.endsOn,
+      status: input.status ?? "planned",
       note: input.note?.trim() || null,
     });
+    if (err) throw err;
+    reload();
+  }, [reload]);
+
+  /** Eigene Abwesenheit anpassen (Status/Zeitraum/Bemerkung). */
+  const update = useCallback(async (id: string, patch: {
+    kind?: AbsenceKind; startsOn?: string; endsOn?: string; note?: string; status?: string;
+  }) => {
+    const { client } = ctx();
+    if (!client) throw new Error("Abwesenheiten benötigen eine Anmeldung.");
+    const { error: err } = await client.from("absences").update({
+      ...(patch.kind !== undefined ? { kind: patch.kind } : {}),
+      ...(patch.startsOn !== undefined ? { starts_on: patch.startsOn } : {}),
+      ...(patch.endsOn !== undefined ? { ends_on: patch.endsOn } : {}),
+      ...(patch.note !== undefined ? { note: patch.note?.trim() || null } : {}),
+      ...(patch.status !== undefined ? { status: patch.status } : {}),
+    }).eq("id", id);
     if (err) throw err;
     reload();
   }, [reload]);
