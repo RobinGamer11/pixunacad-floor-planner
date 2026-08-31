@@ -852,9 +852,22 @@ export default function BoardPage() {
 
           {/* Kategorien + Liste */}
           <div className="mx-4 my-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="text-xs font-medium" style={{ color: INK }}>Kategorien im Projekt</div>
-              {activeCat && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {([["cat", "Kategorien"], ["time", "Zeiterfassung"], ["dev", "Geräte/Werkzeuge"]] as [InsightTab, string][]).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setInsightTab((cur) => (cur === id ? null : id))}
+                  className="h-7 px-2.5 rounded-md text-[11px]"
+                  style={{
+                    background: insightTab === id ? SUBTLE : "transparent",
+                    border: `1px solid ${insightTab === id ? "hsl(var(--accent-gold))" : PANEL_LINE}`,
+                    color: INK,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              {insightTab === "cat" && activeCat && (
                 <button onClick={() => setActiveCat(null)}
                         className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-[11px]"
                         style={{ background: SUBTLE, border: `1px solid ${PANEL_LINE}`, color: INK }}>
@@ -862,6 +875,14 @@ export default function BoardPage() {
                 </button>
               )}
             </div>
+            {insightTab === "time" && (
+              <TimeInsights projectIds={projectId ? [projectId] : []} peopleById={opsPeopleById} />
+            )}
+            {insightTab === "dev" && (
+              <DeviceInsights projectIds={projectId ? [projectId] : []} peopleById={opsPeopleById} />
+            )}
+
+            {insightTab === "cat" && (<>
             <div className="flex flex-wrap items-center gap-6">
               <PieChart
                 slices={catStats.map((s) => ({ value: s.count, color: s.cat.color, id: s.cat.id }))}
@@ -978,6 +999,8 @@ export default function BoardPage() {
                 )}
               </div>
             </div>
+
+            </>)}
 
             {/* Dauerhafter Leerraum unter der Auflistung */}
             <div aria-hidden style={{ minHeight: 260 }} />
