@@ -180,9 +180,36 @@ create policy "contacts_select_own" on public.contacts
   for select to authenticated
   using (requester_id = auth.uid() or addressee_id = auth.uid());
 
+-- Neue Anfragen sind immer 'pending' – niemand kann sich selbst bestätigen.
 drop policy if exists "contacts_insert_as_requester" on public.contacts;
 create policy "contacts_insert_as_requester" on public.contacts
-  for insert to authenticated with check (requester_id = auth.uid());
+  for insert to authenticated
+  with check (requester_id = auth.uid() and status = 'pending');
+
+-- Beteiligte dürfen bei einer Änderung nicht ausgetauscht werden; bestätigen
+-- darf ausschließlich der Empfänger.
+create or replace function public.contacts_guard()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  if new.requester_id is distinct from old.requester_id
+     or new.addressee_id is distinct from old.addressee_id then
+    raise exception 'PIXUNA_FORBIDDEN: Beteiligte einer Kontaktanfrage sind unveränderlich';
+  end if;
+  if new.status is distinct from old.status and auth.uid() <> old.addressee_id then
+    raise exception 'PIXUNA_FORBIDDEN: nur der Empfänger darf eine Anfrage beantworten';
+  end if;
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+drop trigger if exists contacts_guard_trg on public.contacts;
+create trigger contacts_guard_trg
+  before update on public.contacts
+  for each row execute function public.contacts_guard();
 
 -- Annehmen/Ablehnen darf ausschließlich der Empfänger der Anfrage.
 drop policy if exists "contacts_update_addressee" on public.contacts;
