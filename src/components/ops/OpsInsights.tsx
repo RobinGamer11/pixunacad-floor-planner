@@ -5,7 +5,7 @@
  * (`time_entries`, `absences`, `devices`/`device_bookings`, Projektmitglieder).
  * Es werden keine neuen Tabellen und keine zweite Zählerhaltung eingeführt.
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   ABSENCE_LABEL,
