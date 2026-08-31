@@ -377,9 +377,6 @@ export function endLiveBrush(key: string) { liveStates.delete(key); }
  * gestempelt, sondern eine schlichte Linie angezeigt. Der fertige Strich
  * erhält den Stift beim Loslassen.
  */
-let calmPreview = true;
-export function isBrushPreviewCalm() { return calmPreview; }
-export function setBrushPreviewCalm(on: boolean) { calmPreview = !!on; }
 export function clearLiveBrushes() { liveStates.clear(); }
 
 function makeBrushCtx(style: BrushRenderStyle, info: BrushPresetInfo, P: number, phaseRef: number,
