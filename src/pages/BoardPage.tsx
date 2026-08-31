@@ -566,43 +566,55 @@ export default function BoardPage() {
         <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: "hsl(var(--background))" }}>
           {/* Werkzeugleiste – helles Kartenfeld */}
           <div className="p-4 pb-0">
-            <div className="flex flex-wrap items-center gap-2 rounded-xl p-3"
+            <div className="rounded-xl p-3 flex flex-col gap-2"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
-              <BigAddButton kind="contribution" onClick={() => add("contribution")} />
-              {/* Paket 04: Einstieg für Arbeitszeiten und Abwesenheiten. */}
-              <button
-                onClick={() => setTimeDialog(true)}
-                className="h-10 px-3 rounded-lg border text-xs flex items-center gap-1.5"
-                style={{ borderColor: PANEL_LINE, color: INK }}
-                title="Arbeitszeit oder Abwesenheit erfassen"
-              >
-                <Clock size={14} /> + Zeiterfassung
-              </button>
-              <ProjectPeriodBar
-                projectId={projectId}
-                period={state.period}
-              />
-              <Segmented
-                value={surface}
-                onChange={(v) => setSurface(v as typeof surface)}
-                options={[{ v: "cal", l: "Kalender" }, { v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
-              />
-              <div className="flex-1" />
-              {surface === "ray" && (
-                <>
-                  <Segmented
-                    value={colorMode}
-                    onChange={(v) => setColorMode(v as typeof colorMode)}
-                    options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
-                  />
-                  <Segmented
-                    value={axisMode}
-                    onChange={(v) => setAxisMode(v as typeof axisMode)}
-                    options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
-                  />
-                </>
-              )}
+              {/* 1. Projektzeitraum und Projektstand */}
+              <div className="flex flex-wrap items-center gap-2">
+                <ProjectPeriodBar
+                  projectId={projectId}
+                  period={state.period}
+                />
+              </div>
+
+              {/* 2. Hauptumschaltung der Ansichten */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Segmented
+                  value={surface}
+                  onChange={(v) => setSurface(v as typeof surface)}
+                  options={[{ v: "cal", l: "Kalender" }, { v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
+                />
+                <div className="flex-1" />
+                {surface === "ray" && (
+                  <>
+                    <Segmented
+                      value={colorMode}
+                      onChange={(v) => setColorMode(v as typeof colorMode)}
+                      options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
+                    />
+                    <Segmented
+                      value={axisMode}
+                      onChange={(v) => setAxisMode(v as typeof axisMode)}
+                      options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* 3. Erfassen */}
+              <div className="flex flex-wrap items-center gap-2">
+                <BigAddButton kind="contribution" onClick={() => add("contribution")} />
+                {/* Paket 04: Einstieg für Arbeitszeiten und Abwesenheiten. */}
+                <button
+                  onClick={() => setTimeDialog(true)}
+                  className="h-10 px-3 rounded-lg border text-xs flex items-center gap-1.5"
+                  style={{ borderColor: PANEL_LINE, color: INK }}
+                  title="Arbeitszeit oder Abwesenheit erfassen"
+                >
+                  <Clock size={14} /> + Zeiterfassung
+                </button>
+              </div>
             </div>
+
           </div>
 
           {/* Beitrag bearbeiten – klappt direkt unter „+ Beitrag“ auf */}
