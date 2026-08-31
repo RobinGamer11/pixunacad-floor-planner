@@ -312,7 +312,7 @@ export const timelineStore = {
 };
 
 import { useSyncExternalStore } from "react";
-const EMPTY: TlState = { categories: [], priorities: [], statuses: DEFAULT_STATUSES, items: [] };
+const EMPTY: TlState = { categories: [], priorities: [], statuses: DEFAULT_STATUSES, items: [], period: {} };
 
 /** Abo auf Änderungen eines Projekt-Boards (z. B. für projektübergreifende Listen). */
 export function subscribeTimeline(projectId: string, fn: () => void): () => void {
