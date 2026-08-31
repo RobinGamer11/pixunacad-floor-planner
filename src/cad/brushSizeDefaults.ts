@@ -30,7 +30,10 @@ export function applyBrushSizeDefaults(
   const { thicknessM, strokeWidthPx, opacity } = brushSizeDefaultsFor(preset, embedded);
 
   if (targets.length === 0) {
-    if (kind === "line") app.defaultLineThicknessM = thicknessM;
+    if (kind === "line") {
+      app.defaultLineThicknessM = thicknessM;
+      if ("defaultLineAlpha" in app) app.defaultLineAlpha = opacity;
+    }
     else if (kind === "polygon") {
       app.defaultPolygonThicknessM = thicknessM;
       if (opacity != null) app.defaultPolygonAlpha = opacity;
