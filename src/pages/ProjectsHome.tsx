@@ -3076,6 +3076,8 @@ function AllTasksView({ projects }: { projects: Project[] }) {
           onSelectDate={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
           hiddenProjects={new Set(opsProjectIds.filter((id) => !activeIds.has(id)))}
           onToggleProject={toggle}
+          allowAbsenceEntry={false}
+          projectFilterAsDropdown
         />
       </div>
 
