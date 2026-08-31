@@ -568,12 +568,28 @@ export default function BoardPage() {
             </div>
           </div>
 
-          {/* Kalender-Ansicht */}
+          {/* Kalender-Ansicht – Beiträge, Abwesenheiten und Gerätebuchungen */}
           {surface === "cal" && (
             <div className="mx-4 mt-4 rounded-xl p-4"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+              <div className="flex flex-wrap items-center gap-2 mb-2 text-[11px]">
+                {([
+                  ["Abwesenheiten", showAbsences, () => setShowAbsences((v) => !v), "#8b8178"],
+                  ["Geräte", showDevices, () => setShowDevices((v) => !v), "#4da3ff"],
+                ] as [string, boolean, () => void, string][]).map(([label, on, toggle, color]) => (
+                  <button
+                    key={label}
+                    onClick={toggle}
+                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-md border"
+                    style={{ borderColor: on ? color : PANEL_LINE, color: on ? INK : INK_SOFT }}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: on ? color : "transparent", border: `1px solid ${color}` }} />
+                    {label}
+                  </button>
+                ))}
+              </div>
               <RangeCalendar
-                entries={calEntries}
+                entries={[...calEntries, ...opsEntries]}
                 selectedDates={[]}
                 onSelectDate={() => {}}
               />
