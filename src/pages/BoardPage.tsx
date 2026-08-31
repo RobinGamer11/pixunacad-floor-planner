@@ -15,6 +15,7 @@ import {
   ListChecks, CalendarRange,
 } from "lucide-react";
 import { useProjectMemberOptions } from "@/lib/projectTeam";
+import { TimeInsights, DeviceInsights } from "@/components/ops/OpsInsights";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import {
@@ -82,7 +83,9 @@ interface Placed {
 // ------------------------------------------------------------------
 // Seite
 // ------------------------------------------------------------------
-export default function BoardPage() {
+export default type InsightTab = "cat" | "time" | "dev" | null;
+
+function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProject(projectId);
   // Wechsel in eine andere Hauptoberfläche leert die Projektmappen-Zwischenablage.
@@ -114,6 +117,8 @@ export default function BoardPage() {
     setBoardSurface(projectId, v);
   }, [projectId]);
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  /** Auswertungsreiter unter dem Zeitstrahl – „Kategorien“ ist zuerst geöffnet. */
+  const [insightTab, setInsightTab] = useState<InsightTab>("cat");
   const [query, setQuery] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("");
 
@@ -506,6 +511,10 @@ export default function BoardPage() {
 
   // ---- Verantwortliche ---------------------------------------------------
   const teamMembers = useProjectMemberOptions(projectId);
+  const opsPeopleById = useMemo(
+    () => new Map(teamMembers.map((m) => [m.id, m.name])),
+    [teamMembers],
+  );
   const memberNameById = useMemo(
     () => new Map(teamMembers.map((m) => [m.id, m.name])),
     [teamMembers],
