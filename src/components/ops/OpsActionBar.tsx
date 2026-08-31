@@ -38,12 +38,11 @@ type DialogId = "item" | "time" | "absence" | "booking";
 
 /** Beiträge eines Projekts aus der bestehenden Board-Datenbasis. */
 function useItems(projectId: string) {
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (!projectId) return;
     return subscribeTimeline(projectId, () => setTick((t) => t + 1));
   }, [projectId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(
     () =>
       projectId
@@ -52,7 +51,7 @@ function useItems(projectId: string) {
             title: i.title || "Ohne Titel",
           }))
         : [],
-    [projectId, setTick],
+    [projectId, tick],
   );
 }
 
