@@ -2867,6 +2867,105 @@ function BoardPreview({ project }: { project: Project }) {
 }
 
 
+/**
+ * Eine Zeile in „Projektstände“.
+ * Kopf: Projektname, Projektstart/-ende und die insgesamt erfasste Arbeitszeit.
+ * Aufgeklappt: Beiträge, Zeiterfassung (Personen inkl. Abwesenheit) und Geräte/Werkzeuge.
+ */
+function ProjectStandRow({
+  project,
+  open,
+  onToggle,
+  peopleById,
+}: {
+  project: Project;
+  open: boolean;
+  onToggle: () => void;
+  peopleById?: Map<string, string>;
+}) {
+  const navigate = useNavigate();
+  const ids = useMemo(() => [project.id], [project.id]);
+  const times = useTimeEntriesForProjects(ids);
+  const peopleCount = usePeopleCount(ids);
+  const devices = useDevices(project.id);
+  const [tick, setTick] = useState(0);
+  useEffect(() => subscribeTimeline(project.id, () => setTick((t) => t + 1)), [project.id]);
+
+  const state = useMemo(() => {
+    try {
+      return timelineStore.getState(project.id);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch {
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id, tick]);
+
+  const totalMinutes = useMemo(
+    () => times.entries.reduce((s, e) => s + netMinutes(e), 0),
+    [times.entries],
+  );
+  const items = state?.items ?? [];
+  const deviceCount = devices.devices.filter((d) => !d.archived).length;
+
+  return (
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))" }}>
+      <div className="flex items-center gap-3 px-3 py-2">
+        <button type="button" onClick={onToggle} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: projectColor(project.id) }} />
+          <span className="min-w-0">
+            <span className="block text-sm truncate">{project.name}</span>
+            <span className="block text-[11px] text-muted-foreground truncate">
+              {(state?.period.start || "offen")} – {(state?.period.end || "offen")} · {formatMinutes(totalMinutes)} erfasst
+            </span>
+          </span>
+        </button>
+        <button
+          onClick={() => navigate(`/project/${project.id}/board`)}
+          title="In Orga öffnen"
+          className="text-muted-foreground hover:text-foreground shrink-0"
+        >
+          <ExternalLink size={14} />
+        </button>
+      </div>
+
+      {open && (
+        <div className="px-3 pb-3 flex flex-col gap-2">
+          <Collapsible title="Beiträge" badge={items.length} dense>
+            {items.length === 0 ? (
+              <div className="text-[11px] text-muted-foreground">Keine Beiträge.</div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {items.slice(0, 100).map((i) => (
+                  <button
+                    key={i.id}
+                    onClick={() => navigate(`/project/${project.id}/board?item=${i.id}`)}
+                    className="flex items-center gap-2 text-[11px] text-left hover:text-foreground"
+                  >
+                    <span className="truncate flex-1">{i.title}</span>
+                    <span className="shrink-0 text-muted-foreground tabular-nums">
+                      {i.endDate || i.startDate || ""}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Collapsible>
+
+          <Collapsible title="Zeiterfassung" badge={peopleCount} dense>
+            <TimeInsights projectIds={ids} peopleById={peopleById} />
+          </Collapsible>
+
+          <Collapsible title="Geräte/Werkzeuge" badge={deviceCount} dense>
+            <DeviceInsights projectIds={ids} peopleById={peopleById} />
+          </Collapsible>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
   // Gemeinsame Organisationsdaten (Kalender/Aktionen) neu laden, wenn etwas erfasst wurde.
