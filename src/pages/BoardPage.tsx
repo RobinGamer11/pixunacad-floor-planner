@@ -83,9 +83,9 @@ interface Placed {
 // ------------------------------------------------------------------
 // Seite
 // ------------------------------------------------------------------
-export default type InsightTab = "cat" | "time" | "dev" | null;
+type InsightTab = "cat" | "time" | "dev" | null;
 
-function BoardPage() {
+export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProject(projectId);
   // Wechsel in eine andere Hauptoberfläche leert die Projektmappen-Zwischenablage.
