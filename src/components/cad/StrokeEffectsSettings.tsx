@@ -215,6 +215,59 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
   return (
     <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
       <div>
+        <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</div>
+        <button
+          type="button"
+          onClick={() => applyRoughen({ enabled: !roughen.enabled })}
+          className="mb-2 flex h-9 w-full items-center justify-center rounded-md border text-[12px] font-medium transition-colors hover:bg-muted"
+          style={{ borderColor: HAIRLINE, background: roughen.enabled ? "hsl(var(--surface-strong))" : "transparent" }}
+        >
+          {roughen.enabled ? "Aufrauen: Ein" : "Aufrauen: Aus"}
+        </button>
+
+        {roughen.enabled && (
+          <div className="space-y-2">
+            <div className="space-y-2">
+              <SliderField
+                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0}
+                max={isEmbedded ? 50 : 300} inputMax={3000}
+                onChange={(v) => applyRoughen({ strengthMm: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
+              />
+              <SliderField
+                label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={500}
+                onChange={(v) => applyRoughen({ detailPer100Mm: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
+              />
+              <SliderField
+                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10}
+                max={isEmbedded ? 300 : 1800} inputMax={1800}
+                onChange={(v) => applyRoughen({ scalePercent: v })}
+                onDragStart={dragStart} onDragEnd={dragEnd}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-1">
+              {(["smooth", "corner"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => applyRoughen({ mode: m })}
+                  className={`rounded border px-2 py-1 text-[10px] ${roughen.mode === m ? "bg-accent" : "hover:bg-muted"}`}
+                  style={{ borderColor: HAIRLINE }}
+                >
+                  {m === "smooth" ? "Weich" : "Eckig"}
+                </button>
+              ))}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              Nicht-destruktiv: Die Originalgeometrie und alle Fangpunkte bleiben unverändert.
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div>
         <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">LINIENART</div>
         <div className="grid grid-cols-2 gap-1">
           {PATTERNS.map((p) => (
@@ -285,58 +338,6 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
       </div>
 
 
-      <div>
-        <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</div>
-        <button
-          type="button"
-          onClick={() => applyRoughen({ enabled: !roughen.enabled })}
-          className="mb-2 flex h-9 w-full items-center justify-center rounded-md border text-[12px] font-medium transition-colors hover:bg-muted"
-          style={{ borderColor: HAIRLINE, background: roughen.enabled ? "hsl(var(--surface-strong))" : "transparent" }}
-        >
-          {roughen.enabled ? "Aufrauen: Ein" : "Aufrauen: Aus"}
-        </button>
-
-        {roughen.enabled && (
-          <div className="space-y-2">
-            <div className="space-y-2">
-              <SliderField
-                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0}
-                max={isEmbedded ? 50 : 300} inputMax={3000}
-                onChange={(v) => applyRoughen({ strengthMm: v })}
-                onDragStart={dragStart} onDragEnd={dragEnd}
-              />
-              <SliderField
-                label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={500}
-                onChange={(v) => applyRoughen({ detailPer100Mm: v })}
-                onDragStart={dragStart} onDragEnd={dragEnd}
-              />
-              <SliderField
-                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10}
-                max={isEmbedded ? 300 : 1800} inputMax={1800}
-                onChange={(v) => applyRoughen({ scalePercent: v })}
-                onDragStart={dragStart} onDragEnd={dragEnd}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-1">
-              {(["smooth", "corner"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => applyRoughen({ mode: m })}
-                  className={`rounded border px-2 py-1 text-[10px] ${roughen.mode === m ? "bg-accent" : "hover:bg-muted"}`}
-                  style={{ borderColor: HAIRLINE }}
-                >
-                  {m === "smooth" ? "Weich" : "Eckig"}
-                </button>
-              ))}
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              Nicht-destruktiv: Die Originalgeometrie und alle Fangpunkte bleiben unverändert.
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 };
