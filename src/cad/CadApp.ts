@@ -658,6 +658,23 @@ export class CadApp {
     this._setupShortcuts();
     this.refreshLabelUI();
     this._resize();
+    // Ausrichtungswechsel (Handy/Tablet drehen) und Layout-Änderungen der
+    // Zeichenfläche zuverlässig übernehmen — ohne zusätzliche Eigen-Drehung.
+    try {
+      this._resizeObserver = new ResizeObserver(() => {
+        if (!this._destroyed) this._resize();
+      });
+      this._resizeObserver.observe(canvas);
+    } catch { /* ResizeObserver nicht verfügbar */ }
+    this._orientationHandler = () => {
+      if (this._destroyed) return;
+      this._resize();
+      // Nach der Rotation liefert der Browser die endgültigen Maße oft erst
+      // einen Frame später.
+      window.setTimeout(() => { if (!this._destroyed) this._resize(); }, 250);
+    };
+    window.addEventListener("orientationchange", this._orientationHandler);
+    window.visualViewport?.addEventListener("resize", this._orientationHandler);
     this.camera.center(canvas.getBoundingClientRect());
     this._tick();
     this._initHistory();
