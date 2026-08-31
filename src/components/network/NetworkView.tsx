@@ -458,7 +458,20 @@ export function NetworkView({
           )}
 
           {!net.loading && tab === "teams" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Zentrale projektübergreifende Übersicht – Projekte einzeln ein-/ausschaltbar. */}
+              <div className="rounded-lg border p-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarDays size={14} className="text-muted-foreground" />
+                  <span className="text-sm font-semibold">Projektübergreifender Kalender</span>
+                </div>
+                <OpsCalendarTab
+                  projectIds={projects.map((p) => p.id)}
+                  projectNames={projectNameMap}
+                  peopleById={peopleNameMap}
+                />
+              </div>
+
               <div className="text-[11px] text-muted-foreground px-1">
                 Personen per Drag &amp; Drop zwischen Projekten und „Allgemein“ verschieben – oder die Auswahl unten
                 verwenden. Mitglieder verwalten darf nur der Projektbesitzer.
@@ -466,7 +479,12 @@ export function NetworkView({
               {projects.length === 0 && (
                 <div className="p-4 text-sm text-muted-foreground">Noch keine Projekte vorhanden.</div>
               )}
-              {projects.map((p) => {
+              {folderGroups.map((g) => (
+                <div key={g.key} className="space-y-2">
+                  <div className="px-1 text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground">
+                    {g.name} ({g.items.length})
+                  </div>
+                  {g.items.map((p) => {
                 const list = byProject.map.get(p.id) ?? [];
                 const available = net.contacts.filter((c) => !list.some((m) => m.id === c.id));
                 return (
