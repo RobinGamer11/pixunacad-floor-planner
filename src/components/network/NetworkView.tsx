@@ -351,11 +351,9 @@ export function NetworkView({
 
   const openDirect = (person: NetworkPerson) => {
     setChat({ kind: "direct", userId: person.id, title: person.name, avatarUrl: person.avatarUrl });
-    setTimeout(() => void refreshUnread(), 800);
   };
   const openProject = (p: LocalProjectRef) => {
     setChat({ kind: "project", projectId: p.id, title: p.name });
-    setTimeout(() => void refreshUnread(), 800);
   };
 
   const runSearch = async () => {
@@ -559,7 +557,6 @@ export function NetworkView({
                         active={projectPanel?.id === p.id && projectPanel.kind === "chat"}
                         onClick={() => {
                           toggleProjectPanel(p.id, "chat");
-                          setTimeout(() => void refreshUnread(), 800);
                         }}
                         title="Projektchat öffnen"
                       />
@@ -581,6 +578,7 @@ export function NetworkView({
                         <ChatPanel
                           target={{ kind: "project", projectId: p.id, title: p.name }}
                           people={peopleById}
+                          onRead={() => void refreshUnread()}
                           onClose={() => { setProjectPanel(null); void refreshUnread(); }}
                         />
                       </div>
@@ -842,6 +840,7 @@ export function NetworkView({
           <ChatPanel
             target={chat}
             people={peopleById}
+            onRead={() => void refreshUnread()}
             onClose={() => { setChat(null); void refreshUnread(); }}
           />
         )}
