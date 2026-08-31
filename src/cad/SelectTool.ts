@@ -60,6 +60,9 @@ export class SelectTool {
   otherPointOriginal: Vec2 | null = null;
   // Snapshot of all hatch points at edit start (for translate/rotate of full polygon if needed)
   hatchPointsOriginal: Vec2[] | null = null;
+  /** Ausgangsabstand Pivot→Fangpunkt beim gleichmäßigen Skalieren. */
+  hatchScaleBaseDist: number | null = null;
+  hatchScaleLocked = false;
   /** Snapshot aller Loch-Loops beim Edit-Start (für Ganz-Objekt-Rotation). */
   private _hatchHolesOriginal: Vec2[][] | null = null;
   /** Snapshot der Außenkontur beim Edit-Start (für Ganz-Objekt-Rotation). */
@@ -973,6 +976,16 @@ export class SelectTool {
       const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
       const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
       this.app.hub.bindCommit((vals) => this._applyRotateHubValues(vals));
+      this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
+      this.app.hub.updateDisplay(radius, ang);
+      this.app.hub.setValues(radius, ang);
+      this.app.hub.enterEditMode();
+    } else if (action === PointEditAction.SCALE) {
+      const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
+      const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+      this.hatchScaleBaseDist = radius > 1e-9 ? radius : null;
+      this.hatchScaleLocked = false;
+      this.app.hub.bindCommit((vals) => this._applyScaleHubValues(vals));
       this.app.hub.showAt(this.app.input.mouse.sx, this.app.input.mouse.sy);
       this.app.hub.updateDisplay(radius, ang);
       this.app.hub.setValues(radius, ang);
@@ -1953,6 +1966,45 @@ export class SelectTool {
   }
 
 
+  /** Skaliert die GESAMTE Schraffur/das Polygon (inkl. Löcher) gleichmäßig um
+   *  `fixedPoint` (= Schwerpunkt). Die Form bleibt unverändert, nur die Größe
+   *  ändert sich. */
+  private _applyHatchScale(factor: number): boolean {
+    const t: any = this.editTarget;
+    if (!t || (t.kind !== "hatch" && t.kind !== "hatchHole")) return false;
+    if (!this._hatchOuterOriginal || !this.fixedPoint) return false;
+    const hatch = this.app.scene.getHatchById(t.hatchId);
+    if (!hatch) return false;
+    const f = Math.max(0.001, factor);
+    const piv = this.fixedPoint;
+    const sc = (o: Vec2): Vec2 => v(piv.x + (o.x - piv.x) * f, piv.y + (o.y - piv.y) * f);
+    if (this._hatchHolesOriginal) {
+      for (let h = 0; h < (hatch.holes?.length ?? 0); h++) {
+        const orig = this._hatchHolesOriginal[h];
+        if (!orig) continue;
+        for (let i = 0; i < hatch.holes![h].length && i < orig.length; i++) {
+          hatch.holes![h][i] = sc(orig[i]);
+        }
+      }
+    }
+    for (let i = 0; i < hatch.points.length && i < this._hatchOuterOriginal.length; i++) {
+      hatch.points[i] = sc(this._hatchOuterOriginal[i]);
+    }
+    return true;
+  }
+
+  private _applyScaleHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.activeEditAction !== PointEditAction.SCALE) return;
+    const base = this.hatchScaleBaseDist;
+    if (!base) return;
+    const len = vals.lengthM != null ? Math.max(0.0001, vals.lengthM) : base;
+    this.hatchScaleLocked = true;
+    this._applyHatchScale(len / base);
+    const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+    this.app.hub.setValues(len, ang);
+    this.app.hub.updateDisplay(len, ang);
+  }
+
   /** Rotate the WHOLE hatch polygon (inkl. Löcher) around `fixedPoint`
    *  (= Polygon-Schwerpunkt) auf den absoluten Winkel `newAngleDeg`.
    *  Ohne diese Sonderbehandlung würde beim Drehen nur der angefasste
@@ -2132,6 +2184,8 @@ export class SelectTool {
         runWallTopologyMaintenance(this.app.scene);
       } catch { /* noop */ }
     }
+    this.hatchScaleBaseDist = null;
+    this.hatchScaleLocked = false;
     this.activeEditAction = null;
     this.editTarget = null;
     (this as any)._textBoxResizeMode = false;
@@ -3514,6 +3568,24 @@ export class SelectTool {
         return;
       }
 
+      if (this.activeEditAction === PointEditAction.SCALE) {
+        const base = this.hatchScaleBaseDist;
+        if (base && document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
+          const mouseW = v(input.mouse.wx, input.mouse.wy);
+          const len = Math.max(0.0001, dist(this.fixedPoint!, mouseW));
+          this._applyHatchScale(len / base);
+          const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+          this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+          this.app.hub.updateDisplay(len, ang);
+        }
+        if (editCommit) {
+          this._clearEditState();
+          this.app.hub.hide();
+          (this.app as any).commitHistorySnapshot?.();
+        }
+        return;
+      }
+
       if (this.activeEditAction === PointEditAction.SPLIT) {
         this.splitPreview = this._computeSplitPoint(input);
         if (editCommit) {
@@ -4040,7 +4112,10 @@ export class SelectTool {
         PointEditAction.ROTATE,
         PointEditAction.DELETE,
       ] as string[];
-      if (selCtx?.hatchId != null && selCtx?.pointIndex != null) pointActions.push(PointEditAction.BULGE);
+      if (selCtx?.hatchId != null && selCtx?.pointIndex != null) {
+        pointActions.push(PointEditAction.SCALE);
+        pointActions.push(PointEditAction.BULGE);
+      }
       this.app.pointEditMenu.showAt(sp.x, sp.y, pointActions);
     } else if (!this.isEditing() && (this.app.selection as any)?.type === SelectionType.SEGMENT && (this.app.selection as any)?.segmentId) {
       // Linien-Auswahl: Wölben-Menü offen halten.
