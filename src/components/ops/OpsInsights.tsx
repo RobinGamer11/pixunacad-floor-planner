@@ -366,17 +366,37 @@ export function DeviceInsights({
   }, [bookings, devices.devices]);
 
   const total = rows.reduce((s, r) => s + r.minutes, 0);
+
+  /** Auswahl im Kreisdiagramm – filtert Legende, Summe und Verlauf. */
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const toggle = (id: string) => setActiveId((cur) => (cur === id ? null : id));
+  useEffect(() => {
+    if (activeId && !rows.some((r) => r.id === activeId)) setActiveId(null);
+  }, [rows, activeId]);
+
   const history = useMemo(
-    () => [...bookings].sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at)).slice(0, 200),
-    [bookings],
+    () =>
+      [...bookings]
+        .filter((b) => !activeId || b.device_id === activeId)
+        .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at))
+        .slice(0, 200),
+    [bookings, activeId],
   );
   const deviceName = (id: string) => devices.devices.find((d) => d.id === id)?.name ?? "Gerät";
+  const activeRow = activeId ? rows.find((r) => r.id === activeId) : null;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-6">
-        <MiniPie slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))} />
+        <MiniPie
+          slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))}
+          activeId={activeId}
+          onSlice={toggle}
+          onCenter={() => setActiveId(null)}
+        />
         <Legend
+          activeId={activeId}
+          onSelect={toggle}
           rows={rows.map((r, i) => ({
             id: r.id,
             label: r.archived ? `${r.name} (archiviert)` : r.name,
@@ -386,9 +406,20 @@ export function DeviceInsights({
           }))}
         />
         <div className="text-[11px]" style={{ color: SOFT }}>
-          Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+          {activeRow ? (
+            <>
+              {activeRow.name}:{" "}
+              <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(activeRow.minutes)}</span>
+              {total > 0 && <> · {Math.round((activeRow.minutes / total) * 100)}%</>}
+            </>
+          ) : (
+            <>
+              Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+            </>
+          )}
         </div>
       </div>
+
 
       <Collapsible title="Verlauf" badge={history.length} dense>
         <div className="flex flex-col gap-1">
