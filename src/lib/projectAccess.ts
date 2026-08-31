@@ -97,6 +97,18 @@ const LOCAL_OWNER: Omit<ProjectAccess, "projectId"> = {
   deviations: [],
 };
 
+/** Referenzstabile Ersatzobjekte für rein lokale Projekte. */
+const localAccessCache = new Map<string, ProjectAccess>();
+function localAccessFor(projectId: string): ProjectAccess {
+  let hit = localAccessCache.get(projectId);
+  if (!hit) {
+    hit = { projectId, ...LOCAL_OWNER };
+    localAccessCache.set(projectId, hit);
+  }
+  return hit;
+}
+
+
 /* ------------------------------------------------------------------ Store */
 
 interface AccessState {
