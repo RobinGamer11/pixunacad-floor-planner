@@ -252,6 +252,7 @@ function useAsyncList<T>(load: (signal: { cancelled: boolean }) => Promise<T[]>,
 /* ------------------------------------------------------ Schritt 04: Zeit */
 
 export interface TimeEntryInput {
+  /** Leer = ohne Beitragsbezug (Spalte ist NOT NULL, daher leerer Text). */
   itemId: string;
   userId: string;
   startedAt: string;
@@ -259,6 +260,94 @@ export interface TimeEntryInput {
   breakMinutes: number;
   note?: string;
 }
+
+/**
+ * Arbeitszeit für ein beliebiges Projekt anlegen – dieselbe Tabelle wie im
+ * Projektbereich, nur ohne festen Projektfilter (Startseite → Organisation).
+ */
+export async function addTimeEntryFor(projectId: string, input: TimeEntryInput) {
+  const { client, session } = ctx();
+  if (!client || !session) throw new Error("Zeiterfassung benötigt eine Anmeldung.");
+  if (!projectId) throw new Error("Bitte ein Projekt wählen.");
+  const { error: err } = await client.from("time_entries").insert({
+    project_id: projectId,
+    item_id: input.itemId ?? "",
+    user_id: input.userId || session.user.id,
+    started_at: input.startedAt,
+    ended_at: input.endedAt,
+    break_minutes: Math.max(0, Math.round(input.breakMinutes || 0)),
+    note: input.note?.trim() || null,
+    created_by: session.user.id,
+  });
+  if (err) throw err;
+}
+
+/** Eigene Abwesenheit anlegen – projektunabhängig (personenbezogen). */
+export async function addAbsenceEntry(input: {
+  kind: AbsenceKind; startsOn: string; endsOn: string; note?: string; status?: string;
+}) {
+  const { client, session } = ctx();
+  if (!client || !session) throw new Error("Abwesenheiten benötigen eine Anmeldung.");
+  const { error: err } = await client.from("absences").insert({
+    user_id: session.user.id,
+    kind: input.kind,
+    starts_on: input.startsOn,
+    ends_on: input.endsOn,
+    status: input.status ?? "planned",
+    note: input.note?.trim() || null,
+  });
+  if (err) throw err;
+}
+
+export interface DeviceBookingInput {
+  deviceId: string;
+  itemId?: string | null;
+  responsibleId?: string | null;
+  startsAt: string;
+  endsAt: string;
+  overrideReason?: string;
+}
+
+/** Konflikte eines Geräts – auch aus Projekten ohne eigene Sicht (maskiert). */
+export async function checkDeviceConflicts(
+  deviceId: string,
+  startsAt: string,
+  endsAt: string,
+  excludeId?: string,
+): Promise<DeviceConflict[]> {
+  const { client } = ctx();
+  if (!client) return [];
+  const { data, error: err } = await client.rpc("device_booking_conflicts", {
+    _device_id: deviceId,
+    _starts_at: startsAt,
+    _ends_at: endsAt,
+    _exclude_id: excludeId ?? null,
+  });
+  if (err) throw err;
+  return (data ?? []) as DeviceConflict[];
+}
+
+/** Gerätebuchung für ein beliebiges Projekt – zentrale Geräteverwaltung. */
+export async function bookDeviceFor(projectId: string, input: DeviceBookingInput) {
+  const { client, session } = ctx();
+  if (!client || !session) throw new Error("Buchungen benötigen eine Anmeldung.");
+  if (!projectId) throw new Error("Bitte ein Projekt wählen.");
+  const reason = input.overrideReason?.trim() || null;
+  const { error: err } = await client.from("device_bookings").insert({
+    device_id: input.deviceId,
+    project_id: projectId,
+    item_id: input.itemId || null,
+    responsible_id: input.responsibleId ?? null,
+    starts_at: input.startsAt,
+    ends_at: input.endsAt,
+    override_reason: reason,
+    override_by: reason ? session.user.id : null,
+    override_at: reason ? new Date().toISOString() : null,
+    created_by: session.user.id,
+  });
+  if (err) throw err;
+}
+
 
 export function useTimeEntries(projectId: string | undefined) {
   const { rows, loading, status, unavailable, error, reload } = useAsyncList<TimeEntry>(async () => {
