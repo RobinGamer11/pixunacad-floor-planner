@@ -258,6 +258,7 @@ export default function BoardPage() {
   const [showAbsences, setShowAbsences] = useState(true);
   const [showDevices, setShowDevices] = useState(true);
   const [showTimes, setShowTimes] = useState(true);
+  const [showItems, setShowItems] = useState(true);
   const [timeDialog, setTimeDialog] = useState(false);
 
   const opsEntries: CalEntry[] = useMemo(() => {
