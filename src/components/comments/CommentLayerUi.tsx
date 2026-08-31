@@ -5,9 +5,13 @@
  * (Weltkoordinaten in CAD, Seitenprozente in der Mappe) liefert die jeweilige
  * Layer-Komponente. Kommentare sind keine Zeichenobjekte: die Flächen hier
  * sind außerhalb des Kommentarmodus vollständig durchlässig.
+ *
+ * Gestaltung: kompakte, abgerundete Karte mit kleiner Vorschau der
+ * Zeichenfläche, Verlauf mit Antworten, Erwähnungen (@) und Senden-Pfeil.
+ * Alle Farben kommen aus den Design-Tokens → helles und dunkles Design.
  */
 import React from "react";
-import { MessageSquare, Check, RotateCcw, Pencil, Trash2, X } from "lucide-react";
+import { ArrowUp, AtSign, Check, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import {
   commentUi,
   initialsOf,
@@ -15,6 +19,7 @@ import {
   type CommentAuthor,
   type ProjectComment,
 } from "@/lib/commentsStore";
+import type { TeamMemberOption } from "@/lib/projectTeam";
 
 const OPEN_COLOR = "hsl(38 92% 50%)";
 const DONE_COLOR = "hsl(150 45% 42%)";
@@ -34,26 +39,26 @@ export function formatWhen(iso: string): string {
   }
 }
 
-export function CommentAvatar({ author, size = 22 }: { author?: CommentAuthor; size?: number }) {
+export function CommentAvatar({ author, size = 22 }: { author?: { name: string; avatarUrl?: string | null }; size?: number }) {
   const name = author?.name ?? "Unbekannt";
   if (author?.avatarUrl) {
     return (
       <img
         src={author.avatarUrl}
         alt={name}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover" }}
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
       />
     );
   }
   return (
     <span
-      className="flex items-center justify-center rounded-full font-semibold"
+      className="flex shrink-0 items-center justify-center rounded-full font-semibold"
       style={{
         width: size,
         height: size,
         fontSize: Math.round(size * 0.42),
-        background: "hsl(var(--muted))",
-        color: "hsl(var(--muted-foreground))",
+        background: "hsl(var(--primary) / 0.18)",
+        color: "hsl(var(--primary))",
       }}
     >
       {initialsOf(name)}
@@ -61,7 +66,7 @@ export function CommentAvatar({ author, size = 22 }: { author?: CommentAuthor; s
   );
 }
 
-/** Kommentar-Pin (Bedienfläche bleibt zoomunabhängig gut treffbar). */
+/** Kommentar-Pin: runder Avatar mit farbigem Ring an der angeklickten Stelle. */
 export function CommentPin({
   comment,
   author,
@@ -82,13 +87,13 @@ export function CommentPin({
       title={comment.status === "done" ? "Erledigter Kommentar" : "Offener Kommentar"}
       onPointerDown={(e) => { e.stopPropagation(); }}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className="absolute flex items-center justify-center rounded-full shadow-md"
+      className="absolute flex items-center justify-center shadow-md transition-transform hover:scale-105"
       style={{
-        width: 30,
-        height: 30,
-        marginLeft: -15,
-        marginTop: -30,
-        borderRadius: "50% 50% 50% 4px",
+        width: 32,
+        height: 32,
+        marginLeft: -16,
+        marginTop: -32,
+        borderRadius: "50% 50% 50% 6px",
         background: "hsl(var(--card))",
         border: `2px solid ${color}`,
         outline: active ? `2px solid ${color}` : "none",
@@ -99,92 +104,255 @@ export function CommentPin({
         ...style,
       }}
     >
-      <CommentAvatar author={author} size={20} />
+      <CommentAvatar author={author} size={22} />
     </button>
   );
 }
 
-const panelStyle: React.CSSProperties = {
-  width: 260,
+const cardStyle: React.CSSProperties = {
+  width: 288,
   background: "hsl(var(--card))",
   color: "hsl(var(--card-foreground))",
   border: "1px solid hsl(var(--border))",
-  borderRadius: 10,
-  boxShadow: "0 10px 30px hsl(0 0% 0% / 0.25)",
-  padding: 10,
+  borderRadius: 18,
+  boxShadow: "0 18px 45px hsl(0 0% 0% / 0.28)",
+  overflow: "hidden",
   pointerEvents: "auto",
 };
 
-/** Entwurf: leer oder abgebrochen erzeugt keinen gespeicherten Kommentar. */
-export function CommentDraft({
-  style,
-  onSave,
+/** Kleine Vorschau der Zeichenfläche (nur bei Bedarf erzeugt). */
+function PreviewStrip({ src }: { src?: string | null }) {
+  if (!src) return null;
+  return (
+    <div className="px-3 pt-3">
+      <img
+        src={src}
+        alt="Ausschnitt der Zeichenfläche"
+        draggable={false}
+        className="w-full rounded-xl"
+        style={{ height: 108, objectFit: "cover", border: "1px solid hsl(var(--border))", background: "#fff" }}
+      />
+    </div>
+  );
+}
+
+/** Hebt Erwähnungen im Text hervor (reine Anzeige, kein HTML aus Benutzertext). */
+function BodyText({ body }: { body: string }) {
+  const parts = body.split(/(@[^\s@]{1,40})/g);
+  return (
+    <div className="whitespace-pre-wrap break-words text-sm">
+      {parts.map((p, i) =>
+        p.startsWith("@") ? (
+          <span key={i} style={{ color: "hsl(var(--primary))", fontWeight: 600 }}>{p}</span>
+        ) : (
+          <React.Fragment key={i}>{p}</React.Fragment>
+        ),
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- Eingabefeld */
+
+export interface ComposerResult {
+  text: string;
+  mentions: string[];
+}
+
+/**
+ * Texteingabe mit @-Erwähnungen und Senden-Pfeil.
+ * Der eingegebene Text bleibt bei Fehlern erhalten.
+ */
+export function CommentComposer({
+  members,
+  placeholder = "Kommentar hinzufügen",
+  autoFocus,
+  submitLabel = "Senden",
+  onSubmit,
   onCancel,
   error,
+  onDirty,
 }: {
-  style: React.CSSProperties;
-  onSave: (text: string) => Promise<boolean>;
-  onCancel: () => void;
+  members: TeamMemberOption[];
+  placeholder?: string;
+  autoFocus?: boolean;
+  submitLabel?: string;
+  onSubmit: (value: ComposerResult) => Promise<boolean>;
+  onCancel?: () => void;
   error?: string | null;
+  onDirty?: () => void;
 }) {
   const [text, setText] = React.useState("");
   const [busy, setBusy] = React.useState(false);
+  const [picker, setPicker] = React.useState(false);
+  const mentioned = React.useRef<Map<string, string>>(new Map());
   const ref = React.useRef<HTMLTextAreaElement | null>(null);
-  React.useEffect(() => { ref.current?.focus(); }, []);
 
-  const save = async () => {
-    if (!text.trim() || busy) return;
+  React.useEffect(() => { if (autoFocus) ref.current?.focus(); }, [autoFocus]);
+
+  const insertMention = (m: TeamMemberOption) => {
+    mentioned.current.set(m.id, m.name);
+    setText((t) => {
+      const base = t.replace(/@[^\s@]*$/, "");
+      const sep = base && !/\s$/.test(base) ? " " : "";
+      return `${base}${sep}@${m.name} `;
+    });
+    setPicker(false);
+    ref.current?.focus();
+  };
+
+  const query = React.useMemo(() => {
+    const m = /@([^\s@]*)$/.exec(text);
+    return m ? m[1].toLowerCase() : null;
+  }, [text]);
+
+  const suggestions = React.useMemo(() => {
+    const q = picker ? "" : query;
+    if (q === null) return [];
+    return members.filter((m) => !q || m.name.toLowerCase().includes(q)).slice(0, 6);
+  }, [members, query, picker]);
+
+  const showPicker = (picker || query !== null) && suggestions.length > 0;
+
+  const send = async () => {
+    const value = text.trim();
+    if (!value || busy) return;
     setBusy(true);
-    const ok = await onSave(text);
+    const ids = Array.from(mentioned.current.entries())
+      .filter(([, name]) => value.includes(`@${name}`))
+      .map(([id]) => id);
+    const ok = await onSubmit({ text: value, mentions: ids });
     setBusy(false);
-    if (ok) setText("");
+    if (ok) {
+      setText("");
+      mentioned.current.clear();
+    }
+    // Bei Misserfolg bleibt der eingegebene Text bewusst stehen.
   };
 
   return (
-    <div
-      className="absolute"
-      style={{ ...panelStyle, ...style }}
-      onPointerDown={(e) => e.stopPropagation()}
-      onKeyDownCapture={stopCanvasKeys}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onCancel(); }
-      }}
-    >
-      <div className="mb-1 text-xs font-semibold opacity-70">Neuer Kommentar</div>
+    <div className="relative">
+      {showPicker && (
+        <div
+          className="absolute bottom-full left-0 z-10 mb-1 w-full overflow-hidden rounded-xl"
+          style={{ background: "hsl(var(--popover))", color: "hsl(var(--popover-foreground))", border: "1px solid hsl(var(--border))" }}
+        >
+          {suggestions.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:opacity-80"
+              style={{ background: "transparent" }}
+              onClick={() => insertMention(m)}
+            >
+              <CommentAvatar author={{ name: m.name, avatarUrl: m.avatarUrl }} size={18} />
+              <span className="truncate">{m.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <textarea
         ref={ref}
         value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={3}
-        placeholder="Kommentartext …"
-        className="w-full resize-y rounded border bg-transparent p-2 text-sm"
-        style={{ borderColor: "hsl(var(--border))" }}
+        onChange={(e) => { setText(e.target.value); setPicker(false); onDirty?.(); }}
+        rows={2}
+        placeholder={placeholder}
+        className="w-full resize-none bg-transparent px-3 pt-2 text-sm outline-none"
+        style={{ color: "hsl(var(--card-foreground))" }}
+        onKeyDownCapture={stopCanvasKeys}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onCancel?.(); }
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); }
+        }}
       />
-      {error && <div className="mt-1 text-xs" style={{ color: "hsl(0 70% 55%)" }}>{error}</div>}
-      <div className="mt-2 flex justify-end gap-2">
-        <button type="button" className="rounded px-2 py-1 text-xs" onClick={onCancel}>Abbrechen</button>
+
+      {error && (
+        <div className="px-3 pb-1 text-xs" style={{ color: "hsl(var(--destructive))" }}>{error}</div>
+      )}
+
+      <div className="flex items-center gap-1 px-2 pb-2">
         <button
           type="button"
+          title="Person erwähnen"
+          onClick={() => setPicker((v) => !v)}
+          className="flex h-8 w-8 items-center justify-center rounded-full hover:opacity-80"
+          style={{ color: "hsl(var(--muted-foreground))" }}
+        >
+          <AtSign className="h-4 w-4" />
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            className="rounded-full px-2 py-1 text-xs"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+            onClick={onCancel}
+          >
+            Abbrechen
+          </button>
+        )}
+        <span className="flex-1" />
+        <button
+          type="button"
+          title={submitLabel}
           disabled={!text.trim() || busy}
-          onClick={() => void save()}
-          className="rounded px-2 py-1 text-xs font-semibold disabled:opacity-40"
+          onClick={() => void send()}
+          className="flex h-8 w-8 items-center justify-center rounded-full disabled:opacity-40"
           style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
         >
-          {busy ? "Speichern …" : "Speichern"}
+          <ArrowUp className="h-4 w-4" />
         </button>
       </div>
     </div>
   );
 }
 
-export function CommentPopover({
+/* -------------------------------------------------------------- Neue Karte */
+
+export function CommentDraft({
+  style,
+  members,
+  preview,
+  error,
+  onSave,
+  onCancel,
+  onDirty,
+}: {
+  style: React.CSSProperties;
+  members: TeamMemberOption[];
+  preview?: string | null;
+  error?: string | null;
+  onSave: (value: ComposerResult) => Promise<boolean>;
+  onCancel: () => void;
+  onDirty?: () => void;
+}) {
+  return (
+    <div
+      className="absolute"
+      style={{ ...cardStyle, ...style }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDownCapture={stopCanvasKeys}
+    >
+      <PreviewStrip src={preview} />
+      <CommentComposer
+        members={members}
+        autoFocus
+        error={error}
+        onSubmit={onSave}
+        onCancel={onCancel}
+        onDirty={onDirty}
+      />
+    </div>
+  );
+}
+
+/* -------------------------------------------------- Verlauf mit Antworten */
+
+function CommentRow({
   comment,
   author,
   myId,
   canModerate,
-  style,
-  error,
-  onClose,
   onSaveBody,
   onStatus,
   onDelete,
@@ -193,11 +361,8 @@ export function CommentPopover({
   author?: CommentAuthor;
   myId: string | null;
   canModerate: boolean;
-  style: React.CSSProperties;
-  error?: string | null;
-  onClose: () => void;
   onSaveBody: (text: string) => Promise<boolean>;
-  onStatus: (status: "open" | "done") => void;
+  onStatus?: (status: "open" | "done") => void;
   onDelete: () => void;
 }) {
   const isAuthor = !!myId && myId === comment.author_id;
@@ -206,30 +371,128 @@ export function CommentPopover({
   React.useEffect(() => { setText(comment.body); }, [comment.body]);
 
   return (
+    <div className="flex gap-2 px-3 py-2">
+      <CommentAvatar author={author} size={24} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1">
+          <span className="truncate text-xs font-semibold">{author?.name ?? "Unbekannt"}</span>
+          <span className="text-[10px] opacity-55">
+            {formatWhen(comment.created_at)}{comment.edited_at ? " · bearbeitet" : ""}
+          </span>
+        </div>
+
+        {editing ? (
+          <>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={3}
+              className="mt-1 w-full resize-y rounded-lg border bg-transparent p-2 text-sm"
+              style={{ borderColor: "hsl(var(--border))" }}
+              onKeyDownCapture={stopCanvasKeys}
+            />
+            <div className="mt-1 flex justify-end gap-2">
+              <button type="button" className="rounded px-2 py-1 text-xs" onClick={() => { setText(comment.body); setEditing(false); }}>
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                disabled={!text.trim()}
+                className="rounded-full px-2.5 py-1 text-xs font-semibold disabled:opacity-40"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={async () => { if (await onSaveBody(text)) setEditing(false); }}
+              >
+                Speichern
+              </button>
+            </div>
+          </>
+        ) : (
+          <BodyText body={comment.body} />
+        )}
+
+        {!editing && (
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]" style={{ color: "hsl(var(--muted-foreground))" }}>
+            {onStatus && (isAuthor || canModerate) && (
+              comment.status === "open" ? (
+                <button type="button" className="flex items-center gap-1 hover:opacity-80" onClick={() => onStatus("done")}>
+                  <Check className="h-3.5 w-3.5" /> Erledigt
+                </button>
+              ) : (
+                <button type="button" className="flex items-center gap-1 hover:opacity-80" onClick={() => onStatus("open")}>
+                  <RotateCcw className="h-3.5 w-3.5" /> Wieder öffnen
+                </button>
+              )
+            )}
+            {isAuthor && (
+              <button type="button" className="flex items-center gap-1 hover:opacity-80" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5" /> Bearbeiten
+              </button>
+            )}
+            {(isAuthor || canModerate) && (
+              <button
+                type="button"
+                className="flex items-center gap-1 hover:opacity-80"
+                style={{ color: "hsl(var(--destructive))" }}
+                onClick={onDelete}
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Löschen
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function CommentThread({
+  comment,
+  replies,
+  authors,
+  members,
+  myId,
+  canModerate,
+  canComment,
+  preview,
+  style,
+  error,
+  onClose,
+  onSaveBody,
+  onStatus,
+  onDelete,
+  onReply,
+  onDirty,
+}: {
+  comment: ProjectComment;
+  replies: ProjectComment[];
+  authors: Map<string, CommentAuthor>;
+  members: TeamMemberOption[];
+  myId: string | null;
+  canModerate: boolean;
+  canComment: boolean;
+  preview?: string | null;
+  style: React.CSSProperties;
+  error?: string | null;
+  onClose: () => void;
+  onSaveBody: (id: string, text: string) => Promise<boolean>;
+  onStatus: (status: "open" | "done") => void;
+  onDelete: (id: string) => void;
+  onReply: (value: ComposerResult) => Promise<boolean>;
+  onDirty?: () => void;
+}) {
+  return (
     <div
       className="absolute"
-      style={{ ...panelStyle, ...style }}
+      style={{ ...cardStyle, ...style }}
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDownCapture={stopCanvasKeys}
       onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          e.stopPropagation();
-          if (editing) setEditing(false); else onClose();
-        }
+        if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onClose(); }
       }}
     >
-      <div className="mb-2 flex items-center gap-2">
-        <CommentAvatar author={author} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-semibold">{author?.name ?? "Unbekannt"}</div>
-          <div className="text-[10px] opacity-60">
-            {formatWhen(comment.created_at)}
-            {comment.edited_at ? " · bearbeitet" : ""}
-          </div>
-        </div>
+      <div className="flex items-center justify-between px-3 pt-2">
         <span
-          className="rounded px-1.5 py-0.5 text-[10px] font-semibold"
+          className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
           style={{
             background: comment.status === "done" ? "hsl(150 45% 42% / 0.15)" : "hsl(38 92% 50% / 0.18)",
             color: comment.status === "done" ? DONE_COLOR : OPEN_COLOR,
@@ -242,182 +505,87 @@ export function CommentPopover({
         </button>
       </div>
 
-      {editing ? (
-        <>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={3}
-            className="w-full resize-y rounded border bg-transparent p-2 text-sm"
-            style={{ borderColor: "hsl(var(--border))" }}
-          />
-          <div className="mt-2 flex justify-end gap-2">
-            <button type="button" className="rounded px-2 py-1 text-xs" onClick={() => { setText(comment.body); setEditing(false); }}>
-              Abbrechen
-            </button>
-            <button
-              type="button"
-              disabled={!text.trim()}
-              className="rounded px-2 py-1 text-xs font-semibold disabled:opacity-40"
-              style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-              onClick={async () => { if (await onSaveBody(text)) setEditing(false); }}
-            >
-              Speichern
-            </button>
+      <PreviewStrip src={preview} />
+
+      <div className="max-h-64 overflow-y-auto">
+        <CommentRow
+          comment={comment}
+          author={authors.get(comment.author_id)}
+          myId={myId}
+          canModerate={canModerate}
+          onSaveBody={(t) => onSaveBody(comment.id, t)}
+          onStatus={onStatus}
+          onDelete={() => onDelete(comment.id)}
+        />
+        {replies.length > 0 && (
+          <div style={{ borderTop: "1px solid hsl(var(--border))" }}>
+            {replies.map((r) => (
+              <div key={r.id} style={{ paddingLeft: 12 }}>
+                <CommentRow
+                  comment={r}
+                  author={authors.get(r.author_id)}
+                  myId={myId}
+                  canModerate={canModerate}
+                  onSaveBody={(t) => onSaveBody(r.id, t)}
+                  onDelete={() => onDelete(r.id)}
+                />
+              </div>
+            ))}
           </div>
-        </>
-      ) : (
-        // Text bewusst als reiner Text (kein HTML).
-        <div className="whitespace-pre-wrap break-words text-sm">{comment.body}</div>
-      )}
+        )}
+      </div>
 
-      {error && <div className="mt-1 text-xs" style={{ color: "hsl(0 70% 55%)" }}>{error}</div>}
-
-      {!editing && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          {(isAuthor || canModerate) && (
-            comment.status === "open" ? (
-              <button type="button" className="flex items-center gap-1 rounded px-1.5 py-1 hover:opacity-80" onClick={() => onStatus("done")}>
-                <Check className="h-3.5 w-3.5" /> Erledigt
-              </button>
-            ) : (
-              <button type="button" className="flex items-center gap-1 rounded px-1.5 py-1 hover:opacity-80" onClick={() => onStatus("open")}>
-                <RotateCcw className="h-3.5 w-3.5" /> Wieder öffnen
-              </button>
-            )
-          )}
-          {isAuthor && (
-            <button type="button" className="flex items-center gap-1 rounded px-1.5 py-1 hover:opacity-80" onClick={() => setEditing(true)}>
-              <Pencil className="h-3.5 w-3.5" /> Bearbeiten
-            </button>
-          )}
-          {(isAuthor || canModerate) && (
-            <button
-              type="button"
-              className="flex items-center gap-1 rounded px-1.5 py-1 hover:opacity-80"
-              style={{ color: "hsl(0 65% 55%)" }}
-              onClick={onDelete}
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Löschen
-            </button>
-          )}
+      {canComment && (
+        <div style={{ borderTop: "1px solid hsl(var(--border))" }}>
+          <CommentComposer
+            members={members}
+            placeholder="Antworten …"
+            submitLabel="Antwort senden"
+            error={error}
+            onSubmit={onReply}
+            onDirty={onDirty}
+          />
         </div>
+      )}
+      {!canComment && error && (
+        <div className="px-3 pb-2 text-xs" style={{ color: "hsl(var(--destructive))" }}>{error}</div>
       )}
     </div>
   );
 }
 
-/**
- * Genau ein Kommentar-Schalter je Oberfläche, auch wenn mehrere Seiten
- * (Doppelseiten-Layout) gleichzeitig einen Kommentar-Layer einbinden.
- */
-const fabMounted: { id: symbol | null } = { id: null };
-function useSingleFab(): boolean {
-  const self = React.useRef(Symbol("fab"));
-  const [primary, setPrimary] = React.useState(false);
-  React.useEffect(() => {
-    const me = self.current;
-    if (!fabMounted.id) { fabMounted.id = me; setPrimary(true); }
-    return () => { if (fabMounted.id === me) { fabMounted.id = null; } };
-  }, []);
-  return primary;
-}
+/* ------------------------------------------------------- Werkzeugleisten-Schalter */
 
 /**
- * Kommentar-Schalter (in CAD und Mappe identisch): Modus an/aus, Pins
- * ein-/ausblenden und Statusfilter – ohne eigene Verwaltungsoberfläche.
+ * Kommentar-Schalter für die Werkzeugleiste der Zeichenfläche (CAD und
+ * Projektmappe identisch). Erneuter Klick beendet den Kommentarmodus.
  */
-export function CommentFab({
+export function CommentModeButton({
   count,
   disabled,
-  style,
-  className,
-  fixed,
+  title = "Kommentare",
 }: {
   count: number;
   disabled?: boolean;
-  style?: React.CSSProperties;
-  className?: string;
-  /** true = am Fenster verankert (Projektmappe), sonst am Zeichenbereich. */
-  fixed?: boolean;
+  title?: string;
 }) {
   const ui = useCommentUi();
-  const [open, setOpen] = React.useState(false);
-  const primary = useSingleFab();
-  if (!primary) return null;
+  const active = ui.mode;
   return (
-    <div
-      className={`${fixed ? "fixed" : "absolute"} z-30 flex flex-col items-end gap-1 pixuna-comments ${className ?? ""}`}
-      style={style}
+    <button
+      type="button"
+      disabled={disabled}
+      title={disabled ? "Kommentare benötigen ein geöffnetes Projekt und eine Anmeldung" : title}
+      onClick={() => commentUi.toggleMode()}
+      className="relative h-12 w-12 rounded-full flex flex-col items-center justify-center gap-0.5 shadow-lg transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 pixuna-comments"
+      style={{
+        background: active ? "hsl(var(--primary))" : "hsl(var(--surface-card))",
+        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--ink))",
+        border: "2px solid hsl(var(--primary) / 0.75)",
+      }}
     >
-      {open && (
-        <div
-          className="rounded-lg p-2 text-xs"
-          style={{
-            background: "hsl(var(--card))",
-            color: "hsl(var(--card-foreground))",
-            border: "1px solid hsl(var(--border))",
-            boxShadow: "0 8px 24px hsl(0 0% 0% / 0.2)",
-          }}
-        >
-          <label className="mb-1 flex items-center gap-2">
-            <input type="checkbox" checked={ui.visible} onChange={(e) => commentUi.set({ visible: e.target.checked })} />
-            Pins anzeigen
-          </label>
-          <div className="flex gap-1">
-            {(["all", "open", "done"] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => commentUi.set({ filter: f })}
-                className="rounded px-1.5 py-0.5"
-                style={{
-                  background: ui.filter === f ? "hsl(var(--primary))" : "transparent",
-                  color: ui.filter === f ? "hsl(var(--primary-foreground))" : "inherit",
-                  border: "1px solid hsl(var(--border))",
-                }}
-              >
-                {f === "all" ? "Alle" : f === "open" ? "Offen" : "Erledigt"}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          title="Kommentar-Anzeige"
-          className="rounded-full px-2 py-1 text-[10px]"
-          style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--card-foreground))" }}
-        >
-          Filter
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => commentUi.toggleMode()}
-          title={disabled ? "Kommentare benötigen ein verbundenes Projekt" : "Kommentarmodus"}
-          className="relative flex items-center justify-center rounded-full shadow-lg disabled:opacity-40"
-          style={{
-            width: 40,
-            height: 40,
-            background: ui.mode ? "hsl(var(--primary))" : "hsl(var(--card))",
-            color: ui.mode ? "hsl(var(--primary-foreground))" : "hsl(var(--card-foreground))",
-            border: "1px solid hsl(var(--border))",
-          }}
-        >
-          <MessageSquare className="h-5 w-5" />
-          {count > 0 && (
-            <span
-              className="absolute -right-1 -top-1 rounded-full px-1 text-[10px] font-bold"
-              style={{ background: OPEN_COLOR, color: "#fff" }}
-            >
-              {count}
-            </span>
-          )}
-        </button>
-      </div>
-    </div>
+      <MessageSquare size={18} />
+      <span className="text-[10px] font-semibold leading-none">{count}</span>
+    </button>
   );
 }
