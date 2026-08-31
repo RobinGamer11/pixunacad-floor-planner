@@ -12,7 +12,9 @@ import type { BrushPresetId } from "./brushStrokes";
 export function brushSizeDefaultsFor(preset: BrushPresetId | string, embedded: boolean) {
   const thicknessM = embedded ? 400 / 80 : 0.5;
   const strokeWidthPx = embedded ? 400 : 40;
-  const opacity = preset === "marker" ? 0.3 : null;
+  // Marker bekommt 30 % Deckkraft; jede andere Linienart stellt die
+  // Transparenz automatisch wieder auf 100 % zurück.
+  const opacity = preset === "marker" ? 0.3 : 1;
   return { thicknessM, strokeWidthPx, opacity };
 }
 
@@ -28,7 +30,10 @@ export function applyBrushSizeDefaults(
   const { thicknessM, strokeWidthPx, opacity } = brushSizeDefaultsFor(preset, embedded);
 
   if (targets.length === 0) {
-    if (kind === "line") app.defaultLineThicknessM = thicknessM;
+    if (kind === "line") {
+      app.defaultLineThicknessM = thicknessM;
+      if ("defaultLineAlpha" in app) app.defaultLineAlpha = opacity;
+    }
     else if (kind === "polygon") {
       app.defaultPolygonThicknessM = thicknessM;
       if (opacity != null) app.defaultPolygonAlpha = opacity;

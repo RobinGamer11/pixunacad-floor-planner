@@ -4,7 +4,7 @@ import {
   type RoughenParams, type StrokePatternKind, type StrokePatternParams,
 } from "@/cad/strokeEffects";
 import {
-  BRUSH_PRESETS, brushPresetInfo, renderBrushPreview, isBrushPreviewCalm, setBrushPreviewCalm,
+  BRUSH_PRESETS, brushPresetInfo, renderBrushPreview,
   type BrushPresetId,
 } from "@/cad/brushStrokes";
 import { applyBrushSizeDefaults } from "@/cad/brushSizeDefaults";
@@ -207,8 +207,6 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
     commit();
   };
 
-  const [calm, setCalm] = useState(() => isBrushPreviewCalm());
-  const toggleCalm = () => { const next = !calm; setBrushPreviewCalm(next); setCalm(next); commit(); };
 
   return (
     <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
@@ -273,10 +271,6 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
                   onDragStart={dragStart} onDragEnd={dragEnd}
                 />
               )}
-              <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <input type="checkbox" checked={calm} onChange={toggleCalm} className="accent-foreground" />
-                Ruhige Vorschau beim Zeichnen (Stift erst beim Loslassen)
-              </label>
               <div className="text-[11px] text-muted-foreground">
                 Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
               </div>

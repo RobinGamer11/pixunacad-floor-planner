@@ -11,7 +11,7 @@
  */
 
 import type { Vec2 } from "./geometry";
-import { isBrushPresetId, brushPresetInfo, renderBrushStroke, type BrushPresetId , isBrushPreviewCalm } from "./brushStrokes";
+import { isBrushPresetId, brushPresetInfo, renderBrushStroke, type BrushPresetId } from "./brushStrokes";
 
 // ---------------------------------------------------------------- Typen
 
@@ -419,8 +419,11 @@ export function strokeWithBrushIfActive(
   const preset = pattern.brushPreset;
   if (!isBrushPresetId(preset)) return false;
   if (!worldPts || worldPts.length < 1) return true;
-  // Ruhige Vorschau: laufende Live-Vorschau ohne Stempel zeichnen.
-  if (opts.liveKey && isBrushPreviewCalm()) return false;
+  // Live-Vorschau zeigt die Stift-Linienart selbst: Die Stempel sind
+  // weltkoordinaten-verankert (Seed pro Stempelindex), sodass der bereits
+  // gesetzte Teil während des Zeichnens stabil liegen bleibt.
+
+
 
   const roughened = !!opts.roughen?.enabled;
   const pts = roughened
