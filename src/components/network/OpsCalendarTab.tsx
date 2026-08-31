@@ -7,7 +7,7 @@
  * bleiben ohne Art und Bemerkung (Maskierung kommt serverseitig).
  * Zusätzlich lassen sich hier die eigenen Abwesenheiten pflegen.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import {
@@ -19,12 +19,28 @@ import {
   useAbsences,
   useDevices,
   useTimeEntriesForProjects,
+  OPS_STATUS_TEXT,
   type AbsenceKind,
+  type OpsStatus,
 } from "@/lib/opsStore";
+import { effectiveStatusId, subscribeTimeline, timelineStore, type TlItem } from "@/lib/timelineStore";
 
 const inputCls = "h-9 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring";
 const LINE = "hsl(var(--hairline))";
 const SOFT = "hsl(var(--ink-soft))";
+
+/** Beiträge kommen aus der bestehenden Board-Datenbasis – keine zweite Speicherung. */
+function useProjectItems(projectIds: string[]) {
+  const key = projectIds.join("|");
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const ids = key ? key.split("|") : [];
+    const offs = ids.map((id) => subscribeTimeline(id, () => setTick((t) => t + 1)));
+    return () => offs.forEach((off) => off());
+  }, [key]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => (key ? key.split("|") : []).map((id) => ({ id, state: timelineStore.getState(id) })), [key, setTick]);
+}
 
 export function OpsCalendarTab({
   projectIds,
@@ -45,10 +61,12 @@ export function OpsCalendarTab({
   const absences = useAbsences(activeProjects);
   const devices = useDevices(undefined);
   const times = useTimeEntriesForProjects(activeProjects);
+  const boards = useProjectItems(activeProjects);
 
   const [showAbsences, setShowAbsences] = useState(true);
   const [showBookings, setShowBookings] = useState(true);
   const [showTimes, setShowTimes] = useState(true);
+  const [showItems, setShowItems] = useState(true);
   const [personFilter, setPersonFilter] = useState("");
   const [deviceFilter, setDeviceFilter] = useState("");
   const [fromFilter, setFromFilter] = useState("");
@@ -127,11 +145,31 @@ export function OpsCalendarTab({
         }
       }
     }
+    if (showItems && !deviceFilter) {
+      for (const board of boards) {
+        for (const item of board.state.items as TlItem[]) {
+          if (personFilter && !(item.assignees ?? []).includes(personFilter)) continue;
+          const statusId = effectiveStatusId(item);
+          const color = board.state.statuses.find((s) => s.id === statusId)?.color ?? "#c9a227";
+          for (const day of datesInRange(item.startDate, item.endDate || item.startDate)) {
+            if (!inRange(day)) continue;
+            out.push({
+              id: `item-${board.id}-${item.id}-${day}`,
+              date: day,
+              title: item.title || "Beitrag",
+              sub: projectNames.get(board.id) ?? "Projekt",
+              color,
+            });
+          }
+        }
+      }
+    }
+
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [absences.absences, absences.myId, devices.bookings, devices.devices, times.entries, times.myId,
       peopleById, projectNames, showAbsences, showBookings, showTimes, personFilter, deviceFilter,
-      fromFilter, toFilter, hidden]);
+      fromFilter, toFilter, hidden, boards, showItems]);
 
   const save = async () => {
     setError(null);
@@ -145,13 +183,14 @@ export function OpsCalendarTab({
     }
   };
 
-  if (absences.unavailable && devices.unavailable && times.unavailable) {
-    return (
-      <div className="text-xs" style={{ color: SOFT }}>
-        Gemeinsame Kalender stehen zur Verfügung, sobald du angemeldet bist und die Projektfreigabe eingerichtet ist.
-      </div>
-    );
-  }
+  const reloadAll = () => { absences.reload(); devices.reload(); times.reload(); };
+  const sources: { label: string; status: OpsStatus }[] = [
+    { label: "Arbeitszeiten", status: times.status },
+    { label: "Abwesenheiten", status: absences.status },
+    { label: "Geräte", status: devices.status },
+  ];
+  const broken = sources.filter((s) => s.status !== "ready" && s.status !== "loading");
+  const cloudBlocked = broken.length === sources.length;
 
   const toggleProject = (id: string) =>
     setHidden((prev) => {
@@ -164,9 +203,26 @@ export function OpsCalendarTab({
 
   return (
     <div className="flex flex-col gap-3">
+      {!!broken.length && (
+        <div className="rounded-lg p-2.5 text-[11px] flex flex-wrap items-center gap-2"
+             style={{ border: `1px solid ${LINE}`, color: SOFT }}>
+          <div className="flex-1 min-w-[220px]">
+            {cloudBlocked
+              ? OPS_STATUS_TEXT[broken[0].status as Exclude<OpsStatus, "loading" | "ready">]
+              : `Teilweise nicht geladen: ${broken.map((b) => `${b.label} – ${OPS_STATUS_TEXT[b.status as Exclude<OpsStatus, "loading" | "ready">]}`).join(" · ")}`}
+            {cloudBlocked && broken.some((b) => b.status === "setup-missing") && (
+              <> Beiträge werden weiterhin angezeigt.</>
+            )}
+          </div>
+          <button onClick={reloadAll} className="h-8 px-2.5 rounded-md border" style={{ borderColor: LINE }}>
+            Erneut laden
+          </button>
+        </div>
+      )}
       {/* Datenebenen */}
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         {([
+          ["Beiträge", showItems, () => setShowItems((v) => !v), "#c9a227"],
           ["Arbeitszeiten", showTimes, () => setShowTimes((v) => !v), "#3f9c6a"],
           ["Abwesenheiten", showAbsences, () => setShowAbsences((v) => !v), "#8b8178"],
           ["Gerätebuchungen", showBookings, () => setShowBookings((v) => !v), "#4da3ff"],
