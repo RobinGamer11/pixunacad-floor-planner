@@ -342,7 +342,7 @@ export function OpsCalendarTab({
         </div>
       )}
 
-      {!!mine.length && (
+      {allowAbsenceEntry && !!mine.length && (
         <div className="rounded-lg p-2.5" style={{ border: `1px solid ${LINE}` }}>
           <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: SOFT }}>Meine Abwesenheiten</div>
           <div className="flex flex-col gap-1">
