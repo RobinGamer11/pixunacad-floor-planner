@@ -645,31 +645,12 @@ export function useDevices(projectId: string | undefined) {
     return (data ?? []) as DeviceConflict[];
   }, []);
 
-  const book = useCallback(async (input: {
-    deviceId: string;
-    itemId?: string | null;
-    responsibleId?: string | null;
-    startsAt: string;
-    endsAt: string;
-    overrideReason?: string;
-  }) => {
-    const { client, session } = ctx();
-    if (!client || !session || !projectId) throw new Error("Buchungen benötigen ein geteiltes Projekt.");
-    const { error: err } = await client.from("device_bookings").insert({
-      device_id: input.deviceId,
-      project_id: projectId,
-      item_id: input.itemId ?? null,
-      responsible_id: input.responsibleId ?? null,
-      starts_at: input.startsAt,
-      ends_at: input.endsAt,
-      override_reason: input.overrideReason?.trim() || null,
-      override_by: input.overrideReason?.trim() ? session.user.id : null,
-      override_at: input.overrideReason?.trim() ? new Date().toISOString() : null,
-      created_by: session.user.id,
-    });
-    if (err) throw err;
+  const book = useCallback(async (input: DeviceBookingInput) => {
+    if (!projectId) throw new Error("Buchungen benötigen ein geteiltes Projekt.");
+    await bookDeviceFor(projectId, input);
     bookingsState.reload();
   }, [projectId, bookingsState]);
+
 
   const removeBooking = useCallback(async (id: string) => {
     const { client } = ctx();
