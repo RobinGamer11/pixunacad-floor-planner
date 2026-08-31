@@ -14,6 +14,14 @@
 
 import { migrateSceneData } from "@/lib/persistence";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "../strokeEffects";
+
+/** Aufrauen-Werkzeugstandards in der Projektmappe (Stärke 6 mm, Detail 15, 100 %). */
+const MAPPE_ROUGHEN_DEFAULT: RoughenParams = {
+  ...DEFAULT_ROUGHEN,
+  strengthMm: 6,
+  detailPer100Mm: 15,
+  scalePercent: 100,
+};
 import { Camera } from "../Camera";
 import { Scene, copyStrokeEffects } from "../Scene";
 import { Input } from "../Input";
@@ -1582,11 +1590,11 @@ export class MiniCad {
 
   /** Gleiche Kontur-Standardwerte wie in der CAD-Oberfläche. */
   strokeEffectDefaults: Record<string, { strokePattern: StrokePatternParams; roughen: RoughenParams }> = {
-    line: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
-    polygon: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
-    hatch: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...DEFAULT_ROUGHEN } },
+    line: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...MAPPE_ROUGHEN_DEFAULT } },
+    polygon: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...MAPPE_ROUGHEN_DEFAULT } },
+    hatch: { strokePattern: { ...DEFAULT_STROKE_PATTERN }, roughen: { ...MAPPE_ROUGHEN_DEFAULT } },
     // Freihand: mittlere Strich-/Abstandswerte (5 mm) als Werkzeugstandard.
-    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN, dashLengthMm: 5, gapLengthMm: 5 }, roughen: { ...DEFAULT_ROUGHEN } },
+    free: { strokePattern: { ...DEFAULT_STROKE_PATTERN, dashLengthMm: 5, gapLengthMm: 5 }, roughen: { ...MAPPE_ROUGHEN_DEFAULT } },
   };
 
   getStrokeEffectDefaults(kind: "line" | "polygon" | "hatch" | "free") {
