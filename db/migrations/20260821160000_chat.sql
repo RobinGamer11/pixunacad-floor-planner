@@ -48,7 +48,10 @@ create table if not exists public.conversation_members (
 
 create index if not exists conversation_members_user_idx on public.conversation_members(user_id);
 
-grant select, insert, update on public.conversation_members to authenticated;
+-- Änderbar ist ausschließlich der eigene Lesestand (Spaltenrecht).
+revoke update on public.conversation_members from authenticated;
+grant select, insert on public.conversation_members to authenticated;
+grant update (last_read_at) on public.conversation_members to authenticated;
 grant all on public.conversation_members to service_role;
 alter table public.conversation_members enable row level security;
 
