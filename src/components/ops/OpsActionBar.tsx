@@ -7,7 +7,7 @@
  * (`time_entries`, `absences`, `devices`/`device_bookings`, Board-Beiträge).
  */
 import { useEffect, useMemo, useState } from "react";
-import { Clock, CalendarOff, Wrench, X } from "lucide-react";
+import { Clock, CalendarOff, Wrench, X, ListPlus } from "lucide-react";
 import {
   addAbsenceEntry,
   addTimeEntryFor,
@@ -34,7 +34,7 @@ export interface OpsProjectRef {
   name: string;
 }
 
-type DialogId = "time" | "absence" | "booking";
+type DialogId = "item" | "time" | "absence" | "booking";
 
 /** Beiträge eines Projekts aus der bestehenden Board-Datenbasis. */
 function useItems(projectId: string) {
