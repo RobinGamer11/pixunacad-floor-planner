@@ -389,6 +389,15 @@
     color-scheme: light;
   }
 
+  /* Geschlossenes Feld bleibt im dunklen Design dunkel und kontraststark
+     (betrifft u. a. alle Auswahlfelder der Orga-Oberflächen). */
+  .dark select:not([multiple]):not([size]) {
+    background-color: hsl(var(--surface-muted));
+    color: hsl(var(--ink));
+    border-color: hsl(var(--hairline));
+  }
+
+
   .dark select option,
   .dark select optgroup {
     background: #ffffff;
