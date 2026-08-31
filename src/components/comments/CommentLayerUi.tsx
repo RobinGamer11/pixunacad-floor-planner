@@ -316,16 +316,22 @@ export function CommentFab({
   disabled,
   style,
   className,
+  fixed,
 }: {
   count: number;
   disabled?: boolean;
   style?: React.CSSProperties;
   className?: string;
+  /** true = am Fenster verankert (Projektmappe), sonst am Zeichenbereich. */
+  fixed?: boolean;
 }) {
   const ui = useCommentUi();
   const [open, setOpen] = React.useState(false);
   return (
-    <div className={`absolute z-30 flex flex-col items-end gap-1 ${className ?? ""}`} style={style}>
+    <div
+      className={`${fixed ? "fixed" : "absolute"} z-30 flex flex-col items-end gap-1 pixuna-comments ${className ?? ""}`}
+      style={style}
+    >
       {open && (
         <div
           className="rounded-lg p-2 text-xs"
