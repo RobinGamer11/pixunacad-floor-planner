@@ -256,7 +256,7 @@ export function OpsOverview({
       )}
 
       {/* Aktionen – dieselben Daten wie im Projektbereich. */}
-      <div className="mb-4">
+      <div className={fixedProjectId ? "mt-4 mb-4" : "mb-4"}>
         <OpsActionBar
           projects={projects}
           fixedProjectId={fixedProjectId}
