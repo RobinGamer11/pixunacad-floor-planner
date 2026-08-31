@@ -96,6 +96,10 @@ export interface NetworkState {
   /** Von mir gesendete, noch offene Anfragen. */
   outgoing: { contactId: string; person: NetworkProfile }[];
   members: MemberRow[];
+  /** Projekte der gemeinsamen Datenbasis (für echte Besitzer-Anzeige). */
+  sharedProjects: SharedProjectRow[];
+  /** Personen (Kontakte, Mitglieder, Besitzer) nach Benutzer-Id. */
+  peopleById: Map<string, NetworkPerson>;
 }
 
 export function useNetwork(localProjects: LocalProjectRef[]) {
