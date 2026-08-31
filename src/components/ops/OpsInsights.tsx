@@ -132,7 +132,7 @@ export function MiniPie({
 }
 
 /** Legende – dieselben Auswahl-Schaltflächen wie im Kategorien-Diagramm. */
-function Legend({
+export function Legend({
   rows,
   activeId = null,
   onSelect,
@@ -142,6 +142,7 @@ function Legend({
   onSelect?: (id: string) => void;
 }) {
   if (!rows.length) return <div className="text-[11px]" style={{ color: SOFT }}>Keine Daten vorhanden.</div>;
+
   return (
     <div className="flex flex-col gap-1.5 min-w-[200px]">
       {rows.map((r) => (
