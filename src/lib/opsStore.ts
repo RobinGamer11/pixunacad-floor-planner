@@ -211,7 +211,10 @@ function useAsyncList<T>(load: (signal: { cancelled: boolean }) => Promise<T[]>,
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   // Anmeldewechsel sofort berücksichtigen (Token/Signout).
-  useEffect(() => authClient.onAuthStateChange(() => reload()), [reload]);
+  useEffect(() => {
+    const off = authClient.onAuthStateChange(() => reload());
+    return () => { off(); };
+  }, [reload]);
 
   useEffect(() => {
     const signal = { cancelled: false };
@@ -258,7 +261,7 @@ export interface TimeEntryInput {
 }
 
 export function useTimeEntries(projectId: string | undefined) {
-  const { rows, loading, unavailable, error, reload } = useAsyncList<TimeEntry>(async () => {
+  const { rows, loading, status, unavailable, error, reload } = useAsyncList<TimeEntry>(async () => {
     const { client, session } = ctx();
     if (!client || !session || !projectId) return [];
     const { data, error: err } = await client
@@ -336,7 +339,7 @@ export function useTimeEntries(projectId: string | undefined) {
   const overlapIds = useMemo(() => overlappingEntryIds(rows), [rows]);
 
   return {
-    entries: rows, loading, unavailable, error, reload, add, update, remove,
+    entries: rows, loading, status, unavailable, error, reload, add, update, remove,
     minutesByItem, minutesByUser, actualsByItem, overlapIds, myId,
   };
 }
@@ -391,7 +394,7 @@ export function overlappingEntryIds(entries: TimeEntry[]): Set<string> {
  */
 export function useTimeEntriesForProjects(projectIds: string[]) {
   const key = useMemo(() => projectIds.slice().sort().join("|"), [projectIds]);
-  const { rows, loading, unavailable, reload } = useAsyncList<TimeEntry>(async () => {
+  const { rows, loading, status, unavailable, error, reload } = useAsyncList<TimeEntry>(async () => {
     const { client, session } = ctx();
     const ids = key ? key.split("|") : [];
     if (!client || !session || !ids.length) return [];
@@ -405,7 +408,7 @@ export function useTimeEntriesForProjects(projectIds: string[]) {
   }, [key]);
 
   const myId = ctx().session?.user.id ?? null;
-  return { entries: rows, loading, unavailable, reload, myId };
+  return { entries: rows, loading, status, unavailable, error, reload, myId };
 }
 
 /* ----------------------------------------------- Schritt 04: Abwesenheit */
@@ -413,7 +416,7 @@ export function useTimeEntriesForProjects(projectIds: string[]) {
 export function useAbsences(projectIds: string[]) {
   const key = useMemo(() => projectIds.slice().sort().join("|"), [projectIds]);
 
-  const { rows, loading, unavailable, reload } = useAsyncList<Absence>(async () => {
+  const { rows, loading, status, unavailable, error, reload } = useAsyncList<Absence>(async () => {
     const { client, session } = ctx();
     if (!client || !session) return [];
     const ids = key ? key.split("|") : [];
@@ -478,7 +481,7 @@ export function useAbsences(projectIds: string[]) {
     return map;
   }, [rows]);
 
-  return { absences: rows, loading, unavailable, reload, add, update, remove, byDate, myId };
+  return { absences: rows, loading, status, unavailable, error, reload, add, update, remove, byDate, myId };
 }
 
 /* ------------------------------------------------- Schritt 05: Geräte */
@@ -602,7 +605,9 @@ export function useDevices(projectId: string | undefined) {
     bookings: bookingsState.rows,
     bookingsByItem,
     loading: devicesState.loading || bookingsState.loading,
+    status: devicesState.status !== "ready" ? devicesState.status : bookingsState.status,
     unavailable: devicesState.unavailable,
+    error: devicesState.error ?? bookingsState.error,
     reload: () => { devicesState.reload(); bookingsState.reload(); },
     addDevice,
     updateDevice,
