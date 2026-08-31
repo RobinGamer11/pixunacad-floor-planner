@@ -578,6 +578,9 @@ export function NetworkView({
                   </div>
                 );
               })}
+                </div>
+              ))}
+
 
               <div
                 className="rounded-lg border p-2.5"
