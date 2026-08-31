@@ -115,6 +115,8 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
     incoming: [],
     outgoing: [],
     members: [],
+    sharedProjects: [],
+    peopleById: new Map(),
   });
   const desiredStatus = useRef<PresenceStatus>("online");
   const reloadRef = useRef<() => void>(() => {});
@@ -146,11 +148,24 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
 
       const { data: memberRows, error: memberErr } = await client
         .from("project_members")
-        .select("project_id,user_id,role");
+        .select("project_id,user_id,role,permissions");
       if (memberErr) throw memberErr;
       const members = (memberRows ?? []) as MemberRow[];
 
-      const profileIds = Array.from(new Set([myId, ...otherIds, ...members.map((m) => m.user_id)]));
+      // Echte Ownership stammt aus network_projects – nicht aus der Annahme
+      // "lokal vorhanden = mir gehörend".
+      const { data: projectRows, error: projectErr } = await client
+        .from("network_projects")
+        .select("id,name,owner_id");
+      if (projectErr) throw projectErr;
+      const sharedProjects = (projectRows ?? []) as SharedProjectRow[];
+
+      const profileIds = Array.from(new Set([
+        myId,
+        ...otherIds,
+        ...members.map((m) => m.user_id),
+        ...sharedProjects.map((p) => p.owner_id),
+      ]));
       const { data: profileRows, error: profileErr } = await client
         .from("profiles")
         .select("id,display_name,role,avatar_url")
@@ -189,6 +204,8 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
         .filter((r) => r.status === "pending" && r.requester_id === myId)
         .map((r) => ({ contactId: r.id, person: profiles.get(r.addressee_id) ?? { id: r.addressee_id, display_name: "Unbekannt" } }));
 
+      const peopleById = new Map<string, NetworkPerson>(profileIds.map((id) => [id, personOf(id)]));
+
       setState({
         ready: true,
         loading: false,
@@ -201,6 +218,8 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
         incoming,
         outgoing,
         members,
+        sharedProjects,
+        peopleById,
       });
     } catch (error) {
       const missing = isMissingSchemaError(error);
