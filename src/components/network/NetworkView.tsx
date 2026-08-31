@@ -459,7 +459,9 @@ export function NetworkView({
                         title="Projektchat öffnen"
                       />
                       <div className="ml-auto flex items-center gap-1">
-                        <span className="text-[11px] text-muted-foreground">Besitzer: Du</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Besitzer: {ownerOf(p.id).label}
+                        </span>
                       </div>
                     </div>
                     <div className="mt-1.5">
@@ -469,26 +471,45 @@ export function NetworkView({
                           Person hierher ziehen
                         </div>
                       )}
-                      {list.map((person) => (
-                        <PersonRow
-                          key={person.id}
-                          person={person}
-                          handle
-                          draggable
-                          onDragStart={onDragStartPerson(person.id, p.id)}
-                          right={
-                            <button
-                              onClick={() => net.removeMember(p.id, person.id)}
-                              title="Aus Projekt entfernen (Kontakt bleibt bestehen)"
-                              className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground"
-                            >
-                              <UserMinus size={14} />
-                            </button>
-                          }
-                        />
-                      ))}
+                      {list.map((person) => {
+                        const row = memberRow(p.id, person.id);
+                        const manage = canManageProject(p.id);
+                        return (
+                          <div key={person.id}>
+                            <PersonRow
+                              person={person}
+                              handle
+                              draggable
+                              onDragStart={onDragStartPerson(person.id, p.id)}
+                              right={
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    {openContributions(p.id, person.id)} offen
+                                  </span>
+                                  {manage && (
+                                    <button
+                                      onClick={() => net.removeMember(p.id, person.id)}
+                                      title="Aus Projekt entfernen (Kontakt bleibt bestehen)"
+                                      className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground"
+                                    >
+                                      <UserMinus size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              }
+                            />
+                            <MemberRoleControls
+                              role={(row?.role as ProjectRole) ?? "member"}
+                              overrides={row?.permissions ?? {}}
+                              canManage={manage && !!row}
+                              onRole={(role) => net.setMemberRole(p.id, person.id, role)}
+                              onOverrides={(o) => net.setMemberPermissions(p.id, person.id, o)}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
-                    {available.length > 0 && (
+                    {canManageProject(p.id) && available.length > 0 && (
                       <select
                         value=""
                         onChange={(e) => {
