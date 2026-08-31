@@ -2,7 +2,12 @@
 // Persistiert projektbezogen in localStorage: pixuna.board02.<projectId>
 
 
-export type TlKind = "task" | "event" | "note";
+/**
+ * „Beitrag" ist die einheitliche Art für neu angelegte Einträge.
+ * Die früheren Arten Aufgabe/Termin/Notiz bleiben für bestehende Daten
+ * erhalten – vorhandene Einträge behalten Id, Art und alle Felder.
+ */
+export type TlKind = "task" | "event" | "note" | "contribution";
 
 export interface TlCategory { id: string; label: string; color: string }
 /** percent = Priorität in Prozent (1–100). Bestimmt die Kreisgröße. */
@@ -19,7 +24,10 @@ export interface TlItem {
   statusId?: string;
   /** true, sobald der Status manuell gesetzt wurde – dann greift die Automatik nicht mehr. */
   statusManual?: boolean;
+  /** Alter Freitext „Verantwortlich" – bleibt erhalten und wird weiter angezeigt. */
   responsible?: string;
+  /** Verantwortliche Projektmitglieder (Benutzer-Ids), Mehrfachauswahl. */
+  assignees?: string[];
   categoryId?: string;
   priorityId?: string;
   /** ISO "YYYY-MM-DD" */
@@ -33,12 +41,15 @@ export interface TlItem {
   fresh?: boolean;
 }
 
+/** Projektzeitraum – wird prominent am Projekt angezeigt. */
+export interface TlPeriod { start?: string; end?: string }
 
 export interface TlState {
   categories: TlCategory[];
   priorities: TlPriority[];
   statuses: TlStatus[];
   items: TlItem[];
+  period: TlPeriod;
 }
 
 /** Standardkategorie für schnell angelegte Aufgaben/Notizen. */
