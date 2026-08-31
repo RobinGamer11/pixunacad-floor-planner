@@ -106,7 +106,8 @@ begin
   if conv is null then
     insert into public.conversations (type, direct_key, created_by)
     values ('direct', key, me)
-    on conflict (direct_key) do nothing
+    -- Indexprädikat muss zum partiellen Unique-Index passen.
+    on conflict (direct_key) where direct_key is not null do nothing
     returning id into conv;
     if conv is null then
       select id into conv from public.conversations where direct_key = key;
