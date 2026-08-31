@@ -334,7 +334,7 @@ export function OpsCalendarTab({
         </div>
       )}
 
-      <RangeCalendar entries={entries} selectedDates={[]} onSelectDate={() => {}} />
+      <RangeCalendar entries={entries} selectedDates={selectedDates ?? []} onSelectDate={onSelectDate ?? (() => {})} />
     </div>
   );
 }
