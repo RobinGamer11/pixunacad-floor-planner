@@ -178,6 +178,8 @@ export const PointEditAction = {
   OFFSET: "offset",
   INSERT_POINT: "insertPoint",
   RESIZE: "resize",
+  /** Objekt am gewählten Fangpunkt gleichmäßig skalieren */
+  SCALE: "scale",
   DUPLICATE: "duplicate",
   /** Kante wölben (rein-/rauswölben) */
   BULGE: "bulge",
