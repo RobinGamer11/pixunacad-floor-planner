@@ -4,6 +4,7 @@ import {
   FolderKanban,
   UserPlus,
   MessageSquare,
+  StickyNote,
   ChevronDown,
   ChevronRight,
   Check,
@@ -82,6 +83,20 @@ function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () 
           style={{ background: "hsl(var(--accent-gold))", borderColor: "hsl(var(--surface-card))" }}
         />
       )}
+    </button>
+  );
+}
+
+/** Kommentare eines Projekts – gleiches Format wie der Chat, klar anderes Symbol. */
+function CommentsButton({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      title={title}
+      className="h-9 w-9 shrink-0 rounded-lg grid place-items-center border hover:bg-[hsl(var(--surface-muted))]"
+      style={{ color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }}
+    >
+      <StickyNote size={19} />
     </button>
   );
 }
@@ -213,6 +228,9 @@ export function NetworkView({
   const [results, setResults] = useState<NetworkProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [chat, setChat] = useState<ChatTarget | null>(null);
+  /** Kommentarübersicht eines Projekts (aus den Projektzeilen heraus geöffnet). */
+  const [commentsProject, setCommentsProject] = useState<string | undefined>();
+  const openComments = (id: string) => { setCommentsProject(id); setTab("comments"); };
   const [details, setDetails] = useState<NetworkPerson | null>(null);
   const [confirmContact, setConfirmContact] = useState<{ person: NetworkPerson; projects: string[] } | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -413,11 +431,14 @@ export function NetworkView({
                     count={list.filter((x) => x.status !== "offline").length}
                     total={list.length}
                     actions={
-                      <ChatButton
-                        unread={unread[`p:${p.id}`]}
-                        onClick={() => openProject(p)}
-                        title="Projektchat öffnen"
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <ChatButton
+                          unread={unread[`p:${p.id}`]}
+                          onClick={() => openProject(p)}
+                          title="Projektchat öffnen"
+                        />
+                        <CommentsButton onClick={() => openComments(p.id)} title="Kommentare des Projekts" />
+                      </div>
                     }
                   >
                     {list.length === 0 ? (
@@ -509,6 +530,7 @@ export function NetworkView({
                         onClick={() => openProject(p)}
                         title="Projektchat öffnen"
                       />
+                      <CommentsButton onClick={() => openComments(p.id)} title="Kommentare des Projekts" />
                       <div className="ml-auto flex items-center gap-1">
                         <span className="text-[11px] text-muted-foreground">
                           Besitzer: {ownerOf(p.id).label}
@@ -739,6 +761,7 @@ export function NetworkView({
             <CommentsTab
               projects={Array.from(projectNameMap.entries()).map(([id, name]) => ({ id, name }))}
               peopleById={peopleNameMap}
+              initialProjectId={commentsProject}
             />
           )}
         </div>

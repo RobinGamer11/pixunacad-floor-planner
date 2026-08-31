@@ -15,6 +15,7 @@ import {
   ListChecks, CalendarRange,
 } from "lucide-react";
 import { useProjectMemberOptions } from "@/lib/projectTeam";
+import { TimeInsights, DeviceInsights } from "@/components/ops/OpsInsights";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import {
@@ -82,6 +83,8 @@ interface Placed {
 // ------------------------------------------------------------------
 // Seite
 // ------------------------------------------------------------------
+type InsightTab = "cat" | "time" | "dev" | null;
+
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProject(projectId);
@@ -114,6 +117,8 @@ export default function BoardPage() {
     setBoardSurface(projectId, v);
   }, [projectId]);
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  /** Auswertungsreiter unter dem Zeitstrahl – „Kategorien“ ist zuerst geöffnet. */
+  const [insightTab, setInsightTab] = useState<InsightTab>("cat");
   const [query, setQuery] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("");
 
@@ -506,6 +511,10 @@ export default function BoardPage() {
 
   // ---- Verantwortliche ---------------------------------------------------
   const teamMembers = useProjectMemberOptions(projectId);
+  const opsPeopleById = useMemo(
+    () => new Map(teamMembers.map((m) => [m.id, m.name])),
+    [teamMembers],
+  );
   const memberNameById = useMemo(
     () => new Map(teamMembers.map((m) => [m.id, m.name])),
     [teamMembers],
@@ -852,9 +861,22 @@ export default function BoardPage() {
 
           {/* Kategorien + Liste */}
           <div className="mx-4 my-4 rounded-xl p-4" style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="text-xs font-medium" style={{ color: INK }}>Kategorien im Projekt</div>
-              {activeCat && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {([["cat", "Kategorien"], ["time", "Zeiterfassung"], ["dev", "Geräte/Werkzeuge"]] as [InsightTab, string][]).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setInsightTab((cur) => (cur === id ? null : id))}
+                  className="h-7 px-2.5 rounded-md text-[11px]"
+                  style={{
+                    background: insightTab === id ? SUBTLE : "transparent",
+                    border: `1px solid ${insightTab === id ? "hsl(var(--accent-gold))" : PANEL_LINE}`,
+                    color: INK,
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              {insightTab === "cat" && activeCat && (
                 <button onClick={() => setActiveCat(null)}
                         className="ml-auto flex items-center gap-1 rounded-md px-2 py-1 text-[11px]"
                         style={{ background: SUBTLE, border: `1px solid ${PANEL_LINE}`, color: INK }}>
@@ -862,6 +884,14 @@ export default function BoardPage() {
                 </button>
               )}
             </div>
+            {insightTab === "time" && (
+              <TimeInsights projectIds={projectId ? [projectId] : []} peopleById={opsPeopleById} />
+            )}
+            {insightTab === "dev" && (
+              <DeviceInsights projectIds={projectId ? [projectId] : []} peopleById={opsPeopleById} />
+            )}
+
+            {insightTab === "cat" && (<>
             <div className="flex flex-wrap items-center gap-6">
               <PieChart
                 slices={catStats.map((s) => ({ value: s.count, color: s.cat.color, id: s.cat.id }))}
@@ -978,6 +1008,8 @@ export default function BoardPage() {
                 )}
               </div>
             </div>
+
+            </>)}
 
             {/* Dauerhafter Leerraum unter der Auflistung */}
             <div aria-hidden style={{ minHeight: 260 }} />
