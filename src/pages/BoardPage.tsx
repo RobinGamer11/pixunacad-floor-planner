@@ -435,6 +435,18 @@ export default function BoardPage() {
     });
   }, [state.items, query, prioFilter, activeCat, catMap, prioMap, statusMap, now]);
 
+  // ---- Verantwortliche ---------------------------------------------------
+  const teamMembers = useProjectMemberOptions(projectId);
+  const memberNameById = useMemo(
+    () => new Map(teamMembers.map((m) => [m.id, m.name])),
+    [teamMembers],
+  );
+  const responsibleLabel = (i: TlItem) => {
+    const names = (i.assignees ?? []).map((id) => memberNameById.get(id) ?? "").filter(Boolean);
+    if (i.responsible) names.unshift(i.responsible);
+    return names.join(", ");
+  };
+
   // ---- Aktionen --------------------------------------------------------
   const add = (kind: TlKind) => {
     if (!projectId) return;
