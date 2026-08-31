@@ -766,10 +766,47 @@ function changeSignature(a: Project, b: Project): string {
   }
 }
 
+/* ---------- Schreibschutz (gemeinsamer Projektzugriff) ----------
+ * Zentrale Sperre für Projekte, an denen der angemeldete Benutzer kein
+ * Schreibrecht hat (z. B. Rolle „Betrachter" oder entzogene Mitgliedschaft).
+ * Weil sämtliche Mutationen – auch Tastenkürzel, Einfügen, Löschen und
+ * Import – durch `setState` laufen, greift der Schutz an genau einer Stelle.
+ * Serverseitig gilt dieselbe Regel zusätzlich per RLS. */
+let _writeGuard: ((projectId: string) => boolean) | null = null;
+const writeBlockListeners = new Set<(projectId: string) => void>();
+
+function canWriteProject(id: string): boolean {
+  if (!_writeGuard) return true;
+  try {
+    return _writeGuard(id);
+  } catch {
+    return true;
+  }
+}
+
 function setState(updater: (s: State) => Partial<State>, alreadyPersisted = false) {
   const prev = state;
   const prevById = new Map(prev.projects.map((p) => [p.id, p] as const));
   state = { ...state, ...updater(state) };
+  if (_writeGuard) {
+    let blocked: string | null = null;
+    const guarded = state.projects.map((np) => {
+      const op = prevById.get(np.id);
+      if (!op || op === np) return np;
+      if (canWriteProject(np.id)) return np;
+      blocked = np.id;
+      return op;
+    });
+    // Auch das Anlegen/Entfernen gesperrter Projekte wird zurückgenommen.
+    const removed = prev.projects.filter(
+      (op) => !state.projects.some((np) => np.id === op.id) && !canWriteProject(op.id),
+    );
+    if (blocked || removed.length) {
+      state = { ...state, projects: removed.length ? [...guarded, ...removed] : guarded };
+      const id = blocked ?? removed[0]?.id ?? "";
+      writeBlockListeners.forEach((fn) => fn(id));
+    }
+  }
   if (!_suspendHistory) {
     let anyChange = false;
     const now = Date.now();
