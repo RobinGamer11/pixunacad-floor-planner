@@ -18,6 +18,7 @@ import {
   type DeviceBooking,
 } from "@/lib/opsStore";
 import { useProjectsMemberOptions } from "@/lib/projectTeam";
+import { subscribeTimeline, timelineStore, type TlItem } from "@/lib/timelineStore";
 
 const LINE = "hsl(var(--hairline))";
 const SOFT = "hsl(var(--ink-soft))";
@@ -132,7 +133,7 @@ export function MiniPie({
 }
 
 /** Legende – dieselben Auswahl-Schaltflächen wie im Kategorien-Diagramm. */
-function Legend({
+export function Legend({
   rows,
   activeId = null,
   onSelect,
@@ -142,6 +143,7 @@ function Legend({
   onSelect?: (id: string) => void;
 }) {
   if (!rows.length) return <div className="text-[11px]" style={{ color: SOFT }}>Keine Daten vorhanden.</div>;
+
   return (
     <div className="flex flex-col gap-1.5 min-w-[200px]">
       {rows.map((r) => (
@@ -452,4 +454,90 @@ export function usePeopleCount(projectIds: string[]) {
     return set.size;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byProject, projectIds.join("|")]);
+}
+
+/* -------------------------------------------------------- Kategorien */
+
+/**
+ * Kategorien-Auswertung eines Projekts – gleiche Optik und Bedienung wie in
+ * der Orga-Oberfläche: Kreisdiagramm, Legende zum Filtern und darunter die
+ * Beiträge der gewählten Kategorie.
+ */
+export function CategoryInsights({
+  projectId,
+  onSelectItem,
+}: {
+  projectId: string;
+  /** Beitrag anzeigen (z. B. im Kalender darüber) statt in die Projekt-Orga zu springen. */
+  onSelectItem?: (item: TlItem) => void;
+}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => subscribeTimeline(projectId, () => setTick((t) => t + 1)), [projectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const state = useMemo(() => {
+    try { return timelineStore.getState(projectId); } catch { return null; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, tick]);
+
+  const categories = state?.categories ?? [];
+  const items = (state?.items ?? []) as TlItem[];
+
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const toggle = (id: string) => setActiveId((cur) => (cur === id ? null : id));
+  useEffect(() => {
+    if (activeId && !categories.some((c) => c.id === activeId)) setActiveId(null);
+  }, [categories, activeId]);
+
+  const stats = useMemo(
+    () => categories.map((c) => ({ cat: c, count: items.filter((i) => i.categoryId === c.id).length })),
+    [categories, items],
+  );
+  const total = stats.reduce((s, r) => s + r.count, 0);
+  const list = activeId ? items.filter((i) => i.categoryId === activeId) : items;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-6">
+        <MiniPie
+          slices={stats.map((s) => ({ id: s.cat.id, value: s.count, color: s.cat.color }))}
+          activeId={activeId}
+          onSlice={toggle}
+          onCenter={() => setActiveId(null)}
+        />
+        <Legend
+          activeId={activeId}
+          onSelect={toggle}
+          rows={stats.map((s) => ({
+            id: s.cat.id,
+            label: s.cat.label,
+            color: s.cat.color,
+            value: String(s.count),
+            sub: total ? `${Math.round((s.count / total) * 100)}%` : undefined,
+          }))}
+        />
+        <div className="text-[11px]" style={{ color: SOFT }}>
+          Beiträge gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{total}</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {list.slice(0, 200).map((i) => (
+          <button
+            key={i.id}
+            type="button"
+            onClick={() => onSelectItem?.(i)}
+            className="flex items-center gap-2 text-[11px] text-left rounded-md px-1.5 py-1 hover:bg-muted"
+          >
+            <span
+              className="h-2 w-2 rounded-full shrink-0"
+              style={{ background: categories.find((c) => c.id === i.categoryId)?.color ?? "hsl(var(--ink-soft))" }}
+            />
+            <span className="truncate flex-1">{i.title || "Ohne Titel"}</span>
+            <span className="shrink-0 tabular-nums" style={{ color: SOFT }}>{i.endDate || i.startDate || ""}</span>
+          </button>
+        ))}
+        {!list.length && <div className="text-[11px]" style={{ color: SOFT }}>Keine Beiträge.</div>}
+      </div>
+    </div>
+  );
 }
