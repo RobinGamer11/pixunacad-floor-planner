@@ -30,6 +30,15 @@ export interface MemberRow {
   project_id: string;
   user_id: string;
   role: string;
+  /** Individuelle Abweichungen vom Rollenstandard (jsonb-Spalte `permissions`). */
+  permissions?: ProjectPermissionOverrides | null;
+}
+
+/** Projektzeile der gemeinsamen Datenbasis (inkl. echter Ownership). */
+export interface SharedProjectRow {
+  id: string;
+  name: string;
+  owner_id: string;
 }
 
 export interface NetworkPerson {
