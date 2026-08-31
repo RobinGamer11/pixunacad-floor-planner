@@ -90,22 +90,27 @@ function ProjectStandRow({
   const deviceCount = devices.devices.filter((d) => !d.archived).length;
 
   return (
-    <div className="rounded-lg border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))" }}>
-      <div className="flex items-center gap-3 px-3 py-2">
-        <button type="button" onClick={onToggle} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: projectColor(project.id) }} />
-          <span className="min-w-0">
-            <span className="block text-sm truncate">{project.name}</span>
-            <span className="block text-[11px] text-muted-foreground truncate">
-              {(state?.period.start || "offen")} – {(state?.period.end || "offen")} · {formatMinutes(totalMinutes)} erfasst
+    <div
+      className={headless ? "" : "rounded-lg border overflow-hidden"}
+      style={headless ? undefined : { borderColor: "hsl(var(--hairline))" }}
+    >
+      {!headless && (
+        <div className="flex items-center gap-3 px-3 py-2">
+          <button type="button" onClick={onToggle} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: projectColor(project.id) }} />
+            <span className="min-w-0">
+              <span className="block text-sm truncate">{project.name}</span>
+              <span className="block text-[11px] text-muted-foreground truncate">
+                {(state?.period.start || "offen")} – {(state?.period.end || "offen")} · {formatMinutes(totalMinutes)} erfasst
+              </span>
             </span>
-          </span>
-        </button>
-      </div>
+          </button>
+        </div>
+      )}
 
-      {open && (
-        <div className="px-3 pb-3 flex flex-col gap-2">
+      {(headless || open) && (
+        <div className={`${headless ? "" : "px-3 pb-3"} flex flex-col gap-2`}>
           {/* Reiter nebeneinander – „Beiträge“ ist zuerst geöffnet. */}
           <div className="flex flex-wrap items-center gap-2">
             {([
