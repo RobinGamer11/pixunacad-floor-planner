@@ -13,6 +13,7 @@ import {
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
   ListChecks, CalendarRange,
+  Clock,
 } from "lucide-react";
 import { useProjectMemberOptions } from "@/lib/projectTeam";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
