@@ -53,9 +53,13 @@ function selectedTargets(app: any, kind: StrokeEffectKind): any[] {
  */
 const SliderField: React.FC<{
   label: string; unit: string; value: number; step?: number; min: number; max: number;
+  /** Obergrenze der freien Zahleneingabe (darf über dem Reglerbereich liegen). */
+  inputMax?: number;
   onChange: (v: number) => void; onDragStart?: () => void; onDragEnd?: () => void;
-}> = ({ label, unit, value, step = 0.1, min, max, onChange, onDragStart, onDragEnd }) => {
+}> = ({ label, unit, value, step = 0.1, min, max, inputMax, onChange, onDragStart, onDragEnd }) => {
+  const hardMax = inputMax ?? max;
   const clamp = (n: number) => Math.min(max, Math.max(min, n));
+  const clampInput = (n: number) => Math.min(hardMax, Math.max(min, n));
   return (
     <label className="block min-w-0">
       <span className="mb-1 flex items-center justify-between gap-2">
@@ -64,10 +68,10 @@ const SliderField: React.FC<{
           <input
             type="number"
             value={Number(value.toFixed(3))}
-            step={step} min={min} max={max}
+            step={step} min={min} max={hardMax}
             onChange={(e) => {
               const n = Number(e.target.value);
-              if (Number.isFinite(n)) onChange(clamp(n));
+              if (Number.isFinite(n)) onChange(clampInput(n));
             }}
             className="h-full w-14 min-w-0 bg-transparent px-1 text-right text-[11px] tabular-nums outline-none"
           />
@@ -76,7 +80,7 @@ const SliderField: React.FC<{
       </span>
       <input
         type="range"
-        value={value}
+        value={Math.min(max, Math.max(min, value))}
         step={step} min={min} max={max}
         onPointerDown={onDragStart}
         onPointerUp={onDragEnd}
@@ -296,7 +300,8 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
           <div className="space-y-2">
             <div className="space-y-2">
               <SliderField
-                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0} max={300}
+                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0}
+                max={isEmbedded ? 50 : 300} inputMax={3000}
                 onChange={(v) => applyRoughen({ strengthMm: v })}
                 onDragStart={dragStart} onDragEnd={dragEnd}
               />
@@ -306,7 +311,8 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
                 onDragStart={dragStart} onDragEnd={dragEnd}
               />
               <SliderField
-                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10} max={1800}
+                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10}
+                max={isEmbedded ? 300 : 1800} inputMax={1800}
                 onChange={(v) => applyRoughen({ scalePercent: v })}
                 onDragStart={dragStart} onDragEnd={dragEnd}
               />
