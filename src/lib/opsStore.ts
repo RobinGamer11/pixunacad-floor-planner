@@ -429,7 +429,7 @@ export function useAbsences(projectIds: string[]) {
     return map;
   }, [rows]);
 
-  return { absences: rows, loading, unavailable, reload, add, remove, byDate, myId };
+  return { absences: rows, loading, unavailable, reload, add, update, remove, byDate, myId };
 }
 
 /* ------------------------------------------------- Schritt 05: Geräte */
