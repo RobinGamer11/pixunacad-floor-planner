@@ -1011,6 +1011,20 @@ export const projectStore = {
     listeners.add(fn);
     return () => listeners.delete(fn);
   },
+  /**
+   * Registriert den zentralen Schreibschutz. `guard(projectId)` liefert
+   * `false`, wenn der aktuelle Benutzer dieses Projekt nicht ändern darf –
+   * jede Mutation daran wird dann verworfen (Server prüft zusätzlich).
+   */
+  setWriteGuard: (guard: ((projectId: string) => boolean) | null) => {
+    _writeGuard = guard;
+  },
+  canWrite: (projectId: string) => canWriteProject(projectId),
+  /** Meldet blockierte Schreibversuche (für Hinweise in der Oberfläche). */
+  onWriteBlocked: (fn: (projectId: string) => void) => {
+    writeBlockListeners.add(fn);
+    return () => { writeBlockListeners.delete(fn); };
+  },
   createProject: () => {
     const id = `p-${Date.now().toString(36)}`;
     const firstPageId = `${id}-p1`;
