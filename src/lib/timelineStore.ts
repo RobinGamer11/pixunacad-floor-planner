@@ -110,14 +110,18 @@ function loadState(projectId: string): TlState {
         categories: cats,
         priorities: normPriorities(p.priorities),
         statuses: p.statuses?.length ? p.statuses : [...DEFAULT_STATUSES],
+        period: p.period ?? {},
         items: (p.items ?? []).map((i) => ({
           ...i,
           statusId: i.statusId ?? (i.done ? "done" : "open"),
+          // Altbestand ohne Mehrfachauswahl bleibt unverändert erhalten.
+          assignees: Array.isArray(i.assignees) ? i.assignees : [],
         })),
       };
     }
   } catch {}
   return {
+    period: {},
     categories: [...DEFAULT_CATEGORIES],
     priorities: [...DEFAULT_PRIORITIES],
     statuses: [...DEFAULT_STATUSES],
