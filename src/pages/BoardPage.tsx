@@ -1074,6 +1074,21 @@ function ItemEditor({
                     value={item.description ?? ""}
                     onChange={(e) => set({ description: e.target.value })} />
         </Field>
+
+        <ContributionTimePanel
+          projectId={projectId}
+          itemId={item.id}
+          canEdit={canEdit}
+          members={members}
+          plannedMinutes={plannedMinutes}
+        />
+        <ContributionDevicesPanel
+          projectId={projectId}
+          itemId={item.id}
+          canEdit={canEdit}
+          members={members}
+        />
+        <ContributionAttachmentsPanel projectId={projectId} itemId={item.id} canEdit={canEdit} />
       </div>
     </aside>
   );
