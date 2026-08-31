@@ -60,7 +60,7 @@ function HelpItem({
 }: {
   icon: React.ReactNode;
   shortcut: string;
-  description: string;
+  description: React.ReactNode;
 }) {
   return (
     <div className="flex min-w-[62px] flex-col items-center justify-end px-1.5 py-1 text-center">
@@ -201,7 +201,7 @@ export function MappeHelpOverlay({
           <HelpItem
             icon={<HeaderActionGlyph><SquareDashedMousePointer size={17} /></HeaderActionGlyph>}
             shortcut="Strg + A"
-            description="Alles auswählen\n(Werkzeugorientiert)"
+            description={<>Alles auswählen<br />(Werkzeugorientiert)</>}
           />
         </HelpGroup>
 
