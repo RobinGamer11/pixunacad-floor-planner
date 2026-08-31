@@ -32,14 +32,35 @@ export function LayerHelpLegend() {
   );
 }
 
-/** Runder, gut sichtbarer Ebenen-Button oben links auf der Zeichenfläche. */
-export function LayerFab({ count, onClick }: { count: number; onClick: () => void }) {
+/**
+ * Werkzeugleiste über der Zeichenfläche (oben links): Ebenen, Kommentare …
+ * Alle Schalter liegen in derselben Leiste und haben dieselbe Größe.
+ */
+export function CanvasFabBar({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="absolute z-30 left-3 top-3 flex items-center gap-2">
+      {children}
+    </div>
+  );
+}
+
+/** Runder, gut sichtbarer Ebenen-Button für die Werkzeugleiste. */
+export function LayerFab({
+  count,
+  onClick,
+  bare,
+}: {
+  count: number;
+  onClick: () => void;
+  /** true = ohne eigene Positionierung (innerhalb von `CanvasFabBar`). */
+  bare?: boolean;
+}) {
   return (
     <button
       type="button"
       title="Ebenen öffnen"
       onClick={onClick}
-      className="absolute z-30 left-3 top-3 h-12 w-12 rounded-full flex flex-col items-center justify-center gap-0.5 shadow-lg transition-transform hover:scale-105"
+      className={`${bare ? "" : "absolute z-30 left-3 top-3 "}h-12 w-12 rounded-full flex flex-col items-center justify-center gap-0.5 shadow-lg transition-transform hover:scale-105`}
       style={{
         background: "hsl(var(--surface-card))",
         color: "hsl(var(--ink))",
@@ -51,3 +72,4 @@ export function LayerFab({ count, onClick }: { count: number; onClick: () => voi
     </button>
   );
 }
+

@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getNetworkClient, networkConfigured } from "@/lib/networkClient";
 import { supabase as authClient } from "@/lib/supabase";
+import { ensureSharedProject } from "@/lib/projectRegistration";
 
 export type CommentContext = "cad" | "mappe";
 export type CommentStatus = "open" | "done";
@@ -35,6 +36,10 @@ export interface ProjectComment {
   edited_at: string | null;
   resolved_at: string | null;
   resolved_by: string | null;
+  /** Antwort auf einen anderen Kommentar (null = Ausgangskommentar). */
+  parent_id: string | null;
+  /** Erwähnte Benutzer-IDs – reine Information, keine Rechtevergabe. */
+  mentions: string[];
 }
 
 export interface CommentAuthor {
@@ -44,7 +49,8 @@ export interface CommentAuthor {
 }
 
 const COLUMNS =
-  "id,project_id,context,sheet_id,book_id,pos_x,pos_y,body,author_id,status,created_at,updated_at,edited_at,resolved_at,resolved_by";
+  "id,project_id,context,sheet_id,book_id,pos_x,pos_y,body,author_id,status,created_at,updated_at,edited_at,resolved_at,resolved_by,parent_id,mentions";
+
 
 /* ------------------------------------------------ Kommentarmodus (UI-Zustand) */
 
@@ -55,9 +61,11 @@ interface CommentUiState {
   visible: boolean;
   /** Statusfilter der Pins. */
   filter: "all" | "open" | "done";
+  /** Anzahl offener Kommentare der aktuellen Fläche (für den Schalter). */
+  openCount: number;
 }
 
-let uiState: CommentUiState = { mode: false, visible: true, filter: "all" };
+let uiState: CommentUiState = { mode: false, visible: true, filter: "all", openCount: 0 };
 const uiListeners = new Set<() => void>();
 const emitUi = () => uiListeners.forEach((fn) => fn());
 
@@ -68,7 +76,10 @@ export const commentUi = {
     return () => { uiListeners.delete(fn); };
   },
   set(patch: Partial<CommentUiState>) {
-    uiState = { ...uiState, ...patch };
+    const next = { ...uiState, ...patch };
+    const same = (Object.keys(next) as (keyof CommentUiState)[]).every((k) => next[k] === uiState[k]);
+    if (same) return;
+    uiState = next;
     emitUi();
   },
   toggleMode() { commentUi.set({ mode: !uiState.mode, visible: true }); },
@@ -179,6 +190,28 @@ export interface NewComment {
   posX: number;
   posY: number;
   body: string;
+  /** Erwähnte Benutzer-IDs (echte IDs, kein Freitext). */
+  mentions?: string[];
+  /** Antwort auf diesen Kommentar. */
+  parentId?: string | null;
+}
+
+/** Technische Fehler in verständliches Deutsch übersetzen. */
+export function commentErrorMessage(error: unknown, fallback: string): string {
+  const raw = (error as { message?: string })?.message ?? "";
+  const code = (error as { code?: string })?.code ?? "";
+  if (/row-level security/i.test(raw) || code === "42501") {
+    return "Keine Berechtigung zum Kommentieren in diesem Projekt.";
+  }
+  if (code === "PGRST205" || /schema cache/i.test(raw)) {
+    return "Die Datenbank-Einrichtung fehlt. Bitte die SQL-Migrationen einspielen.";
+  }
+  if (/parent_id|mentions/.test(raw) && /column/i.test(raw)) {
+    return "Bitte die neueste SQL-Migration (Antworten & Erwähnungen) einspielen.";
+  }
+  if (/Nur der Autor/.test(raw)) return raw;
+  if (/JWT|not authenticated|401/i.test(raw)) return "Bitte erneut anmelden.";
+  return raw ? `${fallback} (${raw})` : fallback;
 }
 
 export interface CommentsApi {
@@ -194,7 +227,10 @@ export interface CommentsApi {
   remove: (id: string) => Promise<boolean>;
   reload: () => Promise<void>;
   canModerate: boolean;
+  /** Fehlermeldung zurücksetzen (Eingabe bleibt erhalten). */
+  clearError: () => void;
 }
+
 
 export function useSheetComments(opts: {
   projectId: string | undefined;
@@ -202,8 +238,11 @@ export function useSheetComments(opts: {
   sheetId: string | undefined;
   bookId?: string | null;
   canModerate?: boolean;
+  /** Anzeigename für die serverseitige Projektanmeldung. */
+  projectName?: string;
 }): CommentsApi {
-  const { projectId, context, sheetId, bookId = null, canModerate = false } = opts;
+  const { projectId, context, sheetId, bookId = null, canModerate = false, projectName } = opts;
+
   const [comments, setComments] = useState<ProjectComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
@@ -260,14 +299,34 @@ export function useSheetComments(opts: {
     return () => { void client.removeChannel(channel); };
   }, [projectId, load]);
 
-  const create = useCallback<CommentsApi["create"]>(async ({ posX, posY, body }) => {
+  const create = useCallback<CommentsApi["create"]>(async ({ posX, posY, body, mentions, parentId }) => {
     const client = getNetworkClient();
     const text = body.trim();
-    if (!client || !projectId || !sheetId || !text) return null;
+    if (!text) return null;
+    if (!client || !projectId || !sheetId) {
+      setError("Kommentare benötigen ein geöffnetes Projekt und eine Anmeldung.");
+      return null;
+    }
+    // Erst die berechtigte Projektzuordnung sicherstellen – sonst lehnt RLS ab.
+    const ensured = await ensureSharedProject(projectId, projectName);
+    if (!ensured.ok) {
+      setError(ensured.message ?? "Projektzuordnung fehlgeschlagen.");
+      return null;
+    }
     try {
       const { data, error: err } = await client
         .from("project_comments")
-        .insert({ project_id: projectId, context, sheet_id: sheetId, book_id: bookId, pos_x: posX, pos_y: posY, body: text })
+        .insert({
+          project_id: projectId,
+          context,
+          sheet_id: sheetId,
+          book_id: bookId,
+          pos_x: posX,
+          pos_y: posY,
+          body: text,
+          mentions: mentions?.length ? Array.from(new Set(mentions)) : [],
+          parent_id: parentId ?? null,
+        })
         .select(COLUMNS)
         .single();
       if (err) throw err;
@@ -276,10 +335,11 @@ export function useSheetComments(opts: {
       setError(null);
       return row;
     } catch (e: any) {
-      setError(e?.message ?? "Kommentar konnte nicht gespeichert werden.");
+      setError(commentErrorMessage(e, "Kommentar konnte nicht gespeichert werden."));
       return null;
     }
-  }, [projectId, context, sheetId, bookId]);
+  }, [projectId, context, sheetId, bookId, projectName]);
+
 
   const patch = useCallback(async (id: string, values: Record<string, unknown>, failure: string) => {
     const client = getNetworkClient();
@@ -297,7 +357,7 @@ export function useSheetComments(opts: {
       setError(null);
       return true;
     } catch (e: any) {
-      setError(e?.message ?? failure);
+      setError(commentErrorMessage(e, failure));
       return false;
     }
   }, []);
@@ -323,12 +383,17 @@ export function useSheetComments(opts: {
       setError(null);
       return true;
     } catch (e: any) {
-      setError(e?.message ?? "Kommentar konnte nicht gelöscht werden.");
+      setError(commentErrorMessage(e, "Kommentar konnte nicht gelöscht werden."));
       return false;
     }
   }, []);
 
-  return { comments, loading, ready, error, myId, create, updateBody, setStatus, remove, reload: load, canModerate };
+  const clearError = useCallback(() => setError(null), []);
+
+  return {
+    comments, loading, ready, error, myId, create, updateBody, setStatus,
+    remove, reload: load, canModerate, clearError,
+  };
 }
 
 /* ------------------------------------------- Auswertung für die Team-Ansicht */
