@@ -8,7 +8,7 @@
  * Zusätzlich lassen sich hier die eigenen Abwesenheiten pflegen.
  */
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import {
   ABSENCE_LABEL,
@@ -90,6 +90,7 @@ export function OpsCalendarTab({
   const [fromFilter, setFromFilter] = useState("");
   const [toFilter, setToFilter] = useState("");
 
+  const [projectMenu, setProjectMenu] = useState(false);
   const [form, setForm] = useState(false);
   const [kind, setKind] = useState<AbsenceKind>("vacation");
   const [from, setFrom] = useState(() => isoDate(new Date()));
