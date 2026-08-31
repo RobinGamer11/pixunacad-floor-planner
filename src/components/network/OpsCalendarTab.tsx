@@ -46,13 +46,24 @@ export function OpsCalendarTab({
   projectIds,
   projectNames,
   peopleById,
+  selectedDates,
+  onSelectDate,
+  hiddenProjects,
+  onToggleProject,
 }: {
   projectIds: string[];
   projectNames: Map<string, string>;
   peopleById: Map<string, string>;
+  /** Optional: Tagesauswahl von außen steuern (Beiträge des Tages). */
+  selectedDates?: string[];
+  onSelectDate?: (day: string) => void;
+  /** Optional: Projekt-Sichtbarkeit kontrolliert von außen führen. */
+  hiddenProjects?: Set<string>;
+  onToggleProject?: (id: string) => void;
 }) {
   /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
+  const [hiddenState, setHidden] = useState<Set<string>>(() => new Set());
+  const hidden = hiddenProjects ?? hiddenState;
   const activeProjects = useMemo(
     () => projectIds.filter((id) => !hidden.has(id)),
     [projectIds, hidden],
@@ -192,12 +203,14 @@ export function OpsCalendarTab({
   const broken = sources.filter((s) => s.status !== "ready" && s.status !== "loading");
   const cloudBlocked = broken.length === sources.length;
 
-  const toggleProject = (id: string) =>
+  const toggleProject = (id: string) => {
+    if (onToggleProject) { onToggleProject(id); return; }
     setHidden((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
 
   const people = Array.from(peopleById.entries());
 
