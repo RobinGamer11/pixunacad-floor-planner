@@ -1027,6 +1027,28 @@ export const projectStore = {
     writeBlockListeners.add(fn);
     return () => { writeBlockListeners.delete(fn); };
   },
+  /**
+   * Übernahme von Daten aus der gemeinsamen Datenbasis (kein Benutzer-Edit):
+   * umgeht den Schreibschutz bewusst und erzeugt keinen Undo-Schritt.
+   */
+  applySharedProject: (incoming: Project) => {
+    _systemWrite = true;
+    const prevSuspend = _suspendHistory;
+    _suspendHistory = true;
+    try {
+      setState((s) => {
+        const exists = s.projects.some((p) => p.id === incoming.id);
+        return {
+          projects: exists
+            ? s.projects.map((p) => (p.id === incoming.id ? migrateProject(incoming) : p))
+            : [migrateProject(incoming), ...s.projects],
+        };
+      });
+    } finally {
+      _suspendHistory = prevSuspend;
+      _systemWrite = false;
+    }
+  },
   createProject: () => {
     const id = `p-${Date.now().toString(36)}`;
     const firstPageId = `${id}-p1`;
