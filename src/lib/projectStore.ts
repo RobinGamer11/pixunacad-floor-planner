@@ -1268,7 +1268,12 @@ export const projectStore = {
       ),
     }));
   },
-  addPage: (projectId: string, mappeId?: string) => {
+  /**
+   * Neue Seite anlegen. `refPageId` = aktuell ausgewählte Seite: Deren
+   * Seiteneinstellungen (Format, Ränder, Hintergrund, Spalten, Hilfslinien,
+   * Lochung, freie Papiergröße) werden für die neue Seite übernommen.
+   */
+  addPage: (projectId: string, mappeId?: string, refPageId?: string) => {
     const newId = `${projectId}-p${Date.now().toString(36)}`;
     setState((s) => ({
       projects: s.projects.map((p) => {
@@ -1279,6 +1284,15 @@ export const projectStore = {
         const mappen = (p.mappen ?? []).map((m) =>
           m.id === targetMappe ? { ...m, pageIds: [...m.pageIds, newId] } : m
         );
+        const ref =
+          (refPageId ? p.pages.find((pg) => pg.id === refPageId) : undefined) ??
+          (targetMappe
+            ? p.pages.find(
+                (pg) =>
+                  pg.id ===
+                  (p.mappen ?? []).find((m) => m.id === targetMappe)?.pageIds.slice(-1)[0],
+              )
+            : undefined);
         return {
           ...p,
           updatedAt: new Date().toISOString(),
@@ -1287,9 +1301,16 @@ export const projectStore = {
             {
               id: newId,
               title: `${num} Neue Seite`,
-              format: "A3-quer",
-              margins: 20,
-              background: false,
+              format: ref?.format ?? "A3-quer",
+              margins: ref?.margins ?? 20,
+              background: ref?.background ?? false,
+              columns: ref?.columns,
+              columnGap: ref?.columnGap,
+              guides: ref?.guides,
+              punchPattern: ref?.punchPattern,
+              punchSide: ref?.punchSide,
+              customWidthMm: ref?.customWidthMm,
+              customHeightMm: ref?.customHeightMm,
               elements: [],
               cadOverlay: seedSpanOverlay(
                 undefined,

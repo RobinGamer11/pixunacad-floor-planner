@@ -53,12 +53,15 @@ function ProjectStandRow({
   onToggle,
   peopleById,
   onShowItem,
+  /** Ohne Kopfzeile: Inhalt (die drei Reiter) wird direkt angezeigt. */
+  headless = false,
 }: {
   project: OpsOverviewProject;
   open: boolean;
   onToggle: () => void;
   peopleById?: Map<string, string>;
   onShowItem?: (item: TlItem) => void;
+  headless?: boolean;
 }) {
   const ids = useMemo(() => [project.id], [project.id]);
   const times = useTimeEntriesForProjects(ids);
@@ -87,22 +90,27 @@ function ProjectStandRow({
   const deviceCount = devices.devices.filter((d) => !d.archived).length;
 
   return (
-    <div className="rounded-lg border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))" }}>
-      <div className="flex items-center gap-3 px-3 py-2">
-        <button type="button" onClick={onToggle} className="flex items-center gap-2 min-w-0 flex-1 text-left">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: projectColor(project.id) }} />
-          <span className="min-w-0">
-            <span className="block text-sm truncate">{project.name}</span>
-            <span className="block text-[11px] text-muted-foreground truncate">
-              {(state?.period.start || "offen")} – {(state?.period.end || "offen")} · {formatMinutes(totalMinutes)} erfasst
+    <div
+      className={headless ? "" : "rounded-lg border overflow-hidden"}
+      style={headless ? undefined : { borderColor: "hsl(var(--hairline))" }}
+    >
+      {!headless && (
+        <div className="flex items-center gap-3 px-3 py-2">
+          <button type="button" onClick={onToggle} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: projectColor(project.id) }} />
+            <span className="min-w-0">
+              <span className="block text-sm truncate">{project.name}</span>
+              <span className="block text-[11px] text-muted-foreground truncate">
+                {(state?.period.start || "offen")} – {(state?.period.end || "offen")} · {formatMinutes(totalMinutes)} erfasst
+              </span>
             </span>
-          </span>
-        </button>
-      </div>
+          </button>
+        </div>
+      )}
 
-      {open && (
-        <div className="px-3 pb-3 flex flex-col gap-2">
+      {(headless || open) && (
+        <div className={`${headless ? "" : "px-3 pb-3"} flex flex-col gap-2`}>
           {/* Reiter nebeneinander – „Beiträge“ ist zuerst geöffnet. */}
           <div className="flex flex-wrap items-center gap-2">
             {([
@@ -218,7 +226,12 @@ export function OpsOverview({
     });
   }, [projects, tick]);
 
-  const [selectedDate, setSelectedDate] = useState<string | undefined>();
+  /** Vorauswahl: immer der heutige Tag. */
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(() => {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  });
   /** Beitrag im Kalender darüber zeigen – kein Sprung in die Projekt-Orga. */
   const showInCalendar = (date?: string) => {
     if (!date) return;
@@ -243,7 +256,7 @@ export function OpsOverview({
       )}
 
       {/* Aktionen – dieselben Daten wie im Projektbereich. */}
-      <div className="mb-4">
+      <div className={fixedProjectId ? "mt-4 mb-4" : "mb-4"}>
         <OpsActionBar
           projects={projects}
           fixedProjectId={fixedProjectId}
@@ -272,7 +285,7 @@ export function OpsOverview({
       <div className="space-y-6">
         {/* Beiträge – standardmäßig eingeklappt */}
         <Collapsible
-          title={`BEITRÄGE${selectedDate ? ` · ${selectedDate}` : ` · ${visible.length}`}`}
+          title={`ALLE BEITRÄGE${selectedDate ? ` · ${selectedDate}` : ` · ${visible.length}`}`}
           right={selectedDate ? (
             <button onClick={() => setSelectedDate(undefined)} className="text-[11px] text-muted-foreground hover:text-foreground">
               Filter zurücksetzen
@@ -335,28 +348,44 @@ export function OpsOverview({
           )}
         </Collapsible>
 
-        {/* Allgemeines: alle Geräte/Werkzeuge und ihre Gesamtnutzung */}
-        <Collapsible title="ALLGEMEINES">
-          <DeviceInsights projectNames={opsProjectNames} peopleById={opsPeople} />
-        </Collapsible>
-
-        {/* Projektstände */}
-        <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-          <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
-          <div className="space-y-2">
-            {projects.map((p) => (
-              <ProjectStandRow
-                key={p.id}
-                project={p}
-                open={previewId === p.id}
-                onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
-                peopleById={opsPeople}
-                onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
-              />
-            ))}
-            {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+        {fixedProjectId ? (
+          /* Projektbereich: direkt der Projektstand des geöffneten Projekts. */
+          <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+            <ProjectStandRow
+              headless
+              project={projects.find((p) => p.id === fixedProjectId) ?? { id: fixedProjectId, name: "" }}
+              open
+              onToggle={() => {}}
+              peopleById={opsPeople}
+              onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
+            />
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Alle Gerätebuchungen: alle Geräte/Werkzeuge und ihre Gesamtnutzung */}
+            <Collapsible title="ALLE GERÄTEBUCHUNGEN">
+              <DeviceInsights projectNames={opsProjectNames} peopleById={opsPeople} />
+            </Collapsible>
+
+            {/* Projektstände */}
+            <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+              <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
+              <div className="space-y-2">
+                {projects.map((p) => (
+                  <ProjectStandRow
+                    key={p.id}
+                    project={p}
+                    open={previewId === p.id}
+                    onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
+                    peopleById={opsPeople}
+                    onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
+                  />
+                ))}
+                {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

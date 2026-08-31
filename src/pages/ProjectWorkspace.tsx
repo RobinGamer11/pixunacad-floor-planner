@@ -1868,7 +1868,7 @@ export default function ProjectWorkspace() {
                       // Im Vorlagenkontext bleibt die neue Seite in derselben Vorlage.
                       const id = templateKey
                         ? projectStore.addTemplatePage(project.id, templateKey, TEMPLATE_LABEL[templateInfo!.type] ?? "Neue Seite")
-                        : projectStore.addPage(project.id);
+                        : projectStore.addPage(project.id, undefined, activePageId ?? undefined);
                       if (id) setActivePageId(id);
                     }}
                     title="Seite hinzufügen"
