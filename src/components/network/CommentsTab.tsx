@@ -15,11 +15,17 @@ import { formatWhen } from "@/components/comments/CommentLayerUi";
 export function CommentsTab({
   projects,
   peopleById,
+  initialProjectId,
 }: {
   projects: { id: string; name: string }[];
   peopleById: Map<string, string>;
+  /** Vorauswahl, wenn aus einer Projektzeile heraus geöffnet. */
+  initialProjectId?: string;
 }) {
-  const [projectId, setProjectId] = React.useState<string>(projects[0]?.id ?? "");
+  const [projectId, setProjectId] = React.useState<string>(initialProjectId ?? projects[0]?.id ?? "");
+  React.useEffect(() => {
+    if (initialProjectId) setProjectId(initialProjectId);
+  }, [initialProjectId]);
   React.useEffect(() => {
     if (!projects.some((p) => p.id === projectId)) setProjectId(projects[0]?.id ?? "");
   }, [projects, projectId]);
