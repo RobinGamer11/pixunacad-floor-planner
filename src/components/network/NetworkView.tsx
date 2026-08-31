@@ -22,6 +22,14 @@ import {
   type LocalProjectRef,
 } from "@/lib/networkStore";
 import { useUnreadChats, type ChatTarget } from "@/lib/chatStore";
+import {
+  ROLE_LABEL,
+  effectivePermissions,
+  permissionsForRole,
+  type ProjectPermissionOverrides,
+  type ProjectRole,
+} from "@/lib/projectAccess";
+import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
 
@@ -227,14 +235,43 @@ export function NetworkView({
     for (const m of net.members) {
       if (!map.has(m.project_id)) continue;
       if (m.user_id === net.myId) continue;
-      const person = contactsById.get(m.user_id);
+      // Auch Projektmitglieder ohne persönlichen Kontakt gehören ins Team.
+      const person = contactsById.get(m.user_id) ?? net.peopleById.get(m.user_id);
       if (!person) continue;
       map.get(m.project_id)!.push(person);
       assigned.add(person.id);
     }
     const general = net.contacts.filter((c) => !assigned.has(c.id));
     return { map, general };
-  }, [contactsById, net.contacts, net.members, net.myId, projects]);
+  }, [contactsById, net.contacts, net.members, net.myId, net.peopleById, projects]);
+
+  /** Mitgliedszeile (Rolle + Abweichungen) je Projekt/Person. */
+  const memberRow = (projectId: string, userId: string) =>
+    net.members.find((m) => m.project_id === projectId && m.user_id === userId);
+
+  /** Echter Besitzer laut gemeinsamer Datenbasis – keine Annahme „Du". */
+  const ownerOf = (projectId: string) => {
+    const row = net.sharedProjects.find((p) => p.id === projectId);
+    if (!row) return { id: null as string | null, label: "Du (lokal)" };
+    if (row.owner_id === net.myId) return { id: row.owner_id, label: "Du" };
+    return { id: row.owner_id, label: net.peopleById.get(row.owner_id)?.name ?? "Unbekannt" };
+  };
+
+  /** Darf ich in diesem Projekt Mitglieder verwalten? */
+  const canManageProject = (projectId: string) => {
+    const row = net.sharedProjects.find((p) => p.id === projectId);
+    if (!row) return true; // rein lokales Projekt gehört mir.
+    if (row.owner_id === net.myId) return true;
+    const mine = memberRow(projectId, net.myId ?? "");
+    if (!mine) return false;
+    return effectivePermissions(mine.role as ProjectRole, mine.permissions ?? undefined).canManageMembers;
+  };
+
+  /** Offene Beiträge einer Person in einem Projekt. */
+  const openContributions = (projectId: string, userId: string) =>
+    timelineStore
+      .getState(projectId)
+      .items.filter((i) => (i.assignees ?? []).includes(userId) && effectiveStatusId(i) !== "done").length;
 
   const projectsOfPerson = (userId: string) =>
     net.members
