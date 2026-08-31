@@ -23,7 +23,11 @@ import {
   ContributionAttachmentsPanel,
 } from "@/components/board/ContributionOpsPanels";
 import { useProjectAccess } from "@/lib/projectAccess";
-import { ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices } from "@/lib/opsStore";
+import {
+  ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices, useTimeEntries,
+  formatMinutes, netMinutes,
+} from "@/lib/opsStore";
+import { TimeEntryDialog } from "@/components/board/TimeEntryDialog";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
