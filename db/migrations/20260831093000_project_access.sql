@@ -147,6 +147,7 @@ create policy "project_members_update_manager" on public.project_members
   with check (public.project_can_manage_members(project_id, auth.uid()));
 
 drop policy if exists "project_members_delete_owner_or_self" on public.project_members;
+drop policy if exists "project_members_delete_manager_or_self" on public.project_members;
 create policy "project_members_delete_manager_or_self" on public.project_members
   for delete to authenticated
   using (public.project_can_manage_members(project_id, auth.uid()) or user_id = auth.uid());
