@@ -3078,10 +3078,31 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         }}
       />
 
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <h1 className="text-2xl font-semibold tracking-tight">Organisation</h1>
         <span className="text-sm text-muted-foreground">projektübergreifend</span>
       </div>
+
+      {/* Aktionen – dieselben Daten wie im Projektbereich, nur ohne Projektfilter. */}
+      <div className="mb-4">
+        <OpsActionBar
+          projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+          showContribution
+          onChanged={() => setOpsNonce((n) => n + 1)}
+        />
+      </div>
+
+      {/* Projektübergreifender Kalender: Beiträge, Arbeitszeiten, Abwesenheiten, Buchungen. */}
+      <div className="mb-6 rounded-xl border p-3"
+           style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+        <OpsCalendarTab
+          key={opsNonce}
+          projectIds={projects.map((p) => p.id)}
+          projectNames={opsProjectNames}
+          peopleById={opsPeople}
+        />
+      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         {/* Aufgaben-Liste */}
