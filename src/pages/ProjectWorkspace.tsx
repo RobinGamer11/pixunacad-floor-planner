@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
+import { CommentLayer } from "@/components/comments/CommentLayer";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
@@ -3329,6 +3330,9 @@ function PageCanvas({
           }}
 
         >
+        {/* Kommentare (getrennt gespeichert, kein Seitenelement) */}
+        <CommentLayer projectId={projectId} pageId={page.id} />
+
         {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
             touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
         {marquee && (() => {
