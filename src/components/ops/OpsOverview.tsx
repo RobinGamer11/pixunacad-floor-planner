@@ -226,7 +226,12 @@ export function OpsOverview({
     });
   }, [projects, tick]);
 
-  const [selectedDate, setSelectedDate] = useState<string | undefined>();
+  /** Vorauswahl: immer der heutige Tag. */
+  const [selectedDate, setSelectedDate] = useState<string | undefined>(() => {
+    const d = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  });
   /** Beitrag im Kalender darüber zeigen – kein Sprung in die Projekt-Orga. */
   const showInCalendar = (date?: string) => {
     if (!date) return;
