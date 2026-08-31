@@ -3125,13 +3125,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         <div className="space-y-6">
           <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
             <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <span>AUFGABEN {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
+              <span>BEITRÄGE {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
               {selectedDate && (
                 <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
               )}
             </div>
             {visible.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground">Keine offenen Aufgaben.</div>
+              <div className="p-6 text-sm text-muted-foreground">Keine offenen Beiträge.</div>
             ) : (
               <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
                 {visible.map((t) => (
@@ -3159,7 +3159,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
                         {t.title}
                         <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
                               style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
-                          {t.kind === "task" ? "Aufgabe" : t.kind === "event" ? "Termin" : "Notiz"}
+                          {t.kind === "task" ? "Beitrag" : t.kind === "event" ? "Termin" : "Notiz"}
                         </span>
                       </div>
                       <div className="text-[11px] text-muted-foreground truncate">
