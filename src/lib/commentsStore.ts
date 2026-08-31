@@ -61,9 +61,11 @@ interface CommentUiState {
   visible: boolean;
   /** Statusfilter der Pins. */
   filter: "all" | "open" | "done";
+  /** Anzahl offener Kommentare der aktuellen Fläche (für den Schalter). */
+  openCount: number;
 }
 
-let uiState: CommentUiState = { mode: false, visible: true, filter: "all" };
+let uiState: CommentUiState = { mode: false, visible: true, filter: "all", openCount: 0 };
 const uiListeners = new Set<() => void>();
 const emitUi = () => uiListeners.forEach((fn) => fn());
 
@@ -74,7 +76,10 @@ export const commentUi = {
     return () => { uiListeners.delete(fn); };
   },
   set(patch: Partial<CommentUiState>) {
-    uiState = { ...uiState, ...patch };
+    const next = { ...uiState, ...patch };
+    const same = (Object.keys(next) as (keyof CommentUiState)[]).every((k) => next[k] === uiState[k]);
+    if (same) return;
+    uiState = next;
     emitUi();
   },
   toggleMode() { commentUi.set({ mode: !uiState.mode, visible: true }); },

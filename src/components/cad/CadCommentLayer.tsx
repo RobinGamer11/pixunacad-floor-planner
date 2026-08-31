@@ -123,6 +123,7 @@ export function CadCommentLayer({
     [comments],
   );
   const openCount = comments.filter((c) => !c.parent_id && c.status === "open").length;
+  React.useEffect(() => { commentUi.set({ openCount }); }, [openCount]);
 
   const onCanvasClick = (e: React.PointerEvent) => {
     if (!ui.mode || !cam || !hostRef.current) return;
