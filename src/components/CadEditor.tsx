@@ -12,6 +12,7 @@ import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
+import { CadCommentLayer } from "@/components/cad/CadCommentLayer";
 import { TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
@@ -2045,6 +2046,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           selectedId={tableSelectedId}
           setSelectedId={setTableSelectedId}
         />
+
+        {/* Kommentare (DOM-Overlay, kein Zeichenobjekt) */}
+        {!presenting && (
+          <CadCommentLayer app={appRef.current} projectId={projectId} />
+        )}
 
         {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
         {!presenting && helpOn && (

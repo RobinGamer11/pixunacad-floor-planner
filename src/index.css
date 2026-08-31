@@ -1209,3 +1209,8 @@
   filter: invert(1) hue-rotate(180deg) saturate(1.7) contrast(0.82) brightness(1.12);
 }
 
+
+
+/* Kommentare sind Zusammenarbeits-Hinweise und nie Teil eines Exports/Drucks. */
+.pixuna-exporting .pixuna-comments { display: none !important; }
+@media print { .pixuna-comments { display: none !important; } }
