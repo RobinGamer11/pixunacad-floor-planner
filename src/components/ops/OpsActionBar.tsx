@@ -62,6 +62,7 @@ export function OpsActionBar({
   defaultItemId,
   onChanged,
   extra,
+  showContribution,
 }: {
   projects: OpsProjectRef[];
   /** Projektbereich: Projekt ist fest vorgegeben und nicht wählbar. */
@@ -70,6 +71,8 @@ export function OpsActionBar({
   onChanged?: () => void;
   /** Zusätzliche Schaltflächen (z. B. „+ Beitrag“) links davor. */
   extra?: React.ReactNode;
+  /** Startseite: eigener „+ Beitrag“-Dialog mit Projektauswahl. */
+  showContribution?: boolean;
 }) {
   const [dialog, setDialog] = useState<DialogId | null>(null);
   const ids = useMemo(() => projects.map((p) => p.id), [projects]);
@@ -95,11 +98,15 @@ export function OpsActionBar({
     <>
       <div className="flex flex-wrap items-center gap-2">
         {extra}
+        {showContribution && btn("item", <ListPlus size={14} />, "+ Beitrag")}
         {btn("time", <Clock size={14} />, "+ Zeiterfassung")}
         {btn("absence", <CalendarOff size={14} />, "+ Abwesenheit")}
         {btn("booking", <Wrench size={14} />, "+ Buchung Geräte/Werkzeuge")}
       </div>
 
+      {dialog === "item" && (
+        <ContributionDialog projects={projects} fixedProjectId={fixedProjectId} onClose={close} />
+      )}
       {dialog === "time" && (
         <TimeDialog
           projects={projects}
@@ -120,6 +127,7 @@ export function OpsActionBar({
         />
       )}
     </>
+
   );
 }
 
