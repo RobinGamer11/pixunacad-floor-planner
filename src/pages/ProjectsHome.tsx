@@ -2889,6 +2889,9 @@ function ProjectStandRow({
   const peopleCount = usePeopleCount(ids);
   const devices = useDevices(project.id);
   const [tick, setTick] = useState(0);
+  /** Reiter innerhalb einer Projektzeile – „Beiträge“ ist die Vorauswahl. */
+  const [standTab, setStandTab] = useState<"items" | "time" | "dev">("items");
+
   useEffect(() => subscribeTimeline(project.id, () => setTick((t) => t + 1)), [project.id]);
 
   const state = useMemo(() => {
@@ -2932,8 +2935,30 @@ function ProjectStandRow({
 
       {open && (
         <div className="px-3 pb-3 flex flex-col gap-2">
-          <Collapsible title="Beiträge" badge={items.length} dense>
-            {items.length === 0 ? (
+          {/* Reiter nebeneinander – „Beiträge“ ist zuerst geöffnet. */}
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              ["items", "Beiträge", items.length],
+              ["time", "Zeiterfassung", peopleCount],
+              ["dev", "Geräte/Werkzeuge", deviceCount],
+            ] as const).map(([id, label, count]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setStandTab(id)}
+                className="h-7 px-2.5 rounded-md border text-[11px]"
+                style={{
+                  borderColor: standTab === id ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  background: standTab === id ? "hsl(var(--accent-gold) / 0.14)" : "transparent",
+                }}
+              >
+                {label} <span className="tabular-nums text-muted-foreground">({count})</span>
+              </button>
+            ))}
+          </div>
+
+          {standTab === "items" && (
+            items.length === 0 ? (
               <div className="text-[11px] text-muted-foreground">Keine Beiträge.</div>
             ) : (
               <div className="flex flex-col gap-1">
@@ -2950,18 +2975,14 @@ function ProjectStandRow({
                   </button>
                 ))}
               </div>
-            )}
-          </Collapsible>
+            )
+          )}
 
-          <Collapsible title="Zeiterfassung" badge={peopleCount} dense>
-            <TimeInsights projectIds={ids} peopleById={peopleById} />
-          </Collapsible>
-
-          <Collapsible title="Geräte/Werkzeuge" badge={deviceCount} dense>
-            <DeviceInsights projectIds={ids} peopleById={peopleById} />
-          </Collapsible>
+          {standTab === "time" && <TimeInsights projectIds={ids} peopleById={peopleById} />}
+          {standTab === "dev" && <DeviceInsights projectIds={ids} peopleById={peopleById} />}
         </div>
       )}
+
     </div>
   );
 }

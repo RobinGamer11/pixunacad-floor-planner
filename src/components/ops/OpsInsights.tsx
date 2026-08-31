@@ -5,7 +5,7 @@
  * (`time_entries`, `absences`, `devices`/`device_bookings`, Projektmitglieder).
  * Es werden keine neuen Tabellen und keine zweite Zählerhaltung eingeführt.
  */
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   ABSENCE_LABEL,
@@ -68,64 +68,103 @@ export function Collapsible({
   );
 }
 
+/**
+ * Kreisdiagramm – optisch und funktional identisch zum Kategorien-Diagramm
+ * der Orga-Oberfläche: anklickbare Segmente, hervorgehobene Auswahl,
+ * abgedunkelte übrige Segmente und ein Mittelpunkt zum Zurücksetzen.
+ */
 export function MiniPie({
   slices,
-  size = 132,
-  hole = 0.5,
+  activeId = null,
+  onSlice,
+  onCenter,
 }: {
   slices: { id: string; value: number; color: string }[];
-  size?: number;
-  hole?: number;
+  activeId?: string | null;
+  onSlice?: (id: string) => void;
+  onCenter?: () => void;
 }) {
   const total = slices.reduce((a, s) => a + s.value, 0);
-  const C = size / 2;
-  const R = C - 2;
+  const R = 74;
+  const C = 84;
   if (!total) {
     return (
-      <svg width={size} height={size} aria-hidden>
-        <circle cx={C} cy={C} r={R} fill="none" stroke={LINE} strokeWidth={10} />
+      <svg width={C * 2} height={C * 2} aria-hidden>
+        <circle cx={C} cy={C} r={R - 18} fill="none" stroke={LINE} strokeWidth={10} />
       </svg>
     );
   }
   let acc = -Math.PI / 2;
   return (
-    <svg width={size} height={size}>
+    <svg width={C * 2} height={C * 2}>
       {slices.filter((s) => s.value > 0).map((s) => {
         const ang = (s.value / total) * Math.PI * 2;
         const a0 = acc;
         const a1 = acc + ang;
         acc = a1;
+        const r = activeId === s.id ? R + 6 : R;
         const large = ang > Math.PI ? 1 : 0;
         const d =
           ang >= Math.PI * 2 - 1e-6
-            ? `M ${C} ${C - R} A ${R} ${R} 0 1 1 ${C - 0.01} ${C - R} Z`
-            : `M ${C} ${C} L ${C + Math.cos(a0) * R} ${C + Math.sin(a0) * R} A ${R} ${R} 0 ${large} 1 ${C + Math.cos(a1) * R} ${C + Math.sin(a1) * R} Z`;
-        return <path key={s.id} d={d} fill={s.color} />;
+            ? `M ${C} ${C - r} A ${r} ${r} 0 1 1 ${C - 0.01} ${C - r} Z`
+            : `M ${C} ${C} L ${C + Math.cos(a0) * r} ${C + Math.sin(a0) * r} A ${r} ${r} 0 ${large} 1 ${C + Math.cos(a1) * r} ${C + Math.sin(a1) * r} Z`;
+        return (
+          <path
+            key={s.id}
+            d={d}
+            fill={s.color}
+            opacity={activeId && activeId !== s.id ? 0.4 : 1}
+            style={{ cursor: onSlice ? "pointer" : "default" }}
+            onClick={() => onSlice?.(s.id)}
+          />
+        );
       })}
-      {hole > 0 && <circle cx={C} cy={C} r={R * hole} fill="hsl(var(--surface-card))" />}
+      <circle
+        cx={C}
+        cy={C}
+        r={36}
+        fill="hsl(var(--surface-card))"
+        style={{ cursor: onCenter ? "pointer" : "default" }}
+        onClick={() => onCenter?.()}
+      />
     </svg>
   );
 }
 
+/** Legende – dieselben Auswahl-Schaltflächen wie im Kategorien-Diagramm. */
 function Legend({
   rows,
+  activeId = null,
+  onSelect,
 }: {
   rows: { id: string; label: string; color: string; value: string; sub?: string }[];
+  activeId?: string | null;
+  onSelect?: (id: string) => void;
 }) {
   if (!rows.length) return <div className="text-[11px]" style={{ color: SOFT }}>Keine Daten vorhanden.</div>;
   return (
-    <div className="flex flex-col gap-1 min-w-[200px]">
+    <div className="flex flex-col gap-1.5 min-w-[200px]">
       {rows.map((r) => (
-        <div key={r.id} className="flex items-center gap-2 text-[11px]">
+        <button
+          key={r.id}
+          type="button"
+          onClick={() => onSelect?.(r.id)}
+          className="flex items-center gap-2 text-[11px] rounded-md px-2 py-1 text-left"
+          style={{
+            background: activeId === r.id ? "hsl(var(--surface-muted))" : "transparent",
+            opacity: activeId && activeId !== r.id ? 0.55 : 1,
+          }}
+        >
           <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: r.color }} />
           <span className="truncate flex-1">{r.label}</span>
           <span className="tabular-nums shrink-0">{r.value}</span>
           {r.sub && <span className="shrink-0" style={{ color: SOFT }}>· {r.sub}</span>}
-        </div>
+        </button>
       ))}
     </div>
   );
 }
+
 
 const fmtDay = (iso: string) => {
   const d = new Date(iso);
@@ -185,23 +224,44 @@ export function TimeInsights({
 
   const total = rows.reduce((s, r) => s + r.minutes, 0);
 
+  /** Auswahl im Kreisdiagramm – filtert Legende, Summe und Verlauf. */
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const toggle = (id: string) => setActiveId((cur) => (cur === id ? null : id));
+  useEffect(() => {
+    if (activeId && !rows.some((r) => r.id === activeId)) setActiveId(null);
+  }, [rows, activeId]);
+
   const history = useMemo(
-    () => [...times.entries].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)).slice(0, 200),
-    [times.entries],
+    () =>
+      [...times.entries]
+        .filter((e) => !activeId || e.user_id === activeId)
+        .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))
+        .slice(0, 200),
+    [times.entries, activeId],
   );
   const absenceHistory = useMemo(() => {
     const seen = new Set<string>();
     return absences.absences
       .filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)))
+      .filter((a) => !activeId || a.user_id === activeId)
       .sort((a, b) => b.starts_on.localeCompare(a.starts_on))
       .slice(0, 100);
-  }, [absences.absences]);
+  }, [absences.absences, activeId]);
+
+  const activeRow = activeId ? rows.find((r) => r.id === activeId) : null;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-6">
-        <MiniPie slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))} />
+        <MiniPie
+          slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))}
+          activeId={activeId}
+          onSlice={toggle}
+          onCenter={() => setActiveId(null)}
+        />
         <Legend
+          activeId={activeId}
+          onSelect={toggle}
           rows={rows.map((r, i) => ({
             id: r.id,
             label: nameOf(r.id),
@@ -211,7 +271,17 @@ export function TimeInsights({
           }))}
         />
         <div className="text-[11px]" style={{ color: SOFT }}>
-          Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+          {activeRow ? (
+            <>
+              {nameOf(activeRow.id)}:{" "}
+              <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(activeRow.minutes)}</span>
+              {total > 0 && <> · {Math.round((activeRow.minutes / total) * 100)}%</>}
+            </>
+          ) : (
+            <>
+              Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -244,6 +314,7 @@ export function TimeInsights({
     </div>
   );
 }
+
 
 /* ------------------------------------------------------ Geräte / Werkzeuge */
 
@@ -295,17 +366,37 @@ export function DeviceInsights({
   }, [bookings, devices.devices]);
 
   const total = rows.reduce((s, r) => s + r.minutes, 0);
+
+  /** Auswahl im Kreisdiagramm – filtert Legende, Summe und Verlauf. */
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const toggle = (id: string) => setActiveId((cur) => (cur === id ? null : id));
+  useEffect(() => {
+    if (activeId && !rows.some((r) => r.id === activeId)) setActiveId(null);
+  }, [rows, activeId]);
+
   const history = useMemo(
-    () => [...bookings].sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at)).slice(0, 200),
-    [bookings],
+    () =>
+      [...bookings]
+        .filter((b) => !activeId || b.device_id === activeId)
+        .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at))
+        .slice(0, 200),
+    [bookings, activeId],
   );
   const deviceName = (id: string) => devices.devices.find((d) => d.id === id)?.name ?? "Gerät";
+  const activeRow = activeId ? rows.find((r) => r.id === activeId) : null;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-6">
-        <MiniPie slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))} />
+        <MiniPie
+          slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))}
+          activeId={activeId}
+          onSlice={toggle}
+          onCenter={() => setActiveId(null)}
+        />
         <Legend
+          activeId={activeId}
+          onSelect={toggle}
           rows={rows.map((r, i) => ({
             id: r.id,
             label: r.archived ? `${r.name} (archiviert)` : r.name,
@@ -315,9 +406,20 @@ export function DeviceInsights({
           }))}
         />
         <div className="text-[11px]" style={{ color: SOFT }}>
-          Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+          {activeRow ? (
+            <>
+              {activeRow.name}:{" "}
+              <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(activeRow.minutes)}</span>
+              {total > 0 && <> · {Math.round((activeRow.minutes / total) * 100)}%</>}
+            </>
+          ) : (
+            <>
+              Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+            </>
+          )}
         </div>
       </div>
+
 
       <Collapsible title="Verlauf" badge={history.length} dense>
         <div className="flex flex-col gap-1">
