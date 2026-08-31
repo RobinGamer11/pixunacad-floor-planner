@@ -419,9 +419,15 @@ export function strokeWithBrushIfActive(
   const preset = pattern.brushPreset;
   if (!isBrushPresetId(preset)) return false;
   if (!worldPts || worldPts.length < 1) return true;
-  // Live-Vorschau zeigt die Stift-Linienart selbst: Die Stempel sind
-  // weltkoordinaten-verankert (Seed pro Stempelindex), sodass der bereits
-  // gesetzte Teil während des Zeichnens stabil liegen bleibt.
+  // Ruhige Live-Vorschau: Während des Zeichnens wird der Pfad als einfache
+  // Kontur in Stiftfarbe, -deckkraft und -breite gezeichnet (kein Stempeln).
+  // Damit „wandert“ der bereits gesetzte Teil nicht mehr sichtbar mit; der
+  // endgültige Pinselstrich erscheint beim Loslassen.
+  if (opts.liveKey) {
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+    return false;
+  }
 
 
 
