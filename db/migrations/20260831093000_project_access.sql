@@ -20,16 +20,20 @@ alter table public.project_members
   add column if not exists permissions jsonb not null default '{}'::jsonb,
   add column if not exists updated_at timestamptz not null default now();
 
+-- Altbestand ZUERST bereinigen, sonst schlägt der Constraint fehl.
+-- Der ursprüngliche Wert wird in permissions.legacy_role gesichert und geht
+-- damit nicht still verloren.
+update public.project_members
+   set permissions = coalesce(permissions, '{}'::jsonb)
+                     || jsonb_build_object('legacy_role', role),
+       role = case when role = 'owner' then 'admin' else 'member' end
+ where role not in ('admin', 'member', 'viewer');
+
 do $$ begin
   alter table public.project_members
     add constraint project_members_role_valid
     check (role in ('admin', 'member', 'viewer'));
 exception when duplicate_object then null; end $$;
-
--- Altbestand: unbekannte Rollenwerte werden verlustfrei auf 'member' gehoben.
-update public.project_members
-   set role = 'member'
- where role not in ('admin', 'member', 'viewer');
 
 -- ------------------------------------------- 2) Geteilte Projektinhalte
 -- Bewusst getrennt von user_workspaces: dort liegen weiterhin die rein
