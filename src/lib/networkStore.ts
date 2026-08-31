@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getNetworkClient, isMissingSchemaError, networkConfigured } from "@/lib/networkClient";
 import { supabase as authClient } from "@/lib/supabase";
+import type { ProjectPermissionOverrides, ProjectRole } from "@/lib/projectAccess";
 
 export type PresenceStatus = "online" | "away" | "busy" | "offline";
 export type ContactState = "pending" | "accepted" | "declined";
