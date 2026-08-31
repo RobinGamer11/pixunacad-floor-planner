@@ -396,13 +396,11 @@ export function NetworkView({
         </div>
       )}
 
+      {/* Netzwerk ist ein vollwertiger Hauptbereich – volle Contentbreite, einspaltig auf Mobil. */}
       <div
-        className="mt-4 grid gap-4"
-        style={{
-          // Netzwerk ist ein vollwertiger Hauptbereich – volle Contentbreite.
-          gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,420px)" : "minmax(0,1fr)",
-        }}
+        className={`mt-4 grid gap-4 grid-cols-1 ${chat ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]" : ""}`}
       >
+
         <div className="rounded-xl border p-3" style={surface}>
           {net.loading && <div className="p-6 text-center text-sm text-muted-foreground">Netzwerk wird geladen …</div>}
 
