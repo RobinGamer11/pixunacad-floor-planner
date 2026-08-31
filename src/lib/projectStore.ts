@@ -773,9 +773,11 @@ function changeSignature(a: Project, b: Project): string {
  * Import – durch `setState` laufen, greift der Schutz an genau einer Stelle.
  * Serverseitig gilt dieselbe Regel zusätzlich per RLS. */
 let _writeGuard: ((projectId: string) => boolean) | null = null;
+let _systemWrite = false;
 const writeBlockListeners = new Set<(projectId: string) => void>();
 
 function canWriteProject(id: string): boolean {
+  if (_systemWrite) return true;
   if (!_writeGuard) return true;
   try {
     return _writeGuard(id);
