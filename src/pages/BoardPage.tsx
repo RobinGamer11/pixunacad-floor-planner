@@ -521,7 +521,8 @@ export default function BoardPage() {
   // ---- Aktionen --------------------------------------------------------
   const add = (kind: TlKind) => {
     if (!projectId) return;
-    const it = timelineStore.addItem(projectId, kind);
+    // Ohne eigene Datumsangabe erscheint der Beitrag am Tag der Erstellung.
+    const it = timelineStore.addItem(projectId, kind, { startDate: new Date().toISOString().slice(0, 10) });
     setSelectedId(it.id);
   };
 
@@ -565,44 +566,70 @@ export default function BoardPage() {
         <div className="flex-1 min-w-0 overflow-y-auto" style={{ background: "hsl(var(--background))" }}>
           {/* Werkzeugleiste – helles Kartenfeld */}
           <div className="p-4 pb-0">
-            <div className="flex flex-wrap items-center gap-2 rounded-xl p-3"
+            <div className="rounded-xl p-3 flex flex-col gap-2"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
-              <BigAddButton kind="contribution" onClick={() => add("contribution")} />
-              {/* Paket 04: Einstieg für Arbeitszeiten und Abwesenheiten. */}
-              <button
-                onClick={() => setTimeDialog(true)}
-                className="h-10 px-3 rounded-lg border text-xs flex items-center gap-1.5"
-                style={{ borderColor: PANEL_LINE, color: INK }}
-                title="Arbeitszeit oder Abwesenheit erfassen"
-              >
-                <Clock size={14} /> + Zeiterfassung
-              </button>
-              <ProjectPeriodBar
-                projectId={projectId}
-                period={state.period}
-              />
-              <Segmented
-                value={surface}
-                onChange={(v) => setSurface(v as typeof surface)}
-                options={[{ v: "cal", l: "Kalender" }, { v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
-              />
-              <div className="flex-1" />
-              {surface === "ray" && (
-                <>
-                  <Segmented
-                    value={colorMode}
-                    onChange={(v) => setColorMode(v as typeof colorMode)}
-                    options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
-                  />
-                  <Segmented
-                    value={axisMode}
-                    onChange={(v) => setAxisMode(v as typeof axisMode)}
-                    options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
-                  />
-                </>
-              )}
+              {/* 1. Projektzeitraum und Projektstand */}
+              <div className="flex flex-wrap items-center gap-2">
+                <ProjectPeriodBar
+                  projectId={projectId}
+                  period={state.period}
+                />
+              </div>
+
+              {/* 2. Hauptumschaltung der Ansichten */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Segmented
+                  value={surface}
+                  onChange={(v) => setSurface(v as typeof surface)}
+                  options={[{ v: "cal", l: "Kalender" }, { v: "ray", l: "Ansichtstrahl" }, { v: "net", l: "Projektnetz" }]}
+                />
+                <div className="flex-1" />
+                {surface === "ray" && (
+                  <>
+                    <Segmented
+                      value={colorMode}
+                      onChange={(v) => setColorMode(v as typeof colorMode)}
+                      options={[{ v: "status", l: "Farbe: Stand" }, { v: "category", l: "Farbe: Kategorie" }]}
+                    />
+                    <Segmented
+                      value={axisMode}
+                      onChange={(v) => setAxisMode(v as typeof axisMode)}
+                      options={[{ v: "time", l: "Zeitraum" }, { v: "percent", l: "Projektstand %" }]}
+                    />
+                  </>
+                )}
+              </div>
+
+              {/* 3. Erfassen */}
+              <div className="flex flex-wrap items-center gap-2">
+                <BigAddButton kind="contribution" onClick={() => add("contribution")} />
+                {/* Paket 04: Einstieg für Arbeitszeiten und Abwesenheiten. */}
+                <button
+                  onClick={() => setTimeDialog(true)}
+                  className="h-10 px-3 rounded-lg border text-xs flex items-center gap-1.5"
+                  style={{ borderColor: PANEL_LINE, color: INK }}
+                  title="Arbeitszeit oder Abwesenheit erfassen"
+                >
+                  <Clock size={14} /> + Zeiterfassung
+                </button>
+              </div>
             </div>
+
           </div>
+
+          {/* Beitrag bearbeiten – klappt direkt unter „+ Beitrag“ auf */}
+          {selected && projectId && (
+            <div className="px-4 pt-3">
+              <ItemEditor
+                projectId={projectId}
+                item={selected}
+                categories={state.categories}
+                priorities={state.priorities}
+                statuses={state.statuses}
+                onClose={() => setSelectedId(null)}
+              />
+            </div>
+          )}
 
           {/* Kalender-Ansicht – Beiträge, Abwesenheiten und Gerätebuchungen */}
           {surface === "cal" && (
@@ -962,17 +989,6 @@ export default function BoardPage() {
 
         </div>
 
-        {/* Editor */}
-        {selected && projectId && (
-          <ItemEditor
-            projectId={projectId}
-            item={selected}
-            categories={state.categories}
-            priorities={state.priorities}
-            statuses={state.statuses}
-            onClose={() => setSelectedId(null)}
-          />
-        )}
       </div>
       {tabletAidOn && <TabletAidWheel />}
       {timeDialog && projectId && (
@@ -1003,6 +1019,8 @@ function ItemEditor({
   onClose: () => void;
 }) {
   const set = (patch: Partial<TlItem>) => timelineStore.updateItem(projectId, item.id, patch);
+  /** Zunächst nur Name und Beschreibung – alles Weitere hinter „+ Mehr“. */
+  const [more, setMore] = useState(false);
   const prio = priorities.find((p) => p.id === item.priorityId);
   /* Rechte kommen zentral aus dem Projektzugriff (Paket 01). */
   const canEdit = useProjectAccess(projectId).permissions.canEdit;
@@ -1016,7 +1034,7 @@ function ItemEditor({
   }, [item.startDate, item.startTime, item.endDate, item.endTime]);
 
   return (
-    <aside className="w-[340px] shrink-0 border-l overflow-y-auto"
+    <aside className="w-full rounded-xl border overflow-hidden"
            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
       <div className="flex items-center gap-2 px-3 h-12 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         {kindIcon(item.kind, 14)}
@@ -1037,6 +1055,22 @@ function ItemEditor({
           <input className={inputCls} value={item.title} onChange={(e) => set({ title: e.target.value })} />
         </Field>
 
+        <Field label="Beschreibung">
+          <textarea className="w-full min-h-[110px] rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring resize-y"
+                    value={item.description ?? ""}
+                    onChange={(e) => set({ description: e.target.value })} />
+        </Field>
+
+        <button
+          onClick={() => setMore((v) => !v)}
+          className="self-start h-8 px-3 rounded-md border text-xs font-medium"
+          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}
+        >
+          {more ? "– Weniger" : "+ Mehr"}
+        </button>
+
+        {more && (
+        <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:gap-3 md:items-start">
         <Field label="Status">
           <div className="grid grid-cols-3 gap-1.5">
             {statuses.map((s) => {
@@ -1059,16 +1093,16 @@ function ItemEditor({
           </div>
         </Field>
 
-        <Field label="Verantwortliche(r)">
-          <input className={inputCls} placeholder="Name frei eingeben"
-                 value={item.responsible ?? ""} onChange={(e) => set({ responsible: e.target.value })} />
-        </Field>
-
         <AssigneePicker
           projectId={projectId}
           value={item.assignees ?? []}
           onChange={(next) => set({ assignees: next })}
         />
+
+        <Field label="Verantwortliche(r)">
+          <input className={inputCls} placeholder="Name frei eingeben"
+                 value={item.responsible ?? ""} onChange={(e) => set({ responsible: e.target.value })} />
+        </Field>
 
         <ManagedSelect
           label="Kategorie"
@@ -1126,12 +1160,6 @@ function ItemEditor({
           </Field>
         </div>
 
-        <Field label="Beschreibung">
-          <textarea className="w-full min-h-[160px] rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-ring resize-y"
-                    value={item.description ?? ""}
-                    onChange={(e) => set({ description: e.target.value })} />
-        </Field>
-
         <ContributionTimePanel
           projectId={projectId}
           itemId={item.id}
@@ -1146,6 +1174,8 @@ function ItemEditor({
           members={members}
         />
         <ContributionAttachmentsPanel projectId={projectId} itemId={item.id} canEdit={canEdit} />
+        </div>
+        )}
       </div>
     </aside>
   );

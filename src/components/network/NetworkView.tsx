@@ -38,6 +38,7 @@ import {
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
+import { MemberRoleControls } from "@/components/network/MemberRoleControls";
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
 
@@ -170,13 +171,16 @@ function Group({
   );
 }
 
-type TabId = "contacts" | "teams" | "requests" | "calendar" | "devices" | "comments";
+type TabId = "contacts" | "teams" | "requests" | "devices" | "comments";
 
 export function NetworkView({
   projects,
+  folders = [],
   profile,
 }: {
   projects: LocalProjectRef[];
+  /** Bestehende Projektordner der Startseite (nur Anzeige, keine zweite Pflege). */
+  folders?: { id: string; name: string }[];
   /** Lokales Profil – wird als Anzeigename/Funktion ins Netzwerk gespiegelt. */
   profile?: { name: string; role?: string; avatarUrl?: string };
 }) {
@@ -206,7 +210,7 @@ export function NetworkView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [net.ready, myStatus]);
 
-  const [tab, setTab] = useState<TabId>("contacts");
+  const [tab, setTab] = useState<TabId>("teams");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NetworkProfile[]>([]);
   const [searching, setSearching] = useState(false);
@@ -337,19 +341,31 @@ export function NetworkView({
     }
   };
 
+  /** Ordner der Startseite – dieselbe Struktur, keine zweite Pflege. */
+  const folderGroups = useMemo(() => {
+    const groups = folders.map((f) => ({
+      key: f.id,
+      name: f.name,
+      items: projects.filter((p) => p.folderId === f.id),
+    }));
+    const rest = projects.filter((p) => !p.folderId || !folders.some((f) => f.id === p.folderId));
+    if (rest.length) groups.push({ key: "__root", name: "Ohne Ordner", items: rest });
+    return groups.filter((g) => g.items.length > 0);
+  }, [folders, projects]);
+
   const tabs: { id: TabId; label: string; icon: typeof Users; badge?: number }[] = [
-    { id: "contacts", label: "Kontakte", icon: Users },
     { id: "teams", label: "Projekte / Teams", icon: FolderKanban },
+    { id: "contacts", label: "Kontakte", icon: Users },
     { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
-    { id: "calendar", label: "Kalender", icon: CalendarDays },
-    { id: "devices", label: "Geräte", icon: Wrench },
+    { id: "devices", label: "Geräte & Werkzeuge", icon: Wrench },
     { id: "comments", label: "Kommentare", icon: MessageSquare },
   ];
+
 
   return (
     <div className="mt-6">
       {/* Tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -380,14 +396,11 @@ export function NetworkView({
         </div>
       )}
 
+      {/* Netzwerk ist ein vollwertiger Hauptbereich – volle Contentbreite, einspaltig auf Mobil. */}
       <div
-        className="mt-4 grid gap-4"
-        style={{
-          gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)",
-          // Kalender und Geräte brauchen mehr Breite als die Personenlisten.
-          maxWidth: chat ? 1040 : tab === "calendar" || tab === "devices" || tab === "comments" ? 880 : 576,
-        }}
+        className={`mt-4 grid gap-4 grid-cols-1 ${chat ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]" : ""}`}
       >
+
         <div className="rounded-xl border p-3" style={surface}>
           {net.loading && <div className="p-6 text-center text-sm text-muted-foreground">Netzwerk wird geladen …</div>}
 
@@ -458,7 +471,20 @@ export function NetworkView({
           )}
 
           {!net.loading && tab === "teams" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* Zentrale projektübergreifende Übersicht – Projekte einzeln ein-/ausschaltbar. */}
+              <div className="rounded-lg border p-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <CalendarDays size={14} className="text-muted-foreground" />
+                  <span className="text-sm font-semibold">Projektübergreifender Kalender</span>
+                </div>
+                <OpsCalendarTab
+                  projectIds={projects.map((p) => p.id)}
+                  projectNames={projectNameMap}
+                  peopleById={peopleNameMap}
+                />
+              </div>
+
               <div className="text-[11px] text-muted-foreground px-1">
                 Personen per Drag &amp; Drop zwischen Projekten und „Allgemein“ verschieben – oder die Auswahl unten
                 verwenden. Mitglieder verwalten darf nur der Projektbesitzer.
@@ -466,7 +492,12 @@ export function NetworkView({
               {projects.length === 0 && (
                 <div className="p-4 text-sm text-muted-foreground">Noch keine Projekte vorhanden.</div>
               )}
-              {projects.map((p) => {
+              {folderGroups.map((g) => (
+                <div key={g.key} className="space-y-2">
+                  <div className="px-1 text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground">
+                    {g.name} ({g.items.length})
+                  </div>
+                  {g.items.map((p) => {
                 const list = byProject.map.get(p.id) ?? [];
                 const available = net.contacts.filter((c) => !list.some((m) => m.id === c.id));
                 return (
@@ -560,6 +591,9 @@ export function NetworkView({
                   </div>
                 );
               })}
+                </div>
+              ))}
+
 
               <div
                 className="rounded-lg border p-2.5"
@@ -705,13 +739,8 @@ export function NetworkView({
             </div>
           )}
 
-          {!net.loading && tab === "calendar" && (
-            <OpsCalendarTab
-              projectIds={projects.map((p) => p.id)}
-              projectNames={projectNameMap}
-              peopleById={peopleNameMap}
-            />
-          )}
+
+
 
           {!net.loading && tab === "devices" && (
             <DevicesTab projectNames={projectNameMap} peopleById={peopleNameMap} />
@@ -810,68 +839,3 @@ export function NetworkView({
 
 export default NetworkView;
 
-/**
- * Rolle und klar begrenzte Abweichungen eines Projektmitglieds.
- * Ohne Verwaltungsrecht rein informativ (Anzeige bleibt vollständig).
- */
-function MemberRoleControls({
-  role, overrides, canManage, onRole, onOverrides,
-}: {
-  role: ProjectRole;
-  overrides: ProjectPermissionOverrides;
-  canManage: boolean;
-  onRole: (role: Exclude<ProjectRole, "owner">) => void;
-  onOverrides: (o: ProjectPermissionOverrides) => void;
-}) {
-  const base = permissionsForRole(role);
-  const eff = effectivePermissions(role, overrides);
-  const deviating = eff.canEdit !== base.canEdit || eff.canManageMembers !== base.canManageMembers || eff.canComment !== base.canComment;
-
-  const toggle = (key: keyof ProjectPermissionOverrides, value: boolean) =>
-    onOverrides({ ...overrides, [key]: value });
-
-  return (
-    <div className="ml-11 mb-1.5 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-      {canManage ? (
-        <select
-          value={role === "owner" ? "admin" : role}
-          onChange={(e) => onRole(e.target.value as Exclude<ProjectRole, "owner">)}
-          className="h-6 rounded border px-1 text-[10px]"
-          style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
-        >
-          <option value="admin">{ROLE_LABEL.admin}</option>
-          <option value="member">{ROLE_LABEL.member}</option>
-          <option value="viewer">{ROLE_LABEL.viewer}</option>
-        </select>
-      ) : (
-        <span className="rounded border px-1.5 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-          {ROLE_LABEL[role]}
-        </span>
-      )}
-
-      <label className="flex items-center gap-1">
-        <input type="checkbox" disabled={!canManage} checked={eff.canEdit}
-               onChange={(e) => toggle("can_edit", e.target.checked)} />
-        Bearbeiten
-      </label>
-      {base.canManageMembers && (
-        <label className="flex items-center gap-1">
-          <input type="checkbox" disabled={!canManage} checked={eff.canManageMembers}
-                 onChange={(e) => toggle("can_manage_members", e.target.checked)} />
-          Mitglieder
-        </label>
-      )}
-      <label className="flex items-center gap-1">
-        <input type="checkbox" disabled={!canManage} checked={eff.canComment}
-               onChange={(e) => toggle("can_comment", e.target.checked)} />
-        Kommentieren
-      </label>
-
-      {deviating && (
-        <span className="rounded px-1.5 py-0.5" style={{ background: "hsl(var(--accent-gold) / 0.18)", color: "hsl(var(--ink))" }}>
-          Abweichung vom Rollenstandard
-        </span>
-      )}
-    </div>
-  );
-}
