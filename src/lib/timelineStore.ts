@@ -2,7 +2,12 @@
 // Persistiert projektbezogen in localStorage: pixuna.board02.<projectId>
 
 
-export type TlKind = "task" | "event" | "note";
+/**
+ * „Beitrag" ist die einheitliche Art für neu angelegte Einträge.
+ * Die früheren Arten Aufgabe/Termin/Notiz bleiben für bestehende Daten
+ * erhalten – vorhandene Einträge behalten Id, Art und alle Felder.
+ */
+export type TlKind = "task" | "event" | "note" | "contribution";
 
 export interface TlCategory { id: string; label: string; color: string }
 /** percent = Priorität in Prozent (1–100). Bestimmt die Kreisgröße. */
@@ -19,7 +24,10 @@ export interface TlItem {
   statusId?: string;
   /** true, sobald der Status manuell gesetzt wurde – dann greift die Automatik nicht mehr. */
   statusManual?: boolean;
+  /** Alter Freitext „Verantwortlich" – bleibt erhalten und wird weiter angezeigt. */
   responsible?: string;
+  /** Verantwortliche Projektmitglieder (Benutzer-Ids), Mehrfachauswahl. */
+  assignees?: string[];
   categoryId?: string;
   priorityId?: string;
   /** ISO "YYYY-MM-DD" */
@@ -33,12 +41,15 @@ export interface TlItem {
   fresh?: boolean;
 }
 
+/** Projektzeitraum – wird prominent am Projekt angezeigt. */
+export interface TlPeriod { start?: string; end?: string }
 
 export interface TlState {
   categories: TlCategory[];
   priorities: TlPriority[];
   statuses: TlStatus[];
   items: TlItem[];
+  period: TlPeriod;
 }
 
 /** Standardkategorie für schnell angelegte Aufgaben/Notizen. */
@@ -99,14 +110,18 @@ function loadState(projectId: string): TlState {
         categories: cats,
         priorities: normPriorities(p.priorities),
         statuses: p.statuses?.length ? p.statuses : [...DEFAULT_STATUSES],
+        period: p.period ?? {},
         items: (p.items ?? []).map((i) => ({
           ...i,
           statusId: i.statusId ?? (i.done ? "done" : "open"),
+          // Altbestand ohne Mehrfachauswahl bleibt unverändert erhalten.
+          assignees: Array.isArray(i.assignees) ? i.assignees : [],
         })),
       };
     }
   } catch {}
   return {
+    period: {},
     categories: [...DEFAULT_CATEGORIES],
     priorities: [...DEFAULT_PRIORITIES],
     statuses: [...DEFAULT_STATUSES],
@@ -200,20 +215,31 @@ export const timelineStore = {
     h.past.push(getState(projectId));
     persist(projectId, next);
   },
+  /** Projektzeitraum setzen (Start/Ende) – wird prominent am Projekt gezeigt. */
+  setPeriod(projectId: string, patch: TlPeriod) {
+    const s = getState(projectId);
+    commit(projectId, { ...s, period: { ...s.period, ...patch } });
+  },
   addItem(projectId: string, kind: TlKind, patch: Partial<TlItem> = {}): TlItem {
     const s = getState(projectId);
     const now = Date.now();
+    const defaultTitle =
+      kind === "task" ? "Neue Aufgabe"
+        : kind === "event" ? "Neuer Termin"
+          : kind === "note" ? "Neue Notiz"
+            : "Neuer Beitrag";
     const item: TlItem = {
       id: uid(),
       kind,
-      title: patch.title ?? (kind === "task" ? "Neue Aufgabe" : kind === "event" ? "Neuer Termin" : "Neue Notiz"),
+      title: patch.title ?? defaultTitle,
       description: patch.description ?? "",
       done: patch.done ?? false,
       statusId: patch.statusId ?? "open",
       responsible: patch.responsible ?? "",
+      assignees: patch.assignees ?? [],
       categoryId: patch.categoryId ?? s.categories[0]?.id,
       priorityId: patch.priorityId ?? "normal",
-      startDate: patch.startDate ?? today(),
+      startDate: patch.startDate ?? s.period.start ?? today(),
       // Keine Default-Uhrzeit: Ohne Uhrzeit verteilen sich die Kreise im Tag.
       startTime: patch.startTime,
       endDate: patch.endDate,
@@ -297,7 +323,7 @@ export const timelineStore = {
 };
 
 import { useSyncExternalStore } from "react";
-const EMPTY: TlState = { categories: [], priorities: [], statuses: DEFAULT_STATUSES, items: [] };
+const EMPTY: TlState = { categories: [], priorities: [], statuses: DEFAULT_STATUSES, items: [], period: {} };
 
 /** Abo auf Änderungen eines Projekt-Boards (z. B. für projektübergreifende Listen). */
 export function subscribeTimeline(projectId: string, fn: () => void): () => void {

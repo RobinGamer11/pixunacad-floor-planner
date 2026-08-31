@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getNetworkClient, isMissingSchemaError, networkConfigured } from "@/lib/networkClient";
 import { supabase as authClient } from "@/lib/supabase";
+import type { ProjectPermissionOverrides, ProjectRole } from "@/lib/projectAccess";
 
 export type PresenceStatus = "online" | "away" | "busy" | "offline";
 export type ContactState = "pending" | "accepted" | "declined";
@@ -30,6 +31,15 @@ export interface MemberRow {
   project_id: string;
   user_id: string;
   role: string;
+  /** Individuelle Abweichungen vom Rollenstandard (jsonb-Spalte `permissions`). */
+  permissions?: ProjectPermissionOverrides | null;
+}
+
+/** Projektzeile der gemeinsamen Datenbasis (inkl. echter Ownership). */
+export interface SharedProjectRow {
+  id: string;
+  name: string;
+  owner_id: string;
 }
 
 export interface NetworkPerson {
@@ -86,6 +96,10 @@ export interface NetworkState {
   /** Von mir gesendete, noch offene Anfragen. */
   outgoing: { contactId: string; person: NetworkProfile }[];
   members: MemberRow[];
+  /** Projekte der gemeinsamen Datenbasis (für echte Besitzer-Anzeige). */
+  sharedProjects: SharedProjectRow[];
+  /** Personen (Kontakte, Mitglieder, Besitzer) nach Benutzer-Id. */
+  peopleById: Map<string, NetworkPerson>;
 }
 
 export function useNetwork(localProjects: LocalProjectRef[]) {
@@ -101,6 +115,8 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
     incoming: [],
     outgoing: [],
     members: [],
+    sharedProjects: [],
+    peopleById: new Map(),
   });
   const desiredStatus = useRef<PresenceStatus>("online");
   const reloadRef = useRef<() => void>(() => {});
@@ -132,11 +148,24 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
 
       const { data: memberRows, error: memberErr } = await client
         .from("project_members")
-        .select("project_id,user_id,role");
+        .select("project_id,user_id,role,permissions");
       if (memberErr) throw memberErr;
       const members = (memberRows ?? []) as MemberRow[];
 
-      const profileIds = Array.from(new Set([myId, ...otherIds, ...members.map((m) => m.user_id)]));
+      // Echte Ownership stammt aus network_projects – nicht aus der Annahme
+      // "lokal vorhanden = mir gehörend".
+      const { data: projectRows, error: projectErr } = await client
+        .from("network_projects")
+        .select("id,name,owner_id");
+      if (projectErr) throw projectErr;
+      const sharedProjects = (projectRows ?? []) as SharedProjectRow[];
+
+      const profileIds = Array.from(new Set([
+        myId,
+        ...otherIds,
+        ...members.map((m) => m.user_id),
+        ...sharedProjects.map((p) => p.owner_id),
+      ]));
       const { data: profileRows, error: profileErr } = await client
         .from("profiles")
         .select("id,display_name,role,avatar_url")
@@ -175,6 +204,8 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
         .filter((r) => r.status === "pending" && r.requester_id === myId)
         .map((r) => ({ contactId: r.id, person: profiles.get(r.addressee_id) ?? { id: r.addressee_id, display_name: "Unbekannt" } }));
 
+      const peopleById = new Map<string, NetworkPerson>(profileIds.map((id) => [id, personOf(id)]));
+
       setState({
         ready: true,
         loading: false,
@@ -187,6 +218,8 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
         incoming,
         outgoing,
         members,
+        sharedProjects,
+        peopleById,
       });
     } catch (error) {
       const missing = isMissingSchemaError(error);
@@ -364,6 +397,26 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
           .or(
             `and(requester_id.eq.${me},addressee_id.eq.${userId}),and(requester_id.eq.${userId},addressee_id.eq.${me})`
           );
+        if (error) throw error;
+      }),
+    /** Rolle eines Mitglieds ändern (nur Besitzer/Administrator, RLS prüft erneut). */
+    setMemberRole: (projectId: string, userId: string, role: Exclude<ProjectRole, "owner">) =>
+      run(async (client) => {
+        const { error } = await client
+          .from("project_members")
+          .update({ role, updated_at: new Date().toISOString() })
+          .eq("project_id", projectId)
+          .eq("user_id", userId);
+        if (error) throw error;
+      }),
+    /** Klar begrenzte Abweichungen vom Rollenstandard speichern. */
+    setMemberPermissions: (projectId: string, userId: string, permissions: ProjectPermissionOverrides) =>
+      run(async (client) => {
+        const { error } = await client
+          .from("project_members")
+          .update({ permissions, updated_at: new Date().toISOString() })
+          .eq("project_id", projectId)
+          .eq("user_id", userId);
         if (error) throw error;
       }),
     removeMember: (projectId: string, userId: string) =>

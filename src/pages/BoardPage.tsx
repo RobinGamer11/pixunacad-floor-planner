@@ -12,7 +12,9 @@ import {
 } from "@/lib/timelineStore";
 import {
   CheckSquare, CalendarClock, FileText, X, Trash2, Plus, Settings, Save, Search, ChevronLeft,
+  ListChecks, CalendarRange,
 } from "lucide-react";
+import { useProjectMemberOptions } from "@/lib/projectTeam";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 
@@ -40,10 +42,14 @@ const GRID_COLS = "94px minmax(0,1fr) 96px 108px 150px 116px";
 function kindIcon(kind: TlKind, size = 12) {
   if (kind === "task") return <CheckSquare size={size} />;
   if (kind === "event") return <CalendarClock size={size} />;
+  if (kind === "contribution") return <ListChecks size={size} />;
   return <FileText size={size} />;
 }
 function kindLabel(kind: TlKind) {
-  return kind === "task" ? "Aufgabe" : kind === "event" ? "Termin" : "Notiz";
+  return kind === "task" ? "Aufgabe"
+    : kind === "event" ? "Termin"
+      : kind === "note" ? "Notiz"
+        : "Beitrag";
 }
 function fmtDate(d?: string, t?: string) {
   if (!d) return "—";
@@ -478,9 +484,11 @@ export default function BoardPage() {
           <div className="p-4 pb-0">
             <div className="flex flex-wrap items-center gap-2 rounded-xl p-3"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}`, boxShadow: "0 1px 2px rgba(20,17,16,0.05)" }}>
-              <BigAddButton kind="task" onClick={() => add("task")} />
-              <BigAddButton kind="event" onClick={() => add("event")} />
-              <BigAddButton kind="note" onClick={() => add("note")} />
+              <BigAddButton kind="contribution" onClick={() => add("contribution")} />
+              <ProjectPeriodBar
+                projectId={projectId}
+                period={state.period}
+              />
               <Segmented
                 value={surface}
                 onChange={(v) => setSurface(v as typeof surface)}

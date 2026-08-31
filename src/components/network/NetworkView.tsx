@@ -22,6 +22,14 @@ import {
   type LocalProjectRef,
 } from "@/lib/networkStore";
 import { useUnreadChats, type ChatTarget } from "@/lib/chatStore";
+import {
+  ROLE_LABEL,
+  effectivePermissions,
+  permissionsForRole,
+  type ProjectPermissionOverrides,
+  type ProjectRole,
+} from "@/lib/projectAccess";
+import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
 
@@ -227,14 +235,43 @@ export function NetworkView({
     for (const m of net.members) {
       if (!map.has(m.project_id)) continue;
       if (m.user_id === net.myId) continue;
-      const person = contactsById.get(m.user_id);
+      // Auch Projektmitglieder ohne persönlichen Kontakt gehören ins Team.
+      const person = contactsById.get(m.user_id) ?? net.peopleById.get(m.user_id);
       if (!person) continue;
       map.get(m.project_id)!.push(person);
       assigned.add(person.id);
     }
     const general = net.contacts.filter((c) => !assigned.has(c.id));
     return { map, general };
-  }, [contactsById, net.contacts, net.members, net.myId, projects]);
+  }, [contactsById, net.contacts, net.members, net.myId, net.peopleById, projects]);
+
+  /** Mitgliedszeile (Rolle + Abweichungen) je Projekt/Person. */
+  const memberRow = (projectId: string, userId: string) =>
+    net.members.find((m) => m.project_id === projectId && m.user_id === userId);
+
+  /** Echter Besitzer laut gemeinsamer Datenbasis – keine Annahme „Du". */
+  const ownerOf = (projectId: string) => {
+    const row = net.sharedProjects.find((p) => p.id === projectId);
+    if (!row) return { id: null as string | null, label: "Du (lokal)" };
+    if (row.owner_id === net.myId) return { id: row.owner_id, label: "Du" };
+    return { id: row.owner_id, label: net.peopleById.get(row.owner_id)?.name ?? "Unbekannt" };
+  };
+
+  /** Darf ich in diesem Projekt Mitglieder verwalten? */
+  const canManageProject = (projectId: string) => {
+    const row = net.sharedProjects.find((p) => p.id === projectId);
+    if (!row) return true; // rein lokales Projekt gehört mir.
+    if (row.owner_id === net.myId) return true;
+    const mine = memberRow(projectId, net.myId ?? "");
+    if (!mine) return false;
+    return effectivePermissions(mine.role as ProjectRole, mine.permissions ?? undefined).canManageMembers;
+  };
+
+  /** Offene Beiträge einer Person in einem Projekt. */
+  const openContributions = (projectId: string, userId: string) =>
+    timelineStore
+      .getState(projectId)
+      .items.filter((i) => (i.assignees ?? []).includes(userId) && effectiveStatusId(i) !== "done").length;
 
   const projectsOfPerson = (userId: string) =>
     net.members
@@ -422,7 +459,9 @@ export function NetworkView({
                         title="Projektchat öffnen"
                       />
                       <div className="ml-auto flex items-center gap-1">
-                        <span className="text-[11px] text-muted-foreground">Besitzer: Du</span>
+                        <span className="text-[11px] text-muted-foreground">
+                          Besitzer: {ownerOf(p.id).label}
+                        </span>
                       </div>
                     </div>
                     <div className="mt-1.5">
@@ -432,26 +471,45 @@ export function NetworkView({
                           Person hierher ziehen
                         </div>
                       )}
-                      {list.map((person) => (
-                        <PersonRow
-                          key={person.id}
-                          person={person}
-                          handle
-                          draggable
-                          onDragStart={onDragStartPerson(person.id, p.id)}
-                          right={
-                            <button
-                              onClick={() => net.removeMember(p.id, person.id)}
-                              title="Aus Projekt entfernen (Kontakt bleibt bestehen)"
-                              className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground"
-                            >
-                              <UserMinus size={14} />
-                            </button>
-                          }
-                        />
-                      ))}
+                      {list.map((person) => {
+                        const row = memberRow(p.id, person.id);
+                        const manage = canManageProject(p.id);
+                        return (
+                          <div key={person.id}>
+                            <PersonRow
+                              person={person}
+                              handle
+                              draggable
+                              onDragStart={onDragStartPerson(person.id, p.id)}
+                              right={
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                    {openContributions(p.id, person.id)} offen
+                                  </span>
+                                  {manage && (
+                                    <button
+                                      onClick={() => net.removeMember(p.id, person.id)}
+                                      title="Aus Projekt entfernen (Kontakt bleibt bestehen)"
+                                      className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground"
+                                    >
+                                      <UserMinus size={14} />
+                                    </button>
+                                  )}
+                                </div>
+                              }
+                            />
+                            <MemberRoleControls
+                              role={(row?.role as ProjectRole) ?? "member"}
+                              overrides={row?.permissions ?? {}}
+                              canManage={manage && !!row}
+                              onRole={(role) => net.setMemberRole(p.id, person.id, role)}
+                              onOverrides={(o) => net.setMemberPermissions(p.id, person.id, o)}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
-                    {available.length > 0 && (
+                    {canManageProject(p.id) && available.length > 0 && (
                       <select
                         value=""
                         onChange={(e) => {
@@ -700,3 +758,69 @@ export function NetworkView({
 }
 
 export default NetworkView;
+
+/**
+ * Rolle und klar begrenzte Abweichungen eines Projektmitglieds.
+ * Ohne Verwaltungsrecht rein informativ (Anzeige bleibt vollständig).
+ */
+function MemberRoleControls({
+  role, overrides, canManage, onRole, onOverrides,
+}: {
+  role: ProjectRole;
+  overrides: ProjectPermissionOverrides;
+  canManage: boolean;
+  onRole: (role: Exclude<ProjectRole, "owner">) => void;
+  onOverrides: (o: ProjectPermissionOverrides) => void;
+}) {
+  const base = permissionsForRole(role);
+  const eff = effectivePermissions(role, overrides);
+  const deviating = eff.canEdit !== base.canEdit || eff.canManageMembers !== base.canManageMembers || eff.canComment !== base.canComment;
+
+  const toggle = (key: keyof ProjectPermissionOverrides, value: boolean) =>
+    onOverrides({ ...overrides, [key]: value });
+
+  return (
+    <div className="ml-11 mb-1.5 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+      {canManage ? (
+        <select
+          value={role === "owner" ? "admin" : role}
+          onChange={(e) => onRole(e.target.value as Exclude<ProjectRole, "owner">)}
+          className="h-6 rounded border px-1 text-[10px]"
+          style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+        >
+          <option value="admin">{ROLE_LABEL.admin}</option>
+          <option value="member">{ROLE_LABEL.member}</option>
+          <option value="viewer">{ROLE_LABEL.viewer}</option>
+        </select>
+      ) : (
+        <span className="rounded border px-1.5 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+          {ROLE_LABEL[role]}
+        </span>
+      )}
+
+      <label className="flex items-center gap-1">
+        <input type="checkbox" disabled={!canManage} checked={eff.canEdit}
+               onChange={(e) => toggle("can_edit", e.target.checked)} />
+        Bearbeiten
+      </label>
+      {base.canManageMembers && (
+        <label className="flex items-center gap-1">
+          <input type="checkbox" disabled={!canManage} checked={eff.canManageMembers}
+                 onChange={(e) => toggle("can_manage_members", e.target.checked)} />
+          Mitglieder
+        </label>
+      )}
+      <label className="flex items-center gap-1">
+        <input type="checkbox" disabled={!canManage} checked={eff.canComment}
+               onChange={(e) => toggle("can_comment", e.target.checked)} />
+        Kommentieren
+      </label>
+
+      {deviating && (
+        <span className="rounded px-1.5 py-0.5" style={{ background: "hsl(var(--accent-gold) / 0.18)", color: "hsl(var(--ink))" }}>
+          Abweichung vom Rollenstandard
+        </span>
+      )}
+    </div>
+  );
+}
