@@ -208,6 +208,24 @@ export function commentErrorMessage(error: unknown, fallback: string): string {
   return raw ? `${fallback} (${raw})` : fallback;
 }
 
+export interface CommentsApi {
+  comments: ProjectComment[];
+  loading: boolean;
+  /** Datenbasis erreichbar (angemeldet + Migration eingespielt). */
+  ready: boolean;
+  error: string | null;
+  myId: string | null;
+  create: (input: NewComment) => Promise<ProjectComment | null>;
+  updateBody: (id: string, body: string) => Promise<boolean>;
+  setStatus: (id: string, status: CommentStatus) => Promise<boolean>;
+  remove: (id: string) => Promise<boolean>;
+  reload: () => Promise<void>;
+  canModerate: boolean;
+  /** Fehlermeldung zurücksetzen (Eingabe bleibt erhalten). */
+  clearError: () => void;
+}
+
+
 export function useSheetComments(opts: {
   projectId: string | undefined;
   context: CommentContext;
