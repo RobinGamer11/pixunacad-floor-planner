@@ -9,12 +9,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { MessageSquare, ExternalLink } from "lucide-react";
-import {
-  commentNavigation,
-  formatWhen,
-  useProjectCommentOverview,
-} from "@/lib/commentsStore";
-import { formatWhen as _fmt } from "@/components/comments/CommentLayerUi";
+import { commentNavigation, useProjectCommentOverview } from "@/lib/commentsStore";
+import { formatWhen } from "@/components/comments/CommentLayerUi";
 
 export function CommentsTab({
   projects,
