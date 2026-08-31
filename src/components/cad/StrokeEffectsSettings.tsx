@@ -11,6 +11,11 @@ import { applyBrushSizeDefaults } from "@/cad/brushSizeDefaults";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
+// CAD-Regler für „Detail“ und „Skalierung“ laufen von 1..100; 50 entspricht
+// dabei Detail 4 (je 100 mm) bzw. Skalierung 400 %.
+const CAD_DETAIL_UNIT = 4 / 50;
+const CAD_SCALE_UNIT = 400 / 50;
+
 export type StrokeEffectKind = "line" | "polygon" | "hatch" | "free";
 
 const PATTERNS: { value: StrokePatternKind; label: string }[] = [
@@ -234,17 +239,34 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
                 onChange={(v) => applyRoughen({ strengthMm: v })}
                 onDragStart={dragStart} onDragEnd={dragEnd}
               />
-              <SliderField
-                label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={500}
-                onChange={(v) => applyRoughen({ detailPer100Mm: v })}
-                onDragStart={dragStart} onDragEnd={dragEnd}
-              />
-              <SliderField
-                label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10}
-                max={isEmbedded ? 300 : 1800} inputMax={1800}
-                onChange={(v) => applyRoughen({ scalePercent: v })}
-                onDragStart={dragStart} onDragEnd={dragEnd}
-              />
+              {isEmbedded ? (
+                <>
+                  <SliderField
+                    label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={500}
+                    onChange={(v) => applyRoughen({ detailPer100Mm: v })}
+                    onDragStart={dragStart} onDragEnd={dragEnd}
+                  />
+                  <SliderField
+                    label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10}
+                    max={300} inputMax={1800}
+                    onChange={(v) => applyRoughen({ scalePercent: v })}
+                    onDragStart={dragStart} onDragEnd={dragEnd}
+                  />
+                </>
+              ) : (
+                <>
+                  <SliderField
+                    label="Detail" unit="" value={roughen.detailPer100Mm / CAD_DETAIL_UNIT} step={1} min={1} max={100} inputMax={1000}
+                    onChange={(v) => applyRoughen({ detailPer100Mm: v * CAD_DETAIL_UNIT })}
+                    onDragStart={dragStart} onDragEnd={dragEnd}
+                  />
+                  <SliderField
+                    label="Skalierung" unit="" value={(roughen.scalePercent ?? 100) / CAD_SCALE_UNIT} step={1} min={1} max={100} inputMax={225}
+                    onChange={(v) => applyRoughen({ scalePercent: v * CAD_SCALE_UNIT })}
+                    onDragStart={dragStart} onDragEnd={dragEnd}
+                  />
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-1">
