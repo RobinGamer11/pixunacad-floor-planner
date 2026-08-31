@@ -11,7 +11,12 @@ import {
   Search,
   UserMinus,
   GripVertical,
+  CalendarDays,
+  Wrench,
 } from "lucide-react";
+import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
+import { DevicesTab } from "@/components/network/DevicesTab";
+import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
 import {
   useNetwork,
   presenceColor,
@@ -164,7 +169,7 @@ function Group({
   );
 }
 
-type TabId = "contacts" | "teams" | "requests";
+type TabId = "contacts" | "teams" | "requests" | "calendar" | "devices";
 
 export function NetworkView({
   projects,
@@ -245,6 +250,21 @@ export function NetworkView({
     return { map, general };
   }, [contactsById, net.contacts, net.members, net.myId, net.peopleById, projects]);
 
+  /* Namensauflösung für die gemeinsamen Übersichten (Kalender, Geräte). */
+  const projectNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of projects) map.set(p.id, p.name);
+    for (const p of net.sharedProjects) if (!map.has(p.id)) map.set(p.id, p.name || "Projekt");
+    return map;
+  }, [projects, net.sharedProjects]);
+
+  const peopleNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [id, person] of peopleById) map.set(id, person.name);
+    return map;
+  }, [peopleById]);
+
+
   /** Mitgliedszeile (Rolle + Abweichungen) je Projekt/Person. */
   const memberRow = (projectId: string, userId: string) =>
     net.members.find((m) => m.project_id === projectId && m.user_id === userId);
@@ -320,6 +340,8 @@ export function NetworkView({
     { id: "contacts", label: "Kontakte", icon: Users },
     { id: "teams", label: "Projekte / Teams", icon: FolderKanban },
     { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
+    { id: "calendar", label: "Kalender", icon: CalendarDays },
+    { id: "devices", label: "Geräte", icon: Wrench },
   ];
 
   return (
@@ -356,7 +378,14 @@ export function NetworkView({
         </div>
       )}
 
-      <div className="mt-4 grid gap-4" style={{ gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)", maxWidth: chat ? 1040 : 576 }}>
+      <div
+        className="mt-4 grid gap-4"
+        style={{
+          gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)",
+          // Kalender und Geräte brauchen mehr Breite als die Personenlisten.
+          maxWidth: chat ? 1040 : tab === "calendar" || tab === "devices" ? 880 : 576,
+        }}
+      >
         <div className="rounded-xl border p-3" style={surface}>
           {net.loading && <div className="p-6 text-center text-sm text-muted-foreground">Netzwerk wird geladen …</div>}
 
@@ -464,6 +493,7 @@ export function NetworkView({
                         </span>
                       </div>
                     </div>
+                    <ProjectTimeSummary projectId={p.id} peopleById={peopleNameMap} />
                     <div className="mt-1.5">
                       {list.length === 0 && (
                         <div className="px-2 py-3 text-[11px] text-muted-foreground border border-dashed rounded-md text-center"
@@ -671,6 +701,18 @@ export function NetworkView({
                 ))}
               </div>
             </div>
+          )}
+
+          {!net.loading && tab === "calendar" && (
+            <OpsCalendarTab
+              projectIds={projects.map((p) => p.id)}
+              projectNames={projectNameMap}
+              peopleById={peopleNameMap}
+            />
+          )}
+
+          {!net.loading && tab === "devices" && (
+            <DevicesTab projectNames={projectNameMap} peopleById={peopleNameMap} />
           )}
         </div>
 

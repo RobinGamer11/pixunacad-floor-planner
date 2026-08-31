@@ -20,3 +20,23 @@
 - [ ] Projektzeitraum prominent am Projekt
 - [ ] Kalender, Ansichtstrahl, Projektnetz auf gemeinsame Beiträge umstellen
 - [ ] Responsive Team-/Beitrags-UI (Desktop/Tablet/Smartphone)
+
+# Umsetzungspaket 2 – Zeiterfassung, Geräte, Anhänge, Übersichten
+
+## Schritt 4 – Zeiterfassung und Abwesenheiten
+- [x] Migration `db/migrations/20260901090000_time_devices_attachments.sql` (`time_entries`, `absences`, RLS, maskierte RPC `absences_for_projects`)
+- [x] Datenschicht `src/lib/opsStore.ts` (Netto-Zeiten, Auswertung je Beitrag/Person)
+- [x] Zeiterfassung im Beitrags-Editor (`ContributionTimePanel`, Soll/Ist)
+- [x] Eigene Abwesenheiten im Netzwerk-Reiter „Kalender“
+- [ ] Migration im Supabase-Projekt einspielen (manuell durch den Nutzer)
+
+## Schritt 5 – Geräte/Werkzeuge und Beitragsanhänge
+- [x] Tabellen `devices`, `device_bookings`, `contribution_attachments` + privater Storage-Bucket
+- [x] Gerätebuchung am Beitrag inkl. Konfliktwarnung und begründeter Übersteuerung
+- [x] Geräteverwaltung im Netzwerk-Reiter „Geräte“ (Archivieren statt Löschen)
+- [x] Anhänge am Beitrag (Upload, Öffnen, Zuordnung entfernen ohne Datenverlust)
+
+## Schritt 6 – Gemeinsame Kalender und Übersichten
+- [x] Board-Kalender mit Ebenen „Abwesenheiten“ und „Geräte“
+- [x] Projektübergreifender Kalender im Netzwerk
+- [x] Zeit-Auswertung je Projekt/Person in der Team-Ansicht

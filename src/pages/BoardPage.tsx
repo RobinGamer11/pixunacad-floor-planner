@@ -17,6 +17,13 @@ import {
 import { useProjectMemberOptions } from "@/lib/projectTeam";
 import { TimelineNet, FRESH_BLUE } from "@/components/board/TimelineNet";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
+import {
+  ContributionTimePanel,
+  ContributionDevicesPanel,
+  ContributionAttachmentsPanel,
+} from "@/components/board/ContributionOpsPanels";
+import { useProjectAccess } from "@/lib/projectAccess";
+import { ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices } from "@/lib/opsStore";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
@@ -238,6 +245,43 @@ export default function BoardPage() {
     }
     return out;
   }, [state.items, state.categories, now, selectItem]);
+
+  /* Gemeinsamer Kalender: Abwesenheiten und Gerätebuchungen als eigene Ebenen. */
+  const absenceProjects = useMemo(() => (projectId ? [projectId] : []), [projectId]);
+  const absences = useAbsences(absenceProjects);
+  const deviceData = useDevices(projectId);
+  const [showAbsences, setShowAbsences] = useState(true);
+  const [showDevices, setShowDevices] = useState(true);
+
+  const opsEntries: CalEntry[] = useMemo(() => {
+    const out: CalEntry[] = [];
+    if (showAbsences) {
+      for (const a of absences.absences) {
+        const who = a.user_id === absences.myId ? "Ich" : "Teammitglied";
+        for (const day of datesInRange(a.starts_on, a.ends_on)) {
+          out.push({
+            id: `abs-${a.id}-${day}`,
+            date: day,
+            // Fremde Abwesenheiten bleiben ohne Art und Bemerkung.
+            title: a.masked ? `${who}: abwesend` : `${who}: ${ABSENCE_LABEL[a.kind ?? "other"]}`,
+            color: "#8b8178",
+          });
+        }
+      }
+    }
+    if (showDevices) {
+      for (const b of deviceData.bookings) {
+        const name = deviceData.devices.find((d) => d.id === b.device_id)?.name ?? "Gerät";
+        const start = new Date(b.starts_at);
+        const end = new Date(b.ends_at);
+        for (const day of datesInRange(isoDate(start), isoDate(end))) {
+          out.push({ id: `dev-${b.id}-${day}`, date: day, title: name, sub: "Gerät", color: "#4da3ff" });
+        }
+      }
+    }
+    return out;
+  }, [absences.absences, absences.myId, deviceData.bookings, deviceData.devices, showAbsences, showDevices]);
+
 
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
   const statusMap = useMemo(() => new Map(state.statuses.map((s) => [s.id, s])), [state.statuses]);
@@ -524,12 +568,28 @@ export default function BoardPage() {
             </div>
           </div>
 
-          {/* Kalender-Ansicht */}
+          {/* Kalender-Ansicht – Beiträge, Abwesenheiten und Gerätebuchungen */}
           {surface === "cal" && (
             <div className="mx-4 mt-4 rounded-xl p-4"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
+              <div className="flex flex-wrap items-center gap-2 mb-2 text-[11px]">
+                {([
+                  ["Abwesenheiten", showAbsences, () => setShowAbsences((v) => !v), "#8b8178"],
+                  ["Geräte", showDevices, () => setShowDevices((v) => !v), "#4da3ff"],
+                ] as [string, boolean, () => void, string][]).map(([label, on, toggle, color]) => (
+                  <button
+                    key={label}
+                    onClick={toggle}
+                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-md border"
+                    style={{ borderColor: on ? color : PANEL_LINE, color: on ? INK : INK_SOFT }}
+                  >
+                    <span className="h-2 w-2 rounded-full" style={{ background: on ? color : "transparent", border: `1px solid ${color}` }} />
+                    {label}
+                  </button>
+                ))}
+              </div>
               <RangeCalendar
-                entries={calEntries}
+                entries={[...calEntries, ...opsEntries]}
                 selectedDates={[]}
                 onSelectDate={() => {}}
               />
@@ -897,6 +957,16 @@ function ItemEditor({
 }) {
   const set = (patch: Partial<TlItem>) => timelineStore.updateItem(projectId, item.id, patch);
   const prio = priorities.find((p) => p.id === item.priorityId);
+  /* Rechte kommen zentral aus dem Projektzugriff (Paket 01). */
+  const canEdit = useProjectAccess(projectId).permissions.canEdit;
+  const members = useProjectMemberOptions(projectId);
+  /** Soll-Dauer aus dem Beitragszeitraum – nur zur Einordnung der Ist-Zeiten. */
+  const plannedMinutes = useMemo(() => {
+    const start = Date.parse(`${item.startDate}T${item.startTime || "00:00"}:00`);
+    const end = Date.parse(`${item.endDate || item.startDate}T${item.endTime || item.startTime || "00:00"}:00`);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return undefined;
+    return Math.round((end - start) / 60000);
+  }, [item.startDate, item.startTime, item.endDate, item.endTime]);
 
   return (
     <aside className="w-[340px] shrink-0 border-l overflow-y-auto"
@@ -1014,6 +1084,21 @@ function ItemEditor({
                     value={item.description ?? ""}
                     onChange={(e) => set({ description: e.target.value })} />
         </Field>
+
+        <ContributionTimePanel
+          projectId={projectId}
+          itemId={item.id}
+          canEdit={canEdit}
+          members={members}
+          plannedMinutes={plannedMinutes}
+        />
+        <ContributionDevicesPanel
+          projectId={projectId}
+          itemId={item.id}
+          canEdit={canEdit}
+          members={members}
+        />
+        <ContributionAttachmentsPanel projectId={projectId} itemId={item.id} canEdit={canEdit} />
       </div>
     </aside>
   );
