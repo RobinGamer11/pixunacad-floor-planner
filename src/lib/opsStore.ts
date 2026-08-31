@@ -365,21 +365,11 @@ export function useTimeEntries(projectId: string | undefined) {
   const myId = ctx().session?.user.id ?? null;
 
   const add = useCallback(async (input: TimeEntryInput) => {
-    const { client, session } = ctx();
-    if (!client || !session || !projectId) throw new Error("Zeiterfassung benötigt eine Anmeldung.");
-    const { error: err } = await client.from("time_entries").insert({
-      project_id: projectId,
-      item_id: input.itemId,
-      user_id: input.userId,
-      started_at: input.startedAt,
-      ended_at: input.endedAt,
-      break_minutes: Math.max(0, Math.round(input.breakMinutes || 0)),
-      note: input.note?.trim() || null,
-      created_by: session.user.id,
-    });
-    if (err) throw err;
+    if (!projectId) throw new Error("Zeiterfassung benötigt eine Anmeldung.");
+    await addTimeEntryFor(projectId, input);
     reload();
   }, [projectId, reload]);
+
 
   const update = useCallback(async (id: string, patch: Partial<TimeEntryInput>) => {
     const { client } = ctx();
