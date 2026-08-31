@@ -215,20 +215,31 @@ export const timelineStore = {
     h.past.push(getState(projectId));
     persist(projectId, next);
   },
+  /** Projektzeitraum setzen (Start/Ende) – wird prominent am Projekt gezeigt. */
+  setPeriod(projectId: string, patch: TlPeriod) {
+    const s = getState(projectId);
+    commit(projectId, { ...s, period: { ...s.period, ...patch } });
+  },
   addItem(projectId: string, kind: TlKind, patch: Partial<TlItem> = {}): TlItem {
     const s = getState(projectId);
     const now = Date.now();
+    const defaultTitle =
+      kind === "task" ? "Neue Aufgabe"
+        : kind === "event" ? "Neuer Termin"
+          : kind === "note" ? "Neue Notiz"
+            : "Neuer Beitrag";
     const item: TlItem = {
       id: uid(),
       kind,
-      title: patch.title ?? (kind === "task" ? "Neue Aufgabe" : kind === "event" ? "Neuer Termin" : "Neue Notiz"),
+      title: patch.title ?? defaultTitle,
       description: patch.description ?? "",
       done: patch.done ?? false,
       statusId: patch.statusId ?? "open",
       responsible: patch.responsible ?? "",
+      assignees: patch.assignees ?? [],
       categoryId: patch.categoryId ?? s.categories[0]?.id,
       priorityId: patch.priorityId ?? "normal",
-      startDate: patch.startDate ?? today(),
+      startDate: patch.startDate ?? s.period.start ?? today(),
       // Keine Default-Uhrzeit: Ohne Uhrzeit verteilen sich die Kreise im Tag.
       startTime: patch.startTime,
       endDate: patch.endDate,
