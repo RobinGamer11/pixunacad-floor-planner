@@ -485,6 +485,7 @@ export function NetworkView({
                         </span>
                       </div>
                     </div>
+                    <ProjectTimeSummary projectId={p.id} peopleById={peopleNameMap} />
                     <div className="mt-1.5">
                       {list.length === 0 && (
                         <div className="px-2 py-3 text-[11px] text-muted-foreground border border-dashed rounded-md text-center"
