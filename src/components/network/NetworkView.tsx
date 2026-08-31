@@ -339,6 +339,8 @@ export function NetworkView({
     { id: "contacts", label: "Kontakte", icon: Users },
     { id: "teams", label: "Projekte / Teams", icon: FolderKanban },
     { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
+    { id: "calendar", label: "Kalender", icon: CalendarDays },
+    { id: "devices", label: "Geräte", icon: Wrench },
   ];
 
   return (
