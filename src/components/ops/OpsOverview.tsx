@@ -348,28 +348,44 @@ export function OpsOverview({
           )}
         </Collapsible>
 
-        {/* Allgemeines: alle Geräte/Werkzeuge und ihre Gesamtnutzung */}
-        <Collapsible title="ALLGEMEINES">
-          <DeviceInsights projectNames={opsProjectNames} peopleById={opsPeople} />
-        </Collapsible>
-
-        {/* Projektstände */}
-        <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-          <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
-          <div className="space-y-2">
-            {projects.map((p) => (
-              <ProjectStandRow
-                key={p.id}
-                project={p}
-                open={previewId === p.id}
-                onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
-                peopleById={opsPeople}
-                onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
-              />
-            ))}
-            {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+        {fixedProjectId ? (
+          /* Projektbereich: direkt der Projektstand des geöffneten Projekts. */
+          <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+            <ProjectStandRow
+              headless
+              project={projects.find((p) => p.id === fixedProjectId) ?? { id: fixedProjectId, name: "" }}
+              open
+              onToggle={() => {}}
+              peopleById={opsPeople}
+              onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
+            />
           </div>
-        </div>
+        ) : (
+          <>
+            {/* Alle Gerätebuchungen: alle Geräte/Werkzeuge und ihre Gesamtnutzung */}
+            <Collapsible title="ALLE GERÄTEBUCHUNGEN">
+              <DeviceInsights projectNames={opsProjectNames} peopleById={opsPeople} />
+            </Collapsible>
+
+            {/* Projektstände */}
+            <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
+              <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
+              <div className="space-y-2">
+                {projects.map((p) => (
+                  <ProjectStandRow
+                    key={p.id}
+                    project={p}
+                    open={previewId === p.id}
+                    onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
+                    peopleById={opsPeople}
+                    onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
+                  />
+                ))}
+                {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
