@@ -627,23 +627,12 @@ export function useDevices(projectId: string | undefined) {
   }, [devicesState]);
 
   /** Konflikte gegen alle Buchungen des Geräts – auch aus fremden Projekten. */
-  const checkConflicts = useCallback(async (
-    deviceId: string,
-    startsAt: string,
-    endsAt: string,
-    excludeId?: string,
-  ): Promise<DeviceConflict[]> => {
-    const { client } = ctx();
-    if (!client) return [];
-    const { data, error: err } = await client.rpc("device_booking_conflicts", {
-      _device_id: deviceId,
-      _starts_at: startsAt,
-      _ends_at: endsAt,
-      _exclude_id: excludeId ?? null,
-    });
-    if (err) throw err;
-    return (data ?? []) as DeviceConflict[];
-  }, []);
+  const checkConflicts = useCallback(
+    (deviceId: string, startsAt: string, endsAt: string, excludeId?: string) =>
+      checkDeviceConflicts(deviceId, startsAt, endsAt, excludeId),
+    [],
+  );
+
 
   const book = useCallback(async (input: DeviceBookingInput) => {
     if (!projectId) throw new Error("Buchungen benötigen ein geteiltes Projekt.");
