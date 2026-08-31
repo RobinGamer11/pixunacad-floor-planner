@@ -111,6 +111,12 @@ export function ContributionTimePanel({
           Soll aus Zeitraum: {formatMinutes(plannedMinutes)} · Ist: {formatMinutes(total)}
         </Hint>
       ) : null}
+      {/* Ist-Werte werden ausschließlich aus den Zeiteinträgen abgeleitet. */}
+      {actual ? (
+        <Hint>
+          Tatsächlich: {fmtSpan(actual.startedAt, actual.endedAt)} · Aufwand {formatMinutes(actual.minutes)}
+        </Hint>
+      ) : null}
 
       {time.unavailable ? (
         <Hint>Zeiterfassung steht erst für geteilte Projekte mit Anmeldung zur Verfügung.</Hint>
