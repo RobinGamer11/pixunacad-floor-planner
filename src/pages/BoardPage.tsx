@@ -435,6 +435,18 @@ export default function BoardPage() {
     });
   }, [state.items, query, prioFilter, activeCat, catMap, prioMap, statusMap, now]);
 
+  // ---- Verantwortliche ---------------------------------------------------
+  const teamMembers = useProjectMemberOptions(projectId);
+  const memberNameById = useMemo(
+    () => new Map(teamMembers.map((m) => [m.id, m.name])),
+    [teamMembers],
+  );
+  const responsibleLabel = (i: TlItem) => {
+    const names = (i.assignees ?? []).map((id) => memberNameById.get(id) ?? "").filter(Boolean);
+    if (i.responsible) names.unshift(i.responsible);
+    return names.join(", ");
+  };
+
   // ---- Aktionen --------------------------------------------------------
   const add = (kind: TlKind) => {
     if (!projectId) return;
@@ -693,7 +705,7 @@ export default function BoardPage() {
                         {fmtDate(p.item.startDate, p.item.startTime)}
                         {p.item.endDate ? ` – ${fmtDate(p.item.endDate, p.item.endTime)}` : ""}
                       </div>
-                      {p.item.responsible && <div className="mt-1 opacity-70">👤 {p.item.responsible}</div>}
+                      {!!responsibleLabel(p.item) && <div className="mt-1 opacity-70">👤 {responsibleLabel(p.item)}</div>}
                       {p.item.description && <p className="mt-1.5 whitespace-pre-wrap">{p.item.description}</p>}
                     </div>
                   )}
@@ -836,7 +848,7 @@ export default function BoardPage() {
                       <span className="truncate opacity-80">
                         {fmtDate(i.startDate)}{i.endDate ? ` – ${fmtDate(i.endDate)}` : ""}
                       </span>
-                      <span className="truncate">{i.responsible || "—"}</span>
+                      <span className="truncate">{responsibleLabel(i) || "—"}</span>
                     </button>
                   );
                 })}
@@ -934,6 +946,12 @@ function ItemEditor({
           <input className={inputCls} placeholder="Name frei eingeben"
                  value={item.responsible ?? ""} onChange={(e) => set({ responsible: e.target.value })} />
         </Field>
+
+        <AssigneePicker
+          projectId={projectId}
+          value={item.assignees ?? []}
+          onChange={(next) => set({ assignees: next })}
+        />
 
         <ManagedSelect
           label="Kategorie"
@@ -1142,6 +1160,63 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-[10px] text-muted-foreground">{label}</span>
       {children}
     </label>
+  );
+}
+
+/** Projektzeitraum (Start/Ende) – prominent in der Werkzeugleiste. */
+function ProjectPeriodBar({
+  projectId, period,
+}: { projectId?: string; period: { start?: string; end?: string } }) {
+  const set = (patch: { start?: string; end?: string }) => {
+    if (projectId) timelineStore.setPeriod(projectId, patch);
+  };
+  const cls = "h-8 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring";
+  return (
+    <div className="flex items-center gap-1.5 rounded-lg border px-2 h-11"
+         style={{ borderColor: PANEL_LINE, background: "hsl(var(--background))" }}>
+      <span className="text-[10px] text-muted-foreground">Projektzeitraum</span>
+      <input type="date" className={cls} value={period.start ?? ""}
+             onChange={(e) => set({ start: e.target.value || undefined })} />
+      <span className="text-[10px] text-muted-foreground">bis</span>
+      <input type="date" className={cls} value={period.end ?? ""}
+             onChange={(e) => set({ end: e.target.value || undefined })} />
+    </div>
+  );
+}
+
+/** Mehrfachauswahl der Verantwortlichen aus dem Projekt-Team. */
+function AssigneePicker({
+  projectId, value, onChange,
+}: { projectId: string; value: string[]; onChange: (next: string[]) => void }) {
+  const members = useProjectMemberOptions(projectId);
+  if (!members.length) return null;
+  const toggle = (id: string) => {
+    onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
+  };
+  return (
+    <Field label="Verantwortliche (Team)">
+      <div className="flex flex-wrap gap-1.5">
+        {members.map((m) => {
+          const active = value.includes(m.id);
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => toggle(m.id)}
+              className="h-7 px-2 rounded-md border text-[11px] font-medium"
+              style={{
+                background: active ? "hsl(var(--accent-gold-soft))" : "hsl(var(--background))",
+                borderColor: "hsl(var(--hairline))",
+                color: "hsl(var(--ink))",
+              }}
+              title={m.role}
+            >
+              {m.name}
+            </button>
+          );
+        })}
+      </div>
+    </Field>
   );
 }
 
