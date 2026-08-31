@@ -1,5 +1,5 @@
 import React from "react";
-import { ClipboardPaste, Copy, Frame, Grid2x2, Keyboard, Lock, PenTool, Printer, Ruler, Scan } from "lucide-react";
+import { ClipboardPaste, Copy, Frame, Grid2x2, Keyboard, Lock, PenTool, Printer, Ruler, Scan, SquareDashedMousePointer } from "lucide-react";
 
 type MouseHighlight = "wheel" | "left" | "right";
 
@@ -198,6 +198,11 @@ export function MappeHelpOverlay({
           <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="L-Klick" description="Auswählen" />
           <HelpItem icon={<MouseGlyph highlight="right" />} shortcut="R-Klick" description="Hilfslinie" />
           <HelpItem icon={<ShiftClickGlyph />} shortcut="Shift + L-Klick" description="Mehrfachauswahl" />
+          <HelpItem
+            icon={<HeaderActionGlyph><SquareDashedMousePointer size={17} /></HeaderActionGlyph>}
+            shortcut="Strg + A"
+            description="Alles auswählen (Werkzeuge einzeln nutzbar)"
+          />
         </HelpGroup>
 
         <HelpGroup title="Zeichnen & Bearbeiten" bordered>
