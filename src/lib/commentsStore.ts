@@ -184,21 +184,28 @@ export interface NewComment {
   posX: number;
   posY: number;
   body: string;
+  /** Erwähnte Benutzer-IDs (echte IDs, kein Freitext). */
+  mentions?: string[];
+  /** Antwort auf diesen Kommentar. */
+  parentId?: string | null;
 }
 
-export interface CommentsApi {
-  comments: ProjectComment[];
-  loading: boolean;
-  /** Datenbasis erreichbar (angemeldet + Migration eingespielt). */
-  ready: boolean;
-  error: string | null;
-  myId: string | null;
-  create: (input: NewComment) => Promise<ProjectComment | null>;
-  updateBody: (id: string, body: string) => Promise<boolean>;
-  setStatus: (id: string, status: CommentStatus) => Promise<boolean>;
-  remove: (id: string) => Promise<boolean>;
-  reload: () => Promise<void>;
-  canModerate: boolean;
+/** Technische Fehler in verständliches Deutsch übersetzen. */
+export function commentErrorMessage(error: unknown, fallback: string): string {
+  const raw = (error as { message?: string })?.message ?? "";
+  const code = (error as { code?: string })?.code ?? "";
+  if (/row-level security/i.test(raw) || code === "42501") {
+    return "Keine Berechtigung zum Kommentieren in diesem Projekt.";
+  }
+  if (code === "PGRST205" || /schema cache/i.test(raw)) {
+    return "Die Datenbank-Einrichtung fehlt. Bitte die SQL-Migrationen einspielen.";
+  }
+  if (/parent_id|mentions/.test(raw) && /column/i.test(raw)) {
+    return "Bitte die neueste SQL-Migration (Antworten & Erwähnungen) einspielen.";
+  }
+  if (/Nur der Autor/.test(raw)) return raw;
+  if (/JWT|not authenticated|401/i.test(raw)) return "Bitte erneut anmelden.";
+  return raw ? `${fallback} (${raw})` : fallback;
 }
 
 export function useSheetComments(opts: {
@@ -207,8 +214,11 @@ export function useSheetComments(opts: {
   sheetId: string | undefined;
   bookId?: string | null;
   canModerate?: boolean;
+  /** Anzeigename für die serverseitige Projektanmeldung. */
+  projectName?: string;
 }): CommentsApi {
-  const { projectId, context, sheetId, bookId = null, canModerate = false } = opts;
+  const { projectId, context, sheetId, bookId = null, canModerate = false, projectName } = opts;
+
   const [comments, setComments] = useState<ProjectComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
