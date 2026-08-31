@@ -266,6 +266,16 @@ export function NetworkView({
 
   const { unread, refreshUnread } = useUnreadChats(net.myId, net.ready);
 
+  /** Ordneranlage – exakt derselbe Ordnerbestand wie in der Projektliste links. */
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const commitNewFolder = () => {
+    const name = newFolderName.trim();
+    if (name) projectStore.addProjectFolder(name);
+    setCreatingFolder(false);
+    setNewFolderName("");
+  };
+
   const contactsById = useMemo(() => new Map(net.contacts.map((c) => [c.id, c])), [net.contacts]);
 
   /** Alle bekannten Personen inkl. eigenem Profil – für Absenderanzeige im Chat. */
@@ -393,7 +403,7 @@ export function NetworkView({
     }));
     const rest = projects.filter((p) => !p.folderId || !folders.some((f) => f.id === p.folderId));
     if (rest.length) groups.push({ key: "__root", name: "Ohne Ordner", items: rest });
-    return groups.filter((g) => g.items.length > 0);
+    return groups;
   }, [folders, projects]);
 
   const tabs: { id: TabId; label: string; icon: typeof Users; badge?: number }[] = [
@@ -526,14 +536,50 @@ export function NetworkView({
                 Personen per Drag &amp; Drop zwischen Projekten und „Allgemein“ verschieben – oder die Auswahl unten
                 verwenden. Mitglieder verwalten darf nur der Projektbesitzer.
               </div>
+              <div className="flex flex-wrap items-center gap-2 px-1">
+                <button
+                  type="button"
+                  onClick={() => { setCreatingFolder(true); setNewFolderName(""); }}
+                  className="h-9 px-3 rounded-md border text-xs font-semibold flex items-center gap-2"
+                  style={{ background: "hsl(var(--accent-gold) / 0.14)", borderColor: "hsl(var(--accent-gold) / 0.4)" }}
+                >
+                  <FolderPlus size={14} style={{ color: "hsl(var(--accent-gold))" }} />
+                  + Ordner
+                </button>
+                {creatingFolder && (
+                  <div className="flex items-center gap-1 rounded-md border px-2 h-9" style={{ borderColor: "hsl(var(--hairline))" }}>
+                    <input
+                      autoFocus
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitNewFolder();
+                        if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+                      }}
+                      placeholder="Ordnername"
+                      className="bg-transparent text-xs outline-none"
+                    />
+                    <button onClick={commitNewFolder} title="Anlegen"><Check size={13} /></button>
+                    <button onClick={() => { setCreatingFolder(false); setNewFolderName(""); }} title="Abbrechen"><X size={13} /></button>
+                  </div>
+                )}
+              </div>
               {projects.length === 0 && (
                 <div className="p-4 text-sm text-muted-foreground">Noch keine Projekte vorhanden.</div>
               )}
               {folderGroups.map((g) => (
                 <div key={g.key} className="space-y-2">
-                  <div className="px-1 text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground">
-                    {g.name} ({g.items.length})
+                  <div className="flex items-center gap-2 px-1">
+                    <FolderPlus size={16} style={{ color: "hsl(var(--accent-gold))" }} />
+                    <span className="text-base font-semibold tracking-tight">{g.name}</span>
+                    <span className="text-xs text-muted-foreground">({g.items.length})</span>
                   </div>
+                  {g.items.length === 0 && (
+                    <div className="px-2 py-3 text-[11px] text-muted-foreground border border-dashed rounded-md"
+                         style={{ borderColor: "hsl(var(--hairline))" }}>
+                      Noch keine Projekte in diesem Ordner.
+                    </div>
+                  )}
                   {g.items.map((p) => {
                 const list = byProject.map.get(p.id) ?? [];
                 const available = net.contacts.filter((c) => !list.some((m) => m.id === c.id));
