@@ -35,6 +35,10 @@ export interface ProjectComment {
   edited_at: string | null;
   resolved_at: string | null;
   resolved_by: string | null;
+  /** Antwort auf einen anderen Kommentar (null = Ausgangskommentar). */
+  parent_id: string | null;
+  /** Erwähnte Benutzer-IDs – reine Information, keine Rechtevergabe. */
+  mentions: string[];
 }
 
 export interface CommentAuthor {
@@ -44,7 +48,8 @@ export interface CommentAuthor {
 }
 
 const COLUMNS =
-  "id,project_id,context,sheet_id,book_id,pos_x,pos_y,body,author_id,status,created_at,updated_at,edited_at,resolved_at,resolved_by";
+  "id,project_id,context,sheet_id,book_id,pos_x,pos_y,body,author_id,status,created_at,updated_at,edited_at,resolved_at,resolved_by,parent_id,mentions";
+
 
 /* ------------------------------------------------ Kommentarmodus (UI-Zustand) */
 
