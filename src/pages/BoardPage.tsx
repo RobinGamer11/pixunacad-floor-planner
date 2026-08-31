@@ -121,6 +121,13 @@ export default function BoardPage() {
   const [insightTab, setInsightTab] = useState<InsightTab>("cat");
   const [query, setQuery] = useState("");
   const [prioFilter, setPrioFilter] = useState<string>("");
+  /** Tagesauswahl im Projektkalender. */
+  const [calDay, setCalDay] = useState<string | undefined>();
+  const boardProjectNames = useMemo(
+    () => new Map(projectId ? [[projectId, project?.name ?? "Projekt"] as [string, string]] : []),
+    [projectId, project?.name],
+  );
+
 
 
   /** Auswahl setzen – hebt zugleich das blaue Aufleuchten auf. */
