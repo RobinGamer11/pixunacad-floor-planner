@@ -20,7 +20,7 @@ import {
   type AbsenceKind,
   type DeviceConflict,
 } from "@/lib/opsStore";
-import { subscribeTimeline, timelineStore } from "@/lib/timelineStore";
+import { addQuickItem, subscribeTimeline, timelineStore } from "@/lib/timelineStore";
 import { useProjectsMemberOptions } from "@/lib/projectTeam";
 
 const inputCls =
@@ -488,6 +488,54 @@ function BookingDialog({
           {done && !error && <div className="text-[11px]" style={{ color: SOFT }}>{done}</div>}
         </div>
       )}
+    </Modal>
+  );
+}
+
+/* --------------------------------------------------------------- Beitrag */
+
+function ContributionDialog({
+  projects, fixedProjectId, onClose,
+}: {
+  projects: OpsProjectRef[];
+  fixedProjectId?: string;
+  onClose: (changed?: boolean) => void;
+}) {
+  const [projectId, setProjectId] = useState(fixedProjectId ?? projects[0]?.id ?? "");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [date, setDate] = useState(() => isoDate(new Date()));
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  const save = () => {
+    setError(null);
+    if (!projectId) { setError("Bitte ein Projekt wählen."); return; }
+    if (!title.trim()) { setError("Bitte einen Namen angeben."); return; }
+    // Bestehende Board-Datenbasis – keine zweite Speicherung.
+    addQuickItem(projectId, "task", { title: title.trim(), description, date });
+    setTitle("");
+    setDescription("");
+    setDone("Beitrag gespeichert.");
+  };
+
+  return (
+    <Modal title="Beitrag" onClose={() => onClose(Boolean(done))}>
+      <div className="flex flex-col gap-2">
+        <ProjectField projects={projects} fixedProjectId={fixedProjectId} value={projectId} onChange={setProjectId} />
+        <Field label="Name">
+          <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Beitragsname" />
+        </Field>
+        <Field label="Beschreibung">
+          <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
+        </Field>
+        <Field label="Datum">
+          <input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />
+        </Field>
+        <Actions busy={false} onSave={save} onClose={() => onClose(Boolean(done))} />
+        {error && <div className="text-[11px]" style={{ color: "#ef4444" }}>{error}</div>}
+        {done && !error && <div className="text-[11px]" style={{ color: SOFT }}>{done}</div>}
+      </div>
     </Modal>
   );
 }
