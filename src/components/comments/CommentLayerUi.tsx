@@ -561,16 +561,15 @@ export function CommentThread({
  * Projektmappe identisch). Erneuter Klick beendet den Kommentarmodus.
  */
 export function CommentModeButton({
-  count,
   disabled,
   title = "Kommentare",
 }: {
-  count: number;
   disabled?: boolean;
   title?: string;
 }) {
   const ui = useCommentUi();
   const active = ui.mode;
+  const count = ui.openCount;
   return (
     <button
       type="button"

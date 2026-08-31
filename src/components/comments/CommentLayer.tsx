@@ -75,6 +75,9 @@ export function CommentLayer({
     [comments],
   );
 
+  const openCount = comments.filter((c) => !c.parent_id && c.status === "open").length;
+  React.useEffect(() => { commentUi.set({ openCount }); }, [openCount]);
+
   const place = (e: React.PointerEvent) => {
     if (!ui.mode) return;
     if (access.shared && !access.permissions.canComment) return;
