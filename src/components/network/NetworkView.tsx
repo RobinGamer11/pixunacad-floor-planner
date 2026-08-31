@@ -57,7 +57,12 @@ function Avatar({ name, url, size = 34 }: { name: string; url?: string | null; s
   );
 }
 
-function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () => void; title: string }) {
+function ChatButton({
+  unread,
+  active,
+  onClick,
+  title,
+}: { unread?: boolean; active?: boolean; onClick: () => void; title: string }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
@@ -73,7 +78,13 @@ function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () 
               background: "hsl(var(--accent-gold) / 0.16)",
               boxShadow: "0 0 0 3px hsl(var(--accent-gold) / 0.18)",
             }
-          : { color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }
+          : active
+            ? {
+                color: "hsl(var(--accent-gold))",
+                borderColor: "hsl(var(--accent-gold))",
+                background: "hsl(var(--accent-gold) / 0.14)",
+              }
+            : { color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }
       }
     >
       <MessageSquare size={20} />
@@ -88,18 +99,31 @@ function ChatButton({ unread, onClick, title }: { unread?: boolean; onClick: () 
 }
 
 /** Kommentare eines Projekts – gleiches Format wie der Chat, klar anderes Symbol. */
-function CommentsButton({ onClick, title }: { onClick: () => void; title: string }) {
+function CommentsButton({
+  onClick,
+  title,
+  active,
+}: { onClick: () => void; title: string; active?: boolean }) {
   return (
     <button
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       title={title}
       className="h-9 w-9 shrink-0 rounded-lg grid place-items-center border hover:bg-[hsl(var(--surface-muted))]"
-      style={{ color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }}
+      style={
+        active
+          ? {
+              color: "hsl(var(--accent-gold))",
+              borderColor: "hsl(var(--accent-gold))",
+              background: "hsl(var(--accent-gold) / 0.14)",
+            }
+          : { color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }
+      }
     >
       <StickyNote size={19} />
     </button>
   );
 }
+
 
 function PersonRow({
   person,
