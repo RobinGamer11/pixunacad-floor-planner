@@ -127,7 +127,10 @@ export function ContributionTimePanel({
           <div className="flex flex-col gap-1 mt-1.5">
             {entries.map((e) => (
               <div key={e.id} className="flex items-center gap-2 text-[11px]">
-                <span className="truncate flex-1">
+                <span
+                  className="truncate flex-1"
+                  title={overlapIds.has(e.id) ? "Überschneidet sich mit einer anderen Zeit derselben Person." : undefined}
+                >
                   {overlapIds.has(e.id) && (
                     <AlertTriangle size={10} className="inline mr-1" style={{ color: "#d97706" }} />
                   )}
