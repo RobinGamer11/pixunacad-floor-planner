@@ -92,7 +92,7 @@ async function pushNow(projectId: string): Promise<void> {
     const expected = versions.has(projectId) ? (versions.get(projectId) as number) : null;
     const version = await saveProjectDocument(
       projectId,
-      { project: JSON.parse(serialized.replace(/^\{/, `{"__":0,`)) && (JSON.parse(JSON.stringify(project)) as unknown) },
+      { project: JSON.parse(JSON.stringify(project)) as Record<string, unknown> },
       expected,
     );
     versions.set(projectId, version);
