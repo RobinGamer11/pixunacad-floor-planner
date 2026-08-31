@@ -37,8 +37,10 @@ function RequireAuth() {
   if (!session) return <Navigate to="/login" replace />;
   return (
     <WorkspaceSyncProvider>
-      <Outlet />
-      <LegalGearButton />
+      <ProjectAccessProvider>
+        <Outlet />
+        <LegalGearButton />
+      </ProjectAccessProvider>
     </WorkspaceSyncProvider>
   );
 }
