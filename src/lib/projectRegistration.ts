@@ -18,9 +18,11 @@ import { getNetworkClient, isMissingSchemaError, networkConfigured } from "@/lib
 import { supabase as authClient } from "@/lib/supabase";
 import { projectAccessStore } from "@/lib/projectAccess";
 
-export type EnsureProjectResult =
-  | { ok: true }
-  | { ok: false; message: string };
+export interface EnsureProjectResult {
+  ok: boolean;
+  /** Verständliche deutsche Meldung, wenn `ok` false ist. */
+  message?: string;
+}
 
 /** Erfolgreich geprüfte Projekte – pro Sitzung nur einmal nachfragen. */
 const verified = new Set<string>();
