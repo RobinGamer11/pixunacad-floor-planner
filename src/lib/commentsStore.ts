@@ -293,14 +293,34 @@ export function useSheetComments(opts: {
     return () => { void client.removeChannel(channel); };
   }, [projectId, load]);
 
-  const create = useCallback<CommentsApi["create"]>(async ({ posX, posY, body }) => {
+  const create = useCallback<CommentsApi["create"]>(async ({ posX, posY, body, mentions, parentId }) => {
     const client = getNetworkClient();
     const text = body.trim();
-    if (!client || !projectId || !sheetId || !text) return null;
+    if (!text) return null;
+    if (!client || !projectId || !sheetId) {
+      setError("Kommentare benötigen ein geöffnetes Projekt und eine Anmeldung.");
+      return null;
+    }
+    // Erst die berechtigte Projektzuordnung sicherstellen – sonst lehnt RLS ab.
+    const ensured = await ensureSharedProject(projectId, projectName);
+    if (!ensured.ok) {
+      setError(ensured.message);
+      return null;
+    }
     try {
       const { data, error: err } = await client
         .from("project_comments")
-        .insert({ project_id: projectId, context, sheet_id: sheetId, book_id: bookId, pos_x: posX, pos_y: posY, body: text })
+        .insert({
+          project_id: projectId,
+          context,
+          sheet_id: sheetId,
+          book_id: bookId,
+          pos_x: posX,
+          pos_y: posY,
+          body: text,
+          mentions: mentions?.length ? Array.from(new Set(mentions)) : [],
+          parent_id: parentId ?? null,
+        })
         .select(COLUMNS)
         .single();
       if (err) throw err;
@@ -309,10 +329,11 @@ export function useSheetComments(opts: {
       setError(null);
       return row;
     } catch (e: any) {
-      setError(e?.message ?? "Kommentar konnte nicht gespeichert werden.");
+      setError(commentErrorMessage(e, "Kommentar konnte nicht gespeichert werden."));
       return null;
     }
-  }, [projectId, context, sheetId, bookId]);
+  }, [projectId, context, sheetId, bookId, projectName]);
+
 
   const patch = useCallback(async (id: string, values: Record<string, unknown>, failure: string) => {
     const client = getNetworkClient();
