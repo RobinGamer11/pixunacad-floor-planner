@@ -128,6 +128,9 @@ export function ContributionTimePanel({
             {entries.map((e) => (
               <div key={e.id} className="flex items-center gap-2 text-[11px]">
                 <span className="truncate flex-1">
+                  {overlapIds.has(e.id) && (
+                    <AlertTriangle size={10} className="inline mr-1" style={{ color: "#d97706" }} />
+                  )}
                   {nameOf(e.user_id)} · {fmtSpan(e.started_at, e.ended_at)}
                   {e.break_minutes ? ` · ${e.break_minutes} min Pause` : ""}
                   {e.note ? ` · ${e.note}` : ""}
