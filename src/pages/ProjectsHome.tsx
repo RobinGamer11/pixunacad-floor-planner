@@ -75,6 +75,7 @@ import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 import { NetworkView } from "@/components/network/NetworkView";
+import { ProjectTeamTab } from "@/components/project/ProjectTeamTab";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import { clearMappeClipboard } from "@/lib/mappeClipboard";
@@ -958,7 +959,7 @@ export default function ProjectsHome() {
 
             </div>
           ) : hub === "shared" ? (
-            <SharedView profile={profile} projectCount={projectCount} projects={projects} />
+            <SharedView profile={profile} projectCount={projectCount} projects={projects} folders={folders} />
           ) : hub === "trash" ? (
             <TrashView activeCount={projectCount} />
           ) : showAllTasks ? (
@@ -1203,7 +1204,7 @@ export default function ProjectsHome() {
                       ["aufgaben", "Organisation", false],
                       ["finanzen", "Finanzen", false],
                       ["dokumente", "Dokumente", false],
-                      ["team", "Team", true],
+                      ["team", "Team", false],
                     ] as const
                   ).map(([key, label, disabled]) => (
                     <button
@@ -1242,6 +1243,9 @@ export default function ProjectsHome() {
               )}
               {tab === "dokumente" && (
                 <FileBrowser key={selected.id} project={selected} />
+              )}
+              {tab === "team" && (
+                <ProjectTeamTab key={selected.id} projectId={selected.id} projectName={selected.name} />
               )}
               
             </div>
@@ -3451,17 +3455,21 @@ function SharedView({
   profile,
   projectCount,
   projects,
+  folders,
 }: {
   profile: UserProfile;
   projectCount: number;
   projects: Project[];
+  /** Bestehende Projektordner der Startseite – dieselbe Struktur im Netzwerk. */
+  folders: { id: string; name: string }[];
 }) {
   const networkProjects = useMemo(
-    () => projects.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name })),
+    () => projects.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name, folderId: p.folderId ?? null })),
     [projects]
   );
+  const networkFolders = useMemo(() => folders.map((f) => ({ id: f.id, name: f.name })), [folders]);
   return (
-    <div className="px-10 py-7">
+    <div className="px-4 sm:px-6 xl:px-10 py-7 w-full">
       <h1 className="text-2xl font-semibold tracking-tight">Netzwerk</h1>
 
       <div className="mt-5 max-w-xl">
@@ -3474,9 +3482,11 @@ function SharedView({
         </div>
       </div>
 
-      <div className="max-w-xl">
-        <NetworkView projects={networkProjects} profile={{ name: profile.name, role: profile.role, avatarUrl: profile.avatarUrl }} />
-      </div>
+      <NetworkView
+        projects={networkProjects}
+        folders={networkFolders}
+        profile={{ name: profile.name, role: profile.role, avatarUrl: profile.avatarUrl }}
+      />
     </div>
   );
 }
