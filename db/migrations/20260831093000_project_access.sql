@@ -156,24 +156,39 @@ returns trigger language plpgsql security definer set search_path = public as $$
 declare
   actor uuid := auth.uid();
   actor_role text;
-  target_project text := coalesce(new.project_id, old.project_id);
-  target_user uuid := coalesce(new.user_id, old.user_id);
-  old_role text := old.role;
-  new_role text := new.role;
+  is_delete boolean := (tg_op = 'DELETE');
+  target_project text;
+  target_user uuid;
+  old_role text;
+  new_role text;
+  new_permissions jsonb;
 begin
+  if is_delete then
+    target_project := old.project_id;
+    target_user := old.user_id;
+    old_role := old.role;
+  else
+    target_project := new.project_id;
+    target_user := new.user_id;
+    new_role := new.role;
+    new_permissions := coalesce(new.permissions, '{}'::jsonb);
+    if tg_op = 'UPDATE' then old_role := old.role; end if;
+  end if;
+
   -- Server-/Wartungszugriffe ohne Benutzerkontext bleiben unberührt.
   if actor is null then
-    return coalesce(new, old);
+    if is_delete then return old; end if;
+    return new;
   end if;
 
   actor_role := public.project_role_of(target_project, actor);
 
   -- Austritt aus eigenem Willen ist immer erlaubt.
-  if tg_op = 'DELETE' and target_user = actor then
+  if is_delete and target_user = actor then
     return old;
   end if;
 
-  if actor_role not in ('owner', 'admin') then
+  if actor_role is null or actor_role not in ('owner', 'admin') then
     raise exception 'PIXUNA_FORBIDDEN: keine Berechtigung zur Mitgliederverwaltung';
   end if;
 
@@ -192,17 +207,14 @@ begin
       raise exception 'PIXUNA_FORBIDDEN: Owner ist geschützt';
     end if;
     -- Verwaltungsrechte selbst darf nur der Owner vergeben/entziehen.
-    if tg_op in ('INSERT', 'UPDATE')
-       and coalesce(new.permissions, '{}'::jsonb) ? 'can_manage_members' then
+    if not is_delete and new_permissions ? 'can_manage_members' then
       raise exception 'PIXUNA_FORBIDDEN: Verwaltungsrechte nur durch den Owner';
     end if;
   end if;
 
-  if tg_op in ('INSERT', 'UPDATE') then
-    new.updated_at := now();
-    return new;
-  end if;
-  return old;
+  if is_delete then return old; end if;
+  new.updated_at := now();
+  return new;
 end;
 $$;
 
