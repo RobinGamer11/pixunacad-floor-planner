@@ -453,6 +453,8 @@ export class CadApp {
   private _btnMap = new Map<string, HTMLButtonElement>();
   private _rafId = 0;
   private _destroyed = false;
+  private _resizeObserver: ResizeObserver | null = null;
+  private _orientationHandler: (() => void) | null = null;
   private _keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
   // History (Undo/Redo)
