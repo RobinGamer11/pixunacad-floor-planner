@@ -3103,7 +3103,8 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         />
       </div>
 
-      {/* Projektübergreifender Kalender: Beiträge, Arbeitszeiten, Abwesenheiten, Buchungen. */}
+      {/* Projektübergreifender Kalender: Beiträge, Arbeitszeiten, Abwesenheiten, Buchungen.
+          Projekte ein-/ausblenden und Tagesauswahl laufen über denselben Zustand wie die Liste. */}
       <div className="mb-6 rounded-xl border p-3"
            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
         <OpsCalendarTab
@@ -3111,6 +3112,10 @@ function AllTasksView({ projects }: { projects: Project[] }) {
           projectIds={projects.map((p) => p.id)}
           projectNames={opsProjectNames}
           peopleById={opsPeople}
+          selectedDates={selectedDate ? [selectedDate] : []}
+          onSelectDate={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
+          hiddenProjects={new Set(opsProjectIds.filter((id) => !activeIds.has(id)))}
+          onToggleProject={toggle}
         />
       </div>
 
@@ -3232,42 +3237,8 @@ function AllTasksView({ projects }: { projects: Project[] }) {
             </div>
           </div>
 
-          <GlobalCalendar
-            tasks={gTasks.filter((t) => !t.done && activeIds.has(t.projectId))}
-            selectedDate={selectedDate}
-            onSelect={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
-          />
         </div>
       </div>
-    </div>
-  );
-}
-
-function GlobalCalendar({
-  tasks,
-  selectedDate,
-  onSelect,
-}: {
-  tasks: { id?: string; date?: string; color: string; title?: string; kind?: TlKind }[];
-  selectedDate?: string;
-  onSelect: (d: string) => void;
-}) {
-  const entries: CalEntry[] = tasks
-    .filter((t) => !!t.date)
-    .map((t, i) => ({
-      id: `${t.id ?? "e"}-${i}`,
-      date: t.date,
-      title: t.title || "Eintrag",
-      color: t.color,
-    }));
-  return (
-    <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-      <RangeCalendar
-        entries={entries}
-        selectedDates={selectedDate ? [selectedDate] : []}
-        onSelectDate={(d) => onSelect(d)}
-        cellHeight={56}
-      />
     </div>
   );
 }
