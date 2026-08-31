@@ -285,7 +285,7 @@ export function OpsOverview({
       <div className="space-y-6">
         {/* Beiträge – standardmäßig eingeklappt */}
         <Collapsible
-          title={`BEITRÄGE${selectedDate ? ` · ${selectedDate}` : ` · ${visible.length}`}`}
+          title={`ALLE BEITRÄGE${selectedDate ? ` · ${selectedDate}` : ` · ${visible.length}`}`}
           right={selectedDate ? (
             <button onClick={() => setSelectedDate(undefined)} className="text-[11px] text-muted-foreground hover:text-foreground">
               Filter zurücksetzen
