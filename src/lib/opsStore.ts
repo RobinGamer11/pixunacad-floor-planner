@@ -160,32 +160,79 @@ function ctx() {
   return { client, session, ready: Boolean(client && session) };
 }
 
+/**
+ * Klar unterscheidbare Zustände statt eines einzigen `unavailable`.
+ *  - "loading"          – Anfrage läuft
+ *  - "ready"            – geladen (kann leer sein → „noch keine Einträge")
+ *  - "not-configured"   – keine Supabase-Verbindung konfiguriert
+ *  - "signed-out"       – nicht angemeldet
+ *  - "setup-missing"    – Tabellen/Funktionen fehlen (Migration nicht eingespielt)
+ *  - "denied"           – angemeldet, aber keine Berechtigung (RLS/Grants)
+ *  - "offline"          – Netzwerk-/Verbindungsfehler
+ *  - "error"            – sonstiger Ladefehler
+ */
+export type OpsStatus =
+  | "loading" | "ready" | "not-configured" | "signed-out"
+  | "setup-missing" | "denied" | "offline" | "error";
+
+/** Fehler einer Anfrage einem Zustand zuordnen – ohne Inhalte offenzulegen. */
+export function classifyOpsError(err: unknown): OpsStatus {
+  if (isMissingSchemaError(err)) return "setup-missing";
+  const e = err as { code?: string; status?: number; message?: string; name?: string } | null;
+  const code = e?.code ?? "";
+  const status = e?.status ?? 0;
+  const msg = (e?.message ?? "").toLowerCase();
+  if (code === "42501" || code === "PGRST301" || status === 401 || status === 403 || msg.includes("permission denied")) {
+    return "denied";
+  }
+  if (e?.name === "TypeError" || msg.includes("failed to fetch") || msg.includes("networkerror") || msg.includes("load failed")) {
+    return "offline";
+  }
+  return "error";
+}
+
+export const OPS_STATUS_TEXT: Record<Exclude<OpsStatus, "loading" | "ready">, string> = {
+  "not-configured": "Die Cloud-Verbindung ist in dieser Umgebung nicht konfiguriert.",
+  "signed-out": "Bitte melde dich an, um gemeinsame Kalenderdaten zu sehen.",
+  "setup-missing": "Die gemeinsamen Kalendertabellen sind in der Datenbank noch nicht eingerichtet (Migration nicht eingespielt).",
+  denied: "Für diese Daten fehlen die Berechtigungen (Projektfreigabe oder Datenbankrechte).",
+  offline: "Die Daten konnten nicht geladen werden – Verbindung unterbrochen.",
+  error: "Beim Laden ist ein Fehler aufgetreten.",
+};
+
 function useAsyncList<T>(load: (signal: { cancelled: boolean }) => Promise<T[]>, deps: unknown[]) {
   const [rows, setRows] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
+  const [status, setStatus] = useState<OpsStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const tick = useRef(0);
   const [nonce, setNonce] = useState(0);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
+  // Anmeldewechsel sofort berücksichtigen (Token/Signout).
+  useEffect(() => authClient.onAuthStateChange(() => reload()), [reload]);
+
   useEffect(() => {
     const signal = { cancelled: false };
     const run = ++tick.current;
+    const base = ctx();
+    if (!base.client) { setRows([]); setStatus("not-configured"); setError(null); setLoading(false); return; }
+    if (!base.session) { setRows([]); setStatus("signed-out"); setError(null); setLoading(false); return; }
     setLoading(true);
     setError(null);
     load(signal)
       .then((data) => {
         if (signal.cancelled || run !== tick.current) return;
         setRows(data);
-        setUnavailable(false);
+        setStatus("ready");
       })
       .catch((err) => {
         if (signal.cancelled || run !== tick.current) return;
+        const next = classifyOpsError(err);
         setRows([]);
-        setUnavailable(true);
-        setError(isMissingSchemaError(err) ? null : (err as Error)?.message ?? null);
+        setStatus(next);
+        setError(next === "setup-missing" ? null : (err as Error)?.message ?? null);
       })
       .finally(() => {
         if (!signal.cancelled && run === tick.current) setLoading(false);
@@ -194,8 +241,10 @@ function useAsyncList<T>(load: (signal: { cancelled: boolean }) => Promise<T[]>,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, nonce]);
 
-  return { rows, setRows, loading, unavailable, error, reload };
+  const unavailable = status !== "ready" && status !== "loading";
+  return { rows, setRows, loading, status, unavailable, error, reload };
 }
+
 
 /* ------------------------------------------------------ Schritt 04: Zeit */
 
