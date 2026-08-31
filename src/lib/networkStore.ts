@@ -399,6 +399,26 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
           );
         if (error) throw error;
       }),
+    /** Rolle eines Mitglieds ändern (nur Besitzer/Administrator, RLS prüft erneut). */
+    setMemberRole: (projectId: string, userId: string, role: Exclude<ProjectRole, "owner">) =>
+      run(async (client) => {
+        const { error } = await client
+          .from("project_members")
+          .update({ role, updated_at: new Date().toISOString() })
+          .eq("project_id", projectId)
+          .eq("user_id", userId);
+        if (error) throw error;
+      }),
+    /** Klar begrenzte Abweichungen vom Rollenstandard speichern. */
+    setMemberPermissions: (projectId: string, userId: string, permissions: ProjectPermissionOverrides) =>
+      run(async (client) => {
+        const { error } = await client
+          .from("project_members")
+          .update({ permissions, updated_at: new Date().toISOString() })
+          .eq("project_id", projectId)
+          .eq("user_id", userId);
+        if (error) throw error;
+      }),
     removeMember: (projectId: string, userId: string) =>
       run(async (client) => {
         const { error } = await client
