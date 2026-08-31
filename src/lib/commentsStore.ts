@@ -305,7 +305,7 @@ export function useSheetComments(opts: {
     // Erst die berechtigte Projektzuordnung sicherstellen – sonst lehnt RLS ab.
     const ensured = await ensureSharedProject(projectId, projectName);
     if (!ensured.ok) {
-      setError(ensured.message);
+      setError(ensured.message ?? "Projektzuordnung fehlgeschlagen.");
       return null;
     }
     try {
