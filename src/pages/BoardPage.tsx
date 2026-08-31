@@ -28,6 +28,7 @@ import {
   ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices, useTimeEntries,
   formatMinutes, netMinutes,
 } from "@/lib/opsStore";
+import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
 import { OpsActionBar } from "@/components/ops/OpsActionBar";
 
 // ------------------------------------------------------------------
