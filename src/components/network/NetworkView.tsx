@@ -11,10 +11,8 @@ import {
   Search,
   UserMinus,
   GripVertical,
-  CalendarDays,
   Wrench,
 } from "lucide-react";
-import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
 import { DevicesTab } from "@/components/network/DevicesTab";
 import { CommentsTab } from "@/components/network/CommentsTab";
 import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
