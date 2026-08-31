@@ -15,6 +15,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getNetworkClient, networkConfigured } from "@/lib/networkClient";
 import { supabase as authClient } from "@/lib/supabase";
+import { ensureSharedProject } from "@/lib/projectRegistration";
 
 export type CommentContext = "cad" | "mappe";
 export type CommentStatus = "open" | "done";
@@ -351,7 +352,7 @@ export function useSheetComments(opts: {
       setError(null);
       return true;
     } catch (e: any) {
-      setError(e?.message ?? failure);
+      setError(commentErrorMessage(e, failure));
       return false;
     }
   }, []);
@@ -377,12 +378,17 @@ export function useSheetComments(opts: {
       setError(null);
       return true;
     } catch (e: any) {
-      setError(e?.message ?? "Kommentar konnte nicht gelöscht werden.");
+      setError(commentErrorMessage(e, "Kommentar konnte nicht gelöscht werden."));
       return false;
     }
   }, []);
 
-  return { comments, loading, ready, error, myId, create, updateBody, setStatus, remove, reload: load, canModerate };
+  const clearError = useCallback(() => setError(null), []);
+
+  return {
+    comments, loading, ready, error, myId, create, updateBody, setStatus,
+    remove, reload: load, canModerate, clearError,
+  };
 }
 
 /* ------------------------------------------- Auswertung für die Team-Ansicht */
