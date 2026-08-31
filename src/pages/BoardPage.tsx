@@ -28,8 +28,8 @@ import {
   ABSENCE_LABEL, datesInRange, isoDate, useAbsences, useDevices, useTimeEntries,
   formatMinutes, netMinutes,
 } from "@/lib/opsStore";
-import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
 import { OpsActionBar } from "@/components/ops/OpsActionBar";
+import { OpsOverview } from "@/components/ops/OpsOverview";
 
 // ------------------------------------------------------------------
 // Konstanten / Helfer
@@ -646,16 +646,14 @@ export default function BoardPage() {
 
           {/* Kalender-Ansicht – identisch zur projektübergreifenden Organisation,
               nur auf dieses Projekt beschränkt (Beiträge, Zeiten, Abwesenheiten, Buchungen). */}
-          {surface === "cal" && (
-            <div className="mx-4 mt-4 rounded-xl p-4"
+          {surface === "cal" && projectId && (
+            <div className="mx-4 mt-4 rounded-xl"
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
-              <OpsCalendarTab
-                projectIds={projectId ? [projectId] : []}
-                projectNames={boardProjectNames}
-                peopleById={opsPeopleById}
-                selectedDates={calDay ? [calDay] : []}
-                onSelectDate={(d) => setCalDay((cur) => (cur === d ? undefined : d))}
-                allowAbsenceEntry={false}
+              <OpsOverview
+                projects={[{ id: projectId, name: project?.name ?? "Projekt" }]}
+                fixedProjectId={projectId}
+                showHeader={false}
+                className="p-4"
               />
             </div>
           )}
@@ -1084,7 +1082,7 @@ function ItemEditor({
         </button>
 
         {more && (
-        <div className="flex flex-col gap-3 md:grid md:grid-cols-2 md:gap-3 md:items-start">
+        <div className="flex flex-col gap-3">
         <Field label="Status">
           <div className="grid grid-cols-3 gap-1.5">
             {statuses.map((s) => {
