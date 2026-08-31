@@ -201,7 +201,7 @@ export function MappeHelpOverlay({
           <HelpItem
             icon={<HeaderActionGlyph><SquareDashedMousePointer size={17} /></HeaderActionGlyph>}
             shortcut="Strg + A"
-            description="Alles auswählen (Werkzeuge einzeln nutzbar)"
+            description="Alles auswählen\n(Werkzeugorientiert)"
           />
         </HelpGroup>
 

@@ -16,7 +16,7 @@ const GLOBAL_HINTS: string[] = [
 
 const TOOL_HINTS: Record<string, string[]> = {
   select: [
-    "⌘/Strg + A: Alles auswählen (Werkzeuge einzeln nutzbar)",
+    "⌘/Strg + A: Alles auswählen (Werkzeugorientiert)",
     "Shift+Klick auf einen Fangpunkt der Auswahl: Ankerpunkt setzen — daneben erscheinen Verschieben und Drehen",
     "Gedrehte/verschobene Gruppen rasten am Ankerpunkt an fremder Geometrie ein",
     "R: ausgewähltes Objekt bzw. Gruppe drehen · Häkchen oder Enter bestätigt",
