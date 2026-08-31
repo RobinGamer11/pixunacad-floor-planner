@@ -81,15 +81,14 @@ async function run(projectId: string, name: string | undefined): Promise<EnsureP
       if (isMissingSchemaError(insErr)) {
         return fail("Die Datenbank-Einrichtung fehlt. Bitte die SQL-Migrationen einspielen.");
       }
-      throw insErr;
+      return fail(`Projektzuordnung fehlgeschlagen: ${describe(insErr, "Unbekannter Fehler")}`);
     }
 
     verified.add(projectId);
     await projectAccessStore.reload();
     return { ok: true };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "";
-    return fail(msg ? `Projektzuordnung fehlgeschlagen: ${msg}` : "Projektzuordnung fehlgeschlagen.");
+    return fail(`Projektzuordnung fehlgeschlagen: ${describe(error, "Unbekannter Fehler")}`);
   }
 }
 
