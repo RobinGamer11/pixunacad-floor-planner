@@ -224,23 +224,44 @@ export function TimeInsights({
 
   const total = rows.reduce((s, r) => s + r.minutes, 0);
 
+  /** Auswahl im Kreisdiagramm – filtert Legende, Summe und Verlauf. */
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const toggle = (id: string) => setActiveId((cur) => (cur === id ? null : id));
+  useEffect(() => {
+    if (activeId && !rows.some((r) => r.id === activeId)) setActiveId(null);
+  }, [rows, activeId]);
+
   const history = useMemo(
-    () => [...times.entries].sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at)).slice(0, 200),
-    [times.entries],
+    () =>
+      [...times.entries]
+        .filter((e) => !activeId || e.user_id === activeId)
+        .sort((a, b) => Date.parse(b.started_at) - Date.parse(a.started_at))
+        .slice(0, 200),
+    [times.entries, activeId],
   );
   const absenceHistory = useMemo(() => {
     const seen = new Set<string>();
     return absences.absences
       .filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)))
+      .filter((a) => !activeId || a.user_id === activeId)
       .sort((a, b) => b.starts_on.localeCompare(a.starts_on))
       .slice(0, 100);
-  }, [absences.absences]);
+  }, [absences.absences, activeId]);
+
+  const activeRow = activeId ? rows.find((r) => r.id === activeId) : null;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-6">
-        <MiniPie slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))} />
+        <MiniPie
+          slices={rows.map((r, i) => ({ id: r.id, value: r.minutes, color: insightColor(i) }))}
+          activeId={activeId}
+          onSlice={toggle}
+          onCenter={() => setActiveId(null)}
+        />
         <Legend
+          activeId={activeId}
+          onSelect={toggle}
           rows={rows.map((r, i) => ({
             id: r.id,
             label: nameOf(r.id),
@@ -250,7 +271,17 @@ export function TimeInsights({
           }))}
         />
         <div className="text-[11px]" style={{ color: SOFT }}>
-          Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+          {activeRow ? (
+            <>
+              {nameOf(activeRow.id)}:{" "}
+              <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(activeRow.minutes)}</span>
+              {total > 0 && <> · {Math.round((activeRow.minutes / total) * 100)}%</>}
+            </>
+          ) : (
+            <>
+              Gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{formatMinutes(total)}</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -283,6 +314,7 @@ export function TimeInsights({
     </div>
   );
 }
+
 
 /* ------------------------------------------------------ Geräte / Werkzeuge */
 
