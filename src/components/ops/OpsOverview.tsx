@@ -53,12 +53,15 @@ function ProjectStandRow({
   onToggle,
   peopleById,
   onShowItem,
+  /** Ohne Kopfzeile: Inhalt (die drei Reiter) wird direkt angezeigt. */
+  headless = false,
 }: {
   project: OpsOverviewProject;
   open: boolean;
   onToggle: () => void;
   peopleById?: Map<string, string>;
   onShowItem?: (item: TlItem) => void;
+  headless?: boolean;
 }) {
   const ids = useMemo(() => [project.id], [project.id]);
   const times = useTimeEntriesForProjects(ids);
