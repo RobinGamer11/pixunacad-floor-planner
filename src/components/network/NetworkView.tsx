@@ -337,14 +337,26 @@ export function NetworkView({
     }
   };
 
+  /** Ordner der Startseite – dieselbe Struktur, keine zweite Pflege. */
+  const folderGroups = useMemo(() => {
+    const groups = folders.map((f) => ({
+      key: f.id,
+      name: f.name,
+      items: projects.filter((p) => p.folderId === f.id),
+    }));
+    const rest = projects.filter((p) => !p.folderId || !folders.some((f) => f.id === p.folderId));
+    if (rest.length) groups.push({ key: "__root", name: "Ohne Ordner", items: rest });
+    return groups.filter((g) => g.items.length > 0);
+  }, [folders, projects]);
+
   const tabs: { id: TabId; label: string; icon: typeof Users; badge?: number }[] = [
-    { id: "contacts", label: "Kontakte", icon: Users },
     { id: "teams", label: "Projekte / Teams", icon: FolderKanban },
+    { id: "contacts", label: "Kontakte", icon: Users },
     { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
-    { id: "calendar", label: "Kalender", icon: CalendarDays },
-    { id: "devices", label: "Geräte", icon: Wrench },
+    { id: "devices", label: "Geräte & Werkzeuge", icon: Wrench },
     { id: "comments", label: "Kommentare", icon: MessageSquare },
   ];
+
 
   return (
     <div className="mt-6">
