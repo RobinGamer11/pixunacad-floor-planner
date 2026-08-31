@@ -127,6 +127,8 @@ export function CadCommentLayer({
 
   const onCanvasClick = (e: React.PointerEvent) => {
     if (!ui.mode || !cam || !hostRef.current) return;
+    // Freigegebene Projekte: ohne Kommentarrecht keinen Entwurf öffnen.
+    if (access.shared && !access.permissions.canComment) return;
     const rect = hostRef.current.getBoundingClientRect();
     const local = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const w = cam.screenToWorld(local.x, local.y);

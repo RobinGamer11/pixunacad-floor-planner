@@ -3336,7 +3336,7 @@ function PageCanvas({
 
         >
         {/* Kommentare (getrennt gespeichert, kein Seitenelement) */}
-        <CommentLayer projectId={projectId} pageId={page.id} />
+        <CommentLayer projectId={projectId} pageId={page.id} projectName={project.name} />
 
         {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
             touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
