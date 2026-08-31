@@ -3103,7 +3103,8 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         />
       </div>
 
-      {/* Projektübergreifender Kalender: Beiträge, Arbeitszeiten, Abwesenheiten, Buchungen. */}
+      {/* Projektübergreifender Kalender: Beiträge, Arbeitszeiten, Abwesenheiten, Buchungen.
+          Projekte ein-/ausblenden und Tagesauswahl laufen über denselben Zustand wie die Liste. */}
       <div className="mb-6 rounded-xl border p-3"
            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
         <OpsCalendarTab
@@ -3111,6 +3112,10 @@ function AllTasksView({ projects }: { projects: Project[] }) {
           projectIds={projects.map((p) => p.id)}
           projectNames={opsProjectNames}
           peopleById={opsPeople}
+          selectedDates={selectedDate ? [selectedDate] : []}
+          onSelectDate={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
+          hiddenProjects={new Set(opsProjectIds.filter((id) => !activeIds.has(id)))}
+          onToggleProject={toggle}
         />
       </div>
 
@@ -3120,13 +3125,13 @@ function AllTasksView({ projects }: { projects: Project[] }) {
         <div className="space-y-6">
           <div className="rounded-xl border overflow-hidden" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
             <div className="px-4 py-3 border-b text-xs font-semibold tracking-widest text-muted-foreground flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <span>AUFGABEN {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
+              <span>BEITRÄGE {selectedDate ? `· ${selectedDate}` : `· ${visible.length}`}</span>
               {selectedDate && (
                 <button onClick={() => setSelectedDate(undefined)} className="text-[11px] font-normal hover:text-foreground">Filter zurücksetzen</button>
               )}
             </div>
             {visible.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground">Keine offenen Aufgaben.</div>
+              <div className="p-6 text-sm text-muted-foreground">Keine offenen Beiträge.</div>
             ) : (
               <ul className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
                 {visible.map((t) => (
@@ -3154,7 +3159,7 @@ function AllTasksView({ projects }: { projects: Project[] }) {
                         {t.title}
                         <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
                               style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}>
-                          {t.kind === "task" ? "Aufgabe" : t.kind === "event" ? "Termin" : "Notiz"}
+                          {t.kind === "task" ? "Beitrag" : t.kind === "event" ? "Termin" : "Notiz"}
                         </span>
                       </div>
                       <div className="text-[11px] text-muted-foreground truncate">
@@ -3232,42 +3237,8 @@ function AllTasksView({ projects }: { projects: Project[] }) {
             </div>
           </div>
 
-          <GlobalCalendar
-            tasks={gTasks.filter((t) => !t.done && activeIds.has(t.projectId))}
-            selectedDate={selectedDate}
-            onSelect={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
-          />
         </div>
       </div>
-    </div>
-  );
-}
-
-function GlobalCalendar({
-  tasks,
-  selectedDate,
-  onSelect,
-}: {
-  tasks: { id?: string; date?: string; color: string; title?: string; kind?: TlKind }[];
-  selectedDate?: string;
-  onSelect: (d: string) => void;
-}) {
-  const entries: CalEntry[] = tasks
-    .filter((t) => !!t.date)
-    .map((t, i) => ({
-      id: `${t.id ?? "e"}-${i}`,
-      date: t.date,
-      title: t.title || "Eintrag",
-      color: t.color,
-    }));
-  return (
-    <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
-      <RangeCalendar
-        entries={entries}
-        selectedDates={selectedDate ? [selectedDate] : []}
-        onSelectDate={(d) => onSelect(d)}
-        cellHeight={56}
-      />
     </div>
   );
 }
