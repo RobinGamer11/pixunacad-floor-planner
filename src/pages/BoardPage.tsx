@@ -617,7 +617,7 @@ export default function BoardPage() {
                 ))}
               </div>
               <RangeCalendar
-                entries={[...calEntries, ...opsEntries]}
+                entries={[...(showItems ? calEntries : []), ...opsEntries]}
                 selectedDates={[]}
                 onSelectDate={() => {}}
               />
