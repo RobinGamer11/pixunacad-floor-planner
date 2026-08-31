@@ -249,6 +249,21 @@ export function NetworkView({
     return { map, general };
   }, [contactsById, net.contacts, net.members, net.myId, net.peopleById, projects]);
 
+  /* Namensauflösung für die gemeinsamen Übersichten (Kalender, Geräte). */
+  const projectNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of projects) map.set(p.id, p.name);
+    for (const p of net.sharedProjects) if (!map.has(p.id)) map.set(p.id, p.name || "Projekt");
+    return map;
+  }, [projects, net.sharedProjects]);
+
+  const peopleNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [id, person] of peopleById) map.set(id, person.name);
+    return map;
+  }, [peopleById]);
+
+
   /** Mitgliedszeile (Rolle + Abweichungen) je Projekt/Person. */
   const memberRow = (projectId: string, userId: string) =>
     net.members.find((m) => m.project_id === projectId && m.user_id === userId);
