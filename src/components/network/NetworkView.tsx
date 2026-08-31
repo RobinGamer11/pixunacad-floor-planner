@@ -231,6 +231,11 @@ export function NetworkView({
   /** Kommentarübersicht eines Projekts (aus den Projektzeilen heraus geöffnet). */
   const [commentsProject, setCommentsProject] = useState<string | undefined>();
   const openComments = (id: string) => { setCommentsProject(id); setTab("comments"); };
+  /** Chat bzw. Kommentare direkt unter dem Projektnamen in „Projekte / Teams“. */
+  const [projectPanel, setProjectPanel] = useState<{ id: string; kind: "chat" | "comments" } | null>(null);
+  const toggleProjectPanel = (id: string, kind: "chat" | "comments") =>
+    setProjectPanel((cur) => (cur && cur.id === id && cur.kind === kind ? null : { id, kind }));
+
   const [details, setDetails] = useState<NetworkPerson | null>(null);
   const [confirmContact, setConfirmContact] = useState<{ person: NetworkPerson; projects: string[] } | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
