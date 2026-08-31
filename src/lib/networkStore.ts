@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getNetworkClient, isMissingSchemaError, networkConfigured } from "@/lib/networkClient";
+import { ensureSharedProject } from "@/lib/projectRegistration";
 import { supabase as authClient } from "@/lib/supabase";
 import type { ProjectPermissionOverrides, ProjectRole } from "@/lib/projectAccess";
 
