@@ -705,13 +705,8 @@ export function NetworkView({
             </div>
           )}
 
-          {!net.loading && tab === "calendar" && (
-            <OpsCalendarTab
-              projectIds={projects.map((p) => p.id)}
-              projectNames={projectNameMap}
-              peopleById={peopleNameMap}
-            />
-          )}
+
+
 
           {!net.loading && tab === "devices" && (
             <DevicesTab projectNames={projectNameMap} peopleById={peopleNameMap} />
