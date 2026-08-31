@@ -75,6 +75,9 @@ import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 import { NetworkView } from "@/components/network/NetworkView";
+import { OpsActionBar } from "@/components/ops/OpsActionBar";
+import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
+import { useProjectsMemberOptions } from "@/lib/projectTeam";
 import { ProjectTeamTab } from "@/components/project/ProjectTeamTab";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
@@ -2995,6 +2998,14 @@ function BoardPreview({ project }: { project: Project }) {
 
 function AllTasksView({ projects }: { projects: Project[] }) {
   const navigate = useNavigate();
+  // Gemeinsame Organisationsdaten (Kalender/Aktionen) neu laden, wenn etwas erfasst wurde.
+  const [opsNonce, setOpsNonce] = useState(0);
+  const opsProjectIds = useMemo(() => projects.map((p) => p.id), [projects]);
+  const opsProjectNames = useMemo(
+    () => new Map(projects.map((p) => [p.id, p.name])),
+    [projects],
+  );
+  const { namesById: opsPeople } = useProjectsMemberOptions(opsProjectIds);
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(projects.map((p) => p.id)));
   const [previewId, setPreviewId] = useState<string | null>(null);
   // Board-Änderungen aller Projekte live übernehmen.
