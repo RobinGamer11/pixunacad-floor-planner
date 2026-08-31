@@ -2889,6 +2889,9 @@ function ProjectStandRow({
   const peopleCount = usePeopleCount(ids);
   const devices = useDevices(project.id);
   const [tick, setTick] = useState(0);
+  /** Reiter innerhalb einer Projektzeile – „Beiträge“ ist die Vorauswahl. */
+  const [standTab, setStandTab] = useState<"items" | "time" | "dev">("items");
+
   useEffect(() => subscribeTimeline(project.id, () => setTick((t) => t + 1)), [project.id]);
 
   const state = useMemo(() => {
