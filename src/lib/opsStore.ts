@@ -519,19 +519,10 @@ export function useAbsences(projectIds: string[]) {
   const add = useCallback(async (input: {
     kind: AbsenceKind; startsOn: string; endsOn: string; note?: string; status?: string;
   }) => {
-    const { client, session } = ctx();
-    if (!client || !session) throw new Error("Abwesenheiten benötigen eine Anmeldung.");
-    const { error: err } = await client.from("absences").insert({
-      user_id: session.user.id,
-      kind: input.kind,
-      starts_on: input.startsOn,
-      ends_on: input.endsOn,
-      status: input.status ?? "planned",
-      note: input.note?.trim() || null,
-    });
-    if (err) throw err;
+    await addAbsenceEntry(input);
     reload();
   }, [reload]);
+
 
   /** Eigene Abwesenheit anpassen (Status/Zeitraum/Bemerkung). */
   const update = useCallback(async (id: string, patch: {
