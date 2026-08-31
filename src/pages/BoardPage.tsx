@@ -599,6 +599,8 @@ export default function BoardPage() {
                  style={{ background: PANEL, border: `1px solid ${PANEL_LINE}` }}>
               <div className="flex flex-wrap items-center gap-2 mb-2 text-[11px]">
                 {([
+                  ["Beiträge", showItems, () => setShowItems((v) => !v), "hsl(var(--accent-gold))"],
+                  ["Arbeitszeiten", showTimes, () => setShowTimes((v) => !v), "#3f9c6a"],
                   ["Abwesenheiten", showAbsences, () => setShowAbsences((v) => !v), "#8b8178"],
                   ["Geräte", showDevices, () => setShowDevices((v) => !v), "#4da3ff"],
                 ] as [string, boolean, () => void, string][]).map(([label, on, toggle, color]) => (
