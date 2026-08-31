@@ -247,7 +247,10 @@ create policy "devices_delete_owner_unused" on public.devices
   for delete to authenticated
   using (
     owner_id = auth.uid()
-    and not exists (select 1 from public.device_bookings b where b.device_id = id)
+    -- Eindeutig auf das äußere Gerät beziehen (nicht auf b.id).
+    and not exists (
+      select 1 from public.device_bookings b where b.device_id = public.devices.id
+    )
   );
 
 drop policy if exists "device_bookings_select_related" on public.device_bookings;
