@@ -935,6 +935,12 @@ function ItemEditor({
                  value={item.responsible ?? ""} onChange={(e) => set({ responsible: e.target.value })} />
         </Field>
 
+        <AssigneePicker
+          projectId={projectId}
+          value={item.assignees ?? []}
+          onChange={(next) => set({ assignees: next })}
+        />
+
         <ManagedSelect
           label="Kategorie"
           value={item.categoryId ?? ""}
