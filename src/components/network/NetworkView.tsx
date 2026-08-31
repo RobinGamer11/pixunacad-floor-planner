@@ -168,7 +168,7 @@ function Group({
   );
 }
 
-type TabId = "contacts" | "teams" | "requests";
+type TabId = "contacts" | "teams" | "requests" | "calendar" | "devices";
 
 export function NetworkView({
   projects,
