@@ -50,6 +50,8 @@ export function OpsCalendarTab({
   onSelectDate,
   hiddenProjects,
   onToggleProject,
+  allowAbsenceEntry = true,
+  projectFilterAsDropdown = false,
 }: {
   projectIds: string[];
   projectNames: Map<string, string>;
@@ -60,7 +62,12 @@ export function OpsCalendarTab({
   /** Optional: Projekt-Sichtbarkeit kontrolliert von außen führen. */
   hiddenProjects?: Set<string>;
   onToggleProject?: (id: string) => void;
+  /** Abwesenheiten hier eintragen/pflegen (Projektbereich). */
+  allowAbsenceEntry?: boolean;
+  /** Projekte als Auswahlliste in der Filterzeile statt als Schaltflächenreihe. */
+  projectFilterAsDropdown?: boolean;
 }) {
+
   /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
   const [hiddenState, setHidden] = useState<Set<string>>(() => new Set());
   const hidden = hiddenProjects ?? hiddenState;
