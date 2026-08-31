@@ -53,6 +53,8 @@ export interface NetworkPerson {
 export interface LocalProjectRef {
   id: string;
   name: string;
+  /** Zuordnung zum bestehenden Projektordner der Startseite (nur Anzeige). */
+  folderId?: string | null;
 }
 
 const STALE_AFTER_MS = 90_000;

@@ -38,6 +38,7 @@ import {
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
+import { MemberRoleControls } from "@/components/network/MemberRoleControls";
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
 
@@ -170,13 +171,16 @@ function Group({
   );
 }
 
-type TabId = "contacts" | "teams" | "requests" | "calendar" | "devices" | "comments";
+type TabId = "contacts" | "teams" | "requests" | "devices" | "comments";
 
 export function NetworkView({
   projects,
+  folders = [],
   profile,
 }: {
   projects: LocalProjectRef[];
+  /** Bestehende Projektordner der Startseite (nur Anzeige, keine zweite Pflege). */
+  folders?: { id: string; name: string }[];
   /** Lokales Profil – wird als Anzeigename/Funktion ins Netzwerk gespiegelt. */
   profile?: { name: string; role?: string; avatarUrl?: string };
 }) {
@@ -206,7 +210,7 @@ export function NetworkView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [net.ready, myStatus]);
 
-  const [tab, setTab] = useState<TabId>("contacts");
+  const [tab, setTab] = useState<TabId>("teams");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NetworkProfile[]>([]);
   const [searching, setSearching] = useState(false);
@@ -361,7 +365,7 @@ export function NetworkView({
   return (
     <div className="mt-6">
       {/* Tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -395,9 +399,8 @@ export function NetworkView({
       <div
         className="mt-4 grid gap-4"
         style={{
-          gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,1fr)" : "minmax(0,1fr)",
-          // Kalender und Geräte brauchen mehr Breite als die Personenlisten.
-          maxWidth: chat ? 1040 : tab === "calendar" || tab === "devices" || tab === "comments" ? 880 : 576,
+          // Netzwerk ist ein vollwertiger Hauptbereich – volle Contentbreite.
+          gridTemplateColumns: chat ? "minmax(0,1fr) minmax(0,420px)" : "minmax(0,1fr)",
         }}
       >
         <div className="rounded-xl border p-3" style={surface}>
