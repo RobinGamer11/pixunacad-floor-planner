@@ -137,7 +137,8 @@ begin
   if conv is null then
     insert into public.conversations (type, project_id, created_by)
     values ('project', _project_id, me)
-    on conflict (project_id) do nothing
+    -- Indexprädikat muss zum partiellen Unique-Index passen.
+    on conflict (project_id) where project_id is not null do nothing
     returning id into conv;
     if conv is null then
       select id into conv from public.conversations where project_id = _project_id;
