@@ -246,15 +246,33 @@ export default function BoardPage() {
     return out;
   }, [state.items, state.categories, now, selectItem]);
 
-  /* Gemeinsamer Kalender: Abwesenheiten und Gerätebuchungen als eigene Ebenen. */
+  /* Gemeinsamer Kalender: Arbeitszeiten, Abwesenheiten und Geräte als Ebenen. */
   const absenceProjects = useMemo(() => (projectId ? [projectId] : []), [projectId]);
   const absences = useAbsences(absenceProjects);
   const deviceData = useDevices(projectId);
+  const timeData = useTimeEntries(projectId);
   const [showAbsences, setShowAbsences] = useState(true);
   const [showDevices, setShowDevices] = useState(true);
+  const [showTimes, setShowTimes] = useState(true);
+  const [timeDialog, setTimeDialog] = useState(false);
 
   const opsEntries: CalEntry[] = useMemo(() => {
     const out: CalEntry[] = [];
+    if (showTimes) {
+      for (const e of timeData.entries) {
+        const item = state.items.find((i) => i.id === e.item_id);
+        for (const day of datesInRange(isoDate(new Date(e.started_at)), isoDate(new Date(e.ended_at)))) {
+          out.push({
+            id: `time-${e.id}-${day}`,
+            date: day,
+            title: `${formatMinutes(netMinutes(e))} · ${item?.title ?? "Beitrag"}`,
+            sub: "Arbeitszeit",
+            color: "#3f9c6a",
+            onOpen: item ? () => selectItem(item.id) : undefined,
+          });
+        }
+      }
+    }
     if (showAbsences) {
       for (const a of absences.absences) {
         const who = a.user_id === absences.myId ? "Ich" : "Teammitglied";
@@ -280,7 +298,10 @@ export default function BoardPage() {
       }
     }
     return out;
-  }, [absences.absences, absences.myId, deviceData.bookings, deviceData.devices, showAbsences, showDevices]);
+  }, [absences.absences, absences.myId, deviceData.bookings, deviceData.devices, showAbsences, showDevices,
+      showTimes, timeData.entries, state.items, selectItem]);
+
+
 
 
   const catMap = useMemo(() => new Map(state.categories.map((c) => [c.id, c])), [state.categories]);
