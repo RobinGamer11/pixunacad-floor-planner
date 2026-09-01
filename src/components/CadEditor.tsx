@@ -440,6 +440,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const leftSidebarRef = useRef<HTMLElement>(null);
+  // Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne sichtbare Scrollbar.
+  const leftRailScroll = useDragScroll<HTMLElement>("y");
   // Outside-Klick schließt das Werkzeug-Flyout (Freihand/Radiergummi/Schraffur-Varianten …).
   useEffect(() => {
     if (!expandedTool) return;
