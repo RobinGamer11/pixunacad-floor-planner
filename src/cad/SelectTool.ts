@@ -2537,7 +2537,9 @@ export class SelectTool {
       return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
     };
 
-    const visibleHatches = this.app.topology._hatchesFrontToBack();
+    const visibleHatches = this.app.topology
+      ._hatchesFrontToBack()
+      .filter((h: any) => this.app.labelManager.isEditable(h?.labelId));
     let best: { hatch: any; edgeIndex: number; t: number; holeIndex: number | null } | null = null;
     let bestPx = Infinity;
 
