@@ -20,8 +20,9 @@ function read<T extends string>(key: string, fallback: T): T {
   try { return (localStorage.getItem(key) as T) || fallback; } catch { return fallback; }
 }
 
+/** Standard ist das dunkle Design; nur eine bewusste Auswahl schaltet auf hell. */
 export function getTheme(): ThemeMode {
-  return read<ThemeMode>(THEME_KEY, "light") === "dark" ? "dark" : "light";
+  return read<ThemeMode>(THEME_KEY, "dark") === "light" ? "light" : "dark";
 }
 
 export function isCanvasDark(): boolean {

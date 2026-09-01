@@ -144,11 +144,19 @@ export function TabletAidWheel() {
           // Textwerkzeug: Tastatur schon in der echten Geste "vorwärmen",
           // damit sie nach dem Setzen der Textbox automatisch offen ist.
           if ((window as any).__pixunaActiveTool === "text") primeTabletKeyboard();
-          // ENTER ist ausschließlich Abschluss/Bestätigung. Neue Zeichenpunkte
-          // werden separat mit LMB gesetzt; so schließt ENTER insbesondere eine
-          // laufende Schraffur immer sofort final ab.
+          // Werkzeugabhängig: Polygon und Schraffur schließen mit ENTER die
+          // laufende Kontur ab. Punktweise Werkzeuge (Linie, Wand, Maß …)
+          // setzen mit ENTER den vorgemerkten Punkt — exakt wie ein virtueller
+          // linker Mausklick, ohne die laufende Eingabe zu beenden.
+          const tool = String((window as any).__pixunaActiveTool || "");
+          const closesContour = tool === "polygon" || tool === "hatch";
+          if (!closesContour && (window as any).__pixunaLmbHint) {
+            virtualMouseClick(0);
+            return;
+          }
           virtualKeyPress("Enter");
         }}
+        highlight={lmbHint}
         icon={<Keyboard size={24} strokeWidth={1.45} />} />
 
       <WheelButton angle={-25} size={size} label="R-Klick" description="Hilfslinie" tooltip="Rechte Maustaste"

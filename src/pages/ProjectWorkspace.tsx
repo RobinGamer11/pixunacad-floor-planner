@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "re
 import { CommentLayer } from "@/components/comments/CommentLayer";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -241,6 +242,8 @@ type ProjectZoomAnchor =
   | { kind: "viewport"; contentX: number; contentY: number; mx: number; my: number };
 
 export default function ProjectWorkspace() {
+  // Linke Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne Scrollbar.
+  const leftRailScroll = useDragScroll<HTMLElement>("y");
   const { projectId } = useParams();
   const rawProject = useProject(projectId);
   const navigate = useNavigate();
@@ -1545,7 +1548,8 @@ export default function ProjectWorkspace() {
       <div className="flex-1 flex min-h-0">
       {/* Far-left tool rail */}
       <aside
-        className="flex flex-col items-center gap-0.5 py-1.5 shrink-0 border-r"
+        ref={leftRailScroll}
+        className="flex flex-col items-center gap-0.5 py-1.5 shrink-0 border-r overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain"
         style={{
           width: 56,
           borderColor: "hsl(var(--hairline))",

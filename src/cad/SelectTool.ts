@@ -2409,8 +2409,10 @@ export class SelectTool {
     }
 
     const isFrameSeg = (s: any) => s?.labelId === "__page_frame__" || s?.labelId === "__ext_rect__";
-    const visibleSegs = this.app.topology._segmentsFrontToBack().filter((s: any) => !isFrameSeg(s));
-    const visibleHatches = this.app.topology._hatchesFrontToBack();
+    // Gesperrte Ebenen: sichtbar und fangbar, aber nicht anwählbar.
+    const editable = (o: any) => this.app.labelManager.isEditable(o?.labelId);
+    const visibleSegs = this.app.topology._segmentsFrontToBack().filter((s: any) => !isFrameSeg(s) && editable(s));
+    const visibleHatches = this.app.topology._hatchesFrontToBack().filter(editable);
 
     let best: any = null;
     let bestScore = Infinity;
@@ -2535,7 +2537,9 @@ export class SelectTool {
       return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
     };
 
-    const visibleHatches = this.app.topology._hatchesFrontToBack();
+    const visibleHatches = this.app.topology
+      ._hatchesFrontToBack()
+      .filter((h: any) => this.app.labelManager.isEditable(h?.labelId));
     let best: { hatch: any; edgeIndex: number; t: number; holeIndex: number | null } | null = null;
     let bestPx = Infinity;
 

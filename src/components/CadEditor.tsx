@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
+import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
 import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon } from "lucide-react";
@@ -440,6 +441,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const leftSidebarRef = useRef<HTMLElement>(null);
+  // Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne sichtbare Scrollbar.
+  const leftRailScroll = useDragScroll<HTMLElement>("y");
   // Outside-Klick schließt das Werkzeug-Flyout (Freihand/Radiergummi/Schraffur-Varianten …).
   useEffect(() => {
     if (!expandedTool) return;
@@ -1300,8 +1303,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
       {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
-        ref={leftSidebarRef}
-        className="relative shrink-0 flex flex-col border-r"
+        ref={(el) => { (leftSidebarRef as any).current = el; leftRailScroll(el); }}
+        className="relative shrink-0 flex flex-col border-r overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain"
         style={{
           width: 56,
           background: "hsl(var(--surface-card))",
