@@ -3438,27 +3438,7 @@ export class CadApp {
    * gesetzt wurde.
    */
   private _drawPendingPointHint(ctx: CanvasRenderingContext2D) {
-    if (typeof window === "undefined") return;
-    if (!(window as any).__pixunaLmbHint) return;
-    const x = this.input.mouse.sx;
-    const y = this.input.mouse.sy;
-    ctx.save();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "rgba(200,150,40,0.95)";
-    ctx.setLineDash([4, 3]);
-    ctx.beginPath();
-    ctx.arc(x, y, 8, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(x - 12, y); ctx.lineTo(x + 12, y);
-    ctx.moveTo(x, y - 12); ctx.lineTo(x, y + 12);
-    ctx.stroke();
-    ctx.fillStyle = "rgba(200,150,40,0.95)";
-    ctx.beginPath();
-    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    drawPendingPointHint(ctx, this.input.mouse.sx, this.input.mouse.sy);
   }
 
 
