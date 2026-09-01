@@ -2409,8 +2409,10 @@ export class SelectTool {
     }
 
     const isFrameSeg = (s: any) => s?.labelId === "__page_frame__" || s?.labelId === "__ext_rect__";
-    const visibleSegs = this.app.topology._segmentsFrontToBack().filter((s: any) => !isFrameSeg(s));
-    const visibleHatches = this.app.topology._hatchesFrontToBack();
+    // Gesperrte Ebenen: sichtbar und fangbar, aber nicht anwählbar.
+    const editable = (o: any) => this.app.labelManager.isEditable(o?.labelId);
+    const visibleSegs = this.app.topology._segmentsFrontToBack().filter((s: any) => !isFrameSeg(s) && editable(s));
+    const visibleHatches = this.app.topology._hatchesFrontToBack().filter(editable);
 
     let best: any = null;
     let bestScore = Infinity;
