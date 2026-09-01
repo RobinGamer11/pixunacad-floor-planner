@@ -242,6 +242,8 @@ type ProjectZoomAnchor =
   | { kind: "viewport"; contentX: number; contentY: number; mx: number; my: number };
 
 export default function ProjectWorkspace() {
+  // Linke Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne Scrollbar.
+  const leftRailScroll = useDragScroll<HTMLElement>("y");
   const { projectId } = useParams();
   const rawProject = useProject(projectId);
   const navigate = useNavigate();
