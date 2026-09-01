@@ -25,6 +25,7 @@ const MAPPE_ROUGHEN_DEFAULT: RoughenParams = {
 import { Camera } from "../Camera";
 import { Scene, copyStrokeEffects } from "../Scene";
 import { Input } from "../Input";
+import { drawPendingPointHint } from "../pendingPointHint";
 import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
 import { TopologyEngine } from "../TopologyEngine";
