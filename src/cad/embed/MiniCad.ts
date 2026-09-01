@@ -2105,7 +2105,14 @@ export class MiniCad {
   get canvas(): HTMLCanvasElement { return this.dom.canvas; }
 
   setActiveDrawLabelId(labelId: string) {
-    this.activeDrawLabelId = labelId || Defaults.defaultLabelId;
+    let next = labelId || Defaults.defaultLabelId;
+    // Auf gesperrten Ebenen darf nicht gezeichnet werden — automatisch auf die
+    // nächste freie Ebene wechseln (identisch zur eigenständigen CAD-Ansicht).
+    if (this.labelManager.isEditLocked(next)) {
+      const free = this.labelManager.list().find((g) => !g.editLocked && g.visible !== false);
+      if (free) next = free.id;
+    }
+    this.activeDrawLabelId = next;
     this.refreshLabelUI();
   }
 
