@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Keyboard, Pencil } from "lucide-react";
+import { setLmbHint as setGlobalLmbHint } from "@/cad/Input";
 import {
   virtualMouseClick,
   virtualMouseHold,
