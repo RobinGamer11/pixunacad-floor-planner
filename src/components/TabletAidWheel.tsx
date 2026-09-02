@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Keyboard, Pencil } from "lucide-react";
+import { setLmbHint as setGlobalLmbHint } from "@/cad/Input";
 import {
   virtualMouseClick,
   virtualMouseHold,
@@ -54,7 +55,11 @@ export function TabletAidWheel() {
   // Der Commit erfolgt erst über den LMB- oder ENTER-Knopf am Rad.
   useEffect(() => {
     (window as any).__pixunaTabletCommit = true;
-    return () => { (window as any).__pixunaTabletCommit = false; };
+    return () => {
+      (window as any).__pixunaTabletCommit = false;
+      // Hilfsrad aus → vorgemerkten Punkt (gelbes Visier) verwerfen.
+      setGlobalLmbHint(false);
+    };
   }, []);
 
   // "Vorerfasster Punkt": LMB leuchtet, solange ein Stift-Kontakt auf das

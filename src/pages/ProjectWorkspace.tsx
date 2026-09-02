@@ -650,12 +650,12 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     const el = canvasViewportRef.current;
     if (!el) return;
-    let mode: "idle" | "gesture" | "pan1" = "idle";
+    let mode: "idle" | "gesture" = "idle";
     let startDist = 0;
     let startZoom = 1;
     let startAnchor: ProjectZoomAnchor | null = null;
-    let pan1Last: { x: number; y: number } | null = null;
-    let pan1Id: number | null = null;
+    // Zwei-Finger-Pan (wie in CAD): Mittelpunktbewegung schwenkt die Ansicht.
+    let lastMid: { x: number; y: number } | null = null;
     const pts = new Map<number, { x: number; y: number }>();
     const midOf = () => {
       const arr = [...pts.values()];
@@ -688,19 +688,13 @@ export default function ProjectWorkspace() {
         startDist = distOf();
         startZoom = zoomRef.current;
         startAnchor = captureZoomAnchor(m.x, m.y);
-        pan1Last = null;
-        pan1Id = null;
+        lastMid = m;
         e.preventDefault();
-      } else if (pts.size === 1 && (window as any).__pixunaTabletCommit) {
-        // Tablet-Hilfsrad aktiv: Ein-Finger-Bewegung schwenkt die Mappe
-        // (statt zu zeichnen — Commit passiert nur per Wheel-ENTER/LMB).
-        // Im Pen-Only-Modus wurden Stylus-Touches bereits oben ausgefiltert.
-        const t = Array.from(e.touches).find((tt) => pts.has(tt.identifier));
-        if (t) {
-          pan1Id = t.identifier;
-          pan1Last = { x: t.clientX, y: t.clientY };
-          mode = "pan1";
-        }
+      } else {
+        // Ein Finger/Stift verschiebt die Zeichenfläche NICHT (wie in CAD):
+        // er dient nur zum Positionieren des vorgemerkten Punkts.
+        mode = "idle";
+        lastMid = null;
       }
     };
     let rafPending = 0;
@@ -723,6 +717,16 @@ export default function ProjectWorkspace() {
       if (mode === "gesture" && pts.size >= 2) {
         const m = midOf();
         const dist = distOf();
+        // Zwei-Finger-Pan (Mittelpunktbewegung) — gleichzeitig mit Pinch-Zoom.
+        if (lastMid) {
+          const dx = m.x - lastMid.x;
+          const dy = m.y - lastMid.y;
+          if (dx || dy) {
+            el.scrollLeft -= dx;
+            el.scrollTop -= dy;
+          }
+        }
+        lastMid = m;
         if (startDist > 4 && dist > 4) {
           const factor = dist / startDist;
           pendingNextZoom = clampProjectZoom(startZoom * factor);
@@ -732,21 +736,11 @@ export default function ProjectWorkspace() {
           if (!rafPending) rafPending = requestAnimationFrame(flush);
         }
         e.preventDefault();
-      } else if (mode === "pan1" && pan1Id !== null && pan1Last) {
-        const t = Array.from(e.touches).find((tt) => tt.identifier === pan1Id);
-        if (!t) return;
-        const dx = t.clientX - pan1Last.x;
-        const dy = t.clientY - pan1Last.y;
-        pan1Last = { x: t.clientX, y: t.clientY };
-        el.scrollLeft -= dx;
-        el.scrollTop -= dy;
-        e.preventDefault();
       }
     };
     const onTouchEnd = (e: TouchEvent) => {
       for (const t of Array.from(e.changedTouches)) pts.delete(t.identifier);
-      if (pts.size < 2) mode = pts.size === 1 && (window as any).__pixunaTabletCommit ? "pan1" : "idle";
-      if (mode === "pan1" && pts.size === 0) { mode = "idle"; pan1Id = null; pan1Last = null; }
+      if (pts.size < 2) { mode = "idle"; lastMid = null; }
     };
     el.addEventListener("touchstart", onTouchStart, { passive: false });
     el.addEventListener("touchmove", onTouchMove, { passive: false });

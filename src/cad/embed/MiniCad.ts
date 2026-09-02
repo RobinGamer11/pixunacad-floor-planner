@@ -24,7 +24,7 @@ const MAPPE_ROUGHEN_DEFAULT: RoughenParams = {
 };
 import { Camera } from "../Camera";
 import { Scene, copyStrokeEffects } from "../Scene";
-import { Input } from "../Input";
+import { Input, setLmbHint } from "../Input";
 import { drawPendingPointHint } from "../pendingPointHint";
 import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
@@ -955,7 +955,10 @@ export class MiniCad {
       this.pipetteTool.activate();
       this.activeTool = this.pipetteTool as any;
     }
-    try { (window as any).__pixunaActiveTool = tool; } catch {}
+    try {
+      if ((window as any).__pixunaActiveTool !== tool) setLmbHint(false);
+      (window as any).__pixunaActiveTool = tool;
+    } catch {}
   }
 
   /** Alias für `setActiveTool` — DocumentTool ruft `app.setTool(...)`. */
