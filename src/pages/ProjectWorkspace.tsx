@@ -650,12 +650,12 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     const el = canvasViewportRef.current;
     if (!el) return;
-    let mode: "idle" | "gesture" | "pan1" = "idle";
+    let mode: "idle" | "gesture" = "idle";
     let startDist = 0;
     let startZoom = 1;
     let startAnchor: ProjectZoomAnchor | null = null;
-    let pan1Last: { x: number; y: number } | null = null;
-    let pan1Id: number | null = null;
+    // Zwei-Finger-Pan (wie in CAD): Mittelpunktbewegung schwenkt die Ansicht.
+    let lastMid: { x: number; y: number } | null = null;
     const pts = new Map<number, { x: number; y: number }>();
     const midOf = () => {
       const arr = [...pts.values()];
