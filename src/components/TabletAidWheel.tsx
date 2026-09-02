@@ -54,7 +54,11 @@ export function TabletAidWheel() {
   // Der Commit erfolgt erst über den LMB- oder ENTER-Knopf am Rad.
   useEffect(() => {
     (window as any).__pixunaTabletCommit = true;
-    return () => { (window as any).__pixunaTabletCommit = false; };
+    return () => {
+      (window as any).__pixunaTabletCommit = false;
+      // Hilfsrad aus → vorgemerkten Punkt (gelbes Visier) verwerfen.
+      setPendingPointHint(false);
+    };
   }, []);
 
   // "Vorerfasster Punkt": LMB leuchtet, solange ein Stift-Kontakt auf das
