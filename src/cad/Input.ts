@@ -230,6 +230,16 @@ export class Input {
         this.mouse.pressure = readPointerPressure(e);
       }
 
+      // ── Stift-Kontakt bei aktivem Tablet-Hilfsrad: IMMER die aktuelle
+      // Position als "vorgemerkten Punkt" speichern (gelbes Visier + gelbe
+      // Hervorhebung von L-Klick/Enter). Muss VOR der Touch-/Pen-Only-Logik
+      // stehen, damit der Kontakt nicht vorher im Pan-Zweig verschluckt wird.
+      if (e.pointerType === "pen" && isTabletDrawGate(e)) {
+        try { c.setPointerCapture(e.pointerId); } catch {}
+        this._tabletTapQueued = true;
+        return;
+      }
+
       // ---- Touch (Finger) ----
       if (e.pointerType === "touch") {
         this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
