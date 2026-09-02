@@ -3051,7 +3051,10 @@ export class CadApp {
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
     this._updateSettingsVisibility();
-    try { (window as any).__pixunaActiveTool = id; } catch {}
+    try {
+      if ((window as any).__pixunaActiveTool !== id) setLmbHint(false);
+      (window as any).__pixunaActiveTool = id;
+    } catch {}
     this.onToolChange?.(id);
   }
 
