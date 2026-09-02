@@ -3168,6 +3168,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     />
                   )}
 
+                  {/* Türaufschlag (nur Tür) — blendet Türblatt + Öffnungsbogen aus */}
+                  {doorMode === "door" && (
+                    <button
+                      type="button"
+                      onClick={() => setDoorSashEnabled(!doorSashEnabled)}
+                      aria-pressed={doorSashEnabled}
+                      className={`flex h-9 w-full items-center justify-center rounded border text-[11px] transition-colors ${doorSashEnabled ? "bg-accent" : "hover:bg-muted"}`}
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                    >
+                      Türaufschlag {doorSashEnabled ? "aktiv" : "aus"}
+                    </button>
+                  )}
+
                   {/* Laibung */}
                   <div className="space-y-2">
                     <button
