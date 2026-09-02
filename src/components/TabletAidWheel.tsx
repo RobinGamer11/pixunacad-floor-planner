@@ -57,7 +57,7 @@ export function TabletAidWheel() {
     return () => {
       (window as any).__pixunaTabletCommit = false;
       // Hilfsrad aus → vorgemerkten Punkt (gelbes Visier) verwerfen.
-      setPendingPointHint(false);
+      setGlobalLmbHint(false);
     };
   }, []);
 
