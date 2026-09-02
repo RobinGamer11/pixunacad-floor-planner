@@ -1,7 +1,7 @@
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
-import { Input } from "./Input";
+import { Input, setLmbHint } from "./Input";
 import { drawPendingPointHint } from "./pendingPointHint";
 import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects } from "./Scene";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "./strokeEffects";
