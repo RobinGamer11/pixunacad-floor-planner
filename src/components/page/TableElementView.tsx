@@ -546,7 +546,7 @@ export function TableElementView({
       className="w-full h-full relative select-none"
       style={{
         background,
-        color: "hsl(var(--ink))",
+        color: "#111111",
         // Kein eigener Rahmen: Auswahl/Fokus zeichnet die Objekt-Logik der Seite
         // (identisch zu allen anderen PixunaCAD-Objekten).
         outline: "none",
@@ -632,7 +632,7 @@ export function TableElementView({
                 lineHeight: `${lineBoxPx}px`,
                 fontWeight: f.bold ? 700 : 400,
                 fontStyle: f.italic ? "italic" : "normal",
-                color: f.color ?? "hsl(var(--ink))",
+                color: f.color ?? "#111111",
                 cursor: pickFn ? "crosshair" : foreignSession ? "crosshair" : active ? "text" : undefined,
                 ...(refColor ? { outline: `1.5px solid ${refColor}`, outlineOffset: "-1.5px" } : null),
                 // Fremde Tabelle: Klicks für Bezüge annehmen, sonst Objektlogik.

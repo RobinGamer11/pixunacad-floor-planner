@@ -215,6 +215,15 @@
     color: hsl(0 0% 100% / 0.75);
   }
 
+  /* Schwimmende Hubs (Maßkette etc.): Hintergrund folgt surface-card, Icons
+     sollen darauf lesbar bleiben, ohne den aktiven Zustand zu verlieren. */
+  .cad-hub-float .cad-toolbar-btn {
+    color: hsl(var(--ink));
+  }
+  .cad-hub-float .cad-toolbar-btn.active {
+    color: hsl(var(--cad-toolbar-active-foreground));
+  }
+
   .cad-rail-btn {
     @apply w-12 h-12 rounded-lg flex flex-col items-center justify-center gap-0.5 text-[9px] font-medium leading-none;
     color: hsl(var(--ink-soft, var(--cad-toolbar-muted)));

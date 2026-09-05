@@ -1672,12 +1672,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Document Hub — Anker · Verschieben · Drehen · Skalieren (öffnet beim Klick auf Eckpunkt) */}
         {measureFinishHub.visible && (
           <div
-            className="absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
+            className="cad-hub-float absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
             style={{
               left: Math.max(8, measureFinishHub.screenX + 14),
               top: Math.max(8, measureFinishHub.screenY - 30),
-              background: "white",
-              border: "1px solid hsl(var(--border))",
+              background: "hsl(var(--surface-card))",
+              border: "1px solid hsl(var(--hairline))",
+              color: "hsl(var(--ink))",
               boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
             }}
             onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
@@ -1699,12 +1700,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Dimension Hub — Verschieben mit Snap auf andere Maßketten */}
         {dimHub.visible && (
           <div
-            className="absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
+            className="cad-hub-float absolute z-30 flex items-center px-1 py-1 rounded-md shadow-lg"
             style={{
               left: Math.max(8, dimHub.screenX + 14),
               top: Math.max(8, dimHub.screenY - 30),
-              background: "white",
-              border: "1px solid hsl(var(--border))",
+              background: "hsl(var(--surface-card))",
+              border: "1px solid hsl(var(--hairline))",
+              color: "hsl(var(--ink))",
               boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
             }}
             onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
