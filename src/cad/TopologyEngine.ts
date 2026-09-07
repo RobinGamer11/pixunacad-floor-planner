@@ -54,6 +54,8 @@ export interface SnapExclusions {
   freeStrokeIds?: ReadonlySet<string>;
   wallIds?: ReadonlySet<string>;
   doorIds?: ReadonlySet<string>;
+  /** true = das Lineal selbst liefert keine Fangpunkte (beim Ziehen des Lineals). */
+  ruler?: boolean;
 }
 
 
@@ -263,6 +265,11 @@ export class TopologyEngine {
     for (const dim of this.scene.dimensions) {
       if (!this.labels.isVisible(dim.labelId)) continue;
       push(dim.p1); push(dim.p2);
+    }
+    const rg: any = (this.scene as any).rulerGuide;
+    if (rg) {
+      push(rg.a); push(rg.b);
+      push(v((rg.a.x + rg.b.x) / 2, (rg.a.y + rg.b.y) / 2));
     }
     this._nearbyCache = { key, pts };
     return pts;
@@ -523,6 +530,15 @@ export class TopologyEngine {
         if (!this.labels.isVisible(edge.hatch.labelId)) continue;
         considerLine(edge.a, edge.b, null, null);
       }
+    }
+
+    // Lineal — Endpunkte, Mitte und Zeichenkante sind für alle Werkzeuge fangbar.
+    const rg: any = (this.scene as any).rulerGuide;
+    if (rg && !exclusions?.ruler) {
+      considerPoint(v(rg.a.x, rg.a.y), null, null, -1);
+      considerPoint(v(rg.b.x, rg.b.y), null, null, -1);
+      considerPoint(v((rg.a.x + rg.b.x) / 2, (rg.a.y + rg.b.y) / 2), null, null, -1);
+      considerLine(v(rg.a.x, rg.a.y), v(rg.b.x, rg.b.y), null, null);
     }
 
     // Papierrahmen (Plandruck) — Blattrand fangbar machen.
