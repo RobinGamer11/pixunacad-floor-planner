@@ -243,41 +243,57 @@ export function NetworkView({
   };
 
 
-  const tabs: { id: TabId; label: string; icon: typeof Users; badge?: number }[] = [
-    { id: "contacts", label: "Freunde", icon: Users },
-    { id: "teams", label: "Projekte", icon: FolderKanban },
-    { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
+  const tabs: { id: TabId; label: string; icon: typeof Users; count: number; badge?: number }[] = [
+    { id: "contacts", label: "Freunde", icon: Users, count: net.contacts.length },
+    { id: "teams", label: "Projekte", icon: FolderKanban, count: visibleProjects.length },
+    { id: "requests", label: "Kontaktanfragen", icon: UserPlus, count: net.incoming.length + net.outgoing.length, badge: net.incoming.length },
   ];
 
 
 
   return (
     <div className="mt-6">
-      {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-2">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className="h-9 px-3 rounded-lg border text-xs font-medium flex items-center gap-2"
-            style={{
-              borderColor: tab === t.id ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-              background: tab === t.id ? "hsl(var(--accent-gold) / 0.14)" : "hsl(var(--surface-card))",
-            }}
-          >
-            <t.icon size={14} />
-            {t.label}
-            {!!t.badge && (
-              <span
-                className="ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full text-[10px] grid place-items-center"
-                style={{ background: "hsl(0 70% 55%)", color: "#fff" }}
-              >
-                {t.badge}
-              </span>
-            )}
-          </button>
-        ))}
+      {/* Hauptaktion */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => { setAddOpen(true); setAddEmail(""); setAddHint(null); setAddFound(null); }}
+          className="h-14 min-h-[44px] px-6 rounded-xl text-base font-semibold flex items-center gap-2.5"
+          style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
+        >
+          <UserPlus size={19} /> Freund hinzufügen
+        </button>
       </div>
+
+      {/* Hauptbereiche */}
+      <div className="mt-5 -mx-1 px-1 flex gap-3 overflow-x-auto sm:grid sm:grid-cols-3 sm:overflow-visible">
+        {tabs.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className="h-[60px] min-w-[220px] sm:min-w-0 shrink-0 sm:shrink px-5 rounded-xl border flex items-center gap-3 text-left"
+              style={{
+                borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                background: active ? "hsl(var(--accent-gold) / 0.12)" : "hsl(var(--surface-card))",
+              }}
+            >
+              <t.icon size={22} style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }} />
+              <span className="flex-1 min-w-0 truncate text-base font-medium">{t.label}</span>
+              {!!t.badge && (
+                <span
+                  className="min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] grid place-items-center"
+                  style={{ background: "hsl(0 70% 55%)", color: "#fff" }}
+                >
+                  {t.badge}
+                </span>
+              )}
+              <span className="text-xl font-semibold tabular-nums">{t.count}</span>
+            </button>
+          );
+        })}
+      </div>
+
 
       {net.error && (
         <div className="mt-4 rounded-lg border p-3 text-xs" style={{ ...surface, borderColor: "hsl(0 70% 55% / 0.4)" }}>
