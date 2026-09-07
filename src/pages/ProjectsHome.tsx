@@ -1100,9 +1100,6 @@ export default function ProjectsHome() {
                 </div>
               </div>
 
-              {settingsOpen && (
-                <ProjectSettingsPanel project={selected} onClose={() => setSettingsOpen(false)} />
-              )}
 
               {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
