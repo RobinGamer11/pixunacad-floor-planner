@@ -28,7 +28,11 @@ import {
   timelineStore,
   type TlItem,
 } from "@/lib/timelineStore";
-import { OpsGantt, OpsNet, OpsRay, OPS_VIEWS, type OpsBoard, type OpsView } from "@/components/ops/OpsViews";
+import {
+  OpsGantt, OpsNet, OpsRay, OPS_VIEWS,
+  type OpsBoard, type OpsTimeMark, type OpsView,
+} from "@/components/ops/OpsViews";
+import type { OpsSelection } from "@/components/ops/opsSelection";
 
 const inputCls =
   "h-9 rounded-md border bg-background text-foreground px-2 text-xs outline-none focus:ring-1 focus:ring-ring [&>option]:bg-background [&>option]:text-foreground";
@@ -82,6 +86,10 @@ export function OpsCalendarTab({
   calendarDefaultRange?: "month" | "week" | "day";
   /** Beitrag zum Bearbeiten öffnen. */
   onEditItem?: (projectId: string, itemId: string) => void;
+  /** Zeiterfassung auswählen (gemeinsamer Auswahlzustand). */
+  onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
+  /** Gemeinsame Auswahl – in allen Ansichten gleich hervorgehoben. */
+  selection?: OpsSelection;
 }) {
 
   /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
