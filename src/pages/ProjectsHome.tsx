@@ -659,7 +659,7 @@ export default function ProjectsHome() {
                               active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
                               dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
                               onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
-                              onOpen={() => navigate(`/project/${p.id}`)}
+                              onOpen={() => navigate(`/project/${p.id}/cad`)}
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                               onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                               onDelete={() => deleteProjectWithConfirm(p)}
@@ -726,7 +726,7 @@ export default function ProjectsHome() {
                     active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
                     dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
                     onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
-                    onOpen={() => navigate(`/project/${p.id}`)}
+                    onOpen={() => navigate(`/project/${p.id}/cad`)}
                     onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                     onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                     onDelete={() => deleteProjectWithConfirm(p)}
@@ -1086,7 +1086,7 @@ export default function ProjectsHome() {
                 className="mt-4 flex flex-col lg:flex-row lg:items-end gap-4"
               >
                 <button
-                  onClick={() => navigate(`/project/${selected.id}`)}
+                  onClick={() => navigate(`/project/${selected.id}/cad`)}
                   className="h-11 rounded-lg flex items-center gap-3 pl-3 pr-4 text-sm font-semibold transition hover:opacity-90 shrink-0 self-start lg:-mb-px border"
                   style={{ background: "hsl(var(--beige-soft))", color: "hsl(var(--ink))", borderColor: "hsl(var(--hairline))" }}
                 >
