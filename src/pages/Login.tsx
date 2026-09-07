@@ -10,6 +10,8 @@ export default function Login() {
   const { configured, loading, session } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordRepeat, setPasswordRepeat] = useState("");
+  const [username, setUsername] = useState("");
   const [remember, setRemember] = useState(false);
   const [mode, setMode] = useState<"signIn" | "signUp" | "reset">("signIn");
   const [submitting, setSubmitting] = useState(false);
@@ -34,6 +36,20 @@ export default function Login() {
       setError("Das Passwort muss mindestens 8 Zeichen enthalten.");
       return;
     }
+    if (mode === "signUp") {
+      if (!username.trim()) {
+        setError("Bitte gib einen Benutzernamen ein.");
+        return;
+      }
+      if (username.trim().length > 40) {
+        setError("Der Benutzername darf höchstens 40 Zeichen haben.");
+        return;
+      }
+      if (password !== passwordRepeat) {
+        setError("Die beiden Passwörter stimmen nicht überein.");
+        return;
+      }
+    }
 
     setSubmitting(true);
     setError(null);
@@ -45,10 +61,12 @@ export default function Login() {
         return;
       }
       if (mode === "signUp") {
-        const result = await supabase.signUp(email.trim(), password, window.location.origin);
+        // Die Wiederholung dient nur der Prüfung und wird nicht übertragen.
+        const result = await supabase.signUp(email.trim(), password, window.location.origin, username.trim());
         if (result.requiresEmailConfirmation) {
           setNotice("Bitte bestätige deine E-Mail-Adresse über den Link, den wir dir gesendet haben.");
           setMode("signIn");
+          setPasswordRepeat("");
         } else {
           navigate("/", { replace: true });
         }
@@ -104,6 +122,15 @@ export default function Login() {
         {/* Form */}
         <form onSubmit={submit} className="flex-1 flex flex-col px-10">
           <div className="space-y-3">
+            {mode === "signUp" && (
+              <Field
+                label="Benutzername"
+                value={username}
+                onChange={setUsername}
+                type="text"
+                autoComplete="nickname"
+              />
+            )}
             <Field
               label="E-Mail-Adresse"
               value={email}
@@ -118,6 +145,15 @@ export default function Login() {
                 onChange={setPassword}
                 type="password"
                 autoComplete={mode === "signUp" ? "new-password" : "current-password"}
+              />
+            )}
+            {mode === "signUp" && (
+              <Field
+                label="Passwort wiederholen"
+                value={passwordRepeat}
+                onChange={setPasswordRepeat}
+                type="password"
+                autoComplete="new-password"
               />
             )}
           </div>
@@ -172,7 +208,7 @@ export default function Login() {
             </button>
             <button
               type="button"
-              onClick={() => { setMode(mode === "signUp" ? "signIn" : "signUp"); setError(null); setNotice(null); }}
+              onClick={() => { setMode(mode === "signUp" ? "signIn" : "signUp"); setError(null); setNotice(null); setPasswordRepeat(""); }}
               className="text-[11px] uppercase tracking-[0.18em] text-left hover:opacity-70 transition-opacity"
               style={{ color: "hsl(var(--ink-soft))" }}
             >
