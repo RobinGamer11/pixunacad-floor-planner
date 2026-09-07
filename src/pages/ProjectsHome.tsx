@@ -339,7 +339,7 @@ export default function ProjectsHome() {
         className="h-16 shrink-0 flex items-center gap-4 px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
-        <div className="relative" ref={newProjectRef}>
+        <div className="relative">
 
           <button
             onClick={createProject}
