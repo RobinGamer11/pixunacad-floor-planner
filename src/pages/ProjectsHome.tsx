@@ -224,7 +224,7 @@ export default function ProjectsHome() {
   // Drag & Drop von Projekten in Ordner
   const [dragProjectId, setDragProjectId] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
-  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
+  const [dragOverProject, setDragOverProject] = useState<{ id: string; place: "before" | "after" } | null>(null);
   const [dragFolderId, setDragFolderId] = useState<string | null>(null);
   const [dragOverFolderSlot, setDragOverFolderSlot] = useState<string | null>(null);
 
@@ -316,7 +316,7 @@ export default function ProjectsHome() {
   const resetProjectDrag = () => {
     setDragProjectId(null);
     setDragOverFolder(null);
-    setDragOverProjectId(null);
+    setDragOverProject(null);
   };
 
   const handleDropOnFolder = (folderId: string | null) => {
@@ -751,7 +751,7 @@ export default function ProjectsHome() {
                               key={p.id}
                               project={p}
                               active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
-                              dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProjectId === p.id}
+                              dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
                               onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                               onOpen={() => navigate(`/project/${p.id}`)}
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
@@ -759,10 +759,10 @@ export default function ProjectsHome() {
                               onDelete={() => deleteProjectWithConfirm(p)}
                               onDragStart={() => setDragProjectId(p.id)}
                               onDragEnd={resetProjectDrag}
-                              onDragOverCard={() => setDragOverProjectId(p.id)}
-                              onDropOnCard={() => {
+                              onDragOverCard={(place) => setDragOverProject({ id: p.id, place })}
+                              onDropOnCard={(place) => {
                                 if (dragProjectId && dragProjectId !== p.id) {
-                                  projectStore.reorderProject(dragProjectId, p.id, "before");
+                                  projectStore.reorderProject(dragProjectId, p.id, place);
                                 }
                                 resetProjectDrag();
                               }}
@@ -816,7 +816,7 @@ export default function ProjectsHome() {
                     key={p.id}
                     project={p}
                     active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
-                    dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProjectId === p.id}
+                    dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
                     onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                     onOpen={() => navigate(`/project/${p.id}`)}
                     onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
@@ -824,10 +824,10 @@ export default function ProjectsHome() {
                     onDelete={() => deleteProjectWithConfirm(p)}
                     onDragStart={() => setDragProjectId(p.id)}
                     onDragEnd={resetProjectDrag}
-                    onDragOverCard={() => setDragOverProjectId(p.id)}
-                    onDropOnCard={() => {
+                    onDragOverCard={(place) => setDragOverProject({ id: p.id, place })}
+                    onDropOnCard={(place) => {
                       if (dragProjectId && dragProjectId !== p.id) {
-                        projectStore.reorderProject(dragProjectId, p.id, "before");
+                        projectStore.reorderProject(dragProjectId, p.id, place);
                       }
                       resetProjectDrag();
                     }}
@@ -1279,7 +1279,7 @@ function ProjectCard({
 }: {
   project: Project;
   active: boolean;
-  dropIndicator?: boolean;
+  dropIndicator?: "before" | "after" | null | false;
   onSelect: () => void;
   onOpen: () => void;
   onSettings: () => void;
@@ -1287,9 +1287,13 @@ function ProjectCard({
   onDelete: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
-  onDragOverCard?: () => void;
-  onDropOnCard?: () => void;
+  onDragOverCard?: (place: "before" | "after") => void;
+  onDropOnCard?: (place: "before" | "after") => void;
 }) {
+  const placeFromEvent = (e: React.DragEvent<HTMLDivElement>): "before" | "after" => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return e.clientY - r.top > r.height / 2 ? "after" : "before";
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1309,15 +1313,16 @@ function ProjectCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      onDragOver={(e) => { if (onDragOverCard) { e.preventDefault(); e.stopPropagation(); onDragOverCard(); } }}
-      onDrop={(e) => { if (onDropOnCard) { e.preventDefault(); e.stopPropagation(); onDropOnCard(); } }}
+      onDragOver={(e) => { if (onDragOverCard) { e.preventDefault(); e.stopPropagation(); onDragOverCard(placeFromEvent(e)); } }}
+      onDrop={(e) => { if (onDropOnCard) { e.preventDefault(); e.stopPropagation(); onDropOnCard(placeFromEvent(e)); } }}
       onClick={onSelect}
       onDoubleClick={onOpen}
       className="w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
       style={{
         background: active ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
         border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.55)" : "rgba(255,255,255,0.04)"}`,
-        borderTop: dropIndicator ? "2px solid hsl(var(--accent-gold))" : undefined,
+        borderTop: dropIndicator === "before" ? "2px solid hsl(var(--accent-gold))" : undefined,
+        borderBottom: dropIndicator === "after" ? "2px solid hsl(var(--accent-gold))" : undefined,
       }}
     >
       <div className="w-12 h-12 shrink-0 group/thumb" style={{ perspective: "300px" }}>
