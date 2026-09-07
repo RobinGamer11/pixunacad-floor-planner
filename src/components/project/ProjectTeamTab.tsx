@@ -157,19 +157,6 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         >
           <UserPlus size={18} /> Mitglied hinzufügen
         </button>
-        <button
-          type="button"
-          onClick={() => setInviteOpen(true)}
-          className="flex h-14 min-h-[44px] items-center justify-center gap-2 rounded-xl border px-6 text-base font-semibold"
-          style={{ borderColor: LINE }}
-        >
-          <Mail size={18} /> Einladungen
-          {invites.pending.length > 0 && (
-            <span className="rounded-full px-2 text-xs font-bold" style={{ background: GOLD, color: "hsl(var(--ink))" }}>
-              {invites.pending.length}
-            </span>
-          )}
-        </button>
         <label className="relative lg:ml-auto lg:w-[420px]">
           <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={19} />
           <input
