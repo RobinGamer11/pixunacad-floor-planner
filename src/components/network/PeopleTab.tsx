@@ -101,7 +101,6 @@ export function PeopleTab(props: PeopleTabProps) {
 
   const pick = (person: NetworkPerson) => {
     setSelectedId(person.id);
-    setMenuOpen(false);
     if (window.matchMedia("(max-width: 1279px)").matches) setSheetOpen(true);
   };
 

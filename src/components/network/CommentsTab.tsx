@@ -56,16 +56,18 @@ export function CommentsTab({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={projectId}
-          onChange={(e) => setProjectId(e.target.value)}
-          className="rounded border bg-[hsl(var(--surface-card))] px-2 py-1 text-sm text-[hsl(var(--foreground))]"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+        {projects.length > 1 && (
+          <select
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+            className="rounded border bg-[hsl(var(--surface-card))] px-2 py-1 text-sm text-[hsl(var(--foreground))]"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        )}
         {(["open", "done", "all"] as const).map((f) => (
           <button
             key={f}
