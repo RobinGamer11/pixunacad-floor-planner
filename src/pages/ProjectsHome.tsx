@@ -159,7 +159,43 @@ export default function ProjectsHome() {
   const [tab, setTab] = useState<Tab>("uebersicht");
   const headerScrollRef = useDragScroll<HTMLElement>();
   const tabsScrollRef = useDragScroll<HTMLDivElement>();
-  const [leftOpen, setLeftOpen] = useState(true);
+  /** Tablet/Handy: Projektleiste ist ein vollflächiges Panel, kein Split-Screen. */
+  const [compact, setCompact] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 1023px)").matches : false
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const apply = () => setCompact(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  const [leftOpen, setLeftOpen] = useState(() =>
+    typeof window !== "undefined" ? !window.matchMedia("(max-width: 1023px)").matches : true
+  );
+  // Wechsel der Bildschirmbreite: kompakt startet geschlossen, Desktop offen.
+  const lastCompact = useRef(compact);
+  useEffect(() => {
+    if (lastCompact.current === compact) return;
+    lastCompact.current = compact;
+    setLeftOpen(!compact);
+  }, [compact]);
+  const mobilePanelOpen = compact && leftOpen;
+  // Escape schließt das mobile Panel.
+  useEffect(() => {
+    if (!mobilePanelOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLeftOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobilePanelOpen]);
+  // Hintergrund nicht mitscrollen lassen.
+  useEffect(() => {
+    if (!mobilePanelOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [mobilePanelOpen]);
+  const closeSidebarOnCompact = () => { if (compact) setLeftOpen(false); };
   const [titleMenuOpen, setTitleMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [legalOpen, setLegalOpen] = useState(false);
