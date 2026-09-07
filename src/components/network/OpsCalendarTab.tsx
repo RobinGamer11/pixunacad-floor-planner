@@ -260,6 +260,8 @@ export function OpsCalendarTab({
           </button>
         </div>
       )}
+      {showToolbar && (
+        <>
       {/* Datenebenen */}
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         {([
@@ -331,6 +333,9 @@ export function OpsCalendarTab({
           {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
         </select>
       </div>
+        </>
+      )}
+
 
       {view === "calendar" && (
         <RangeCalendar
