@@ -212,6 +212,8 @@ export function FileBrowser({ project }: Props) {
   const nodes = useMemo(() => project.files ?? [], [project.files]);
   const [query, setQuery] = useState("");
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(() => new Set());
+  /** Aktuell geöffneter Ordner (Pfadnavigation wie in der Vorlage). */
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -285,6 +287,26 @@ export function FileBrowser({ project }: Props) {
     return names.join(" / ");
   };
 
+  /** Pfad des aktuell geöffneten Ordners für die Pfadleiste. */
+  const trail = useMemo(() => {
+    const out: FileNode[] = [];
+    const visited = new Set<string>();
+    let id: string | null = currentFolderId;
+    while (id && !visited.has(id)) {
+      visited.add(id);
+      const node = nodesById.get(id);
+      if (!node) break;
+      out.unshift(node);
+      id = node.parentId ?? null;
+    }
+    return out;
+  }, [currentFolderId, nodesById]);
+
+  // Gelöschter oder verschobener Ordner: sauber zurück auf die oberste Ebene.
+  useEffect(() => {
+    if (currentFolderId && !nodesById.has(currentFolderId)) setCurrentFolderId(null);
+  }, [currentFolderId, nodesById]);
+
   const activateDropTarget = (next: DropTarget) => {
     setDropTarget((current) => sameDropTarget(current, next) ? current : next);
   };
@@ -335,7 +357,7 @@ export function FileBrowser({ project }: Props) {
       if (!isAcceptedDocument(file)) continue;
       const reader = new FileReader();
       reader.onload = () => {
-        const nodeId = projectStore.addFile(project.id, "files", null, {
+        const nodeId = projectStore.addFile(project.id, "files", currentFolderId, {
           name: file.name,
           dataUrl: String(reader.result),
           mimeType: documentMimeType(file),
@@ -353,6 +375,12 @@ export function FileBrowser({ project }: Props) {
     if (rejected.length > 0) {
       window.alert(`Nicht unterstützt: ${rejected.map((file) => file.name).join(", ")}. Erlaubt sind PDF, JPG und PNG.`);
     }
+  };
+
+  /** Ordner öffnen: bei aktiver Suche auf-/zuklappen, sonst hineinnavigieren. */
+  const openFolder = (folderId: string) => {
+    if (visibleNodeIds) toggleFolder(folderId);
+    else setCurrentFolderId(folderId);
   };
 
   const toggleFolder = (folderId: string) => {
@@ -616,7 +644,8 @@ export function FileBrowser({ project }: Props) {
       <ul>
         {group.folders.map((folder, index) => {
           if (ancestors.has(folder.id)) return null;
-          const expanded = Boolean(visibleNodeIds) || expandedFolderIds.has(folder.id);
+          // Ohne Suche wird navigiert (Pfadleiste), bei Suche flach aufgeklappt.
+          const expanded = Boolean(visibleNodeIds);
           const folderDropActive = dropTarget?.mode === "inside" && dropTarget.folderId === folder.id;
           const nextAncestors = new Set(ancestors).add(folder.id);
 
@@ -667,17 +696,14 @@ export function FileBrowser({ project }: Props) {
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => toggleFolder(folder.id)}
-                          aria-expanded={expanded}
-                          aria-controls={`document-folder-${folder.id}`}
-                          aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
+                          onClick={() => openFolder(folder.id)}
+                          aria-label={`${folder.name} öffnen`}
                           className="flex shrink-0 items-center gap-2"
                         >
-                          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                           {expanded ? (
-                            <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                            <FolderOpen size={22} style={{ color: "hsl(var(--accent-gold))" }} />
                           ) : (
-                            <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                            <Folder size={22} style={{ color: "hsl(var(--accent-gold))" }} />
                           )}
                         </button>
                         <input
@@ -697,19 +723,20 @@ export function FileBrowser({ project }: Props) {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => toggleFolder(folder.id)}
-                        aria-expanded={expanded}
-                        aria-controls={`document-folder-${folder.id}`}
-                        aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        onClick={() => openFolder(folder.id)}
+                        aria-label={`${folder.name} öffnen`}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
-                        {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         {expanded ? (
-                          <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          <FolderOpen size={26} style={{ color: "hsl(var(--accent-gold))" }} />
                         ) : (
-                          <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          <Folder size={26} style={{ color: "hsl(var(--accent-gold))" }} />
                         )}
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-semibold">{folder.name}</span>
+                          <span className="block text-[11px] text-muted-foreground">Ordner</span>
+                        </span>
+                        <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
                       </button>
                     )}
                   </div>
@@ -889,7 +916,7 @@ export function FileBrowser({ project }: Props) {
         {renderDropSlot(parentId, null, "file", "Dokument ans Ende verschieben")}
 
 
-        {!root && group.folders.length === 0 && group.files.length === 0 && (
+        {group.folders.length === 0 && group.files.length === 0 && (
           <li className="py-2 text-xs text-muted-foreground">Dieser Ordner ist leer.</li>
         )}
       </ul>
@@ -898,32 +925,32 @@ export function FileBrowser({ project }: Props) {
 
   return (
     <div>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
         <button
           type="button"
           onClick={() => uploadRef.current?.click()}
-          className="flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold"
+          className="flex h-14 min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 text-base font-semibold"
           style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
         >
-          <FileText size={16} /> + Dokument
+          <FileText size={18} /> + Dokument
         </button>
         <button
           type="button"
-          onClick={() => addFolder(null)}
-          className="flex h-11 items-center justify-center gap-2 rounded-md border px-5 text-sm font-semibold"
+          onClick={() => addFolder(currentFolderId)}
+          className="flex h-14 min-h-[44px] items-center justify-center gap-2 rounded-xl border px-6 text-base font-semibold"
           style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}
         >
-          <Folder size={16} /> + Ordner
+          <Folder size={18} /> + Ordner
         </button>
-        <label className="relative sm:ml-auto sm:w-[360px]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={17} />
+        <label className="relative lg:ml-auto lg:w-[420px]">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={19} />
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Dokumente durchsuchen …"
             aria-label="Dokumente durchsuchen"
-            className="h-11 w-full rounded-md border bg-transparent pl-10 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+            className="h-14 w-full rounded-xl border bg-transparent pl-12 pr-4 text-base outline-none focus:ring-1 focus:ring-ring"
             style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted) / 0.45)" }}
           />
         </label>
@@ -940,9 +967,35 @@ export function FileBrowser({ project }: Props) {
         />
       </div>
 
-      <div className="rounded-md border p-4 sm:p-5" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-        <div className="mb-3 border-b pb-3 text-sm font-medium" style={{ borderColor: "hsl(var(--hairline))" }}>
-          Alle Dokumente
+      <div className="rounded-xl border p-4 sm:p-6" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+        <nav aria-label="Ordnerpfad" className="flex flex-wrap items-center gap-1.5 text-sm">
+          <button
+            type="button"
+            onClick={() => setCurrentFolderId(null)}
+            className="min-h-[32px] rounded-md px-1 font-medium hover:underline"
+            style={{ color: currentFolderId ? "hsl(var(--muted-foreground))" : "hsl(var(--accent-gold))" }}
+          >
+            Alle Dokumente
+          </button>
+          {trail.map((folder, index) => (
+            <Fragment key={folder.id}>
+              <span className="text-muted-foreground">/</span>
+              <button
+                type="button"
+                onClick={() => setCurrentFolderId(folder.id)}
+                className="min-h-[32px] max-w-[220px] truncate rounded-md px-1 font-medium hover:underline"
+                style={{ color: index === trail.length - 1 ? "hsl(var(--accent-gold))" : "hsl(var(--muted-foreground))" }}
+              >
+                {folder.name}
+              </button>
+            </Fragment>
+          ))}
+        </nav>
+        <div
+          className="mb-3 mt-3 border-b pb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          Name
         </div>
         {draggingFromFolder && (
           <div
@@ -982,7 +1035,7 @@ export function FileBrowser({ project }: Props) {
         ) : visibleNodeIds?.size === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">Keine passenden Dokumente gefunden.</p>
         ) : (
-          renderGroup(null, new Set(), true)
+          renderGroup(visibleNodeIds ? null : currentFolderId, new Set(), true)
         )}
         <button
           type="button"
