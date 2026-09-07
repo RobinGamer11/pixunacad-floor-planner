@@ -30,6 +30,8 @@ import {
 } from "@/components/ops/OpsInsights";
 import { formatMinutes, netMinutes, useTimeEntriesForProjects } from "@/lib/opsStore";
 import { OpsItemEditDialog } from "@/components/ops/OpsItemEditDialog";
+import { CategoryManagerDialog, PriorityManagerDialog } from "@/components/ops/OpsTaxonomyDialogs";
+import { sameSelection, type OpsSelection } from "@/components/ops/opsSelection";
 
 export interface OpsOverviewProject {
   id: string;
