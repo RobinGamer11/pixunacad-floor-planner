@@ -897,23 +897,36 @@ export function FileBrowser({ project }: Props) {
   };
 
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center justify-end gap-2 border-b pb-3" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <button
-          type="button"
-          onClick={() => addFolder(null)}
-          className="flex h-8 items-center gap-1.5 px-2 text-xs font-medium hover:underline"
-        >
-          <Folder size={14} /> + Ordner
-        </button>
+    <div>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
           type="button"
           onClick={() => uploadRef.current?.click()}
-          className="flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          className="flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold"
+          style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
         >
-          <FileText size={14} /> + Dokument
+          <FileText size={16} /> + Dokument
         </button>
+        <button
+          type="button"
+          onClick={() => addFolder(null)}
+          className="flex h-11 items-center justify-center gap-2 rounded-md border px-5 text-sm font-semibold"
+          style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}
+        >
+          <Folder size={16} /> + Ordner
+        </button>
+        <label className="relative sm:ml-auto sm:w-[360px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={17} />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Dokumente durchsuchen …"
+            aria-label="Dokumente durchsuchen"
+            className="h-11 w-full rounded-md border bg-transparent pl-10 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted) / 0.45)" }}
+          />
+        </label>
         <input
           ref={uploadRef}
           type="file"
@@ -927,7 +940,10 @@ export function FileBrowser({ project }: Props) {
         />
       </div>
 
-      <div className="pt-3">
+      <div className="rounded-md border p-4 sm:p-5" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+        <div className="mb-3 border-b pb-3 text-sm font-medium" style={{ borderColor: "hsl(var(--hairline))" }}>
+          Alle Dokumente
+        </div>
         {draggingFromFolder && (
           <div
             onDragOver={(event) => {
@@ -963,9 +979,20 @@ export function FileBrowser({ project }: Props) {
           <p className="py-8 text-center text-sm text-muted-foreground">
             Noch keine Dokumente. Lege einen Ordner an oder füge ein PDF, JPG oder PNG hinzu.
           </p>
+        ) : visibleNodeIds?.size === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Keine passenden Dokumente gefunden.</p>
         ) : (
           renderGroup(null, new Set(), true)
         )}
+        <button
+          type="button"
+          onClick={() => uploadRef.current?.click()}
+          className="mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-md border border-dashed px-4 text-sm text-muted-foreground transition-colors hover:bg-muted/30"
+          style={{ borderColor: "hsl(var(--accent-gold) / 0.45)" }}
+        >
+          <UploadCloud size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+          Dokumente hier ablegen oder <span className="font-semibold" style={{ color: "hsl(var(--accent-gold))" }}>hinzufügen</span>
+        </button>
       </div>
 
       <Dialog open={Boolean(movingNode)} onOpenChange={(open) => { if (!open) closeMoveDialog(); }}>
