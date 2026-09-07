@@ -532,6 +532,8 @@ export function OpsOverview({
               title="Aktuelle Beiträge"
               right={
                 <>
+                  {resetButton}
+
                   <select value={sort} onChange={(e) => setSort(e.target.value as OpsSort)}
                           className={inputCls} style={{ borderColor: LINE }} aria-label="Sortierung">
                     {OPS_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -593,7 +595,7 @@ export function OpsOverview({
           )}
 
           {card === "time" && (
-            <Panel title="Aktuelle Arbeitszeiten">
+            <Panel title="Aktuelle Arbeitszeiten" right={resetButton}>
               <div className="flex flex-col gap-1.5">
                 {timeRows.slice(0, 200).map((e) => {
                   const on = isTimeSelected(selection, e.id);
@@ -663,7 +665,7 @@ export function OpsOverview({
             <Panel
               title="Filter"
               right={
-                <button type="button" onClick={() => { setFilters(EMPTY_FILTERS); setSelectedDate(undefined); }}
+                <button type="button" onClick={resetAllFilters}
                         className="h-11 rounded-md border px-3 text-[12px]" style={{ borderColor: LINE }}>
                   Alle Filter zurücksetzen
                 </button>
