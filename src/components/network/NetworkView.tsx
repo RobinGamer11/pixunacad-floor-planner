@@ -463,72 +463,20 @@ export function NetworkView({
           {net.loading && <div className="p-6 text-center text-sm text-muted-foreground">Netzwerk wird geladen …</div>}
 
           {!net.loading && tab === "contacts" && (
-            <>
-              {projects.map((p) => {
-                const list = byProject.map.get(p.id) ?? [];
-                return (
-                  <Group
-                    key={p.id}
-                    title={p.name}
-                    count={list.filter((x) => x.status !== "offline").length}
-                    total={list.length}
-                    actions={
-                      <div className="flex items-center gap-1.5">
-                        <ChatButton
-                          unread={unread[`p:${p.id}`]}
-                          onClick={() => openProject(p)}
-                          title="Projektchat öffnen"
-                        />
-                        <CommentsButton onClick={() => openComments(p.id)} title="Kommentare des Projekts" />
-                      </div>
-                    }
-                  >
-                    {list.length === 0 ? (
-                      <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Keine Personen zugeordnet.</div>
-                    ) : (
-                      list.map((person) => (
-                        <PersonRow
-                          key={person.id}
-                          person={person}
-                          onClick={() => setDetails(person)}
-                          chat={
-                            <ChatButton
-                              unread={unread[`d:${person.id}`]}
-                              onClick={() => openDirect(person)}
-                              title="Direktchat öffnen"
-                            />
-                          }
-                        />
-                      ))
-                    )}
-                  </Group>
-                );
-              })}
-              <Group
-                title="Allgemein"
-                count={byProject.general.filter((x) => x.status !== "offline").length}
-                total={byProject.general.length}
-              >
-                {byProject.general.length === 0 ? (
-                  <div className="px-2 py-1.5 text-[11px] text-muted-foreground">Keine weiteren Kontakte.</div>
-                ) : (
-                  byProject.general.map((person) => (
-                    <PersonRow
-                      key={person.id}
-                      person={person}
-                      onClick={() => setDetails(person)}
-                      chat={
-                        <ChatButton
-                          unread={unread[`d:${person.id}`]}
-                          onClick={() => openDirect(person)}
-                          title="Direktchat öffnen"
-                        />
-                      }
-                    />
-                  ))
-                )}
-              </Group>
-            </>
+            <PeopleTab
+              people={net.contacts}
+              pendingIds={pendingContactIds}
+              projects={visibleProjects}
+              memberRow={memberRow}
+              canManageProject={canManageProject}
+              unread={unread}
+              onOpenChat={openDirect}
+              onRemoveContact={(person) => setConfirmContact({ person, projects: projectsOfPerson(person.id) })}
+              onAddMember={(projectId, userId) => void net.addMember(projectId, userId)}
+              onRemoveMember={(projectId, userId) => void net.removeMember(projectId, userId)}
+              onSetRole={(projectId, userId, role) => void net.setMemberRole(projectId, userId, role)}
+              onSetPermissions={(projectId, userId, o) => void net.setMemberPermissions(projectId, userId, o)}
+            />
           )}
 
           {!net.loading && tab === "teams" && (
