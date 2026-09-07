@@ -38,13 +38,17 @@ function Avatar({ name, url, size = 44 }: { name: string; url?: string | null; s
   );
 }
 
-function ProjectMark({ name, size = 48 }: { name: string; size?: number }) {
+function ProjectMark({ name, url, size = 48 }: { name: string; url?: string | null; size?: number }) {
   return (
     <div
-      className="rounded-xl grid place-items-center border shrink-0"
+      className="rounded-xl overflow-hidden grid place-items-center border shrink-0"
       style={{ width: size, height: size, background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}
     >
-      <FolderKanban size={Math.round(size * 0.42)} style={{ color: "hsl(var(--accent-gold))" }} />
+      {url ? (
+        <img src={url} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        <FolderKanban size={Math.round(size * 0.42)} style={{ color: "hsl(var(--accent-gold))" }} />
+      )}
     </div>
   );
 }
@@ -119,7 +123,7 @@ export function ProjectsTab(props: ProjectsTabProps) {
     <div className="space-y-5">
       {/* Kopf */}
       <div className="flex items-start gap-4">
-        <ProjectMark name={selected.name} size={64} />
+        <ProjectMark name={selected.name} url={selected.thumbnail} size={64} />
         <div className="min-w-0 flex-1">
           <div className="text-xl font-semibold truncate">{selected.name}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -351,7 +355,7 @@ export function ProjectsTab(props: ProjectsTabProps) {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <ProjectMark name={p.name} size={48} />
+                  <ProjectMark name={p.name} url={p.thumbnail} size={48} />
                   <div className="min-w-0 flex-1">
                     <div className="text-base font-semibold truncate">{p.name}</div>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
