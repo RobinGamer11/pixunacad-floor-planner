@@ -7,7 +7,7 @@
  * einem normalen Beitrag und einer Zeiterfassung gewählt – beides schreibt
  * weiterhin in die bestehenden Datenquellen (Board-Beiträge, `time_entries`).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, ListPlus } from "lucide-react";
 import {
   addTimeEntryFor,
@@ -349,7 +349,7 @@ function ContributionDialog({
               <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Beitragsname" />
             </Field>
             <Field label="Beschreibung">
-              <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
+              <AutoTextarea value={description} onChange={setDescription} placeholder="optional" />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Field label="Kategorie">
