@@ -1645,7 +1645,7 @@ export default function ProjectWorkspace() {
                 }}
                 showLabel
               />
-            </div>
+            </RailFlyout>
           )}
         </div>
         <ToolRailButton
