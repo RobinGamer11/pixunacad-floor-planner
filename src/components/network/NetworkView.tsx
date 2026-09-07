@@ -4,12 +4,9 @@ import {
   FolderKanban,
   UserPlus,
   MessageSquare,
-  ChevronDown,
-  ChevronRight,
   Check,
   X,
   Search,
-  GripVertical,
 } from "lucide-react";
 import {
   useNetwork,
