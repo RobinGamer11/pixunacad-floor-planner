@@ -1496,7 +1496,7 @@ function ProfileAvatar({
           background: statusColor,
           borderColor: "hsl(var(--surface-card))",
         }}
-        title={profile.status}
+        title={statusLabelOf(profile.status)}
       />
     </div>
   );
