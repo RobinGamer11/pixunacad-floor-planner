@@ -56,6 +56,8 @@ export interface LocalProjectRef {
   name: string;
   /** Zuordnung zum bestehenden Projektordner der Startseite (nur Anzeige). */
   folderId?: string | null;
+  /** Projektbild (nur Anzeige). */
+  thumbnail?: string | null;
 }
 
 const STALE_AFTER_MS = 90_000;

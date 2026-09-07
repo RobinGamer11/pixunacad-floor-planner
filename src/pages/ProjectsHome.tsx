@@ -2704,7 +2704,7 @@ function SharedView({
   folders: { id: string; name: string }[];
 }) {
   const networkProjects = useMemo(
-    () => projects.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name, folderId: p.folderId ?? null })),
+    () => projects.filter((p) => !p.isTemplate).map((p) => ({ id: p.id, name: p.name, folderId: p.folderId ?? null, thumbnail: p.thumbnail ?? null })),
     [projects]
   );
   const networkFolders = useMemo(() => folders.map((f) => ({ id: f.id, name: f.name })), [folders]);
