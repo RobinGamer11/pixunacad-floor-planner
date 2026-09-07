@@ -37,6 +37,7 @@ import {
   type ProjectRole,
 } from "@/lib/projectAccess";
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
+import { isPlaceholderName } from "@/lib/accountProfile";
 import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
 import { MemberRoleControls } from "@/components/network/MemberRoleControls";
