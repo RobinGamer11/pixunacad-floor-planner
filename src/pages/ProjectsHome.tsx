@@ -676,7 +676,7 @@ export default function ProjectsHome() {
               background: "#0B0D10",
               color: "#E6E8EB",
               borderRight: compact ? "none" : "1px solid rgba(255,255,255,0.06)",
-              paddingTop: compact ? "env(safe-area-inset-top)" : undefined,
+              
             }}
           >
             <div className="px-5 pt-5 pb-3">
