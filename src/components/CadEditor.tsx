@@ -1317,7 +1317,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             onClick={() => handleToolClick(ToolIds.RULER)}
             title="Lineal"
-            className={`cad-rail-btn ${activeTool === ToolIds.RULER ? "active tool-glow-active" : ""}`}
+            className={`cad-rail-btn ${activeTool === ToolIds.RULER ? "active" : ""}`}
           >
             <RulerIcon size={18} />
             <span>Lineal</span>
