@@ -70,10 +70,13 @@ export class RulerDragController {
     // Aktiv? -> verarbeite Drag
     if (this._mode) {
       if (!input.mouse.left) { this.reset(); return false; }
-      const mw = snapped();
+      let mw = snapped();
+      const shift = !!input.keys?.shift;
       if (this._mode === "a") {
+        if (shift) { const c = constrainRulerAngle(g.b, mw); mw = v(c.x, c.y); this.lastSnapScreen = null; }
         g.a = v(mw.x, mw.y);
       } else if (this._mode === "b") {
+        if (shift) { const c = constrainRulerAngle(g.a, mw); mw = v(c.x, c.y); this.lastSnapScreen = null; }
         g.b = v(mw.x, mw.y);
       } else if (this._mode === "body" && this._startMouseW && this._startA && this._startB) {
         const dx = mw.x - this._startMouseW.x;
