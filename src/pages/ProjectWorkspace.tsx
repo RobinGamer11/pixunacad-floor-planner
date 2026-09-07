@@ -2597,8 +2597,6 @@ function ToolRailButton({
   onClick?: () => void;
   showLabel?: boolean;
   disabled?: boolean;
-  /** true = zusätzlich deutlich gelb aufleuchten, solange aktiv. */
-  glow?: boolean;
 }) {
   return (
     <button
