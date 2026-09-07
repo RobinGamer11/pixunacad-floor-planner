@@ -916,7 +916,7 @@ export function FileBrowser({ project }: Props) {
         {renderDropSlot(parentId, null, "file", "Dokument ans Ende verschieben")}
 
 
-        {!root && group.folders.length === 0 && group.files.length === 0 && (
+        {group.folders.length === 0 && group.files.length === 0 && (
           <li className="py-2 text-xs text-muted-foreground">Dieser Ordner ist leer.</li>
         )}
       </ul>
@@ -1035,7 +1035,7 @@ export function FileBrowser({ project }: Props) {
         ) : visibleNodeIds?.size === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">Keine passenden Dokumente gefunden.</p>
         ) : (
-          renderGroup(null, new Set(), true)
+          renderGroup(visibleNodeIds ? null : currentFolderId, new Set(), true)
         )}
         <button
           type="button"
