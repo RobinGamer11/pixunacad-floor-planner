@@ -844,6 +844,8 @@ export class CadApp {
       rulerGuide: scene.rulerGuide ? {
         a: { x: scene.rulerGuide.a.x, y: scene.rulerGuide.a.y },
         b: { x: scene.rulerGuide.b.x, y: scene.rulerGuide.b.y },
+        side: rulerSideOf(scene.rulerGuide),
+        unit: rulerUnitOf(scene.rulerGuide),
       } : null,
       doors: scene.doors.map(d => ({
         id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,
