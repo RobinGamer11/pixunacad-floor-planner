@@ -1355,13 +1355,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <span>{t.label.length > 9 ? t.label.slice(0, 8) + "…" : t.label}</span>
                 </button>
                 {isExpanded && (
-                  <div
-                    className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-30"
-                    style={{
-                      background: "hsl(var(--surface-card))",
-                      border: "1px solid hsl(var(--hairline))",
-                    }}
-                  >
+                  <RailFlyout onClose={() => setExpandedTool(null)}>
                     {variants.map((v, i) => {
                       const VIcon = v.icon;
                       const vActive = v.kind === "tool"
