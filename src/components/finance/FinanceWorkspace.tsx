@@ -265,9 +265,26 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         )}
 
         <section className="flex-1 min-w-0 min-h-0 overflow-auto">
-          <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1.5 px-3 py-2 border-b"
+          {/* Tablet und Handy: große Anlege-Knöpfe über der Struktur */}
+          <div className="lg:hidden grid grid-cols-2 gap-2 px-3 pt-3">
+            <button onClick={() => addNode("overview")}
+              className="h-12 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2"
+              style={{
+                borderColor: "hsl(var(--accent-gold))",
+                background: "hsl(var(--accent-gold) / 0.12)",
+                color: "hsl(var(--accent-gold))",
+              }}>
+              <Plus size={18} /> Ordner
+            </button>
+            <button onClick={() => addNode("action")}
+              className="h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
+              <Plus size={18} /> Anlage
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b"
                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-            <button onClick={() => setMobileNavOpen(true)}
+            <button onClick={() => setMobileNavOpen((v) => !v)}
               className="lg:hidden h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium"
               style={{ borderColor: "hsl(var(--hairline))" }}>
               <ListTree size={16} /> Struktur
@@ -312,6 +329,14 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
             )}
           </div>
 
+          {/* Struktur klappt unterhalb des Kopfes auf (Tablet und Handy) */}
+          {mobileNavOpen && (
+            <div className="lg:hidden border-b max-h-[70vh] overflow-auto"
+                 style={{ borderColor: "hsl(var(--hairline))" }}>
+              {structure}
+            </div>
+          )}
+
           <div ref={exportRef} className="p-3 sm:p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
             {filterActive && (
               <FilterResults hits={filterHits} onOpen={(id) => { setFilterQuery(""); setFilterTypes([]); setSelectedId(id); }} />
@@ -330,15 +355,6 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         </section>
       </div>
 
-      {/* Struktur als seitliches Panel auf Tablet und Handy */}
-      {mobileNavOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNavOpen(false)} />
-          <div className="relative h-full w-[86vw] max-w-[340px] shadow-xl">
-            {structure}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

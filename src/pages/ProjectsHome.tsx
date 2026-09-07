@@ -1329,7 +1329,7 @@ export default function ProjectsHome() {
                 </div>
 
                 {/* Handy: Reiter als Symbole, alles auf einen Blick */}
-                <div className="sm:hidden grid grid-cols-5 gap-2">
+                <div className="sm:hidden grid grid-cols-5 gap-2 mt-3">
                   {(
                     [
                       ["uebersicht", "Übersicht", Home],

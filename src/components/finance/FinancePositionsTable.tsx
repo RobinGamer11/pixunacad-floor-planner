@@ -42,6 +42,8 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
   const isMobile = useIsMobile();
 
   const [dragId, setDragId] = useState<string | null>(null);
+  /** Auf dem Handy geöffnete Position (Detailansicht). */
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const upd = (id: string, patch: Partial<FinancePosition>) =>
     financeStore.updatePosition(projectId, id, patch);
@@ -67,7 +69,7 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
   if (isMobile) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-2">
         {positions.length === 0 && (
           <div className="rounded-xl border px-4 py-6 text-xs"
                style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))", color: "hsl(var(--ink-soft))" }}>
@@ -78,9 +80,30 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
           const isMinus = p.type === "supplement" && p.supplementKind === "minus";
           const isPlus = p.type === "supplement" && p.supplementKind === "plus";
           const amountColor = isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : undefined;
+          const label = p.type === "supplement"
+            ? (isMinus ? "Mindernachtrag" : "Mehrnachtrag")
+            : TYPE_LABEL[p.type];
+          const title = p.number?.trim() || `${label} ${numberOf.get(p.id)}`;
+
+          if (openId !== p.id) {
+            return (
+              <button key={p.id} type="button" onClick={() => setOpenId(p.id)}
+                className="w-full rounded-xl border px-3 py-3 flex items-center gap-3 text-left"
+                style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium truncate">{title}</span>
+                  <span className="block text-[11px]" style={{ color: "hsl(var(--ink-soft))" }}>{label}</span>
+                </span>
+                <span className="text-sm font-semibold whitespace-nowrap" style={{ color: amountColor }}>
+                  {isMinus && p.amount ? "−" : ""}{formatEur(p.amount)}
+                </span>
+              </button>
+            );
+          }
+
           return (
             <div key={p.id} className="rounded-xl border p-3 space-y-2"
-                 style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
+                 style={{ borderColor: "hsl(var(--accent-gold))", background: background ?? "hsl(var(--surface-card))" }}>
               <div className="flex items-center gap-2">
                 {p.type === "supplement" ? (
                   <select
@@ -124,6 +147,11 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
                 className={FIELD_CLASS} style={FIELD_STYLE} />
 
               <div className="flex items-center justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setOpenId(null)}
+                  className="h-9 px-3 rounded-md border flex items-center gap-2 text-xs mr-auto"
+                  style={{ borderColor: "hsl(var(--hairline))" }}>
+                  Zuklappen
+                </button>
                 {p.hasTemplate && (
                   <button type="button"
                     onClick={() => navigate(`/project/${projectId}?tpl=${encodeURIComponent(templateKeyOf(p.type, p.id))}&back=${nodeId}`)}
