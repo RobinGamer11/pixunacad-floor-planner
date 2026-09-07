@@ -170,9 +170,33 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         </label>
       </div>
 
-      {(net.error || invites.error) && (
-        <div className="mt-4 rounded-xl border p-3 text-xs" style={{ background: CARD, borderColor: "hsl(0 70% 55% / 0.4)" }}>
-          {net.error ?? invites.error}
+      {net.error && (
+        <div
+          className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border p-4 text-sm"
+          style={{ background: CARD, borderColor: "hsl(0 70% 55% / 0.4)" }}
+        >
+          <span className="min-w-0 flex-1">{net.error}</span>
+          <button
+            type="button"
+            onClick={() => net.reload()}
+            className="h-11 rounded-lg border px-4 text-sm font-medium"
+            style={{ borderColor: LINE }}
+          >
+            Erneut laden
+          </button>
+        </div>
+      )}
+
+      {!net.error && net.loading && !net.ready && (
+        <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground" style={{ background: CARD, borderColor: LINE }}>
+          Team wird geladen …
+        </div>
+      )}
+
+      {!net.error && net.ready && !sharedRow && (
+        <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground" style={{ background: CARD, borderColor: LINE }}>
+          Für dieses Projekt liegt noch keine Freigabe vor. Besitzer und Rechte werden angezeigt, sobald das Projekt
+          im Netzwerk verfügbar ist.
         </div>
       )}
 
