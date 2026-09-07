@@ -1191,9 +1191,27 @@ export default function ProjectsHome() {
       </div>
 
       {newProjectDialogOpen && (
-        <NewProjectSettingsDialog
+        <ProjectEditDialog
+          title="Neues Projekt"
+          submitLabel="Projekt anlegen"
+          initial={emptyDraft()}
           onCancel={() => setNewProjectDialogOpen(false)}
-          onCreate={finishCreateProject}
+          onSubmit={finishCreateProject}
+        />
+      )}
+
+      {settingsOpen && selected && (
+        <ProjectEditDialog
+          title="Projekt bearbeiten"
+          submitLabel="Speichern"
+          project={selected}
+          initial={draftFromProject(selected)}
+          onCancel={() => setSettingsOpen(false)}
+          onSubmit={(draft) => {
+            projectStore.updateProject(selected.id, draftToPatch(draft, "edit"));
+            syncProjectPeriod(selected.id, draft.projektStart, draft.projektEnde);
+            setSettingsOpen(false);
+          }}
         />
       )}
     </div>
