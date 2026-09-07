@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Search, MessageSquare, Lock, FolderKanban, StickyNote,
-  MoreHorizontal, X, UserPlus, ExternalLink, Crown,
+  X, UserPlus, ExternalLink, Crown,
 } from "lucide-react";
 import { presenceColor, presenceLabel, type NetworkPerson, type LocalProjectRef } from "@/lib/networkStore";
 import { type ProjectPermissionOverrides, type ProjectRole } from "@/lib/projectAccess";
@@ -79,18 +79,8 @@ export function ProjectsTab(props: ProjectsTabProps) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
-  }, [menuOpen]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
