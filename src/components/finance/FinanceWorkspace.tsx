@@ -15,6 +15,7 @@ import {
   type FinancePositionType,
 } from "@/lib/financeStore";
 import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
