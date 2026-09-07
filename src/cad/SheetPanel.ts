@@ -261,6 +261,7 @@ export class SheetPanel {
       actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
 
+      row.appendChild(glyph);
       row.appendChild(main);
       row.appendChild(actions);
       item.appendChild(row);
