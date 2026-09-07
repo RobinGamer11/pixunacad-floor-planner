@@ -368,49 +368,8 @@ const placeholder = (label: string) =>
     `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 260'><rect width='400' height='260' fill='%23efe9df'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Inter,sans-serif' font-size='22' fill='%238a7a5f'>${label}</text></svg>`
   )}`;
 
+/** Neue Konten starten bewusst ohne Beispielprojekte. */
 function demoProjects(): Project[] {
-  const now = new Date().toISOString();
-  const mk = (
-    id: string,
-    name: string,
-    ort: string,
-    extra: Partial<Project> = {}
-  ): Project => ({
-    id,
-    name,
-    ort,
-    thumbnail: placeholder(name),
-    updatedAt: now,
-    erstelltAm: "03.06.2026",
-    bauherr: "Familie Müller",
-    projektTyp: "Neubau Einfamilienhaus",
-    status: "In Bearbeitung",
-    pages: [
-      { id: `${id}-p1`, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p2`, title: "02 Bestand", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p3`, title: "03 Analyse", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p4`, title: "04 Variante A", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p5`, title: "05 Variante B", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p6`, title: "06 Präsentation", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p7`, title: "07 Kostenübersicht", format: "A3-quer", margins: 20, background: false, elements: [] },
-    ],
-    sheets: [],
-    tasks: [
-      { id: `${id}-t1`, title: "Bestandsaufnahme prüfen", done: true, date: "2026-06-03", time: "09:00", priority: "medium" },
-      { id: `${id}-t2`, title: "Entwurf Variante A fertigstellen", done: true, date: "2026-06-07", time: "14:00", priority: "high" },
-      { id: `${id}-t3`, title: "Variante B ausarbeiten", done: false, date: "2026-06-15", time: "10:00", priority: "high" },
-      { id: `${id}-t4`, title: "Bauherrengespräch vorbereiten", done: false, date: "2026-06-18", time: "11:30", priority: "medium" },
-      { id: `${id}-t5`, title: "Materialkonzept abstimmen", done: false, date: "2026-06-22", time: "15:00", priority: "low" },
-    ],
-    events: [
-      { id: `${id}-e1`, date: "2026-06-12", time: "10:00", title: "Bauherrengespräch", location: "Besprechungsraum 1" },
-      { id: `${id}-e2`, date: "2026-06-18", time: "14:00", title: "Materialpräsentation", location: "Showroom" },
-    ],
-    ...extra,
-  });
-
-  // Neue Konten starten bewusst ohne Beispielprojekte.
-  void mk;
   return [];
 }
 
