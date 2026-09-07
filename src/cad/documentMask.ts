@@ -88,27 +88,30 @@ export function eraseDocCircle(doc: DocumentObject, centerW: Vec2, radiusM: numb
   const px = lx * sx;
   const py = ly * sy;
   // Mittlerer Skalierungsfaktor für Radius (Maske ist evtl. nicht-uniform — nehmen längere Achse)
-  const pr = radiusM * Math.max(sx, sy);
+  const prBase = radiusM * Math.max(sx, sy);
 
   const ctx = mask.getContext("2d")!;
   ctx.save();
   ctx.globalCompositeOperation = "destination-out";
   // Weicher Rand für sanftes Radieren
   const a = Math.max(0.05, Math.min(1, strength));
+  let pr = prBase;
   if (mode === "hard") {
     // Harte Kante: alles innerhalb des Radius wird voll radiert.
     ctx.fillStyle = `rgba(0,0,0,${a})`;
   } else {
     // Vignette: Kern hart, nach außen nebelartig ausblendend.
-    // Höhere Weichheit = kleinerer Kern, flacherer Verlauf und geringere
-    // Deckkraft pro Strich (mehrfaches Verweilen radiert erst voll aus).
+    // Höhere Weichheit = kleinerer Kern, deutlich breiterer Auslauf (bis 2x
+    // Radius) und geringere Deckkraft pro Strich.
     const soft = Math.max(0.05, Math.min(1, softness));
-    const core = pr * Math.pow(1 - soft, 3.5);
-    const aSoft = a * (1 - 0.93 * soft);
+    pr = prBase * (1 + soft);
+    const core = pr * Math.pow(1 - soft, 2) * 0.6;
+    const aSoft = a * Math.pow(1 - 0.97 * soft, 1.4);
     const grad = ctx.createRadialGradient(px, py, Math.max(0, core), px, py, Math.max(core + 0.01, pr));
     grad.addColorStop(0, `rgba(0,0,0,${aSoft})`);
-    grad.addColorStop(0.35, `rgba(0,0,0,${aSoft * (1 - 0.8 * soft)})`);
-    grad.addColorStop(0.7, `rgba(0,0,0,${aSoft * 0.1 * (1 - soft * 0.9)})`);
+    grad.addColorStop(0.25, `rgba(0,0,0,${aSoft * (1 - 0.75 * soft)})`);
+    grad.addColorStop(0.55, `rgba(0,0,0,${aSoft * (1 - 0.92 * soft) * 0.5})`);
+    grad.addColorStop(0.8, `rgba(0,0,0,${aSoft * 0.06 * (1 - 0.95 * soft)})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
 
     ctx.fillStyle = grad;
@@ -117,6 +120,7 @@ export function eraseDocCircle(doc: DocumentObject, centerW: Vec2, radiusM: numb
   ctx.beginPath();
   ctx.arc(px, py, pr, 0, Math.PI * 2);
   ctx.fill();
+
   ctx.restore();
 
   doc._eraseMaskDirty = true;
