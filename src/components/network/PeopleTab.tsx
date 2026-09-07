@@ -8,8 +8,8 @@
  * Diese Datei enthält ausschließlich Layout/Darstellung – alle Aktionen laufen
  * unverändert über die übergebenen Handler.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, MessageSquare, UserMinus, Lock, MoreHorizontal, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, MessageSquare, Lock, X } from "lucide-react";
 import {
   presenceColor,
   presenceLabel,
@@ -17,7 +17,6 @@ import {
   type LocalProjectRef,
 } from "@/lib/networkStore";
 import {
-  effectivePermissions,
   type ProjectPermissionOverrides,
   type ProjectRole,
 } from "@/lib/projectAccess";
@@ -80,17 +79,6 @@ export function PeopleTab(props: PeopleTabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Auf Handy/Tablet werden Details als eigenes Fenster geöffnet. */
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
-  }, [menuOpen]);
 
   const projectsOf = (userId: string) => projects.filter((p) => !!memberRow(p.id, userId));
 
@@ -156,7 +144,6 @@ export function PeopleTab(props: PeopleTabProps) {
             const manage = canManageProject(p.id);
             const isMember = !!row;
             const role = (row?.role as ProjectRole) ?? "member";
-            const eff = effectivePermissions(role, row?.permissions ?? undefined);
             return (
               <div key={p.id} className="rounded-xl border p-3" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <div className="flex items-center gap-3">
