@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
+import { RulerSettingsPanel } from "@/components/cad/RulerSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
@@ -89,6 +90,7 @@ const CAD_TOOLS = [
   { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
   { id: ToolIds.POLYGON, label: "Polygon", key: "G", icon: Pentagon },
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
+  { id: ToolIds.FREE, label: "Freihand", key: "F", icon: Pencil },
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
@@ -97,13 +99,6 @@ const CAD_TOOLS = [
 ];
 
 
-
-// Sub-Werkzeuge unter "Linie": gemeinsam ein Einstellungsfenster mit
-// drei wählbaren Zeichenarten oben. Letzte Auswahl wird gemerkt.
-const LINE_VARIANTS = [
-  { id: ToolIds.LINE, label: "Linie", icon: Minus },
-  { id: ToolIds.FREE, label: "Freihand", icon: Pencil },
-];
 
 type ToolVariant =
   | { kind: "tool"; id: string; label: string; icon: any }
@@ -117,10 +112,6 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
   [ToolIds.DOOR]: [
     { kind: "door", mode: "window", label: "Fenster", icon: AppWindow },
     { kind: "door", mode: "door", label: "Tür", icon: DoorOpen },
-  ],
-  [ToolIds.LINE]: [
-    { kind: "tool", id: ToolIds.LINE, label: "Linie", icon: Minus },
-    { kind: "tool", id: ToolIds.FREE, label: "Freihand", icon: Pencil },
   ],
   [ToolIds.POLYGON]: [
     { kind: "polygon", mode: "polygon", label: "Polygon", icon: Pentagon },
@@ -460,7 +451,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
   // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
   // Default = Linie. Bei jedem Wechsel wird gemerkt.
-  const [lineVariant, setLineVariant] = useState<string>(ToolIds.LINE);
   // Zuletzt verwendete Polygon-Zeichenart (bleibt über Werkzeugwechsel erhalten).
   const [polygonDrawMode, setPolygonDrawMode] = useState<PolygonDrawMode>("polygon");
   // Marquee-Rahmen-Modus des Auswahl-Werkzeugs (Berühren / Umschließen).
@@ -844,9 +834,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       if (id === ToolIds.SELECT) setRightTab("sheets");
       else setRightTab("settings");
-      if (id === ToolIds.LINE || id === ToolIds.FREE) {
-        setLineVariant(id);
-      }
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
@@ -1133,8 +1120,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   }, []);
 
   const handleToolClick = useCallback((id: string) => {
-    // "Linie" Sidebar-Knopf aktiviert die zuletzt gewählte Variante
-    const targetId = id === ToolIds.LINE ? lineVariant : id;
+    const targetId = id;
     const app = appRef.current;
 
     // Erneuter Klick auf das bereits aktive Auswahlwerkzeug hebt zuerst den
@@ -1154,7 +1140,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     setGridPanelOpen(false);
     // Flyout: erneuter Klick auf dasselbe Symbol schließt die Variantenauswahl wieder.
     setExpandedTool(prev => (TOOL_VARIANTS[id] ? (prev === id ? null : id) : null));
-  }, [lineVariant, activeTool]);
+  }, [activeTool]);
 
 
   /**
@@ -1338,6 +1324,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <Pipette size={18} />
             <span>Pipette</span>
           </button>
+          <button
+            onClick={() => handleToolClick(ToolIds.RULER)}
+            title="Lineal"
+            className={`cad-rail-btn ${activeTool === ToolIds.RULER ? "active" : ""}`}
+          >
+            <RulerIcon size={18} />
+            <span>Lineal</span>
+          </button>
         </div>
 
         {/* Divider */}
@@ -1347,9 +1341,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <div className="flex flex-col items-center gap-0.5 p-1.5">
           {CAD_TOOLS.map((t) => {
             const Icon = t.icon;
-            const isActive = t.id === ToolIds.LINE
-              ? (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE)
-              : activeTool === t.id;
+            const isActive = activeTool === t.id;
             const variants = TOOL_VARIANTS[t.id];
             const isExpanded = expandedTool === t.id && !!variants;
             return (
@@ -1388,7 +1380,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                             if (v.kind === "tool") {
                               appRef.current?.setTool(v.id);
                               setActiveTool(v.id);
-                              setLineVariant(v.id);
+                              
                             } else if (v.kind === "hatch") {
                               if (activeTool !== ToolIds.HATCH) {
                                 appRef.current?.setTool(ToolIds.HATCH);
@@ -2210,32 +2202,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
 
           {/* Reihenfolge identisch zur Projektmappe: Ebene → Modus → Objektart → Rahmen */}
-          {(activeTool === ToolIds.LINE || activeTool === ToolIds.FREE) && (
+          {activeTool === ToolIds.LINE && (
             <div className="cad-settings-panel mb-2">
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
-              </div>
-              <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                MODUS
-              </div>
-              <div className="grid grid-cols-2 gap-1">
-                {LINE_VARIANTS.map(v => {
-                  const Icon = v.icon;
-                  const active = activeTool === v.id;
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => { appRef.current?.setTool(v.id); setActiveTool(v.id); setLineVariant(v.id); }}
-                      title={v.label}
-                      className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${active ? "bg-accent" : "hover:bg-muted"}`}
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      <span className="text-[9px] leading-tight">{v.label}</span>
-                    </button>
-                  );
-                })}
               </div>
               <div className="mt-3">
                 <RasterModeToggle app={appRef.current} projectId={projectId} />
@@ -2248,14 +2218,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <div
             ref={settingsRef}
             className={`cad-settings-panel mb-2 ${
-              (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE
+              (activeTool === ToolIds.LINE
                 || (activeTool === ToolIds.SELECT && !!selectedSegmentId)) ? "" : "hidden"
             }`}
           >
             <div className="hidden">
               <select ref={idSelectRef} className="cad-settings-select w-full" />
             </div>
-            {activeTool !== ToolIds.LINE && activeTool !== ToolIds.FREE && (
+            {activeTool !== ToolIds.LINE && (
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
               </div>
@@ -3051,12 +3021,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Freihand-Tool-Panel */}
           {(activeTool === ToolIds.FREE || (activeTool === ToolIds.SELECT && selectedFreeStrokeId)) && (
             <div className="cad-settings-panel mb-2">
-              {activeTool !== ToolIds.FREE && (
-                <div className="space-y-3 mb-3">
-                  <CadEbeneSelect target={idSelectRef} />
-                  <RasterModeToggle app={appRef.current} projectId={projectId} />
-                </div>
-              )}
+              <div className="space-y-3 mb-3">
+                <CadEbeneSelect target={idSelectRef} />
+                <RasterModeToggle app={appRef.current} projectId={projectId} />
+              </div>
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <FreeDrawSettingsPanel app={appRef.current} units="m" projectId={projectId} framedCad />
@@ -3072,6 +3040,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <EraserSettingsPanel app={appRef.current} variant="cad" />
               </div>
+            </div>
+          )}
+
+          {/* Lineal-Panel — eigenständiges Werkzeug */}
+          {activeTool === ToolIds.RULER && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Lineal</div>
+              <RulerSettingsPanel app={appRef.current} />
             </div>
           )}
 
@@ -3535,6 +3511,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             && activeTool !== ToolIds.STICKER
             && activeTool !== ToolIds.LINE
             && activeTool !== ToolIds.FREE
+            && activeTool !== ToolIds.RULER
             && activeTool !== ToolIds.HATCH
             && activeTool !== ToolIds.POLYGON
             && activeTool !== ToolIds.DOCUMENT

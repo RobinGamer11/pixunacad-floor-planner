@@ -147,6 +147,7 @@ export const ToolIds = {
   WALL: "wall",
   DOOR: "door",
   TABLE: "table",
+  RULER: "ruler",
 } as const;
 
 export const SelectionType = {

@@ -3534,6 +3534,11 @@ export class Renderer {
   }
 
   // ---- Ruler Guide ----
+  /**
+   * Zeichenlineal: transparenter Körper mit Zentimeter-Teilung.
+   * Die Teilung folgt immer den Weltkoordinaten (1 cm = 0.01 Welteinheiten),
+   * der Zoom verändert nur die Bildschirmgröße.
+   */
   private _drawRulerGuide() {
     const g = this.scene.rulerGuide;
     if (!g) return;
@@ -3541,25 +3546,88 @@ export class Renderer {
     const cam = this.camera;
     const a = cam.worldToScreen(g.a.x, g.a.y);
     const b = cam.worldToScreen(g.b.x, g.b.y);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenPx = Math.hypot(dx, dy);
+    if (lenPx < 1) return;
+    const ang = Math.atan2(dy, dx);
+    const lenM = Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y);
+    const pxPerCm = (lenPx / Math.max(1e-9, lenM)) * 0.01;
+    const bandPx = 38;
+
     ctx.save();
-    ctx.strokeStyle = "rgba(77,163,255,0.85)";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([8, 5]);
+    ctx.translate(a.x, a.y);
+    ctx.rotate(ang);
+
+    // Körper (transparent)
+    ctx.fillStyle = "rgba(180, 210, 255, 0.14)";
+    ctx.strokeStyle = "rgba(77,163,255,0.75)";
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
+    ctx.rect(0, -bandPx / 2, lenPx, bandPx);
+    ctx.fill();
     ctx.stroke();
-    ctx.setLineDash([]);
-    // Endpunkt-Marker
+
+    // Messkante
+    ctx.strokeStyle = "rgba(77,163,255,0.95)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -bandPx / 2);
+    ctx.lineTo(lenPx, -bandPx / 2);
+    ctx.stroke();
+
+    // Teilung
+    const totalCm = Math.floor(lenM * 100 + 1e-6);
+    const showMm = pxPerCm >= 26;
+    const labelEvery = pxPerCm >= 26 ? 1 : pxPerCm >= 12 ? 5 : pxPerCm >= 4 ? 10 : 50;
+    ctx.strokeStyle = "rgba(30,70,120,0.85)";
+    ctx.fillStyle = "rgba(30,70,120,0.95)";
+    ctx.lineWidth = 1;
+    ctx.font = "9px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    const top = -bandPx / 2;
+    for (let c = 0; c <= totalCm; c++) {
+      const x = c * pxPerCm;
+      if (x > lenPx + 0.5) break;
+      const major = c % 10 === 0;
+      const mid = c % 5 === 0;
+      const h = major ? bandPx * 0.55 : mid ? bandPx * 0.38 : bandPx * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, top + h);
+      ctx.stroke();
+      if (showMm && c < totalCm) {
+        for (let m = 1; m < 10; m++) {
+          const mx = x + (m / 10) * pxPerCm;
+          if (mx > lenPx) break;
+          ctx.beginPath();
+          ctx.moveTo(mx, top);
+          ctx.lineTo(mx, top + bandPx * 0.14);
+          ctx.stroke();
+        }
+      }
+      if (c % labelEvery === 0) {
+        ctx.save();
+        ctx.translate(x, top + bandPx * 0.6);
+        if (Math.abs(ang) > Math.PI / 2) ctx.rotate(Math.PI);
+        ctx.fillText(String(c), 0, 0);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+
+    // Endpunkt-Griffe (verschieben / drehen / Länge ändern)
     for (const p of [a, b]) {
+      ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.95)";
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      ctx.restore();
     }
-    ctx.restore();
   }
 }
+

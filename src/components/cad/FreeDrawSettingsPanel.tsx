@@ -58,7 +58,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   const [color, setColor] = useState("#111111");
   const [thickness, setThickness] = useState(0.03);
   const [opacity, setOpacity] = useState(1);
-  const [hasRuler, setHasRuler] = useState(false);
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imgSize, setImgSize] = useState(0.18);
   const [imgSpacing, setImgSpacing] = useState(0.22);
@@ -95,7 +94,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       setImgRotate(app.defaultFreeImageRotate);
       setLabelId(app.activeDrawLabelId);
     }
-    setHasRuler(!!app.scene.rulerGuide);
     // Bei Auswahl zeigt der Schalter den Zustand des Objekts, sonst den Standard.
     setAutoShape(stroke ? (stroke as any).autoShape === true : app.defaultFreeAutoShape);
   };
@@ -135,20 +133,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
   if (!app) return null;
   const labels = app.labelManager.list();
 
-  const toggleRuler = () => {
-    if (!app) return;
-    if (app.scene.rulerGuide) {
-      app.scene.rulerGuide = null;
-      setHasRuler(false);
-    } else {
-      const rect = app.canvas.getBoundingClientRect();
-      const left = app.camera.screenToWorld(rect.width * 0.2, rect.height * 0.5);
-      const right = app.camera.screenToWorld(rect.width * 0.8, rect.height * 0.5);
-      app.scene.rulerGuide = { a: { x: left.x, y: left.y }, b: { x: right.x, y: right.y } };
-      setHasRuler(true);
-    }
-  };
-
   const onPickFile = () => fileRef.current?.click();
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,11 +167,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
     setThickness(v);
     if (selectedStrokeId) applyToStroke((s) => { s.thicknessM = v; });
     else app.defaultFreeThicknessM = v;
-  };
-  const rulerSide: "left" | "center" | "right" = (app as any).defaultFreeRulerSide ?? "center";
-  const setRulerSide = (id: "left" | "center" | "right") => {
-    (app as any).defaultFreeRulerSide = id;
-    force((n) => n + 1);
   };
 
 
@@ -330,32 +309,9 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               </span>
             </button>
 
-            <button type="button" onClick={toggleRuler} className={`${framedBtn} justify-center`} style={framedStyle}>
-              <span>{hasRuler ? "Lineal entfernen" : "Lineal hinzufügen"}</span>
-            </button>
-
-            <div className={hasRuler ? "" : "opacity-50"}>
-              <div className="mb-1 text-muted-foreground">Zeichenseite</div>
-              <div className="grid grid-cols-3 gap-1">
-                {([
-                  { id: "left" as const, label: "Links" },
-                  { id: "center" as const, label: "Mittig" },
-                  { id: "right" as const, label: "Rechts" },
-                ]).map(({ id, label }) => (
-                  <button key={id} type="button"
-                    onClick={() => { setRulerSide(id); (app as any).defaultFreeRulerSide = id; }}
-                    className={`rounded border px-1 py-1 text-[10px] transition-colors ${rulerSide === id ? "bg-accent" : "hover:bg-muted"}`}
-                    style={framedStyle}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {!framedCad && (
               <div className="text-[10px] leading-snug text-muted-foreground">
-                Maus gedrückt halten → zeichnen. Das Lineal lässt sich nur an seinen
-                Endpunkten verschieben; an der Linie selbst fängt der Stift.
+                Maus gedrückt halten → zeichnen. Das Lineal ist ein eigenes Werkzeug.
               </div>
             )}
           </>
@@ -450,13 +406,8 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
           <span className="text-xs">{autoShape ? "Auto-Form: AN" : "Auto-Form: AUS"}</span>
         </button>
 
-        <button type="button" onClick={toggleRuler}
-          className="cad-toolbar-btn w-full justify-center h-9">
-          <span className="text-xs">{hasRuler ? "Lineal entfernen" : "Lineal hinzufügen"}</span>
-        </button>
-
         <div className="text-[11px] leading-relaxed pt-2" style={{ color: "hsl(var(--cad-toolbar-muted))", borderTop: "1px solid hsl(var(--border))" }}>
-          Maus gedrückt halten → zeichnen. Lineal: nur an den Endpunkten verschiebbar; Stift folgt der Linie.
+          Maus gedrückt halten → zeichnen. Das Lineal ist ein eigenes Werkzeug.
         </div>
         </>
         )}

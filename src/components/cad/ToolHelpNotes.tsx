@@ -80,6 +80,11 @@ const TOOL_HINTS: Record<string, string[]> = {
     "Klick auf ein Objekt übernimmt dessen Eigenschaften",
     "Anschließend gilt der Stil für neu gezeichnete Objekte",
   ],
+  ruler: [
+    "L-Klick: Anfangspunkt, zweiter L-Klick: Endpunkt",
+    "Körper ziehen verschiebt, Endpunkte ziehen dreht und ändert die Länge",
+    "Die Länge lässt sich rechts in Zentimetern genau eingeben",
+  ],
   guide: [
     "Rechtsklick auf einen Fangpunkt erzeugt Hilfslinien",
     "ESC entfernt alle Hilfslinien",

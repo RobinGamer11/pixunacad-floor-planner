@@ -86,6 +86,7 @@ import {
   Layers,
   Star,
   Pentagon,
+  Ruler as RulerIcon,
 } from "lucide-react";
 
 import {
@@ -138,6 +139,7 @@ import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/Polygo
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import { StrokeSettingsPanel } from "@/components/cad/StrokeSettingsPanel";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
+import { RulerSettingsPanel } from "@/components/cad/RulerSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
@@ -180,13 +182,8 @@ import {
   type WarpCorners,
 } from "@/lib/warpMatrix";
 
-export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "hatch" | "polygon" | "document" | "table" | null;
+export type PageTool = "guide" | "line" | "free" | "eraser" | "text" | "cad" | "pipette" | "ruler" | "hatch" | "polygon" | "document" | "table" | null;
 type LinePageTool = "line" | "free";
-
-const LINE_TOOL_VARIANTS: Array<{ id: LinePageTool; label: string; icon: React.ElementType }> = [
-  { id: "line", label: "Linie", icon: Minus },
-  { id: "free", label: "Freihand", icon: Pencil },
-];
 
 const POLYGON_MODE_VARIANTS: Array<{ id: PolygonDrawMode; label: string; icon: React.ElementType }> = [
   { id: "polygon", label: "Polygon", icon: Pentagon },
@@ -1572,6 +1569,13 @@ export default function ProjectWorkspace() {
           onClick={() => setActiveToolAndTab(activeTool === "pipette" ? null : "pipette")}
           showLabel
         />
+        <ToolRailButton
+          icon={<RulerIcon size={18} />}
+          label="Lineal"
+          active={activeTool === "ruler"}
+          onClick={() => setActiveToolAndTab(activeTool === "ruler" ? null : "ruler")}
+          showLabel
+        />
 
         <div className="my-1 w-8 border-t" style={{ borderColor: "hsl(var(--hairline))" }} />
 
@@ -1664,48 +1668,20 @@ export default function ProjectWorkspace() {
           active={activeTool === "text"}
           onClick={() => setActiveToolAndTab(activeTool === "text" ? null : "text")}
         />
-        <div className="relative w-full flex justify-center">
-          <ToolRailButton
-            icon={<Minus size={18} />}
-            label="Linie"
-            active={isLinePageTool(activeTool)}
-            onClick={() => {
-              if (!isLinePageTool(activeTool)) {
-                activateLineTool(lineToolVariant);
-                setLineToolFlyoutOpen(true);
-              }
-              else setLineToolFlyoutOpen((open) => !open);
-              setRightTabState("tools");
-            }}
-            showLabel
-          />
-          {lineToolFlyoutOpen && (
-            <div
-              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
-              style={{
-                background: "hsl(var(--surface-card))",
-                border: "1px solid hsl(var(--hairline))",
-              }}
-            >
-              {LINE_TOOL_VARIANTS.map((variant) => {
-                const Icon = variant.icon;
-                return (
-                  <ToolRailButton
-                    key={variant.id}
-                    icon={<Icon size={18} />}
-                    label={variant.label}
-                    active={activeTool === variant.id}
-                    onClick={() => {
-                      activateLineTool(variant.id);
-                      setLineToolFlyoutOpen(false);
-                    }}
-                    showLabel
-                  />
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <ToolRailButton
+          icon={<Minus size={18} />}
+          label="Linie"
+          active={activeTool === "line"}
+          onClick={() => { setActiveToolAndTab(activeTool === "line" ? null : "line"); setRightTabState("tools"); }}
+          showLabel
+        />
+        <ToolRailButton
+          icon={<Pencil size={18} />}
+          label="Freihand"
+          active={activeTool === "free"}
+          onClick={() => { setActiveToolAndTab(activeTool === "free" ? null : "free"); setRightTabState("tools"); }}
+          showLabel
+        />
         <div className="relative w-full flex justify-center">
           <ToolRailButton
             icon={<Pentagon size={18} />}
@@ -3636,12 +3612,13 @@ function PageCanvas({
             : activeTool === "polygon" ? "polygon"
             : activeTool === "document" ? "document"
             : activeTool === "pipette" ? "pipette"
+            : activeTool === "ruler" ? "ruler"
             : activeTool === null ? "select"
             : null
           }
           hatchDrawMode={hatchDrawMode}
           polygonDrawMode={polygonDrawMode}
-          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "polygon" || activeTool === "document" || activeTool === "pipette" || activeTool === null}
+          enabled={activeTool === "line" || activeTool === "text" || activeTool === "guide" || activeTool === "free" || activeTool === "eraser" || activeTool === "hatch" || activeTool === "polygon" || activeTool === "document" || activeTool === "pipette" || activeTool === "ruler" || activeTool === null}
           initialState={page.cadOverlay}
           ghostSnapState={overlayPage ? overlayPage.cadOverlay : null}
           onEraseWorld={(c, rM, mode, soft, strength) => {
@@ -6107,7 +6084,7 @@ function RightInspector({
               onCancelTable={onCancelTable}
             />
           )}
-          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && activeTool !== "hatch" && !isLinePageTool(activeTool) && (
+          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "ruler" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && activeTool !== "hatch" && !isLinePageTool(activeTool) && (
             <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
@@ -6673,12 +6650,6 @@ function ToolsTab({
           />
         </div>
       )}
-      {(settingsTool === "line" || settingsTool === "free") && (
-        <LineModeSelect
-          value={settingsTool === "free" ? "free" : "line"}
-          onChange={(next) => { if (next !== settingsTool) setActiveTool(next); }}
-        />
-      )}
       {settingsTool === "line" && cadEngine && (
         <>
           <LineShapeModeSelect app={cadEngine} />
@@ -6715,6 +6686,11 @@ function ToolsTab({
       {settingsTool === "pipette" && cadEngine && (
         <SettingsBlock title="PIPETTE">
           <PipetteSettingsPanel app={cadEngine} />
+        </SettingsBlock>
+      )}
+      {settingsTool === "ruler" && cadEngine && (
+        <SettingsBlock title="LINEAL">
+          <RulerSettingsPanel app={cadEngine} />
         </SettingsBlock>
       )}
       {settingsTool === "polygon" && cadEngine && (
@@ -7163,38 +7139,6 @@ function GuideSettings({
         </button>
       </Row>
     </SettingsBlock>
-  );
-}
-
-/** Modus-Auswahl Linie / Freihand — Design analog zum Schraffurwerkzeug. */
-function LineModeSelect({
-  value,
-  onChange,
-}: {
-  value: LinePageTool;
-  onChange: (next: LinePageTool) => void;
-}) {
-  return (
-    <div>
-      <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
-      <div className="grid grid-cols-2 gap-1">
-        {LINE_TOOL_VARIANTS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            title={label}
-            onClick={() => onChange(id)}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
-              value === id ? "bg-accent" : "hover:bg-muted"
-            }`}
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <Icon size={14} />
-            <span className="text-[9px] leading-tight">{label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 
