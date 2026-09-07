@@ -21,7 +21,9 @@ import {
   FolderOpen,
   GripVertical,
   Pencil,
+  Search,
   Trash2,
+  UploadCloud,
 } from "lucide-react";
 import {
   Dialog,
@@ -208,6 +210,7 @@ function DropSlot({
 
 export function FileBrowser({ project }: Props) {
   const nodes = useMemo(() => project.files ?? [], [project.files]);
+  const [query, setQuery] = useState("");
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(() => new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -241,16 +244,32 @@ export function FileBrowser({ project }: Props) {
       return true;
     });
   }, [movingNode, nodes, nodesById]);
+  const visibleNodeIds = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase("de-DE");
+    if (!term) return null;
+    const ids = new Set<string>();
+    for (const node of nodes) {
+      if (!node.name.toLocaleLowerCase("de-DE").includes(term)) continue;
+      ids.add(node.id);
+      let parentId = node.parentId;
+      while (parentId) {
+        ids.add(parentId);
+        parentId = nodesById.get(parentId)?.parentId ?? null;
+      }
+    }
+    return ids;
+  }, [nodes, nodesById, query]);
   const childrenByParent = useMemo(() => {
     const groups = new Map<string | null, NodeGroup>();
     for (const node of nodes) {
+      if (visibleNodeIds && !visibleNodeIds.has(node.id)) continue;
       const group = groups.get(node.parentId) ?? { folders: [], files: [] };
       if (node.kind === "folder") group.folders.push(node);
       else group.files.push(node);
       groups.set(node.parentId, group);
     }
     return groups;
-  }, [nodes]);
+  }, [nodes, visibleNodeIds]);
 
   const folderPath = (folder: FileNode) => {
     const names = [folder.name];
