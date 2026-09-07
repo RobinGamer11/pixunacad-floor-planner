@@ -1,7 +1,7 @@
 import { Vec2, v, dist, projectPointToSegment } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
-import { snapRulerPoint } from "./rulerModel";
+import { constrainRulerAngle, snapRulerPoint } from "./rulerModel";
 
 export type RulerHit = { kind: "a" | "b" | "body" } | null;
 
