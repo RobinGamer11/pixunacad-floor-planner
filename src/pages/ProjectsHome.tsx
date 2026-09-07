@@ -766,8 +766,6 @@ export default function ProjectsHome() {
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                               onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                               onDelete={() => deleteProjectWithConfirm(p)}
-                    onMoveUp={() => moveProjectInList(rootProjects, p.id, -1)}
-                    onMoveDown={() => moveProjectInList(rootProjects, p.id, 1)}
                               onMoveUp={() => moveProjectInList(inside, p.id, -1)}
                               onMoveDown={() => moveProjectInList(inside, p.id, 1)}
                               onDragStart={() => setDragProjectId(p.id)}
