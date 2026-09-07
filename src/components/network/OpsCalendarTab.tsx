@@ -140,7 +140,7 @@ export function OpsCalendarTab({
   const [projectMenu, setProjectMenu] = useState(false);
 
 
-  /** Bereits nach Person gefilterte Beiträge – Grundlage aller Ansichten. */
+  /** Bereits gefilterte Beiträge (Person, Kategorie, Suche …) – Grundlage aller Ansichten. */
   const filteredBoards: OpsBoard[] = useMemo(
     () =>
       boards.map((b) => ({
@@ -148,12 +148,13 @@ export function OpsCalendarTab({
         name: projectNames.get(b.id) ?? "Projekt",
         color: projectHue(b.id),
         state: b.state,
-        items: (b.state.items as TlItem[]).filter(
-          (i) => !personFilter || (i.assignees ?? []).includes(personFilter),
-        ),
+        items: (b.state.items as TlItem[])
+          .filter((i) => !personFilter || (i.assignees ?? []).includes(personFilter))
+          .filter((i) => !itemFilter || itemFilter(i)),
       })),
-    [boards, personFilter, projectNames],
+    [boards, personFilter, projectNames, itemFilter],
   );
+
 
   const entries: CalEntry[] = useMemo(() => {
     const out: CalEntry[] = [];
