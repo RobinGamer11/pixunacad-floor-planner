@@ -171,6 +171,16 @@ export class IdPanel {
         row.classList.remove("dragging");
       });
 
+      const grip = document.createElement("div");
+      grip.className = "id-grip";
+      grip.innerHTML = `<span></span><span></span><span></span><span></span><span></span><span></span>`;
+      row.appendChild(grip);
+
+      const swatch = document.createElement("div");
+      swatch.className = "id-swatch";
+      swatch.style.background = this._swatchColor(group.id, index);
+      row.appendChild(swatch);
+
       const main = document.createElement("div");
       main.className = "id-main";
       main.innerHTML = `
