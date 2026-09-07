@@ -190,7 +190,19 @@ export function OpsOverview({
   const [previewId, setPreviewId] = useState<string | null>(null);
   /** Offener Beitrag zum Bearbeiten (dieselben Board-Datensätze). */
   const [editing, setEditing] = useState<{ projectId: string; itemId: string } | null>(null);
-  const openItem = (projectId: string, itemId: string) => setEditing({ projectId, itemId });
+  /** Gemeinsame Auswahl über alle Ansichten und Listen hinweg. */
+  const [selection, setSelection] = useState<OpsSelection>(null);
+  /** Kategorien-/Prioritätenverwaltung (dieselbe Board-Datenbasis). */
+  const [taxonomy, setTaxonomy] = useState<{ kind: "category" | "priority"; projectId: string } | null>(null);
+  const openItem = (projectId: string, itemId: string) => {
+    setSelection((cur) =>
+      sameSelection(cur, { kind: "item", projectId, itemId }) ? cur : { kind: "item", projectId, itemId },
+    );
+    setEditing({ projectId, itemId });
+  };
+  const selectItem = (projectId: string, itemId: string) => setSelection({ kind: "item", projectId, itemId });
+  const selectTime = (projectId: string, entryId: string, itemId?: string) =>
+    setSelection({ kind: "time", projectId, entryId, itemId });
   // Board-Änderungen aller Projekte live übernehmen.
   const [tick, setTick] = useState(0);
   useEffect(() => {
