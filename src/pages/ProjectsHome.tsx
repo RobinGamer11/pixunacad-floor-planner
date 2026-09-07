@@ -2668,15 +2668,7 @@ function SharedView({
     <div className="px-4 sm:px-6 xl:px-10 py-7 w-full">
       <h1 className="text-2xl font-semibold tracking-tight">Netzwerk</h1>
 
-      <div className="mt-5 max-w-xl">
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MEIN PROFIL</div>
-        <div
-          className="mt-2 rounded-xl border p-4"
-          style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
-        >
-          <ProfileEditor profile={profile} projectCount={projectCount} />
-        </div>
-      </div>
+
 
       <NetworkView
         projects={networkProjects}
