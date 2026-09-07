@@ -508,7 +508,7 @@ export function CategoryInsights({
   const list = useMemo(() => {
     const base = items
       .filter((i) => !activeId || i.categoryId === activeId)
-      .filter((i) => matchesQuery(i, query, categories, priorities));
+      .filter((i) => matchesQuery(i, query));
     return sortItems(base, sort, priorities, categories);
   }, [items, activeId, query, sort, priorities, categories]);
 
