@@ -392,15 +392,19 @@ export default function ProjectsHome() {
       {/* ============= TOP HEADER ============= */}
       <header
         ref={headerScrollRef}
-        className="h-16 shrink-0 flex items-center gap-4 px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
-        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+        className="h-16 shrink-0 flex items-center gap-2 sm:gap-4 px-3 sm:px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
+        style={{
+          borderColor: "hsl(var(--hairline))",
+          background: "hsl(var(--surface-card))",
+          paddingRight: "max(env(safe-area-inset-right), 0.75rem)",
+        }}
       >
-        <div className="relative">
+        <div className="relative shrink-0">
 
           <button
             onClick={createProject}
             disabled={!canCreateProject}
-            className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            className="h-11 lg:h-12 px-3 sm:px-5 rounded-lg flex items-center gap-2 text-sm sm:text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
             title={canCreateProject ? "Neues Projekt anlegen" : `Maximal ${MAX_PROJECTS} Projekte`}
           >
@@ -408,21 +412,39 @@ export default function ProjectsHome() {
           </button>
         </div>
 
+        {/* Tablet/Handy: Projektliste öffnen bzw. schließen (gleicher Zustand
+            wie der Einklappbutton der Projektleiste auf Desktop). */}
+        <button
+          type="button"
+          onClick={() => setLeftOpen((v) => !v)}
+          aria-expanded={leftOpen}
+          aria-label="Projekte"
+          title={leftOpen ? "Projektliste schließen" : "Projektliste öffnen"}
+          className="lg:hidden h-11 px-3 rounded-lg border flex items-center gap-2 text-sm font-semibold shrink-0 whitespace-nowrap"
+          style={
+            leftOpen
+              ? { background: "hsl(var(--accent-gold) / 0.18)", borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }
+              : { borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }
+          }
+        >
+          <PanelLeftOpen size={17} /> Projekte
+        </button>
+
 
         {/* Nav-Icons mit feinen vertikalen Trennstrichen */}
-        <div className="ml-2 flex items-center h-10">
+        <div className="ml-0 sm:ml-2 flex items-center h-10 shrink-0">
           <NavIcon
             icon={<Home size={18} strokeWidth={1.5} />}
             label="Hauptseite"
             active={hub === "home"}
-            onClick={() => { setShowAllTasks(false); setSettingsOpen(false); setHub("home"); }}
+            onClick={() => { setShowAllTasks(false); setSettingsOpen(false); setHub("home"); closeSidebarOnCompact(); }}
           />
           <HeaderDivider />
           <NavIcon
             icon={<ListChecks size={18} strokeWidth={1.5} />}
             label="Allg. Organisation"
             active={showAllTasks && !hub}
-            onClick={() => { setHub(null); setMode("projects"); setShowAllTasks(true); }}
+            onClick={() => { setHub(null); setMode("projects"); setShowAllTasks(true); closeSidebarOnCompact(); }}
           />
 
           <HeaderDivider />
@@ -430,14 +452,14 @@ export default function ProjectsHome() {
             icon={<Users size={18} strokeWidth={1.5} />}
             label="Netzwerk"
             active={hub === "shared"}
-            onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); }}
+            onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); closeSidebarOnCompact(); }}
           />
         </div>
 
-        <div className="flex-1" />
+        <div className="flex-1 min-w-0" />
 
-        {/* Shop (näher am Münzenfenster, ohne Rahmen) */}
-        <div className="relative ml-1" ref={shopRef}>
+        {/* Shop – auf Tablet/Handy im Profilfenster, nicht im Kopf. */}
+        <div className="relative ml-1 hidden lg:block" ref={shopRef}>
           <button
             onClick={() => setShopOpen((v) => !v)}
             className="h-8 w-8 flex items-center justify-center hover:opacity-80"
@@ -449,19 +471,19 @@ export default function ProjectsHome() {
         </div>
 
         {/* Profil oben rechts (ohne Rahmen, Text innerhalb Avatar-Höhe) */}
-        <div className="relative ml-2" ref={profileRef}>
+        <div className="relative ml-1 sm:ml-2 shrink-0" ref={profileRef}>
           <button
             onClick={() => setProfileOpen((v) => !v)}
-            className="flex items-center gap-3 h-14 pl-1 pr-2 rounded-full hover:bg-muted/40 transition"
+            className="flex items-center gap-3 h-14 pl-1 pr-0 sm:pr-2 rounded-full hover:bg-muted/40 transition"
             title="Profil"
           >
             <ProfileAvatar
               profile={profile}
               count={projectCount}
               max={MAX_PROJECTS}
-              size={52}
+              size={compact ? 40 : 52}
             />
-            <div className="hidden md:flex flex-col justify-center leading-tight text-left" style={{ height: 52, maxWidth: 160 }}>
+            <div className="hidden xl:flex flex-col justify-center leading-tight text-left" style={{ height: 52, maxWidth: 160 }}>
               <span className="text-sm font-semibold truncate">{profile.name}</span>
               <span className="text-[11px] text-muted-foreground truncate">{profile.role}</span>
               <span
@@ -477,15 +499,56 @@ export default function ProjectsHome() {
             <div
               /* fixed statt absolute: die Kopfzeile scrollt horizontal
                  (overflow-x-auto) und würde ein absolutes Panel abschneiden. */
-              className="fixed right-6 top-16 mt-2 w-80 rounded-xl border shadow-lg z-50 p-4"
-              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+              className="fixed z-[90] rounded-xl border shadow-lg p-4 overflow-y-auto left-2 right-2 top-[68px] w-auto max-h-[75vh] lg:left-auto lg:right-6 lg:top-16 lg:mt-2 lg:w-80"
+              style={{
+                background: "hsl(var(--surface))",
+                borderColor: "hsl(var(--hairline))",
+                marginRight: "max(env(safe-area-inset-right), 0px)",
+              }}
             >
               <ProfileEditor profile={profile} projectCount={projectCount} showSignOut />
+              {/* Shop auf Tablet/Handy hier erreichbar (gleiche Funktion). */}
+              <button
+                type="button"
+                onClick={() => { setProfileOpen(false); setMobileShopOpen(true); }}
+                className="lg:hidden mt-3 h-11 w-full rounded-lg border text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                <ShoppingBag size={16} /> Shop
+              </button>
             </div>
           )}
         </div>
 
       </header>
+
+      {/* Shop als eigenes Fenster auf Tablet/Handy. */}
+      {mobileShopOpen && (
+        <div
+          className="fixed inset-0 z-[95] lg:hidden flex items-end sm:items-center justify-center p-3"
+          style={{ background: "rgba(0,0,0,0.5)" }}
+          onMouseDown={() => setMobileShopOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-label="Shop"
+            className="w-full max-w-md rounded-xl border p-4 shadow-xl"
+            style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <ShoppingBag size={16} /> Projektkapazitäten
+              </div>
+              <button onClick={() => setMobileShopOpen(false)} aria-label="Schließen" className="h-9 w-9 grid place-items-center rounded-md hover:bg-muted">
+                <X size={16} />
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">Shop ist bald verfügbar.</p>
+          </div>
+        </div>
+      )}
+
 
 
 
