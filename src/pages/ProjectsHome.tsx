@@ -101,8 +101,8 @@ const TAB_HEADINGS: Record<Tab, { title: string; subtitle: string }> = {
   uebersicht: { title: "Übersicht", subtitle: "Allgemeine Beschreibung" },
   aufgaben: { title: "Organisation – projektintern", subtitle: "Beiträge, Zeiten und Termine auf einen Blick." },
   finanzen: { title: "Finanzen", subtitle: "Angebote, Rechnungen, Nachträge und Gesamtstand im Überblick" },
-  dokumente: { title: "Dokumente", subtitle: "Projektbezogene Dateien" },
-  team: { title: "Netzwerk – projektintern", subtitle: "Überblick über dein Team" },
+  dokumente: { title: "Dokumente", subtitle: "Projektbezogene Dateien und Ordner verwalten." },
+  team: { title: "Team", subtitle: "Projektmitglieder, Rollen und Berechtigungen verwalten." },
 };
 
 
