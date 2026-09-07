@@ -129,6 +129,7 @@ export default function ProjectsHome() {
   /** Zusätzliche Kopf-Ansichten (Hauptseite, Netzwerk, Papierkorb). */
   const [hub, setHub] = useState<null | "home" | "shared" | "trash">("home");
   const [shopOpen, setShopOpen] = useState(false);
+  const [mobileShopOpen, setMobileShopOpen] = useState(false);
   const shopRef = useRef<HTMLDivElement | null>(null);
   // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
   useEffect(() => { clearMappeClipboard(); }, []);
