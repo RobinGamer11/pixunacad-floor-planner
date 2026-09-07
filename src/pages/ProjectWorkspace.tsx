@@ -1759,7 +1759,7 @@ export default function ProjectWorkspace() {
                   />
                 );
               })}
-            </div>
+            </RailFlyout>
           )}
         </div>
         <ToolRailButton
