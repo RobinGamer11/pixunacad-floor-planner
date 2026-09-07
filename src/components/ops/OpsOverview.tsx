@@ -417,21 +417,9 @@ export function OpsOverview({
                 {subtitle && <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>}
               </>
             )}
-            <div className={`${showHeader ? "mt-5" : ""} text-base font-medium`}>{viewLabel}</div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <select
-              className={`${inputCls} h-12 min-w-[170px]`}
-              value={view}
-              onChange={(e) => setView(e.target.value as OpsView)}
-              title="Ansicht wählen"
-              aria-label="Ansicht"
-            >
-              {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-            </select>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className={`${showHeader ? "mt-5" : ""} flex flex-wrap items-center gap-2`}>
           <OpsActionBar
             projects={projects}
             fixedProjectId={fixedProjectId}
@@ -442,6 +430,18 @@ export function OpsOverview({
 
 
       {/* 2. Hauptansicht */}
+      <div className="mb-2 flex items-center gap-3">
+        <div className="min-w-0 text-base font-medium">{viewLabel}</div>
+        <select
+          className={`${inputCls} ml-auto h-11 min-w-[170px]`}
+          value={view}
+          onChange={(e) => setView(e.target.value as OpsView)}
+          title="Ansicht wählen"
+          aria-label="Ansicht"
+        >
+          {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+        </select>
+      </div>
       <div ref={viewRef} className="mb-5 rounded-xl border p-2 sm:p-3"
            style={{ borderColor: LINE, background: "hsl(var(--surface))" }}>
         <OpsCalendarTab

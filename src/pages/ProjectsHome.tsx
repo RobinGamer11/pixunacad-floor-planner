@@ -1169,7 +1169,7 @@ export default function ProjectsHome() {
 
               <SectionHeading
                 size="tab"
-                className="mt-6"
+                className="mt-8 mb-10"
                 title={TAB_HEADINGS[tab].title}
                 subtitle={TAB_HEADINGS[tab].subtitle}
               />

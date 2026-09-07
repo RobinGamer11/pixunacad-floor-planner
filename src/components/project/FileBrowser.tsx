@@ -21,7 +21,9 @@ import {
   FolderOpen,
   GripVertical,
   Pencil,
+  Search,
   Trash2,
+  UploadCloud,
 } from "lucide-react";
 import {
   Dialog,
@@ -208,6 +210,7 @@ function DropSlot({
 
 export function FileBrowser({ project }: Props) {
   const nodes = useMemo(() => project.files ?? [], [project.files]);
+  const [query, setQuery] = useState("");
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(() => new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
@@ -241,16 +244,32 @@ export function FileBrowser({ project }: Props) {
       return true;
     });
   }, [movingNode, nodes, nodesById]);
+  const visibleNodeIds = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase("de-DE");
+    if (!term) return null;
+    const ids = new Set<string>();
+    for (const node of nodes) {
+      if (!node.name.toLocaleLowerCase("de-DE").includes(term)) continue;
+      ids.add(node.id);
+      let parentId = node.parentId;
+      while (parentId) {
+        ids.add(parentId);
+        parentId = nodesById.get(parentId)?.parentId ?? null;
+      }
+    }
+    return ids;
+  }, [nodes, nodesById, query]);
   const childrenByParent = useMemo(() => {
     const groups = new Map<string | null, NodeGroup>();
     for (const node of nodes) {
+      if (visibleNodeIds && !visibleNodeIds.has(node.id)) continue;
       const group = groups.get(node.parentId) ?? { folders: [], files: [] };
       if (node.kind === "folder") group.folders.push(node);
       else group.files.push(node);
       groups.set(node.parentId, group);
     }
     return groups;
-  }, [nodes]);
+  }, [nodes, visibleNodeIds]);
 
   const folderPath = (folder: FileNode) => {
     const names = [folder.name];
@@ -597,7 +616,7 @@ export function FileBrowser({ project }: Props) {
       <ul>
         {group.folders.map((folder, index) => {
           if (ancestors.has(folder.id)) return null;
-          const expanded = expandedFolderIds.has(folder.id);
+          const expanded = Boolean(visibleNodeIds) || expandedFolderIds.has(folder.id);
           const folderDropActive = dropTarget?.mode === "inside" && dropTarget.folderId === folder.id;
           const nextAncestors = new Set(ancestors).add(folder.id);
 
@@ -760,7 +779,7 @@ export function FileBrowser({ project }: Props) {
 
         {group.files.length > 0 && (
           <li>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            <div>
               {group.files.map((file) => {
                 const dropActive = dropTarget?.mode === "before"
                   && dropTarget.kind === "file"
@@ -806,7 +825,7 @@ export function FileBrowser({ project }: Props) {
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && event.target === event.currentTarget) setViewingId(file.id);
                     }}
-                    className="flex cursor-pointer flex-col gap-1.5 rounded-md border p-2"
+                    className="group flex min-h-16 cursor-pointer items-center gap-3 border-b px-2 py-2.5 transition-colors hover:bg-muted/30"
                     style={{
                       touchAction: "pan-y",
                       opacity: draggingId === file.id ? 0.45 : 1,
@@ -814,7 +833,7 @@ export function FileBrowser({ project }: Props) {
                       background: dropActive ? "hsla(38, 45%, 70%, 0.25)" : undefined,
                     }}
                   >
-                    <div className="w-full" aria-hidden="true">
+                    <div className="h-12 w-16 shrink-0 overflow-hidden rounded-sm" aria-hidden="true">
                       <DocumentPreview node={file} />
                     </div>
 
@@ -829,15 +848,19 @@ export function FileBrowser({ project }: Props) {
                           if (event.key === "Enter") finishRename(file);
                           if (event.key === "Escape") setRenamingId(null);
                         }}
-                        className="w-full border-b bg-transparent text-xs outline-none"
+                        className="min-w-0 flex-1 border-b bg-transparent text-sm outline-none"
                         style={{ borderColor: "hsl(var(--hairline))" }}
                       />
                     ) : (
-                      <div className="break-words text-xs leading-4" title={file.name}>{file.name}</div>
+                      <div className="min-w-0 flex-1" title={file.name}>
+                        <div className="truncate text-sm font-semibold">{file.name}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
+                          {(isPdf(file) ? "PDF" : isImage(file) ? "Bild" : "Dokument")}{humanSize(file.sizeBytes) ? ` · ${humanSize(file.sizeBytes)}` : ""}
+                        </div>
+                      </div>
                     )}
-                    <div className="text-[10px] text-muted-foreground">{humanSize(file.sizeBytes)}</div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                    <div className="ml-auto flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] opacity-70 transition-opacity group-hover:opacity-100">
                       <button type="button" onClick={() => startRename(file)} className="hover:underline">Umbenennen</button>
                       {file.dataUrl && (
                         <a href={file.dataUrl} download={file.name} className="hover:underline">Herunterladen</a>
@@ -874,23 +897,36 @@ export function FileBrowser({ project }: Props) {
   };
 
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center justify-end gap-2 border-b pb-3" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <button
-          type="button"
-          onClick={() => addFolder(null)}
-          className="flex h-8 items-center gap-1.5 px-2 text-xs font-medium hover:underline"
-        >
-          <Folder size={14} /> + Ordner
-        </button>
+    <div>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
           type="button"
           onClick={() => uploadRef.current?.click()}
-          className="flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-medium"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+          className="flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold"
+          style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
         >
-          <FileText size={14} /> + Dokument
+          <FileText size={16} /> + Dokument
         </button>
+        <button
+          type="button"
+          onClick={() => addFolder(null)}
+          className="flex h-11 items-center justify-center gap-2 rounded-md border px-5 text-sm font-semibold"
+          style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}
+        >
+          <Folder size={16} /> + Ordner
+        </button>
+        <label className="relative sm:ml-auto sm:w-[360px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={17} />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Dokumente durchsuchen …"
+            aria-label="Dokumente durchsuchen"
+            className="h-11 w-full rounded-md border bg-transparent pl-10 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted) / 0.45)" }}
+          />
+        </label>
         <input
           ref={uploadRef}
           type="file"
@@ -904,7 +940,10 @@ export function FileBrowser({ project }: Props) {
         />
       </div>
 
-      <div className="pt-3">
+      <div className="rounded-md border p-4 sm:p-5" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+        <div className="mb-3 border-b pb-3 text-sm font-medium" style={{ borderColor: "hsl(var(--hairline))" }}>
+          Alle Dokumente
+        </div>
         {draggingFromFolder && (
           <div
             onDragOver={(event) => {
@@ -940,9 +979,28 @@ export function FileBrowser({ project }: Props) {
           <p className="py-8 text-center text-sm text-muted-foreground">
             Noch keine Dokumente. Lege einen Ordner an oder füge ein PDF, JPG oder PNG hinzu.
           </p>
+        ) : visibleNodeIds?.size === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Keine passenden Dokumente gefunden.</p>
         ) : (
           renderGroup(null, new Set(), true)
         )}
+        <button
+          type="button"
+          onClick={() => uploadRef.current?.click()}
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            if (!event.dataTransfer.files.length) return;
+            event.preventDefault();
+            uploadDocuments(event.dataTransfer.files);
+          }}
+          className="mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-md border border-dashed px-4 text-sm text-muted-foreground transition-colors hover:bg-muted/30"
+          style={{ borderColor: "hsl(var(--accent-gold) / 0.45)" }}
+        >
+          <UploadCloud size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+          Dokumente hier ablegen oder <span className="font-semibold" style={{ color: "hsl(var(--accent-gold))" }}>hinzufügen</span>
+        </button>
       </div>
 
       <Dialog open={Boolean(movingNode)} onOpenChange={(open) => { if (!open) closeMoveDialog(); }}>
