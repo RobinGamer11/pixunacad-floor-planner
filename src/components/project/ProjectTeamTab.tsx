@@ -121,10 +121,15 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         .includes(term));
   }, [people, query]);
 
-  const invitedIds = new Set(invites.pending.map((i) => i.invitee_id));
-  const available = net.contacts.filter((c) => !people.some((p) => p.person.id === c.id) && !invitedIds.has(c.id));
+  const available = net.contacts.filter((c) => !people.some((p) => p.person.id === c.id));
 
-  const nameOf = (id: string) => net.peopleById.get(id)?.name ?? "Unbekannt";
+  /** Mitglied über den bestehenden Weg (`project_members`) aufnehmen. */
+  const addMember = async (userId: string, role: AssignableRole, perms: ProjectPermissionOverrides) => {
+    await net.addMember(projectId, userId);
+    if (role !== "member") await net.setMemberRole(projectId, userId, role);
+    if (Object.keys(perms).length > 0) await net.setMemberPermissions(projectId, userId, perms);
+  };
+
 
   useEffect(() => {
     if (!menuFor) return;
