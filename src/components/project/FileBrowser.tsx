@@ -212,6 +212,8 @@ export function FileBrowser({ project }: Props) {
   const nodes = useMemo(() => project.files ?? [], [project.files]);
   const [query, setQuery] = useState("");
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<string>>(() => new Set());
+  /** Aktuell geöffneter Ordner (Pfadnavigation wie in der Vorlage). */
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [movingId, setMovingId] = useState<string | null>(null);
@@ -285,6 +287,26 @@ export function FileBrowser({ project }: Props) {
     return names.join(" / ");
   };
 
+  /** Pfad des aktuell geöffneten Ordners für die Pfadleiste. */
+  const trail = useMemo(() => {
+    const out: FileNode[] = [];
+    const visited = new Set<string>();
+    let id: string | null = currentFolderId;
+    while (id && !visited.has(id)) {
+      visited.add(id);
+      const node = nodesById.get(id);
+      if (!node) break;
+      out.unshift(node);
+      id = node.parentId ?? null;
+    }
+    return out;
+  }, [currentFolderId, nodesById]);
+
+  // Gelöschter oder verschobener Ordner: sauber zurück auf die oberste Ebene.
+  useEffect(() => {
+    if (currentFolderId && !nodesById.has(currentFolderId)) setCurrentFolderId(null);
+  }, [currentFolderId, nodesById]);
+
   const activateDropTarget = (next: DropTarget) => {
     setDropTarget((current) => sameDropTarget(current, next) ? current : next);
   };
@@ -335,7 +357,7 @@ export function FileBrowser({ project }: Props) {
       if (!isAcceptedDocument(file)) continue;
       const reader = new FileReader();
       reader.onload = () => {
-        const nodeId = projectStore.addFile(project.id, "files", null, {
+        const nodeId = projectStore.addFile(project.id, "files", currentFolderId, {
           name: file.name,
           dataUrl: String(reader.result),
           mimeType: documentMimeType(file),
@@ -616,7 +638,8 @@ export function FileBrowser({ project }: Props) {
       <ul>
         {group.folders.map((folder, index) => {
           if (ancestors.has(folder.id)) return null;
-          const expanded = Boolean(visibleNodeIds) || expandedFolderIds.has(folder.id);
+          // Ohne Suche wird navigiert (Pfadleiste), bei Suche flach aufgeklappt.
+          const expanded = Boolean(visibleNodeIds);
           const folderDropActive = dropTarget?.mode === "inside" && dropTarget.folderId === folder.id;
           const nextAncestors = new Set(ancestors).add(folder.id);
 
@@ -667,17 +690,14 @@ export function FileBrowser({ project }: Props) {
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => toggleFolder(folder.id)}
-                          aria-expanded={expanded}
-                          aria-controls={`document-folder-${folder.id}`}
-                          aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
+                          onClick={() => openFolder(folder.id)}
+                          aria-label={`${folder.name} öffnen`}
                           className="flex shrink-0 items-center gap-2"
                         >
-                          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                           {expanded ? (
-                            <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                            <FolderOpen size={22} style={{ color: "hsl(var(--accent-gold))" }} />
                           ) : (
-                            <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                            <Folder size={22} style={{ color: "hsl(var(--accent-gold))" }} />
                           )}
                         </button>
                         <input
@@ -697,19 +717,20 @@ export function FileBrowser({ project }: Props) {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => toggleFolder(folder.id)}
-                        aria-expanded={expanded}
-                        aria-controls={`document-folder-${folder.id}`}
-                        aria-label={`${folder.name} ${expanded ? "einklappen" : "ausklappen"}`}
-                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                        onClick={() => openFolder(folder.id)}
+                        aria-label={`${folder.name} öffnen`}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       >
-                        {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         {expanded ? (
-                          <FolderOpen size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          <FolderOpen size={26} style={{ color: "hsl(var(--accent-gold))" }} />
                         ) : (
-                          <Folder size={18} style={{ color: "hsl(var(--accent-gold))" }} />
+                          <Folder size={26} style={{ color: "hsl(var(--accent-gold))" }} />
                         )}
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{folder.name}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-semibold">{folder.name}</span>
+                          <span className="block text-[11px] text-muted-foreground">Ordner</span>
+                        </span>
+                        <ChevronRight size={16} className="shrink-0 text-muted-foreground" />
                       </button>
                     )}
                   </div>
