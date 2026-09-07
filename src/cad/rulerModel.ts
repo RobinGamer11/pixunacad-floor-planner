@@ -76,3 +76,19 @@ export function snapRulerPoint(app: any, input: any): { x: number; y: number; sn
   } catch { /* Fangsystem optional */ }
   return { ...raw, snapped: false };
 }
+
+/**
+ * Shift-Fang: hält das Lineal auf 0°, 45°, 90°, 135°, 180° … relativ zum
+ * Anfangspunkt. Die Länge bleibt dabei erhalten.
+ */
+export function constrainRulerAngle(
+  anchor: { x: number; y: number },
+  p: { x: number; y: number }
+): { x: number; y: number } {
+  const dx = p.x - anchor.x, dy = p.y - anchor.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-9) return { x: p.x, y: p.y };
+  const step = Math.PI / 4;
+  const ang = Math.round(Math.atan2(dy, dx) / step) * step;
+  return { x: anchor.x + Math.cos(ang) * len, y: anchor.y + Math.sin(ang) * len };
+}
