@@ -290,7 +290,19 @@ export interface Project {
   bauherr?: string;
   projektTyp?: string;
   status?: string;
+  /** Anzeigetext des Erstellungsdatums (Altbestand). */
   erstelltAm?: string;
+  /** Festes Erstellungsdatum (ISO) – nicht manuell veränderbar. */
+  createdAtIso?: string;
+  /* Projektadresse in Einzelfeldern; `ort` bleibt die zusammengesetzte Adresse. */
+  adrStrasse?: string;
+  adrHausnummer?: string;
+  adrPlz?: string;
+  adrOrt?: string;
+  adrLand?: string;
+  /** Projektzeitraum (ISO "YYYY-MM-DD"), beide Angaben optional. */
+  projektStart?: string;
+  projektEnde?: string;
   updatedAt: string;
   favorite?: boolean;
   pages: ProjectPage[];
