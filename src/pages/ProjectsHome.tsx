@@ -98,7 +98,6 @@ type Tab = "uebersicht" | "aufgaben" | "finanzen" | "dokumente" | "team";
 export default function ProjectsHome() {
   const projects = useProjects();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
   const [mode, setMode] = useState<"projects" | "templates">("projects");
   const visibleProjects = useMemo(
     () => projects.filter((p) => (mode === "templates" ? p.isTemplate : !p.isTemplate)),
@@ -865,7 +864,9 @@ export default function ProjectsHome() {
               <AuroraBackground />
               <div className="relative px-10 py-7">
                 <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "#F3F6FF" }}>
-                  Hauptseite
+                  {isPlaceholderName(profile.name) || !profile.name.trim()
+                    ? "Willkommen"
+                    : `Willkommen ${profile.name.trim()}`}
                 </h1>
 
                 {/* Platzhalter für das kommende Tutorial-Video (noch ausgegraut) */}
@@ -2506,7 +2507,17 @@ const ALL_STATUS: ProfileStatus[] = ["online", "away", "busy", "offline"];
  * Gemeinsamer Profil-Editor für das Kopf-Dropdown und die Netzwerk-Seite.
  * Beide schreiben in denselben Store, dadurch sind sie immer synchron.
  */
-function ProfileEditor({ profile, projectCount }: { profile: UserProfile; projectCount: number }) {
+function ProfileEditor({
+  profile,
+  projectCount,
+  showSignOut,
+}: {
+  profile: UserProfile;
+  projectCount: number;
+  /** Abmelden nur im Profilfenster der Kopfzeile anbieten. */
+  showSignOut?: boolean;
+}) {
+  const { signOut } = useAuth();
   return (
     <>
       <div className="flex items-center gap-4">
@@ -2588,6 +2599,20 @@ function ProfileEditor({ profile, projectCount }: { profile: UserProfile; projec
           {projectCount} / {MAX_PROJECTS}
         </span>
       </div>
+      {showSignOut && (
+        <button
+          onClick={async () => {
+            await signOut();
+            // Ein Neuladen verhindert, dass Daten des vorherigen Kontos im
+            // Arbeitsspeicher sichtbar bleiben.
+            window.location.assign("/login");
+          }}
+          className="mt-3 h-9 w-full rounded-md border text-sm flex items-center justify-center gap-2 hover:bg-muted"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <LogOut size={14} /> Abmelden
+        </button>
+      )}
     </>
   );
 }
@@ -2623,42 +2648,6 @@ const popupStyle: React.CSSProperties = {
   boxShadow: "0 18px 48px rgba(0,0,0,0.18)",
 };
 
-/** Münzen-Popup – Kaufoptionen sind vorbereitet, aber deaktiviert. */
-function CoinsPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
-  const pos = useAnchorPos(anchor, 288);
-  return (
-    <div
-      className="fixed z-[60] w-72 rounded-xl p-4"
-      style={{ ...popupStyle, top: pos.top, left: pos.left }}
-    >
-      <div className="flex items-center gap-2">
-        <Coins size={16} className="text-muted-foreground" />
-        <span className="text-sm font-semibold">Münzen</span>
-        <span className="ml-auto text-sm font-semibold">26</span>
-      </div>
-      <div className="mt-3 opacity-40 pointer-events-none select-none">
-        <button
-          className="w-full h-9 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          disabled
-        >
-          <Plus size={13} /> Coins
-        </button>
-        <div
-          className="mt-3 rounded-lg p-3 text-xs space-y-1"
-          style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
-        >
-          <div className="font-medium">Währungsumrechner</div>
-          <div className="text-muted-foreground">1 Coin = 1,50 €</div>
-          <div className="text-muted-foreground">10 Coins = 15,00 €</div>
-        </div>
-      </div>
-      <p className="mt-3 text-[11px] text-muted-foreground">Kauf von Coins ist bald verfügbar.</p>
-    </div>
-  );
-}
-
-/** Shop-Popup – Abos und Einzelkapazitäten, vollständig ausgegraut. */
 function ShopPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
   const pos = useAnchorPos(anchor, 320);
   const items = [
