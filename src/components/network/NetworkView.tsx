@@ -90,7 +90,7 @@ export function NetworkView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [net.ready, myStatus]);
 
-  const [tab, setTab] = useState<TabId>("teams");
+  const [tab, setTab] = useState<TabId>("contacts");
   const [addOpen, setAddOpen] = useState(false);
   const [addEmail, setAddEmail] = useState("");
   const [addBusy, setAddBusy] = useState(false);
