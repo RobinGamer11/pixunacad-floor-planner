@@ -66,6 +66,8 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
     scene.rulerGuide = {
       a: { x: data.rulerGuide.a.x, y: data.rulerGuide.a.y },
       b: { x: data.rulerGuide.b.x, y: data.rulerGuide.b.y },
+      side: rulerSideOf(data.rulerGuide),
+      unit: rulerUnitOf(data.rulerGuide),
     };
   }
   for (const s of data.segments || []) {
