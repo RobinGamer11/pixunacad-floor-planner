@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
+import { AccountProfileSync } from "@/components/auth/AccountProfileSync";
 import { WorkspaceSyncProvider } from "@/lib/workspaceSync";
 import { ProjectAccessProvider } from "@/lib/projectAccessProvider";
 import LegalGearButton from "@/components/legal/LegalMenu";
@@ -39,6 +40,7 @@ function RequireAuth() {
   return (
     <WorkspaceSyncProvider>
       <ProjectAccessProvider>
+        <AccountProfileSync />
         <Outlet />
         <LegalGearButton />
       </ProjectAccessProvider>
