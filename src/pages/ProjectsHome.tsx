@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LegalMenuPopover } from "@/components/legal/LegalMenu";
 import { useNavigate } from "react-router-dom";
 import {
+  ChevronUp,
   Plus,
   Search,
   Settings,
