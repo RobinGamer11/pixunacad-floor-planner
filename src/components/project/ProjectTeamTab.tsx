@@ -429,7 +429,7 @@ function AddMemberDialog({
           </select>
           {available.length === 0 && (
             <span className="mt-1 block text-xs text-muted-foreground">
-              Alle Kontakte sind bereits im Projekt oder eingeladen.
+              Alle Kontakte sind bereits im Projekt.
             </span>
           )}
         </label>
