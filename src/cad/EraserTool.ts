@@ -532,8 +532,9 @@ export class EraserTool {
 
 
 
+    const rOut = mode === "smooth" ? r * (1 + soft) : r;
     if (mode === "smooth") {
-      const g = ctx.createRadialGradient(c.x, c.y, r * (1 - soft), c.x, c.y, r);
+      const g = ctx.createRadialGradient(c.x, c.y, rOut * Math.pow(1 - soft, 2) * 0.6, c.x, c.y, rOut);
       g.addColorStop(0, "rgba(77,163,255,0.28)");
       g.addColorStop(1, "rgba(77,163,255,0)");
       ctx.fillStyle = g;
@@ -543,9 +544,10 @@ export class EraserTool {
     ctx.strokeStyle = "rgba(77,163,255,0.65)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+    ctx.arc(c.x, c.y, rOut, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+
     ctx.restore();
   }
 }
