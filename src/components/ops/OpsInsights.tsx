@@ -126,7 +126,7 @@ export function MiniPie({
       <circle
         cx={C}
         cy={C}
-        r={36}
+        r={Math.max(28, R * 0.46)}
         fill="hsl(var(--surface-card))"
         style={{ cursor: onCenter ? "pointer" : "default" }}
         onClick={() => onCenter?.()}
