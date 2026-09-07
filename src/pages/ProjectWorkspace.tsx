@@ -1716,7 +1716,7 @@ export default function ProjectWorkspace() {
                   />
                 );
               })}
-            </div>
+            </RailFlyout>
           )}
         </div>
         <div className="relative w-full flex justify-center">
