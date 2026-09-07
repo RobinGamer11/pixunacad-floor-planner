@@ -779,7 +779,7 @@ export function FileBrowser({ project }: Props) {
 
         {group.files.length > 0 && (
           <li>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            <div>
               {group.files.map((file) => {
                 const dropActive = dropTarget?.mode === "before"
                   && dropTarget.kind === "file"
@@ -825,7 +825,7 @@ export function FileBrowser({ project }: Props) {
                     onKeyDown={(event) => {
                       if (event.key === "Enter" && event.target === event.currentTarget) setViewingId(file.id);
                     }}
-                    className="flex cursor-pointer flex-col gap-1.5 rounded-md border p-2"
+                    className="group flex min-h-16 cursor-pointer items-center gap-3 border-b px-2 py-2.5 transition-colors hover:bg-muted/30"
                     style={{
                       touchAction: "pan-y",
                       opacity: draggingId === file.id ? 0.45 : 1,
@@ -833,7 +833,7 @@ export function FileBrowser({ project }: Props) {
                       background: dropActive ? "hsla(38, 45%, 70%, 0.25)" : undefined,
                     }}
                   >
-                    <div className="w-full" aria-hidden="true">
+                    <div className="h-12 w-16 shrink-0 overflow-hidden rounded-sm" aria-hidden="true">
                       <DocumentPreview node={file} />
                     </div>
 
@@ -848,15 +848,19 @@ export function FileBrowser({ project }: Props) {
                           if (event.key === "Enter") finishRename(file);
                           if (event.key === "Escape") setRenamingId(null);
                         }}
-                        className="w-full border-b bg-transparent text-xs outline-none"
+                        className="min-w-0 flex-1 border-b bg-transparent text-sm outline-none"
                         style={{ borderColor: "hsl(var(--hairline))" }}
                       />
                     ) : (
-                      <div className="break-words text-xs leading-4" title={file.name}>{file.name}</div>
+                      <div className="min-w-0 flex-1" title={file.name}>
+                        <div className="truncate text-sm font-semibold">{file.name}</div>
+                        <div className="mt-0.5 text-[11px] text-muted-foreground">
+                          {(isPdf(file) ? "PDF" : isImage(file) ? "Bild" : "Dokument")}{humanSize(file.sizeBytes) ? ` · ${humanSize(file.sizeBytes)}` : ""}
+                        </div>
+                      </div>
                     )}
-                    <div className="text-[10px] text-muted-foreground">{humanSize(file.sizeBytes)}</div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                    <div className="ml-auto flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] opacity-70 transition-opacity group-hover:opacity-100">
                       <button type="button" onClick={() => startRename(file)} className="hover:underline">Umbenennen</button>
                       {file.dataUrl && (
                         <a href={file.dataUrl} download={file.name} className="hover:underline">Herunterladen</a>
