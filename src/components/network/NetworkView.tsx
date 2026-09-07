@@ -296,18 +296,30 @@ export function NetworkView({
 
 
       {net.error && (
-        <div className="mt-4 rounded-lg border p-3 text-xs" style={{ ...surface, borderColor: "hsl(0 70% 55% / 0.4)" }}>
-          {net.error}
+        <div className="mt-5 rounded-xl border p-4 text-sm flex flex-wrap items-center gap-3"
+             style={{ ...surface, borderColor: "hsl(0 70% 55% / 0.4)" }}>
+          <span className="flex-1 min-w-[200px]">{net.error}</span>
+          <button
+            onClick={() => net.reload()}
+            className="h-11 min-h-[44px] px-4 rounded-xl border text-sm font-medium"
+            style={{ borderColor: "hsl(var(--accent-gold))" }}
+          >
+            Erneut laden
+          </button>
         </div>
       )}
 
       {/* Netzwerk ist ein vollwertiger Hauptbereich – volle Contentbreite, einspaltig auf Mobil. */}
       <div
-        className={`mt-4 grid gap-4 grid-cols-1 ${chat ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]" : ""}`}
+        className={`mt-5 grid gap-5 grid-cols-1 ${chat ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]" : ""}`}
       >
 
-        <div className="rounded-xl border p-3" style={surface}>
-          {net.loading && <div className="p-6 text-center text-sm text-muted-foreground">Netzwerk wird geladen …</div>}
+        <div className="min-w-0">
+          {net.loading && (
+            <div className="rounded-2xl border p-8 text-center text-sm text-muted-foreground" style={surface}>
+              Netzwerk wird geladen …
+            </div>
+          )}
 
           {!net.loading && tab === "contacts" && (
             <PeopleTab
@@ -327,88 +339,89 @@ export function NetworkView({
           )}
 
           {!net.loading && tab === "teams" && (
-            <ProjectsTab
-              projects={visibleProjects}
-              membersOf={membersOf}
-              memberRow={memberRow}
-              canManageProject={canManageProject}
-              ownerLabel={(id) => ownerOf(id).label}
-              contacts={net.contacts}
-              peopleNames={peopleNameMap}
-              unread={unread}
-              onOpenChat={(p) => openProject(p)}
-              onAddMember={(projectId, userId) => void net.addMember(projectId, userId)}
-              onRemoveMember={(projectId, userId) => void net.removeMember(projectId, userId)}
-              onSetRole={(projectId, userId, role) => void net.setMemberRole(projectId, userId, role)}
-              onSetPermissions={(projectId, userId, o) => void net.setMemberPermissions(projectId, userId, o)}
-            />
+            <div className="rounded-2xl border p-4 sm:p-5" style={surface}>
+              <ProjectsTab
+                projects={visibleProjects}
+                membersOf={membersOf}
+                memberRow={memberRow}
+                canManageProject={canManageProject}
+                ownerLabel={(id) => ownerOf(id).label}
+                contacts={net.contacts}
+                peopleNames={peopleNameMap}
+                unread={unread}
+                onOpenChat={(p) => openProject(p)}
+                onAddMember={(projectId, userId) => void net.addMember(projectId, userId)}
+                onRemoveMember={(projectId, userId) => void net.removeMember(projectId, userId)}
+                onSetRole={(projectId, userId, role) => void net.setMemberRole(projectId, userId, role)}
+                onSetPermissions={(projectId, userId, o) => void net.setMemberPermissions(projectId, userId, o)}
+              />
+            </div>
           )}
 
 
           {!net.loading && tab === "requests" && (
-            <div className="space-y-4">
-              <button
-                onClick={() => { setAddOpen(true); setAddEmail(""); setAddHint(null); setAddFound(null); }}
-                className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2"
-                style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
-              >
-                <UserPlus size={15} /> Freund hinzufügen
-              </button>
-
-              <div>
-                <div className="text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground">
-                  Eingehende Anfragen
-                </div>
+            <div className="grid gap-5 grid-cols-1 lg:grid-cols-2">
+              <div className="rounded-2xl border p-4 sm:p-5" style={surface}>
+                <div className="text-xl font-semibold tracking-tight">Eingegangen</div>
                 {net.incoming.length === 0 ? (
-                  <div className="mt-1 px-2 py-1.5 text-[11px] text-muted-foreground">Keine offenen Anfragen.</div>
+                  <div className="mt-4 text-sm text-muted-foreground">Keine offenen Anfragen.</div>
                 ) : (
-                  net.incoming.map((r) => (
-                    <div key={r.contactId} className="flex items-center gap-2.5 px-2 py-1.5">
-                      <Avatar name={r.person.display_name} url={r.person.avatar_url} />
-                      <span className="flex-1 min-w-0 text-sm font-medium truncate">
-                        {r.person.display_name || "Unbekannt"}
-                      </span>
-                      <button
-                        onClick={() => net.acceptRequest(r.contactId)}
-                        className="h-7 px-2 rounded-md border text-xs flex items-center gap-1"
-                        style={{ borderColor: "hsl(140 60% 45%)", color: "hsl(140 60% 40%)" }}
-                      >
-                        <Check size={13} /> Annehmen
-                      </button>
-                      <button
-                        onClick={() => net.declineRequest(r.contactId)}
-                        className="h-7 px-2 rounded-md border text-xs flex items-center gap-1"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                      >
-                        <X size={13} /> Ablehnen
-                      </button>
-                    </div>
-                  ))
+                  <div className="mt-4 space-y-2.5">
+                    {net.incoming.map((r) => (
+                      <div key={r.contactId}
+                           className="rounded-xl border p-3 flex flex-wrap items-center gap-3"
+                           style={{ borderColor: "hsl(var(--hairline))" }}>
+                        <Avatar name={r.person.display_name} url={r.person.avatar_url} size={44} />
+                        <span className="flex-1 min-w-[120px] text-base font-medium truncate">
+                          {r.person.display_name || "Unbekannt"}
+                        </span>
+                        <button
+                          onClick={() => net.acceptRequest(r.contactId)}
+                          className="h-11 min-h-[44px] px-4 rounded-xl border text-sm font-medium flex items-center gap-1.5"
+                          style={{ borderColor: "hsl(140 60% 45%)", color: "hsl(140 60% 40%)" }}
+                        >
+                          <Check size={16} /> Annehmen
+                        </button>
+                        <button
+                          onClick={() => net.declineRequest(r.contactId)}
+                          className="h-11 min-h-[44px] px-4 rounded-xl border text-sm flex items-center gap-1.5"
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                        >
+                          <X size={16} /> Ablehnen
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
-              {net.outgoing.length > 0 && (
-                <div>
-                  <div className="text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground">
-                    Gesendete Anfragen
+              <div className="rounded-2xl border p-4 sm:p-5" style={surface}>
+                <div className="text-xl font-semibold tracking-tight">Gesendet</div>
+                {net.outgoing.length === 0 ? (
+                  <div className="mt-4 text-sm text-muted-foreground">Keine gesendeten Anfragen.</div>
+                ) : (
+                  <div className="mt-4 space-y-2.5">
+                    {net.outgoing.map((r) => (
+                      <div key={r.contactId}
+                           className="rounded-xl border p-3 flex flex-wrap items-center gap-3"
+                           style={{ borderColor: "hsl(var(--hairline))" }}>
+                        <Avatar name={r.person.display_name} url={r.person.avatar_url} size={44} />
+                        <span className="flex-1 min-w-[120px] text-base truncate">{r.person.display_name || "Unbekannt"}</span>
+                        <button
+                          onClick={() => net.declineRequest(r.contactId)}
+                          className="h-11 min-h-[44px] px-4 rounded-xl border text-sm"
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                        >
+                          Zurückziehen
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  {net.outgoing.map((r) => (
-                    <div key={r.contactId} className="flex items-center gap-2.5 px-2 py-1.5">
-                      <Avatar name={r.person.display_name} url={r.person.avatar_url} />
-                      <span className="flex-1 min-w-0 text-sm truncate">{r.person.display_name || "Unbekannt"}</span>
-                      <button
-                        onClick={() => net.declineRequest(r.contactId)}
-                        className="h-7 px-2 rounded-md border text-xs"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                      >
-                        Zurückziehen
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
+
 
         </div>
 
