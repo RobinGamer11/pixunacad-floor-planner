@@ -3140,7 +3140,7 @@ export class MiniCad {
       this._emitExternalDocChanges();
 
       this.renderer.render();
-      this.globalGuides.draw(this.dom.ctx, this.camera, this.renderer.vw, this.renderer.vh);
+      this.globalGuides.draw(this.renderer.ctx, this.camera, this.renderer.vw, this.renderer.vh);
       // Tablet-Hilfsrad: gelber Visierpunkt an der vorgemerkten Position
       // (identische Logik wie in der eigenständigen CAD-Oberfläche).
       drawPendingPointHint(this.renderer.ctx, this.input.mouse.sx, this.input.mouse.sy);
