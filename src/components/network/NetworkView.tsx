@@ -842,18 +842,6 @@ export function NetworkView({
 
 
 
-
-          {!net.loading && tab === "devices" && (
-            <DevicesTab projectNames={projectNameMap} peopleById={peopleNameMap} />
-          )}
-
-          {!net.loading && tab === "comments" && (
-            <CommentsTab
-              projects={Array.from(projectNameMap.entries()).map(([id, name]) => ({ id, name }))}
-              peopleById={peopleNameMap}
-              initialProjectId={commentsProject}
-            />
-          )}
         </div>
 
         {chat && (
