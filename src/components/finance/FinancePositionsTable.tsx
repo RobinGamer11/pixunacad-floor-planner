@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import React, { useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+
 import { GripVertical, Trash2, Calendar, FileText, ChevronUp, ChevronDown } from "lucide-react";
 import {
   financeStore, formatEur, parseEur, templateKeyOf,
