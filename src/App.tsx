@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { AccountProfileSync } from "@/components/auth/AccountProfileSync";
 import { WorkspaceSyncProvider } from "@/lib/workspaceSync";
 import { ProjectAccessProvider } from "@/lib/projectAccessProvider";
-import LegalGearButton from "@/components/legal/LegalMenu";
 import ProjectsHome from "./pages/ProjectsHome";
 import Login from "./pages/Login";
 import ProjectWorkspace from "./pages/ProjectWorkspace";
@@ -42,7 +41,6 @@ function RequireAuth() {
       <ProjectAccessProvider>
         <AccountProfileSync />
         <Outlet />
-        <LegalGearButton />
       </ProjectAccessProvider>
     </WorkspaceSyncProvider>
   );
