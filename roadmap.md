@@ -1,5 +1,10 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Aktuelle Oberflächenanpassung
+- [ ] Mehr Abstand zwischen Reiterkopf und Inhalt
+- [ ] Organisations-Ansichtsauswahl direkt über der gewählten Ansicht
+- [ ] Dokumente-Reiter als klare Dokumentenliste mit Suche und vorhandenen Aktionen
+
 ## Schritt 1 – Gemeinsamer Projektzugriff und Rollen
 - [x] Migration `db/migrations/20260831093000_project_access.sql` (Rollen, Overrides, `project_documents`, RLS, Guard-Trigger, RPC `save_project_document`)
 - [x] Client-Rechte-Layer `src/lib/projectAccess.ts` (+ Hooks)
