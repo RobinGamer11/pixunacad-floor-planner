@@ -819,14 +819,17 @@
   }
 
   .sheet-icon-btn {
-    @apply rounded border bg-transparent flex items-center justify-center;
-    width: 22px;
-    height: 22px;
+    @apply border bg-transparent flex items-center justify-center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
     padding: 0;
-    color: hsl(var(--foreground));
+    font-size: 12.5px;
+    line-height: 1;
+    color: hsl(var(--muted-foreground));
     border-color: hsl(var(--border));
     cursor: pointer;
-    transition: background-color 0.12s ease, border-color 0.12s ease;
+    transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
   }
   .sheet-icon-btn:hover:not(:disabled) {
     background: hsl(var(--accent));
