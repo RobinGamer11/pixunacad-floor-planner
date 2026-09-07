@@ -379,6 +379,28 @@ export function OpsOverview({
   const activeFilterCount = Object.entries(filters).filter(([, v]) => v).length;
   const viewLabel = OPS_VIEWS.find((v) => v.id === view)?.label ?? "Organisation";
 
+  /** Alle wirksamen Einschränkungen – auch Zeitraum und Projektauswahl. */
+  const hiddenProjectCount = fixedProjectId ? 0 : hiddenProjects.size;
+  const anyFilterActive =
+    activeFilterCount > 0 || !!selectedDate || hiddenProjectCount > 0 || !showItems || !showTimes;
+  const resetAllFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    setSelectedDate(undefined);
+    setActiveIds(new Set(opsProjectIds));
+    setShowItems(true);
+    setShowTimes(true);
+  };
+  const resetButton = anyFilterActive ? (
+    <button
+      type="button"
+      onClick={resetAllFilters}
+      className="h-12 min-w-[44px] rounded-xl border px-5 text-sm font-semibold shadow-sm transition hover:opacity-90"
+      style={{ borderColor: GOLD, background: "hsl(var(--accent-gold) / 0.18)", color: "hsl(var(--ink))" }}
+    >
+      Filter zurücksetzen
+    </button>
+  ) : null;
+
   const taxonomyProject = taxonomy?.projectId ?? fixedProjectId;
 
   /* ------------------------------------------------------------------- UI */
@@ -386,35 +408,38 @@ export function OpsOverview({
   return (
     <div className={className}>
       {/* 1. Kopfbereich */}
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="min-w-0">
-          {showHeader && (
-            <div className="text-[11px] uppercase tracking-widest" style={{ color: SOFT }}>
-              {title}{subtitle ? ` · ${subtitle}` : ""}
-            </div>
-          )}
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{viewLabel}</h1>
-          <div className="text-[11px]" style={{ color: SOFT }}>
-            Beiträge, Zeiten und Termine auf einen Blick.
+      <div className="mb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="min-w-0">
+            {showHeader && (
+              <>
+                <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{title}</h1>
+                {subtitle && <p className="mt-1.5 text-sm text-muted-foreground">{subtitle}</p>}
+              </>
+            )}
+            <div className={`${showHeader ? "mt-5" : ""} text-base font-medium`}>{viewLabel}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+            <select
+              className={`${inputCls} h-12 min-w-[170px]`}
+              value={view}
+              onChange={(e) => setView(e.target.value as OpsView)}
+              title="Ansicht wählen"
+              aria-label="Ansicht"
+            >
+              {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+            </select>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <OpsActionBar
             projects={projects}
             fixedProjectId={fixedProjectId}
             onChanged={() => setOpsNonce((n) => n + 1)}
           />
-          <select
-            className={`${inputCls} min-w-[150px]`}
-            value={view}
-            onChange={(e) => setView(e.target.value as OpsView)}
-            title="Ansicht wählen"
-            aria-label="Ansicht"
-          >
-            {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-          </select>
         </div>
       </div>
+
 
       {/* 2. Hauptansicht */}
       <div ref={viewRef} className="mb-5 rounded-xl border p-2 sm:p-3"
