@@ -73,6 +73,7 @@ import { FileBrowser } from "@/components/project/FileBrowser";
 import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverview";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { isPlaceholderName } from "@/lib/accountProfile";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 import { NetworkView } from "@/components/network/NetworkView";
 import { OpsActionBar } from "@/components/ops/OpsActionBar";
@@ -524,6 +525,56 @@ export default function ProjectsHome() {
 
 
 
+      {creatingFolder && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onMouseDown={() => { setCreatingFolder(false); setNewFolderName(""); }}
+        >
+          <div
+            role="dialog"
+            aria-label="Neuen Ordner anlegen"
+            className="w-full max-w-sm rounded-xl border p-5 shadow-xl"
+            style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <FolderIcon size={15} style={{ color: "hsl(var(--accent-gold))" }} />
+              Neuen Ordner anlegen
+            </div>
+            <input
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitNewFolder();
+                if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+              }}
+              placeholder="Ordnername"
+              className="mt-4 h-10 w-full rounded-md border bg-transparent px-3 text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}
+                className="h-9 px-4 rounded-md border text-sm hover:bg-muted"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={commitNewFolder}
+                disabled={!newFolderName.trim()}
+                className="h-9 px-4 rounded-md text-sm font-semibold disabled:opacity-50"
+                style={{ background: "hsl(var(--accent-gold))", color: "#1A1A1A" }}
+              >
+                Anlegen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ============= BODY (Left panel + Main) ============= */}
       <div className="flex flex-1 overflow-hidden">
         {leftOpen ? (
@@ -564,12 +615,11 @@ export default function ProjectsHome() {
               </div>
               <button
                 type="button"
-                disabled={creatingFolder}
                 onClick={() => {
                   setCreatingFolder(true);
                   setNewFolderName("");
                 }}
-                aria-expanded={creatingFolder}
+                aria-haspopup="dialog"
                 className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md border text-xs font-semibold transition disabled:cursor-default disabled:opacity-50"
                 style={{
                   background: "hsl(var(--accent-gold) / 0.14)",
@@ -580,36 +630,6 @@ export default function ProjectsHome() {
                 <FolderPlus size={14} style={{ color: "hsl(var(--accent-gold))" }} />
                 + Ordner
               </button>
-              {creatingFolder && (
-                <div
-                  className="flex items-center gap-1 mt-2 rounded-md px-2 py-1"
-                  style={{ background: "rgba(255,255,255,0.05)" }}
-                >
-                  <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
-                  <input
-                    autoFocus
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitNewFolder();
-                      if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
-                    }}
-                    placeholder="Ordnername"
-                    className="flex-1 bg-transparent text-xs outline-none"
-                    style={{ color: "#E6E8EB" }}
-                  />
-                  <button onClick={commitNewFolder} title="Anlegen" style={{ color: "#8A9099" }}>
-                    <Check size={12} />
-                  </button>
-                  <button
-                    onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}
-                    title="Abbrechen"
-                    style={{ color: "#8A9099" }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              )}
             </div>
 
             {folders.length > 0 && (
@@ -815,6 +835,22 @@ export default function ProjectsHome() {
                 ))}
               </div>
             </div>
+            <div className="px-3 pb-2">
+              <button
+                type="button"
+                onClick={() => { setShowAllTasks(false); setHub("trash"); }}
+                className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-xs font-medium transition"
+                style={{
+                  background: hub === "trash" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                  color: hub === "trash" ? "#E6E8EB" : "#B7BCC2",
+                }}
+                title="Gelöschte Projekte wiederherstellen"
+              >
+                <Trash2 size={14} style={{ color: "#8A9099" }} />
+                Projektpapierkorb
+              </button>
+            </div>
+
             {/* Fuß-Zeile mit Einstellungen-Icon */}
             <div
               className="px-4 py-3 flex items-center justify-between"
