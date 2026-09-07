@@ -885,7 +885,7 @@ export default function ProjectsHome() {
             <div className="px-3 pb-2">
               <button
                 type="button"
-                onClick={() => { setShowAllTasks(false); setHub("trash"); }}
+                onClick={() => { setShowAllTasks(false); setHub("trash"); closeSidebarOnCompact(); }}
                 className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-xs font-medium transition"
                 style={{
                   background: hub === "trash" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
