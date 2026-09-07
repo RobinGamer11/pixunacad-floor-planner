@@ -15,6 +15,7 @@ import {
   type FinancePositionType,
 } from "@/lib/financeStore";
 import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
@@ -135,7 +136,8 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
     const node = financeStore.addNode(pid, type, parent);
     if (parent) setExpanded((e) => ({ ...e, [parent!]: true }));
     setSelectedId(node.id);
-    setMobileNavOpen(false);
+    // Auf Tablet und Handy klappt der Strukturbaum sofort auf.
+    setMobileNavOpen(true);
   };
 
   const openNode = (id: string | null) => { setSelectedId(id); setMobileNavOpen(false); };
@@ -180,7 +182,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
     });
 
   /** Strukturspalte – auf großen Bildschirmen fest, sonst als Panel. */
-  const structure = (
+  const structureFor = (showAdd: boolean) => (
     <div className="flex h-full min-h-0 flex-col overflow-hidden"
          style={{ background: "hsl(var(--surface-card))" }}>
       <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -192,6 +194,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         </button>
       </div>
 
+      {showAdd && (
       <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <button onClick={() => addNode("overview")}
           className="w-full h-12 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2"
@@ -208,6 +211,8 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           <Plus size={18} /> Anlage
         </button>
       </div>
+      )}
+
 
       <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="flex items-center gap-1.5 h-11 rounded-md border px-2"
@@ -260,7 +265,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         {leftOpen && (
           <aside className="hidden lg:flex w-[280px] shrink-0 min-h-0 flex-col border-r overflow-hidden"
                  style={{ borderColor: "hsl(var(--hairline))" }}>
-            {structure}
+            {structureFor(true)}
           </aside>
         )}
 
@@ -285,9 +290,16 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b"
                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
             <button onClick={() => setMobileNavOpen((v) => !v)}
-              className="lg:hidden h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium"
-              style={{ borderColor: "hsl(var(--hairline))" }}>
-              <ListTree size={16} /> Struktur
+              aria-expanded={mobileNavOpen}
+              className="lg:hidden order-first basis-full h-14 rounded-xl border-2 flex items-center gap-2 px-4 text-sm font-semibold"
+              style={{
+                borderColor: "hsl(var(--accent-gold))",
+                background: "hsl(var(--accent-gold) / 0.12)",
+                color: "hsl(var(--accent-gold))",
+              }}>
+              <ListTree size={20} />
+              <span className="flex-1 text-left">Strukturbaum</span>
+              {mobileNavOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
             </button>
             {!leftOpen && (
               <button onClick={() => setLeftOpen(true)}
@@ -333,7 +345,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           {mobileNavOpen && (
             <div className="lg:hidden border-b max-h-[70vh] overflow-auto"
                  style={{ borderColor: "hsl(var(--hairline))" }}>
-              {structure}
+              {structureFor(false)}
             </div>
           )}
 
@@ -480,12 +492,16 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
 
       {/* Erhalten = bestehende Belege erfassen; darunter das Anlegen neuer Belege */}
       <div className="space-y-1.5" data-export-hide>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
             <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
-              className="h-9 px-3 rounded-lg border-2 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-muted"
-              style={{ borderColor: "hsl(var(--hairline))" }}>
-              <Plus size={15} /> {label} erhalten
+              className="h-14 px-4 rounded-xl border-2 text-[15px] font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors"
+              style={{
+                borderColor: "hsl(var(--accent-gold))",
+                background: "hsl(var(--accent-gold) / 0.14)",
+                color: "hsl(var(--accent-gold))",
+              }}>
+              <Plus size={20} /> {label} erhalten
             </button>
           ))}
         </div>
@@ -657,11 +673,104 @@ const ProjectView: React.FC<{ projectId: string; state: FinanceState; projectNam
 
 /* ------------------------------------------------- Liste untergeordneter Knoten */
 
+/**
+ * Handy und Tablet: Ordner und Anlagen zeigen nur Name und Betrag.
+ * Ein Tippen öffnet ein Fenster mit den gegliederten Einzelheiten.
+ */
+const MobileNodeList: React.FC<{
+  projectId: string; state: FinanceState; nodes: FinanceNode[]; onSelect: (id: string) => void;
+}> = ({ projectId, state, nodes, onSelect }) => {
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = detailId ? nodes.find((n) => n.id === detailId) ?? null : null;
+  const dt = detail ? nodeTotals(state, detail) : null;
+
+  return (
+    <div className="space-y-2">
+      {nodes.map((n) => {
+        const t = nodeTotals(state, n);
+        return (
+          <button key={n.id} onClick={() => setDetailId(n.id)}
+            className="w-full flex items-center gap-2 rounded-xl border px-3 py-3 text-left"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: "hsl(var(--surface-card))",
+              opacity: n.enabled ? 1 : 0.45,
+            }}>
+            {n.type === "overview"
+              ? <Folder size={16} style={{ color: "hsl(var(--accent-gold))" }} />
+              : <Building2 size={16} style={{ color: "hsl(var(--ink-soft))" }} />}
+            <span className="flex-1 min-w-0 truncate text-sm font-medium">{n.name}</span>
+            <span className="tabular-nums text-sm font-semibold">{formatEur(t.invoices)}</span>
+            <ChevronRight size={16} style={{ color: "hsl(var(--ink-soft))" }} />
+          </button>
+        );
+      })}
+
+      {detail && dt && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+             style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setDetailId(null)}>
+          <div onClick={(e) => e.stopPropagation()}
+               className="w-full sm:max-w-md max-h-[85vh] overflow-auto rounded-t-2xl sm:rounded-2xl border p-4 space-y-3"
+               style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>
+                  {detail.type === "overview" ? "Ordner" : "Anlage"}
+                </div>
+                <div className="text-lg font-semibold truncate">{detail.name}</div>
+              </div>
+              <button onClick={() => setDetailId(null)} className="h-11 w-11 rounded-md flex items-center justify-center">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5 text-sm">
+              <DetailRow label="Kostenschätzung" value={formatEur(dt.estimate)} />
+              <DetailRow label="Angebote" value={formatEur(dt.offers)} />
+              <DetailRow label="Rechnungen" value={formatEur(dt.invoices)} />
+              <DetailRow label="Kontrolle Angebote" value={formatPct(control(dt.estimate, dt.offers).pct)} />
+              <DetailRow label="Kontrolle Rechnungen" value={formatPct(control(dt.estimate, dt.invoices).pct)} />
+            </div>
+
+            {detail.note && (
+              <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{detail.note}</div>
+            )}
+
+            <button
+              onClick={() => financeStore.updateNode(projectId, detail.id, { enabled: !detail.enabled })}
+              className="w-full h-11 rounded-lg border text-sm font-medium flex items-center justify-center gap-2"
+              style={{ borderColor: "hsl(var(--hairline))" }}>
+              {detail.enabled
+                ? <><ToggleRight size={18} style={{ color: "hsl(var(--accent-gold))" }} /> Wird berücksichtigt</>
+                : <><ToggleLeft size={18} /> Wird nicht berücksichtigt</>}
+            </button>
+
+            <button onClick={() => { setDetailId(null); onSelect(detail.id); }}
+              className="w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+              style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}>
+              Öffnen <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DetailRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex items-center gap-2 border-b pb-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+    <span className="flex-1" style={{ color: "hsl(var(--ink-soft))" }}>{label}</span>
+    <span className="tabular-nums font-medium">{value}</span>
+  </div>
+);
+
+
 const ChildList: React.FC<{
   projectId: string; state: FinanceState; nodes: FinanceNode[];
   onSelect: (id: string) => void; deep?: boolean;
 }> = ({ projectId, state, nodes, onSelect }) => {
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const isMobile = useIsMobile();
   if (nodes.length === 0) {
     return (
       <div className="rounded-xl border px-4 py-6 text-xs"
@@ -669,6 +778,9 @@ const ChildList: React.FC<{
         Noch keine Einträge. Lege links „+ Ordner" oder „+ Anlegen" an.
       </div>
     );
+  }
+  if (isMobile) {
+    return <MobileNodeList projectId={projectId} state={state} nodes={nodes} onSelect={onSelect} />;
   }
   return (
     <div className="rounded-xl border overflow-hidden"

@@ -5,7 +5,7 @@ import {
   ChevronLeft,
   Undo2,
   Redo2,
-  Share2,
+  
   Play,
   FolderKanban,
   Compass,
@@ -163,7 +163,7 @@ export function WorkspaceHeader({
 
 
       <div className="shrink-0 w-8 md:flex-1 md:min-w-8" />
-      {/* Right: Undo/Redo · Zoom · Präsentieren · Teilen · Exportieren */}
+      {/* Right: Undo/Redo · Zoom · Präsentieren · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
 
         <button
@@ -220,14 +220,6 @@ export function WorkspaceHeader({
           title="Präsentieren"
         >
           <Play size={13} /> Präsentieren
-        </button>
-        <button
-          disabled
-          className="h-8 px-2.5 rounded-md border text-xs flex items-center gap-1.5 opacity-50 cursor-not-allowed"
-          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
-          title="Teilen — kommt später (wird mit Team-Funktion kombiniert)"
-        >
-          <Share2 size={13} /> Teilen
         </button>
         <button
           onClick={onExport}
