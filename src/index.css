@@ -14,9 +14,9 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 32% 12%;
 
-    --primary: 230 70% 56%;
+    --primary: 32 55% 46%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 230 90% 68%;
+    --primary-glow: 32 60% 58%;
 
     --secondary: 220 18% 92%;
     --secondary-foreground: 222 28% 22%;
@@ -32,7 +32,7 @@
 
     --border: 220 16% 86%;
     --input: 220 16% 86%;
-    --ring: 230 70% 56%;
+    --ring: 32 55% 46%;
 
     --radius: 0.625rem;
 
@@ -93,8 +93,8 @@
     --popover: 222 16% 17%;
     --popover-foreground: 210 20% 95%;
 
-    --primary: 215 90% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary: 38 62% 58%;
+    --primary-foreground: 30 25% 12%;
 
     --secondary: 220 14% 21%;
     --secondary-foreground: 210 20% 90%;
@@ -110,7 +110,7 @@
 
     --border: 220 12% 26%;
     --input: 220 12% 26%;
-    --ring: 215 90% 55%;
+    --ring: 38 62% 58%;
 
     --cad-canvas: 222 16% 15%;
     --cad-toolbar: 222 16% 17%;
@@ -131,7 +131,7 @@
     --cad-settings-bg: 222 16% 17%;
     --cad-tools-bg: 222 16% 17%;
 
-    --primary-glow: 215 90% 66%;
+    --primary-glow: 38 62% 68%;
 
     /* Projektmappen-Tokens im Dunkelmodus – gedämpftes Anthrazit statt Schwarz */
     --surface: 222 18% 13%;

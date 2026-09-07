@@ -8,7 +8,6 @@ import {
   Settings,
   Star,
   FolderKanban,
-  LayoutTemplate,
   Users,
   Trash2,
   Pencil,
@@ -193,21 +192,8 @@ export default function ProjectsHome() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [profileOpen]);
 
-  // "+ Projekt"-Popup (Neu / Vorlage)
-  const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const [newProjectMode, setNewProjectMode] = useState<"choice" | "fromTemplate">("choice");
-  const newProjectRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!newProjectOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!newProjectRef.current?.contains(e.target as Node)) {
-        setNewProjectOpen(false);
-        setNewProjectMode("choice");
-      }
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [newProjectOpen]);
+  // „+ Projekt“ öffnet direkt die Projekteinstellungen (kein Zwischenfenster).
+
 
   // "Vorlage +"-Popup im Vorlagen-Hub
   const [saveAsTplOpen, setSaveAsTplOpen] = useState(false);
@@ -352,18 +338,10 @@ export default function ProjectsHome() {
         className="h-16 shrink-0 flex items-center gap-4 px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
       >
-        <div className="relative" ref={newProjectRef}>
+        <div className="relative">
 
           <button
-            onClick={() => {
-              // Toggle: erneuter Klick schließt das Fenster wieder
-              setNewProjectOpen((v) => {
-                const next = !v;
-                if (!next) setNewProjectMode("choice");
-                return next;
-              });
-              setNewProjectMode("choice");
-            }}
+            onClick={createProject}
             disabled={!canCreateProject}
             className="h-12 px-5 rounded-lg flex items-center gap-2 text-base font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
@@ -371,86 +349,6 @@ export default function ProjectsHome() {
           >
             <Plus size={18} /> Projekt
           </button>
-
-          {newProjectOpen && (
-            <div
-              /* fixed, damit die horizontal scrollbare Kopfzeile nicht abschneidet */
-              className="fixed left-6 top-16 mt-2 w-72 rounded-xl border shadow-lg z-50 p-3"
-              style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
-            >
-              {newProjectMode === "choice" ? (
-                <div className="flex flex-col gap-2">
-                  <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-1" style={{ color: "hsl(var(--ink-soft))" }}>
-                    Neues Projekt
-                  </div>
-                  <button
-                    onClick={() => {
-                      createProject();
-                      setNewProjectOpen(false);
-                      setNewProjectMode("choice");
-                    }}
-                    className="h-10 rounded-md flex items-center gap-2 px-3 text-sm font-medium hover:opacity-90"
-                    style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-                  >
-                    <Plus size={14} /> Neu
-                  </button>
-                  <button
-                    onClick={() => setNewProjectMode("fromTemplate")}
-                    className="h-10 rounded-md flex items-center gap-2 px-3 text-sm font-medium border hover:bg-muted"
-                    style={{ borderColor: "hsl(var(--hairline))" }}
-                  >
-                    <LayoutTemplate size={14} /> Vorlage
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="text-[11px] font-semibold tracking-[0.16em] uppercase px-1 pb-1" style={{ color: "hsl(var(--ink-soft))" }}>
-                    Aus Vorlage
-                  </div>
-                  {(() => {
-                    const tpls = projects.filter((p) => p.isTemplate);
-                    if (tpls.length === 0) {
-                      return (
-                        <div className="text-xs text-muted-foreground p-3 rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
-                          Noch keine Vorlagen vorhanden.
-                        </div>
-                      );
-                    }
-                    return (
-                      <select
-                        autoFocus
-                        defaultValue=""
-                        onChange={(e) => {
-                          const tid = e.target.value;
-                          if (!tid) return;
-                          const id = projectStore.createFromTemplate(tid);
-                          if (id) {
-                            setMode("projects");
-                            setSelectedId(id);
-                          }
-                          setNewProjectOpen(false);
-                          setNewProjectMode("choice");
-                        }}
-                        className="h-10 rounded-md border px-2 text-sm bg-transparent"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                      >
-                        <option value="" disabled>Vorlage wählen…</option>
-                        {tpls.map((t) => (
-                          <option key={t.id} value={t.id}>{t.name}</option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                  <button
-                    onClick={() => setNewProjectMode("choice")}
-                    className="h-8 text-xs text-muted-foreground hover:text-foreground text-left px-1"
-                  >
-                    ← Zurück
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
 
@@ -880,7 +778,7 @@ export default function ProjectsHome() {
                   aria-expanded={legalOpen}
                   className="h-9 w-9 rounded-full flex items-center justify-center"
                   style={{ background: "rgba(255,255,255,0.05)", color: "#B7BCC2" }}
-                  title="Impressum & Datenschutz"
+                  title="Einstellungen"
                 >
                   <Settings size={15} />
                 </button>
@@ -1446,12 +1344,8 @@ function ProfileAvatar({
   const r = size / 2 - stroke;
   const c = 2 * Math.PI * r;
   const initial = (profile.name?.[0] ?? "?").toUpperCase();
-  const statusColor =
-    profile.status === "online"
-      ? "hsl(140 60% 45%)"
-      : profile.status === "busy"
-        ? "hsl(0 70% 55%)"
-        : "hsl(0 0% 65%)";
+  // Einheitliche Statusfarben: Online grün, Abwesend gelb, Beschäftigt rot, Offline grau.
+  const statusColor = statusColorOf(profile.status);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="absolute inset-0 -rotate-90">
@@ -1500,7 +1394,7 @@ function ProfileAvatar({
           background: statusColor,
           borderColor: "hsl(var(--surface-card))",
         }}
-        title={profile.status}
+        title={statusLabelOf(profile.status)}
       />
     </div>
   );
@@ -2615,9 +2509,6 @@ function ProfileEditor({
               />
             </label>
           </div>
-          <div className="mt-1.5 text-[10px] font-semibold whitespace-nowrap" style={{ color: "hsl(var(--ink-soft))" }}>
-            {projectCount} / {MAX_PROJECTS}
-          </div>
         </div>
         <div className="flex-1 min-w-0">
           <input
@@ -2801,7 +2692,23 @@ function TrashView({ activeCount }: { activeCount: number }) {
   const full = activeCount >= MAX_PROJECTS;
   return (
     <div className="px-10 py-7">
-      <h1 className="text-2xl font-semibold tracking-tight">Papierkorb</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Papierkorb</h1>
+        <div className="flex-1" />
+        <button
+          onClick={() => {
+            if (trashed.length === 0) return;
+            if (!confirm(`Alle ${trashed.length} Projekte im Papierkorb endgültig löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`)) return;
+            for (const p of trashed) projectStore.purgeProject(p.id);
+          }}
+          disabled={trashed.length === 0}
+          className="h-9 px-3 rounded-md border text-xs font-medium flex items-center gap-2 disabled:opacity-40"
+          style={{ borderColor: "hsl(0 70% 55% / 0.6)", color: "hsl(0 70% 52%)" }}
+          title="Papierkorb vollständig leeren"
+        >
+          <Trash2 size={14} /> Alle löschen
+        </button>
+      </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Gelöschte Projekte bleiben 30 Tage erhalten und können wiederhergestellt werden.
       </p>
