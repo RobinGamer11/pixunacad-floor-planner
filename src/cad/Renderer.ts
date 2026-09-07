@@ -1,6 +1,7 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
+import { rulerSideOf, rulerUnitOf, unitsPerMeter } from "./rulerModel";
 import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
@@ -73,6 +74,8 @@ export class Renderer {
   labels: LabelManager;
   vw = 1;
   vh = 1;
+  /** Canvas-Pixel je CSS-Pixel (Projektmappe: Export-Renderscale). */
+  uiScale = 1;
   overlay: Overlay | null = null;
   /** Andere Blätter, die als Transparentpause unter der aktiven Scene gezeichnet werden. */
   overlayScenes: { scene: Scene; mode: "stamp" | "tint"; color: string | null; opacity: number }[] = [];
