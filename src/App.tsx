@@ -19,6 +19,15 @@ import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
 
+/**
+ * Die Finanzen liegen jetzt im Reiter „Finanzen“ der Projektstartseite.
+ * Alte Links auf /project/:projectId/finance führen dorthin.
+ */
+function FinanceRedirect() {
+  const { projectId } = useParams<{ projectId: string }>();
+  return <Navigate to={`/?project=${projectId ?? ""}&tab=finanzen`} replace />;
+}
+
 function RequireAuth() {
   const { configured, loading, session } = useAuth();
 
