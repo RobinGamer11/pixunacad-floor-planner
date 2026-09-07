@@ -395,7 +395,11 @@ export function OpsOverview({
               open
               onToggle={() => {}}
               peopleById={opsPeople}
+              selection={selection}
+              onSelectTime={selectTime}
               onShowItem={(i) => openItem(fixedProjectId, i.id)}
+              onManageCategories={() => setTaxonomy({ kind: "category", projectId: fixedProjectId })}
+              onManagePriorities={() => setTaxonomy({ kind: "priority", projectId: fixedProjectId })}
             />
           </div>
         ) : (
@@ -411,7 +415,11 @@ export function OpsOverview({
                     open={previewId === p.id}
                     onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
                     peopleById={opsPeople}
+                    selection={selection}
+                    onSelectTime={selectTime}
                     onShowItem={(i) => openItem(p.id, i.id)}
+                    onManageCategories={() => setTaxonomy({ kind: "category", projectId: p.id })}
+                    onManagePriorities={() => setTaxonomy({ kind: "priority", projectId: p.id })}
                   />
                 ))}
                 {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
@@ -428,6 +436,13 @@ export function OpsOverview({
           itemId={editing.itemId}
           onClose={() => setEditing(null)}
         />
+      )}
+
+      {taxonomy?.kind === "category" && (
+        <CategoryManagerDialog projectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
+      )}
+      {taxonomy?.kind === "priority" && (
+        <PriorityManagerDialog projectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
       )}
     </div>
   );
