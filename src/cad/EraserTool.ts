@@ -68,26 +68,11 @@ export class EraserTool {
 
 
   update(input: Input) {
-    if (this._rulerDrag.update(input)) {
-      this._erasing = false;
-      this._lastWorld = null;
-      return;
-    }
+    // Der Radiergummi nutzt ein vorhandenes Lineal nur als Führung. Verschieben,
+    // Drehen oder Löschen ist ausschließlich im Werkzeug "Lineal" möglich.
     const ruler = this.app.scene.rulerGuide;
     const rawW = v(input.mouse.wx, input.mouse.wy);
-    let projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
-    // Radierseite relativ zum Lineal: links / mittig / rechts der Linienführung.
-    const side = (this.app as any).defaultEraserRulerSide ?? "center";
-    if (ruler && side !== "center") {
-      const dx = ruler.b.x - ruler.a.x, dy = ruler.b.y - ruler.a.y;
-      const len = Math.hypot(dx, dy);
-      if (len > 1e-9) {
-        const r = this.app.defaultEraserRadiusM;
-        const nx = -dy / len, ny = dx / len; // Linke Normale (bezogen auf a→b)
-        const s = side === "left" ? 1 : -1;
-        projW = v(projW.x + nx * r * s, projW.y + ny * r * s);
-      }
-    }
+    const projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
 
     if (input.mouse.left) {
       if (!this._erasing) {

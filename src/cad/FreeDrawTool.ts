@@ -68,21 +68,11 @@ export class FreeDrawTool {
     this._drawing = false; this._points = []; this._pressures = []; this._lastSamplePx = null; }
       return;
     }
+    // Die Strecke a→b des Lineals IST die Zeichenkante (links / mittig / rechts
+    // verschiebt nur den Linealkörper). Der Stift läuft exakt auf dieser Kante.
     const ruler = this.app.scene.rulerGuide;
     const rawW = v(input.mouse.wx, input.mouse.wy);
-    let projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
-    // Zeichenseite relativ zum Lineal: links / mittig / rechts der Linienführung.
-    const side = (this.app as any).defaultFreeRulerSide ?? "center";
-    if (ruler && side !== "center") {
-      const dx = ruler.b.x - ruler.a.x, dy = ruler.b.y - ruler.a.y;
-      const len = Math.hypot(dx, dy);
-      if (len > 1e-9) {
-        const off = Math.max(1e-6, (this.app.defaultFreeThicknessM ?? 0.01) / 2);
-        const nx = -dy / len, ny = dx / len;
-        const s = side === "left" ? 1 : -1;
-        projW = v(projW.x + nx * off * s, projW.y + ny * off * s);
-      }
-    }
+    const projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
 
     if (!this._drawing && input.mouse.left && input.clicked) {
       this._drawing = true;
