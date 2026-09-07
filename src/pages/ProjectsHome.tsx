@@ -1446,12 +1446,8 @@ function ProfileAvatar({
   const r = size / 2 - stroke;
   const c = 2 * Math.PI * r;
   const initial = (profile.name?.[0] ?? "?").toUpperCase();
-  const statusColor =
-    profile.status === "online"
-      ? "hsl(140 60% 45%)"
-      : profile.status === "busy"
-        ? "hsl(0 70% 55%)"
-        : "hsl(0 0% 65%)";
+  // Einheitliche Statusfarben: Online grün, Abwesend gelb, Beschäftigt rot, Offline grau.
+  const statusColor = statusColorOf(profile.status);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="absolute inset-0 -rotate-90">
