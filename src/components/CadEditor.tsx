@@ -49,7 +49,7 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
-import { CanvasFabBar, LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayersPanelHeader } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
