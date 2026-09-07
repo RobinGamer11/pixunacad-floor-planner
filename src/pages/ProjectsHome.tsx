@@ -284,16 +284,10 @@ export default function ProjectsHome() {
     setNewProjectDialogOpen(true);
   };
 
-  const finishCreateProject = (values: {
-    name: string;
-    bauherr: string;
-    ort: string;
-    projektTyp: string;
-    status: string;
-    erstelltAm: string;
-  }) => {
+  const finishCreateProject = (draft: ProjectDraft) => {
     const id = projectStore.createProject();
-    projectStore.updateProject(id, values);
+    projectStore.updateProject(id, draftToPatch(draft, "create"));
+    syncProjectPeriod(id, draft.projektStart, draft.projektEnde);
     setNewProjectDialogOpen(false);
     setMode("projects");
     setShowAllTasks(false);
