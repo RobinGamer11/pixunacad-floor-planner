@@ -4,21 +4,13 @@ import {
   FolderKanban,
   UserPlus,
   MessageSquare,
-  StickyNote,
   ChevronDown,
   ChevronRight,
   Check,
   X,
   Search,
-  UserMinus,
   GripVertical,
-  Wrench,
-  FolderPlus,
-
 } from "lucide-react";
-import { DevicesTab } from "@/components/network/DevicesTab";
-import { CommentsTab } from "@/components/network/CommentsTab";
-import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
 import {
   useNetwork,
   presenceColor,
@@ -30,18 +22,16 @@ import {
 } from "@/lib/networkStore";
 import { useUnreadChats, type ChatTarget } from "@/lib/chatStore";
 import {
-  ROLE_LABEL,
   effectivePermissions,
-  permissionsForRole,
-  type ProjectPermissionOverrides,
   type ProjectRole,
 } from "@/lib/projectAccess";
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 import { isPlaceholderName } from "@/lib/accountProfile";
-import { projectStore, useProfile } from "@/lib/projectStore";
+import { useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
-import { MemberRoleControls } from "@/components/network/MemberRoleControls";
 import { PeopleTab } from "@/components/network/PeopleTab";
+import { ProjectsTab } from "@/components/network/ProjectsTab";
+
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
 
