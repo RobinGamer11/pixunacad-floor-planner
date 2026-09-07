@@ -822,11 +822,12 @@ export default function ProjectsHome() {
             <div className="relative min-h-full overflow-hidden">
               <AuroraBackground />
               <div className="relative px-10 py-7">
-                <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "#F3F6FF" }}>
+                <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight" style={{ color: "#F3F6FF" }}>
                   {isPlaceholderName(profile.name) || !profile.name.trim()
                     ? "Willkommen"
                     : `Willkommen ${profile.name.trim()}`}
                 </h1>
+
 
                 {/* Platzhalter für das kommende Tutorial-Video (noch ausgegraut) */}
                 <div
