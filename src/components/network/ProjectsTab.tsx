@@ -6,11 +6,11 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Search, MessageSquare, UserMinus, Lock, FolderKanban, StickyNote,
+  Search, MessageSquare, Lock, FolderKanban, StickyNote,
   MoreHorizontal, X, UserPlus, ExternalLink, Crown,
 } from "lucide-react";
 import { presenceColor, presenceLabel, type NetworkPerson, type LocalProjectRef } from "@/lib/networkStore";
-import { effectivePermissions, type ProjectPermissionOverrides, type ProjectRole } from "@/lib/projectAccess";
+import { type ProjectPermissionOverrides, type ProjectRole } from "@/lib/projectAccess";
 import { MemberRoleControls } from "@/components/network/MemberRoleControls";
 import { CommentsTab } from "@/components/network/CommentsTab";
 import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
@@ -200,7 +200,6 @@ export function ProjectsTab(props: ProjectsTabProps) {
           {selectedMembers.map((person) => {
             const row = memberRow(selected.id, person.id);
             const role = (row?.role as ProjectRole) ?? "member";
-            const eff = effectivePermissions(role, row?.permissions ?? undefined);
             return (
               <div key={person.id} className="rounded-xl border p-3" style={hairline}>
                 <div className="flex items-center gap-3">
