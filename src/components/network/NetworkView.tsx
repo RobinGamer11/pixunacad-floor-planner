@@ -358,6 +358,26 @@ export function NetworkView({
       .getState(projectId)
       .items.filter((i) => (i.assignees ?? []).includes(userId) && effectiveStatusId(i) !== "done").length;
 
+  /** Offene Kontaktanfragen – nur Kennzeichnung, kein Personenstatus. */
+  const pendingContactIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of net.incoming) s.add(r.person.id);
+    for (const r of net.outgoing) s.add(r.person.id);
+    return s;
+  }, [net.incoming, net.outgoing]);
+
+  /** Lokale und geteilte Projekte, die ich sehen darf (auch als reines Mitglied). */
+  const visibleProjects = useMemo<LocalProjectRef[]>(() => {
+    const map = new Map<string, LocalProjectRef>();
+    for (const p of projects) map.set(p.id, p);
+    for (const p of net.sharedProjects) {
+      if (map.has(p.id)) continue;
+      const mine = p.owner_id === net.myId || net.members.some((m) => m.project_id === p.id && m.user_id === net.myId);
+      if (mine) map.set(p.id, { id: p.id, name: p.name || "Projekt" });
+    }
+    return [...map.values()];
+  }, [projects, net.sharedProjects, net.members, net.myId]);
+
   const projectsOfPerson = (userId: string) =>
     net.members
       .filter((m) => m.user_id === userId)
