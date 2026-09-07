@@ -114,7 +114,10 @@ export class IdPanel {
     try {
       const titleEl = this.root.querySelector(".id-title") as HTMLElement | null;
       if (titleEl) {
-        titleEl.textContent = `▤ Bezeichnungs-ID (${groups.length})`;
+        titleEl.innerHTML =
+          `<span class="id-title-icon">▤</span>` +
+          `<span class="id-title-text">Bezeichnungs-ID</span>` +
+          `<span class="id-title-badge">${groups.length}</span>`;
         titleEl.style.cursor = "pointer";
         titleEl.title = "Ebenen-Panel öffnen/schließen";
         if (!(titleEl as any).__pixunaLayerToggle) {
@@ -167,6 +170,16 @@ export class IdPanel {
       row.addEventListener("dragend", () => {
         row.classList.remove("dragging");
       });
+
+      const grip = document.createElement("div");
+      grip.className = "id-grip";
+      grip.innerHTML = `<span></span><span></span><span></span><span></span><span></span><span></span>`;
+      row.appendChild(grip);
+
+      const swatch = document.createElement("div");
+      swatch.className = "id-swatch";
+      swatch.style.background = this._swatchColor(group.id, index);
+      row.appendChild(swatch);
 
       const main = document.createElement("div");
       main.className = "id-main";
@@ -333,6 +346,14 @@ export class IdPanel {
 
     // Symbol-Legende wird im Hilfe-Modus oberhalb des Panels (React) angezeigt.
 
+  }
+
+  /** Ruhiger, gleichbleibender Farbpunkt je Ebene (nur Darstellung). */
+  private _swatchColor(id: string, index: number): string {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+    if (!id) h = (index * 47) % 360;
+    return `hsl(${h} 55% 55%)`;
   }
 
   private _escapeHtml(str: string): string {

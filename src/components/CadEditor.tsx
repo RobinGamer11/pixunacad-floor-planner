@@ -49,7 +49,7 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
-import { CanvasFabBar, LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayersPanelHeader } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
@@ -1317,7 +1317,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             onClick={() => handleToolClick(ToolIds.RULER)}
             title="Lineal"
-            className={`cad-rail-btn ${activeTool === ToolIds.RULER ? "active tool-glow-active" : ""}`}
+            className={`cad-rail-btn ${activeTool === ToolIds.RULER ? "active" : ""}`}
           >
             <RulerIcon size={18} />
             <span>Lineal</span>
@@ -3554,7 +3554,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
-          {helpOn && <LayerHelpLegend />}
+          <LayersPanelHeader helpOn={helpOn} />
 
           <div ref={idPanelRef} className="cad-id-panel w-full">
             <div className="id-head">
@@ -3569,6 +3569,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="id-add-wrap">
                 <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
               </div>
+              <div className="id-hint">Oben = Vordergrund</div>
               <div ref={idListRef} className="id-list" />
             </div>
           </div>

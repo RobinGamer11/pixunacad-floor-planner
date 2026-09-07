@@ -151,7 +151,7 @@ import { TextSpanAllPages } from "@/components/workspace/TextSpanAllPages";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
-import { CanvasFabBar, LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayersPanelHeader } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
@@ -1574,7 +1574,6 @@ export default function ProjectWorkspace() {
           icon={<RulerIcon size={18} />}
           label="Lineal"
           active={activeTool === "ruler"}
-          glow
           onClick={() => setActiveToolAndTab(activeTool === "ruler" ? null : "ruler")}
           showLabel
         />
@@ -2590,7 +2589,6 @@ function ToolRailButton({
   onClick,
   showLabel,
   disabled,
-  glow,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -2599,8 +2597,6 @@ function ToolRailButton({
   onClick?: () => void;
   showLabel?: boolean;
   disabled?: boolean;
-  /** true = zusätzlich deutlich gelb aufleuchten, solange aktiv. */
-  glow?: boolean;
 }) {
   return (
     <button
@@ -2608,7 +2604,7 @@ function ToolRailButton({
       title={disabled ? `${label} — noch nicht verfügbar` : label}
       disabled={disabled}
       data-active={active ? "true" : undefined}
-      className={`cad-rail-btn${active && glow ? " tool-glow-active" : ""}`}
+      className="cad-rail-btn"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
         color: disabled
@@ -6076,7 +6072,7 @@ function RightInspector({
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
-              {helpOn && <LayerHelpLegend />}
+              <LayersPanelHeader helpOn={helpOn} />
 
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
                  CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen

@@ -53,6 +53,7 @@ export function CadIdPanelHost({ engine }: Props) {
         <div className="id-add-wrap">
           <button ref={addBtnRef} className="id-head-btn id-add-btn">+ ID</button>
         </div>
+        <div className="id-hint">Oben = Vordergrund</div>
         <div ref={listRef} className="id-list" />
       </div>
     </div>
