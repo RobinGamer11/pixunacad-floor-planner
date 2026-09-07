@@ -50,6 +50,7 @@ import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
 import { CanvasFabBar, LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
 
@@ -434,18 +435,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const leftSidebarRef = useRef<HTMLElement>(null);
   // Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne sichtbare Scrollbar.
   const leftRailScroll = useDragScroll<HTMLElement>("y");
-  // Outside-Klick schließt das Werkzeug-Flyout (Freihand/Radiergummi/Schraffur-Varianten …).
-  useEffect(() => {
-    if (!expandedTool) return;
-    const onDown = (e: MouseEvent | PointerEvent) => {
-      const el = leftSidebarRef.current;
-      if (!el) return;
-      if (el.contains(e.target as Node)) return;
-      setExpandedTool(null);
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
-  }, [expandedTool]);
+  // Outside-Klick und ESC schließen das Werkzeug-Flyout — siehe RailFlyout.
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
@@ -1355,13 +1345,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <span>{t.label.length > 9 ? t.label.slice(0, 8) + "…" : t.label}</span>
                 </button>
                 {isExpanded && (
-                  <div
-                    className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-30"
-                    style={{
-                      background: "hsl(var(--surface-card))",
-                      border: "1px solid hsl(var(--hairline))",
-                    }}
-                  >
+                  <RailFlyout onClose={() => setExpandedTool(null)}>
                     {variants.map((v, i) => {
                       const VIcon = v.icon;
                       const vActive = v.kind === "tool"
@@ -1432,7 +1416,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                         </button>
                       );
                     })}
-                  </div>
+                  </RailFlyout>
                 )}
               </div>
             );

@@ -152,6 +152,7 @@ import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { CanvasFabBar, LayerFab, LayerHelpLegend } from "@/components/cad/LayerHelp";
+import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
 
@@ -1601,13 +1602,7 @@ export default function ProjectWorkspace() {
 
           />
           {selectToolFlyoutOpen && (
-            <div
-              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
-              style={{
-                background: "hsl(var(--surface-card))",
-                border: "1px solid hsl(var(--hairline))",
-              }}
-            >
+            <RailFlyout onClose={() => setSelectToolFlyoutOpen(false)}>
               <ToolRailButton
                 icon={<MousePointer2 size={18} />}
                 label="Klick"
@@ -1651,7 +1646,7 @@ export default function ProjectWorkspace() {
                 }}
                 showLabel
               />
-            </div>
+            </RailFlyout>
           )}
         </div>
         <ToolRailButton
@@ -1699,13 +1694,7 @@ export default function ProjectWorkspace() {
             showLabel
           />
           {polygonToolFlyoutOpen && (
-            <div
-              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
-              style={{
-                background: "hsl(var(--surface-card))",
-                border: "1px solid hsl(var(--hairline))",
-              }}
-            >
+            <RailFlyout onClose={() => setPolygonToolFlyoutOpen(false)}>
               {POLYGON_MODE_VARIANTS.map((variant) => {
                 const Icon = variant.icon;
                 return (
@@ -1722,7 +1711,7 @@ export default function ProjectWorkspace() {
                   />
                 );
               })}
-            </div>
+            </RailFlyout>
           )}
         </div>
         <div className="relative w-full flex justify-center">
@@ -1742,13 +1731,7 @@ export default function ProjectWorkspace() {
             showLabel
           />
           {hatchToolFlyoutOpen && (
-            <div
-              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
-              style={{
-                background: "hsl(var(--surface-card))",
-                border: "1px solid hsl(var(--hairline))",
-              }}
-            >
+            <RailFlyout onClose={() => setHatchToolFlyoutOpen(false)}>
               {HATCH_MODE_VARIANTS.map((variant) => {
                 const Icon = variant.icon;
                 return (
@@ -1765,7 +1748,7 @@ export default function ProjectWorkspace() {
                   />
                 );
               })}
-            </div>
+            </RailFlyout>
           )}
         </div>
         <ToolRailButton
