@@ -72,6 +72,14 @@ export function OpsCalendarTab({
   onEditItem,
   onSelectTime,
   selection,
+  view: viewProp,
+  onViewChange,
+  personFilter: personProp,
+  onPersonFilterChange,
+  itemFilter,
+  showItems: showItemsProp,
+  showTimes: showTimesProp,
+  showToolbar = true,
 }: {
   projectIds: string[];
   projectNames: Map<string, string>;
@@ -92,6 +100,19 @@ export function OpsCalendarTab({
   onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
   /** Gemeinsame Auswahl – in allen Ansichten gleich hervorgehoben. */
   selection?: OpsSelection;
+  /** Ansicht von außen steuern (Kopfbereich der Organisation). */
+  view?: OpsView;
+  onViewChange?: (v: OpsView) => void;
+  /** Personenfilter von außen steuern. */
+  personFilter?: string;
+  onPersonFilterChange?: (id: string) => void;
+  /** Zusätzlicher Beitragsfilter (Kategorie, Priorität, Status, Suche). */
+  itemFilter?: (item: TlItem) => boolean;
+  /** Datenebenen von außen steuern. */
+  showItems?: boolean;
+  showTimes?: boolean;
+  /** Eigene Filterzeile ausblenden, wenn der Kopfbereich sie übernimmt. */
+  showToolbar?: boolean;
 }) {
 
   /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
@@ -105,12 +126,19 @@ export function OpsCalendarTab({
   const times = useTimeEntriesForProjects(activeProjects);
   const boards = useProjectItems(activeProjects);
 
-  const [showTimes, setShowTimes] = useState(true);
-  const [showItems, setShowItems] = useState(true);
-  const [personFilter, setPersonFilter] = useState("");
-  const [view, setView] = useState<OpsView>("calendar");
+  const [showTimesState, setShowTimes] = useState(true);
+  const [showItemsState, setShowItems] = useState(true);
+  const [personState, setPersonState] = useState("");
+  const [viewState, setViewState] = useState<OpsView>("calendar");
+  const showTimes = showTimesProp ?? showTimesState;
+  const showItems = showItemsProp ?? showItemsState;
+  const personFilter = personProp ?? personState;
+  const setPersonFilter = (id: string) => (onPersonFilterChange ? onPersonFilterChange(id) : setPersonState(id));
+  const view = viewProp ?? viewState;
+  const setView = (v: OpsView) => (onViewChange ? onViewChange(v) : setViewState(v));
 
   const [projectMenu, setProjectMenu] = useState(false);
+
 
   /** Bereits nach Person gefilterte Beiträge – Grundlage aller Ansichten. */
   const filteredBoards: OpsBoard[] = useMemo(
