@@ -58,8 +58,9 @@ export const FinanceSummaryCard: React.FC<Props> = ({
   return (
     <div className="rounded-xl border overflow-hidden"
          style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
-      <div className="flex flex-wrap items-stretch divide-x" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className={cellCls} style={{ maxWidth: 240 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:flex xl:flex-wrap items-stretch divide-y sm:divide-y-0 xl:divide-x [&>*]:border-b sm:[&>*]:border-b-0" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className={cellCls} style={{ borderColor: "hsl(var(--hairline))" }}>
+
           <div className="text-sm font-semibold">{title ?? "Gesamt"}</div>
           <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
             {subtitle ?? "Übersicht aller Positionen"}

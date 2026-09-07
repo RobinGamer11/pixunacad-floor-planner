@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import React, { useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+
 import { GripVertical, Trash2, Calendar, FileText, ChevronUp, ChevronDown } from "lucide-react";
 import {
   financeStore, formatEur, parseEur, templateKeyOf,
@@ -37,6 +39,7 @@ const FIELD_STYLE: React.CSSProperties = {
 
 export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions, background, emptyHint }) => {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -62,10 +65,91 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
     financeStore.reorderPositions(projectId, nodeId, id, target.id);
   };
 
+  if (isMobile) {
+    return (
+      <div className="space-y-3">
+        {positions.length === 0 && (
+          <div className="rounded-xl border px-4 py-6 text-xs"
+               style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))", color: "hsl(var(--ink-soft))" }}>
+            {emptyHint ?? "Noch keine Positionen. Über „+ Angebot\u201c, „+ Rechnung\u201c oder „+ Nachtrag\u201c anlegen."}
+          </div>
+        )}
+        {positions.map((p) => {
+          const isMinus = p.type === "supplement" && p.supplementKind === "minus";
+          const isPlus = p.type === "supplement" && p.supplementKind === "plus";
+          const amountColor = isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : undefined;
+          return (
+            <div key={p.id} className="rounded-xl border p-3 space-y-2"
+                 style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
+              <div className="flex items-center gap-2">
+                {p.type === "supplement" ? (
+                  <select
+                    value={p.supplementKind ?? "plus"}
+                    onChange={(e) => upd(p.id, { supplementKind: e.target.value as "plus" | "minus" })}
+                    className="h-8 rounded-md border bg-transparent px-2 text-xs outline-none"
+                    style={{ borderColor: "hsl(var(--hairline))" }}>
+                    <option value="plus">Mehrnachtrag</option>
+                    <option value="minus">Mindernachtrag</option>
+                  </select>
+                ) : (
+                  <span className="text-sm font-semibold">{TYPE_LABEL[p.type]}</span>
+                )}
+                <span className="text-xs tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>
+                  {numberOf.get(p.id)}
+                </span>
+                <div className="flex-1" />
+                <button type="button" onClick={() => move(p.id, -1)} title="Nach oben"
+                  className="h-8 w-8 rounded-md border flex items-center justify-center"
+                  style={{ borderColor: "hsl(var(--hairline))" }}>
+                  <ChevronUp size={15} style={{ color: "hsl(var(--ink-soft))" }} />
+                </button>
+                <button type="button" onClick={() => move(p.id, 1)} title="Nach unten"
+                  className="h-8 w-8 rounded-md border flex items-center justify-center"
+                  style={{ borderColor: "hsl(var(--hairline))" }}>
+                  <ChevronDown size={15} style={{ color: "hsl(var(--ink-soft))" }} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <DateCell value={p.date} onChange={(v) => upd(p.id, { date: v })} />
+                <AmountInput value={p.amount} color={amountColor} negative={isMinus}
+                  onCommit={(v) => upd(p.id, { amount: v })} />
+              </div>
+
+              <input value={p.number} placeholder={NUMBER_PLACEHOLDER[p.type]}
+                onChange={(e) => upd(p.id, { number: e.target.value })}
+                className={FIELD_CLASS} style={FIELD_STYLE} />
+              <input value={p.note} placeholder="Notiz eingeben..."
+                onChange={(e) => upd(p.id, { note: e.target.value })}
+                className={FIELD_CLASS} style={FIELD_STYLE} />
+
+              <div className="flex items-center justify-end gap-2 pt-1">
+                {p.hasTemplate && (
+                  <button type="button"
+                    onClick={() => navigate(`/project/${projectId}?tpl=${encodeURIComponent(templateKeyOf(p.type, p.id))}&back=${nodeId}`)}
+                    className="h-9 px-3 rounded-md border flex items-center gap-2 text-xs"
+                    style={{ borderColor: "hsl(var(--hairline))" }}>
+                    <FileText size={14} /> Vorlage
+                  </button>
+                )}
+                <button type="button" onClick={() => financeStore.deletePosition(projectId, p.id)}
+                  className="h-9 px-3 rounded-md border flex items-center gap-2 text-xs"
+                  style={{ borderColor: "hsl(var(--hairline))" }}>
+                  <Trash2 size={14} /> Löschen
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border overflow-x-auto"
          style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
       <div className="min-w-[760px]">
+
       <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
            style={{ gridTemplateColumns: "32px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
         <span />

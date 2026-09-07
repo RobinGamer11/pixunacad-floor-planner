@@ -1297,33 +1297,28 @@ export default function ProjectsHome() {
 
                 <div
                   ref={tabsScrollRef}
-                  className="flex items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 overflow-x-auto no-scrollbar touch-pan-x"
+                  className="hidden sm:flex items-end gap-x-8 gap-y-1 text-sm flex-1 min-w-0 overflow-x-auto no-scrollbar touch-pan-x"
                 >
                   {(
                     [
-                      ["uebersicht", "Übersicht", false],
-                      ["aufgaben", "Organisation", false],
-                      ["finanzen", "Finanzen", false],
-                      ["dokumente", "Dokumente", false],
-                      ["team", "Team", false],
+                      ["uebersicht", "Übersicht", Home],
+                      ["aufgaben", "Organisation", ListChecks],
+                      ["finanzen", "Finanzen", Coins],
+                      ["dokumente", "Dokumente", FileText],
+                      ["team", "Team", Users],
                     ] as const
-                  ).map(([key, label, disabled]) => (
+                  ).map(([key, label]) => (
                     <button
                       key={key}
-                      onClick={() => !disabled && setTab(key as Tab)}
-                      disabled={disabled}
-                      title={disabled ? "Bald verfügbar" : undefined}
-                      className="pb-2 relative whitespace-nowrap disabled:cursor-not-allowed"
+                      onClick={() => setTab(key as Tab)}
+                      className="pb-2 relative whitespace-nowrap"
                       style={{
-                        color: disabled
-                          ? "hsl(var(--ink-soft) / 0.5)"
-                          : tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+                        color: tab === key ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
                         fontWeight: tab === key ? 600 : 400,
-                        opacity: disabled ? 0.5 : 1,
                       }}
                     >
                       {label}
-                      {tab === key && !disabled && (
+                      {tab === key && (
                         <span
                           className="absolute left-0 right-0 -bottom-px h-[2px]"
                           style={{ background: "hsl(var(--accent-gold))" }}
@@ -1332,6 +1327,38 @@ export default function ProjectsHome() {
                     </button>
                   ))}
                 </div>
+
+                {/* Handy: Reiter als Symbole, alles auf einen Blick */}
+                <div className="sm:hidden grid grid-cols-5 gap-2">
+                  {(
+                    [
+                      ["uebersicht", "Übersicht", Home],
+                      ["aufgaben", "Organisation", ListChecks],
+                      ["finanzen", "Finanzen", Coins],
+                      ["dokumente", "Dokumente", FileText],
+                      ["team", "Team", Users],
+                    ] as const
+                  ).map(([key, label, Icon]) => {
+                    const active = tab === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setTab(key as Tab)}
+                        title={label}
+                        aria-label={label}
+                        className="h-12 rounded-xl border flex items-center justify-center"
+                        style={{
+                          borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                          background: active ? "hsl(var(--accent-gold) / 0.15)" : "hsl(var(--surface-card))",
+                          color: active ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
+                        }}
+                      >
+                        <Icon size={19} />
+                      </button>
+                    );
+                  })}
+                </div>
+
 
               </div>
 
