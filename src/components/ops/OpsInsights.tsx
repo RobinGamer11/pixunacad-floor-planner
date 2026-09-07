@@ -19,6 +19,15 @@ import {
 } from "@/lib/opsStore";
 import { useProjectsMemberOptions } from "@/lib/projectTeam";
 import { subscribeTimeline, timelineStore, type TlItem } from "@/lib/timelineStore";
+import {
+  isItemSelected,
+  isTimeSelected,
+  matchesQuery,
+  sortItems,
+  OPS_SORTS,
+  type OpsSelection,
+  type OpsSort,
+} from "@/components/ops/opsSelection";
 
 const LINE = "hsl(var(--hairline))";
 const SOFT = "hsl(var(--ink-soft))";
