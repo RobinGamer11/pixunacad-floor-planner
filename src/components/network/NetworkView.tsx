@@ -299,22 +299,23 @@ export function NetworkView({
     return map;
   }, [contactsById, net.myId, net.myProfile, net.myStatus]);
 
-  const byProject = useMemo(() => {
-    const map = new Map<string, NetworkPerson[]>();
-    for (const p of projects) map.set(p.id, []);
-    const assigned = new Set<string>();
-    for (const m of net.members) {
-      if (!map.has(m.project_id)) continue;
-      if (m.user_id === net.myId) continue;
-      // Auch Projektmitglieder ohne persönlichen Kontakt gehören ins Team.
-      const person = contactsById.get(m.user_id) ?? net.peopleById.get(m.user_id);
-      if (!person) continue;
-      map.get(m.project_id)!.push(person);
-      assigned.add(person.id);
-    }
-    const general = net.contacts.filter((c) => !assigned.has(c.id));
-    return { map, general };
-  }, [contactsById, net.contacts, net.members, net.myId, net.peopleById, projects]);
+  /** Mitglieder eines Projekts (ohne mich) – aus der gemeinsamen Datenbasis. */
+  const membersOf = useMemo(() => {
+    const cache = new Map<string, NetworkPerson[]>();
+    return (projectId: string) => {
+      let hit = cache.get(projectId);
+      if (hit) return hit;
+      hit = [];
+      for (const m of net.members) {
+        if (m.project_id !== projectId || m.user_id === net.myId) continue;
+        const person = contactsById.get(m.user_id) ?? net.peopleById.get(m.user_id);
+        if (person) hit.push(person);
+      }
+      cache.set(projectId, hit);
+      return hit;
+    };
+  }, [contactsById, net.members, net.myId, net.peopleById]);
+
 
   /* Namensauflösung für die gemeinsamen Übersichten (Kalender, Geräte). */
   const projectNameMap = useMemo(() => {
