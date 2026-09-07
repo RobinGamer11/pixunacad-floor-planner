@@ -178,24 +178,28 @@ const fmtDay = (iso: string) => {
     : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 };
 
-/* ------------------------------------------------------ Zeit + Abwesenheit */
+/* ------------------------------------------------------------------- Zeit */
 
 /**
  * Zeiterfassung je Person über die angegebenen Projekte.
- * Alle Projektbeteiligten erscheinen – auch mit 0 Minuten. Abwesenheiten
- * werden separat als Tage ausgewiesen (sie zählen nicht als Arbeitszeit).
+ * Alle Projektbeteiligten erscheinen – auch mit 0 Minuten. Jede einzelne
+ * Buchung im Verlauf ist anklickbar und teilt sich die Auswahl mit den
+ * übrigen Organisationsansichten.
  */
 export function TimeInsights({
   projectIds,
   projectNames,
   peopleById,
+  selection,
+  onSelectTime,
 }: {
   projectIds: string[];
   projectNames?: Map<string, string>;
   peopleById?: Map<string, string>;
+  selection?: OpsSelection;
+  onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
 }) {
   const times = useTimeEntriesForProjects(projectIds);
-  const absences = useAbsences(projectIds);
   const { byProject } = useProjectsMemberOptions(projectIds);
 
   const nameOf = (id: string) => {
@@ -212,20 +216,11 @@ export function TimeInsights({
       for (const m of byProject[id] ?? []) if (!minutes.has(m.id)) minutes.set(m.id, 0);
     }
     for (const e of times.entries) minutes.set(e.user_id, (minutes.get(e.user_id) ?? 0) + netMinutes(e));
-    const absenceDays = new Map<string, number>();
-    const seen = new Set<string>();
-    for (const a of absences.absences) {
-      if (seen.has(a.id)) continue;
-      seen.add(a.id);
-      if (a.status === "cancelled") continue;
-      absenceDays.set(a.user_id, (absenceDays.get(a.user_id) ?? 0) + datesInRange(a.starts_on, a.ends_on).length);
-      if (!minutes.has(a.user_id)) minutes.set(a.user_id, 0);
-    }
     return Array.from(minutes.entries())
-      .map(([id, m]) => ({ id, minutes: m, absenceDays: absenceDays.get(id) ?? 0 }))
+      .map(([id, m]) => ({ id, minutes: m }))
       .sort((a, b) => b.minutes - a.minutes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [times.entries, absences.absences, byProject, projectIds.join("|")]);
+  }, [times.entries, byProject, projectIds.join("|")]);
 
   const total = rows.reduce((s, r) => s + r.minutes, 0);
 
@@ -244,14 +239,6 @@ export function TimeInsights({
         .slice(0, 200),
     [times.entries, activeId],
   );
-  const absenceHistory = useMemo(() => {
-    const seen = new Set<string>();
-    return absences.absences
-      .filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)))
-      .filter((a) => !activeId || a.user_id === activeId)
-      .sort((a, b) => b.starts_on.localeCompare(a.starts_on))
-      .slice(0, 100);
-  }, [absences.absences, activeId]);
 
   const activeRow = activeId ? rows.find((r) => r.id === activeId) : null;
 
@@ -272,7 +259,6 @@ export function TimeInsights({
             label: nameOf(r.id),
             color: insightColor(i),
             value: formatMinutes(r.minutes),
-            sub: r.absenceDays ? `${r.absenceDays} Tage abwesend` : undefined,
           }))}
         />
         <div className="text-[11px]" style={{ color: SOFT }}>
@@ -290,29 +276,34 @@ export function TimeInsights({
         </div>
       </div>
 
-      <Collapsible title="Verlauf" badge={history.length + absenceHistory.length} dense>
+      <Collapsible title="Verlauf" badge={history.length} dense defaultOpen>
         <div className="flex flex-col gap-1">
-          {history.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 text-[11px]">
-              <span className="shrink-0 tabular-nums" style={{ color: SOFT }}>{fmtDay(e.started_at)}</span>
-              <span className="truncate flex-1">{nameOf(e.user_id)}</span>
-              {projectNames && (
-                <span className="truncate shrink-0" style={{ color: SOFT }}>
-                  {projectNames.get(e.project_id) ?? "Projekt"}
-                </span>
-              )}
-              <span className="tabular-nums shrink-0">{formatMinutes(netMinutes(e))}</span>
-            </div>
-          ))}
-          {absenceHistory.map((a) => (
-            <div key={`abs-${a.id}`} className="flex items-center gap-2 text-[11px]" style={{ color: SOFT }}>
-              <span className="shrink-0 tabular-nums">{a.starts_on} – {a.ends_on}</span>
-              <span className="truncate flex-1">{nameOf(a.user_id)}</span>
-              <span className="shrink-0">{a.masked ? "abwesend" : ABSENCE_LABEL[a.kind ?? "other"]}</span>
-            </div>
-          ))}
-          {!history.length && !absenceHistory.length && (
-            <div className="text-[11px]" style={{ color: SOFT }}>Kein Verlauf vorhanden.</div>
+          {history.map((e) => {
+            const on = isTimeSelected(selection ?? null, e.id);
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => onSelectTime?.(e.project_id, e.id, e.item_id ?? undefined)}
+                className="flex items-center gap-2 text-[11px] text-left rounded-md px-1.5 py-1"
+                style={{
+                  background: on ? "hsl(var(--accent-gold) / 0.16)" : "transparent",
+                  outline: on ? "1px solid hsl(var(--accent-gold))" : "none",
+                }}
+              >
+                <span className="shrink-0 tabular-nums" style={{ color: SOFT }}>{fmtDay(e.started_at)}</span>
+                <span className="truncate flex-1">{nameOf(e.user_id)}</span>
+                {projectNames && (
+                  <span className="truncate shrink-0" style={{ color: SOFT }}>
+                    {projectNames.get(e.project_id) ?? "Projekt"}
+                  </span>
+                )}
+                <span className="tabular-nums shrink-0">{formatMinutes(netMinutes(e))}</span>
+              </button>
+            );
+          })}
+          {!history.length && (
+            <div className="text-[11px]" style={{ color: SOFT }}>Noch keine Arbeitszeit erfasst.</div>
           )}
         </div>
       </Collapsible>
