@@ -8,7 +8,6 @@ import {
   Settings,
   Star,
   FolderKanban,
-  LayoutTemplate,
   Users,
   Trash2,
   Pencil,
