@@ -136,29 +136,6 @@ export function PeopleTab(props: PeopleTabProps) {
         >
           <MessageSquare size={17} /> Direktchat
         </button>
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Weitere Aktionen"
-            className="h-12 w-12 min-w-[44px] rounded-xl border grid place-items-center"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <MoreHorizontal size={18} />
-          </button>
-          {menuOpen && (
-            <div
-              className="absolute right-0 top-[52px] z-30 w-56 rounded-xl border p-1.5 shadow-lg"
-              style={surface}
-            >
-              <button
-                onClick={() => { setMenuOpen(false); props.onRemoveContact(selected); }}
-                className="w-full h-10 px-3 rounded-lg text-left text-sm flex items-center gap-2 hover:bg-[hsl(var(--surface-muted))]"
-              >
-                <UserMinus size={15} /> Kontakt entfernen
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       <div>
@@ -212,21 +189,6 @@ export function PeopleTab(props: PeopleTabProps) {
                       onRole={(r) => props.onSetRole(p.id, selected.id, r)}
                       onOverrides={(o) => props.onSetPermissions(p.id, selected.id, o)}
                     />
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-                      <span className="rounded-md border px-2 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-                        {eff.canEdit ? "Bearbeiten" : "Nur Ansicht"}
-                      </span>
-                      {eff.canManageMembers && (
-                        <span className="rounded-md border px-2 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-                          Mitglieder verwalten
-                        </span>
-                      )}
-                      {eff.canComment && (
-                        <span className="rounded-md border px-2 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-                          Kommentieren
-                        </span>
-                      )}
-                    </div>
                   </>
                 )}
                 {!manage && (
