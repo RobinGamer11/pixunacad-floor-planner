@@ -5,9 +5,7 @@ import {
 import { projectStore, type Project } from "@/lib/projectStore";
 import { useTimeline } from "@/lib/timelineStore";
 import { nextAppointment } from "@/lib/projectPeriodSync";
-import {
-  NOT_SET, createdAtLabel, defaultThumbnailForType, formatDateDE, isPlaceholderThumbnail,
-} from "@/lib/projectMeta";
+import { NOT_SET, createdAtLabel, formatDateDE, isPlaceholderThumbnail } from "@/lib/projectMeta";
 
 interface Props {
   project: Project;
