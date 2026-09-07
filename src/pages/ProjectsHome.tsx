@@ -2711,7 +2711,7 @@ function SharedView({
   return (
     <div className="px-4 sm:px-6 xl:px-10 py-7 w-full">
       <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Netzwerk</h1>
-      <p className="mt-1.5 text-sm text-muted-foreground">Kontakte, Freunde und Projektteams auf einen Blick.</p>
+      <p className="mt-1.5 text-sm text-muted-foreground">Kontakte, gemeinsame Projekte und Anfragen verwalten.</p>
 
 
 

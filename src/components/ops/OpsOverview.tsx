@@ -377,7 +377,7 @@ export function OpsOverview({
 
   const pieTotal = pie.rows.reduce((s, r) => s + r.value, 0);
   const activeFilterCount = Object.entries(filters).filter(([, v]) => v).length;
-  const viewLabel = OPS_VIEWS.find((v) => v.id === view)?.label ?? "Organisation";
+  
 
   /** Alle wirksamen Einschränkungen – auch Zeitraum und Projektauswahl. */
   const hiddenProjectCount = fixedProjectId ? 0 : hiddenProjects.size;
@@ -430,10 +430,9 @@ export function OpsOverview({
 
 
       {/* 2. Hauptansicht */}
-      <div className="mb-2 flex items-center gap-3">
-        <div className="min-w-0 text-base font-medium">{viewLabel}</div>
+      <div className="mb-2 flex items-center justify-end gap-3">
         <select
-          className={`${inputCls} ml-auto h-11 min-w-[170px]`}
+          className={`${inputCls} h-11 min-w-[170px]`}
           value={view}
           onChange={(e) => setView(e.target.value as OpsView)}
           title="Ansicht wählen"
@@ -442,6 +441,7 @@ export function OpsOverview({
           {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
         </select>
       </div>
+
       <div ref={viewRef} className="mb-5 rounded-xl border p-2 sm:p-3"
            style={{ borderColor: LINE, background: "hsl(var(--surface))" }}>
         <OpsCalendarTab
