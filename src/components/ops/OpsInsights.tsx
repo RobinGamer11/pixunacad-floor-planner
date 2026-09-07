@@ -469,23 +469,31 @@ export function usePeopleCount(projectIds: string[]) {
 export function CategoryInsights({
   projectId,
   onSelectItem,
+  selection,
+  onManageCategories,
+  onManagePriorities,
 }: {
   projectId: string;
-  /** Beitrag anzeigen (z. B. im Kalender darüber) statt in die Projekt-Orga zu springen. */
+  /** Beitrag zum Bearbeiten öffnen. */
   onSelectItem?: (item: TlItem) => void;
+  selection?: OpsSelection;
+  onManageCategories?: () => void;
+  onManagePriorities?: () => void;
 }) {
   const [tick, setTick] = useState(0);
   useEffect(() => subscribeTimeline(projectId, () => setTick((t) => t + 1)), [projectId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const state = useMemo(() => {
     try { return timelineStore.getState(projectId); } catch { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, tick]);
 
   const categories = state?.categories ?? [];
+  const priorities = state?.priorities ?? [];
   const items = (state?.items ?? []) as TlItem[];
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [sort, setSort] = useState<OpsSort>("priority");
+  const [query, setQuery] = useState("");
   const toggle = (id: string) => setActiveId((cur) => (cur === id ? null : id));
   useEffect(() => {
     if (activeId && !categories.some((c) => c.id === activeId)) setActiveId(null);
@@ -496,12 +504,22 @@ export function CategoryInsights({
     [categories, items],
   );
   const total = stats.reduce((s, r) => s + r.count, 0);
-  const list = activeId ? items.filter((i) => i.categoryId === activeId) : items;
+
+  const list = useMemo(() => {
+    const base = items
+      .filter((i) => !activeId || i.categoryId === activeId)
+      .filter((i) => matchesQuery(i, query, categories, priorities));
+    return sortItems(base, sort, priorities, categories);
+  }, [items, activeId, query, sort, priorities, categories]);
+
+  const labelOf = (id?: string, list2?: { id: string; label: string }[]) =>
+    list2?.find((x) => x.id === id)?.label;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-6">
         <MiniPie
+          size={220}
           slices={stats.map((s) => ({ id: s.cat.id, value: s.count, color: s.cat.color }))}
           activeId={activeId}
           onSlice={toggle}
@@ -518,28 +536,83 @@ export function CategoryInsights({
             sub: total ? `${Math.round((s.count / total) * 100)}%` : undefined,
           }))}
         />
-        <div className="text-[11px]" style={{ color: SOFT }}>
-          Beiträge gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{total}</span>
+        <div className="flex flex-col gap-2">
+          <div className="text-[11px]" style={{ color: SOFT }}>
+            Beiträge gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{total}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {onManageCategories && (
+              <button type="button" onClick={onManageCategories}
+                      className="h-8 px-2.5 rounded-md border text-[11px]" style={{ borderColor: LINE }}>
+                + Kategorie
+              </button>
+            )}
+            {onManagePriorities && (
+              <button type="button" onClick={onManagePriorities}
+                      className="h-8 px-2.5 rounded-md border text-[11px]" style={{ borderColor: LINE }}>
+                + Priorität
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-1">
-        {list.slice(0, 200).map((i) => (
-          <button
-            key={i.id}
-            type="button"
-            onClick={() => onSelectItem?.(i)}
-            className="flex items-center gap-2 text-[11px] text-left rounded-md px-1.5 py-1 hover:bg-muted"
-          >
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ background: categories.find((c) => c.id === i.categoryId)?.color ?? "hsl(var(--ink-soft))" }}
-            />
-            <span className="truncate flex-1">{i.title || "Ohne Titel"}</span>
-            <span className="shrink-0 tabular-nums" style={{ color: SOFT }}>{i.endDate || i.startDate || ""}</span>
-          </button>
-        ))}
-        {!list.length && <div className="text-[11px]" style={{ color: SOFT }}>Keine Beiträge.</div>}
+      {/* Sortierung und freie Textsuche über die Beiträge des Projekts. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Beiträge durchsuchen"
+          className="h-9 min-w-[200px] flex-1 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
+          style={{ borderColor: LINE }}
+        />
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as OpsSort)}
+          className="h-9 rounded-md border bg-background px-2 text-xs outline-none [&>option]:bg-background"
+          style={{ borderColor: LINE }}
+        >
+          {OPS_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        {list.slice(0, 200).map((i) => {
+          const on = isItemSelected(selection ?? null, projectId, i.id);
+          return (
+            <button
+              key={i.id}
+              type="button"
+              onClick={() => onSelectItem?.(i)}
+              className="flex flex-col gap-0.5 rounded-lg border px-3 py-2 text-left"
+              style={{
+                borderColor: on ? "hsl(var(--accent-gold))" : LINE,
+                background: on ? "hsl(var(--accent-gold) / 0.12)" : "transparent",
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ background: categories.find((c) => c.id === i.categoryId)?.color ?? "hsl(var(--ink-soft))" }}
+                />
+                <span className="truncate flex-1 text-[12px]">{i.title || "Ohne Titel"}</span>
+                <span className="shrink-0 tabular-nums text-[11px]" style={{ color: SOFT }}>
+                  {i.endDate || i.startDate || ""}
+                </span>
+              </span>
+              <span className="text-[11px] truncate" style={{ color: SOFT }}>
+                {[labelOf(i.categoryId, categories), labelOf(i.priorityId, priorities), i.description]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </button>
+          );
+        })}
+        {!list.length && (
+          <div className="text-[11px]" style={{ color: SOFT }}>
+            {query ? "Keine Treffer für diese Suche." : "Noch keine Beiträge – oben über „+ Beitrag“ anlegen."}
+          </div>
+        )}
       </div>
     </div>
   );
