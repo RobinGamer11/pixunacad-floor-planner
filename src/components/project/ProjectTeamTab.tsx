@@ -402,11 +402,11 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function AddMemberDialog({
-  available, onClose, onInvite,
+  available, onClose, onAdd,
 }: {
   available: NetworkPerson[];
   onClose: () => void;
-  onInvite: (userId: string, role: AssignableRole, perms: ProjectPermissionOverrides) => Promise<void> | void;
+  onAdd: (userId: string, role: AssignableRole, perms: ProjectPermissionOverrides) => Promise<void> | void;
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState<AssignableRole>("member");
@@ -465,11 +465,11 @@ function AddMemberDialog({
           <button
             type="button"
             disabled={!userId}
-            onClick={() => void onInvite(userId, role, perms)}
+            onClick={() => void onAdd(userId, role, perms)}
             className="h-12 rounded-lg px-5 text-sm font-semibold disabled:opacity-50"
             style={{ background: GOLD, color: "hsl(var(--ink))" }}
           >
-            Einladung absenden
+            Mitglied hinzufügen
           </button>
         </div>
       </div>
