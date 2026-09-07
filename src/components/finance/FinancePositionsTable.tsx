@@ -42,6 +42,8 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
   const isMobile = useIsMobile();
 
   const [dragId, setDragId] = useState<string | null>(null);
+  /** Auf dem Handy geöffnete Position (Detailansicht). */
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const upd = (id: string, patch: Partial<FinancePosition>) =>
     financeStore.updatePosition(projectId, id, patch);
