@@ -283,9 +283,15 @@ export function OpsCalendarTab({
           defaultRange={calendarDefaultRange}
         />
       )}
-      {view === "ray" && <OpsRay boards={filteredBoards} onSelect={onEditItem} />}
-      {view === "net" && <OpsNet boards={filteredBoards} onSelect={onEditItem} />}
-      {view === "gantt" && <OpsGantt boards={filteredBoards} onSelect={onEditItem} />}
+      {view === "ray" && (
+        <OpsRay boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onSelectTime={onSelectTime} />
+      )}
+      {view === "net" && (
+        <OpsNet boards={filteredBoards} selection={selection} onSelectItem={onEditItem} />
+      )}
+      {view === "gantt" && (
+        <OpsGantt boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onSelectTime={onSelectTime} />
+      )}
     </div>
   );
 }
