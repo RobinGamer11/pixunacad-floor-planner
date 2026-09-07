@@ -315,6 +315,8 @@ export function OpsOverview({
           projectFilterAsDropdown
           calendarDefaultRange="week"
           onEditItem={openItem}
+          onSelectTime={selectTime}
+          selection={selection}
         />
       </div>
 
