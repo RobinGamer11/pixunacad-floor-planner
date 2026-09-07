@@ -119,8 +119,6 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
   const [strength, setStrength] = useState(1);
   const [mode, setMode] = useState<"hard" | "smooth">("hard");
   const [softness, setSoftness] = useState(0.5);
-  const [hasRuler, setHasRuler] = useState(false);
-  const [rulerSide, setRulerSide] = useState<"left" | "center" | "right">("center");
   /** Aus dem Schraffur-Werkzeug hierher verschoben: Kanten nach Radieren glätten. */
   const [smoothEdges, setSmoothEdges] = useState(true);
   const smoothAllowed = useRasterSelection(app, rasterSelection);
@@ -131,9 +129,7 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
     setStrength(app.defaultEraserStrength);
     setMode(app.defaultEraserMode ?? "hard");
     setSoftness(app.defaultEraserSoftness ?? 0.5);
-    setHasRuler(!!app.scene.rulerGuide);
     setSmoothEdges((app as any).defaultHatchAutoSmooth !== false);
-    setRulerSide((app as any).defaultEraserRulerSide ?? "center");
   }, [app]);
 
   // Modus-Wechsel aus der Modus-Leiste oberhalb spiegeln.
@@ -144,20 +140,6 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
   }, [app]);
 
   if (!app) return null;
-
-  const toggleRuler = () => {
-    if (!app) return;
-    if (app.scene.rulerGuide) {
-      app.scene.rulerGuide = null;
-      setHasRuler(false);
-    } else {
-      const rect = app.canvas.getBoundingClientRect();
-      const left = app.camera.screenToWorld(rect.width * 0.2, rect.height * 0.5);
-      const right = app.camera.screenToWorld(rect.width * 0.8, rect.height * 0.5);
-      app.scene.rulerGuide = { a: { x: left.x, y: left.y }, b: { x: right.x, y: right.y } };
-      setHasRuler(true);
-    }
-  };
 
   const framedBtn = "w-full flex items-center justify-between gap-2 h-9 px-2 rounded-md border text-xs transition-colors hover:bg-muted";
   const framedStyle = { borderColor: "hsl(var(--hairline))" } as React.CSSProperties;
@@ -205,35 +187,10 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
         </span>
       </button>
 
-      <button type="button" onClick={toggleRuler} className={`${framedBtn} justify-center`} style={framedStyle}>
-        <span>{hasRuler ? "Lineal entfernen" : "Lineal hinzufügen"}</span>
-      </button>
-
-      <div className={hasRuler ? "" : "opacity-50"}>
-        <div className="mb-1 text-muted-foreground">Radierseite</div>
-        <div className="grid grid-cols-3 gap-1">
-          {([
-            { id: "left" as const, label: "Links" },
-            { id: "center" as const, label: "Mittig" },
-            { id: "right" as const, label: "Rechts" },
-          ]).map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => { setRulerSide(id); (app as any).defaultEraserRulerSide = id; }}
-              className={`rounded border px-1 py-1 text-[10px] transition-colors ${rulerSide === id ? "bg-accent" : "hover:bg-muted"}`}
-              style={framedStyle}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="text-[10px] leading-snug text-muted-foreground">
-        Maus gedrückt halten → radieren. Das Lineal lässt sich nur an seinen
-        Endpunkten verschieben; an der Linie selbst fängt der Radiergummi für
-        ein gerades Radieren.
+        Maus gedrückt halten → radieren. Ist im Werkzeug „Lineal“ ein Lineal
+        gesetzt, radiert der Radiergummi exakt an dessen Zeichenkante entlang.
+        Geändert wird das Lineal nur im Linealwerkzeug selbst.
       </div>
     </div>
   );
