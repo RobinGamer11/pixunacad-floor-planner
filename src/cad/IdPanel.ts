@@ -348,6 +348,14 @@ export class IdPanel {
 
   }
 
+  /** Ruhiger, gleichbleibender Farbpunkt je Ebene (nur Darstellung). */
+  private _swatchColor(id: string, index: number): string {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+    if (!id) h = (index * 47) % 360;
+    return `hsl(${h} 55% 55%)`;
+  }
+
   private _escapeHtml(str: string): string {
     return String(str)
       .split("&").join("&amp;")
