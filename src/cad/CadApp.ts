@@ -38,6 +38,7 @@ import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import { DocumentTool } from "./DocumentTool";
 import { FreeDrawTool } from "./FreeDrawTool";
+import { RulerTool } from "./RulerTool";
 import { EraserTool } from "./EraserTool";
 import { WallTool } from "./WallTool";
 import { DoorTool } from "./DoorTool";
@@ -337,6 +338,7 @@ export class CadApp {
   tableTool!: TableTool;
   documentTool!: DocumentTool;
   freeDrawTool!: FreeDrawTool;
+  rulerTool!: RulerTool;
   eraserTool!: EraserTool;
   wallTool!: WallTool;
   doorTool!: DoorTool;
@@ -581,6 +583,7 @@ export class CadApp {
     this.tableTool = new TableTool(this);
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
+    this.rulerTool = new RulerTool(this);
     this.eraserTool = new EraserTool(this);
     this.wallTool = new WallTool(this);
     this.doorTool = new DoorTool(this);
@@ -3044,6 +3047,7 @@ export class CadApp {
     else if (id === ToolIds.WALL) { this.activeTool = this.wallTool; this.wallTool.activate(); }
     else if (id === ToolIds.DOOR) { this.activeTool = this.doorTool; this.doorTool.activate(); }
     else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool; this.tableTool.activate(); }
+    else if (id === ToolIds.RULER) { this.activeTool = this.rulerTool as any; this.rulerTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();

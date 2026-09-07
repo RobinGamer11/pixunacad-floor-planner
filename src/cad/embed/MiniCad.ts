@@ -42,6 +42,7 @@ import { TextTool } from "../TextTool";
 import { TextEditorOverlay } from "../TextEditorOverlay";
 import { SelectTool } from "../SelectTool";
 import { FreeDrawTool } from "../FreeDrawTool";
+import { RulerTool } from "../RulerTool";
 import { EraserTool } from "../EraserTool";
 import { PipetteTool } from "../PipetteTool";
 import { PolygonTool } from "../PolygonTool";
@@ -110,7 +111,7 @@ type SelectionGeometrySnapshot =
   | { kind: "freestroke"; pts: { x: number; y: number }[] };
 
 
-export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "polygon" | "document" | "pipette" | null;
+export type MiniTool = "line" | "text" | "select" | "guide" | "free" | "eraser" | "hatch" | "polygon" | "document" | "pipette" | "ruler" | null;
 export type MiniCadSelectionInfo =
   | {
       tool: "line";
@@ -193,6 +194,7 @@ export class MiniCad {
   readonly textEditor: TextEditorOverlay;
   readonly selectTool: SelectTool;
   readonly freeDrawTool: FreeDrawTool;
+  readonly rulerTool: RulerTool;
   readonly eraserTool: EraserTool;
   readonly pipetteTool: PipetteTool;
   readonly hatchTool: HatchTool;
@@ -423,6 +425,7 @@ export class MiniCad {
     );
     this.selectTool = new SelectTool(this as any);
     this.freeDrawTool = new FreeDrawTool(this as any);
+    this.rulerTool = new RulerTool(this as any);
     this.eraserTool = new EraserTool(this as any);
     this.pipetteTool = new PipetteTool(this as any);
     this.hatchTool = new HatchTool(this as any);
@@ -924,6 +927,7 @@ export class MiniCad {
     if (this._activeTool === "polygon") this.polygonTool.cancel();
     if (this._activeTool === "document") this.documentTool.cancel();
     if (this._activeTool === "pipette") this.pipetteTool.cancel();
+    if (this._activeTool === "ruler") this.rulerTool.cancel();
     this._activeTool = tool;
     this.activeTool = null;
     // Guide-Modus aktivieren/deaktivieren — wirkt auf den createSegment-Interceptor.
@@ -954,6 +958,9 @@ export class MiniCad {
     } else if (tool === "pipette") {
       this.pipetteTool.activate();
       this.activeTool = this.pipetteTool as any;
+    } else if (tool === "ruler") {
+      this.rulerTool.activate();
+      this.activeTool = this.rulerTool as any;
     }
     try {
       if ((window as any).__pixunaActiveTool !== tool) setLmbHint(false);
@@ -3084,6 +3091,7 @@ export class MiniCad {
       else if (this._activeTool === "polygon") this.polygonTool.update(this.input);
       else if (this._activeTool === "document") this.documentTool.update(this.input);
       else if (this._activeTool === "pipette") this.pipetteTool.update(this.input);
+      else if (this._activeTool === "ruler") this.rulerTool.update(this.input);
 
       // Multi-Select Group-Move: nach SelectTool-Update das Delta des Primary
       // auf die Snapshot-Positionen der Extras anwenden.

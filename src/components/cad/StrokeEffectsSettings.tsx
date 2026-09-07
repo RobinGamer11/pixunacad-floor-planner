@@ -335,41 +335,48 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
           </div>
         )}
 
-        <div className="mt-2 grid grid-cols-2 gap-1">
-          {BRUSH_PRESETS.map((b) => (
-            <BrushButton
-              key={b.id}
-              id={b.id}
-              label={b.label}
-              active={activeBrush === b.id}
-              onClick={() => selectBrush(activeBrush === b.id ? "" : b.id)}
-              character={activeBrush === b.id ? brushCharacter : undefined}
-            />
-
-          ))}
-        </div>
-
-        <div className="mt-2">
-          {activeBrush && (
-            <div className="mt-2 space-y-2">
-              <SliderField
-                label="Charakter" unit="" value={brushCharacter} step={1} min={0} max={100}
-                onChange={(v) => applyPattern({ brushCharacter: v })}
-                onDragStart={dragStart} onDragEnd={dragEnd}
-              />
-              {brushInfo?.usesAngle && (
-                <SliderField
-                  label="Federwinkel" unit="°" value={pattern.brushAngleDeg ?? 38} step={1} min={-180} max={180}
-                  onChange={(v) => applyPattern({ brushAngleDeg: v })}
-                  onDragStart={dragStart} onDragEnd={dragEnd}
+        {/* Pinsel-Linienarten gibt es nur beim Freihand-Werkzeug.
+            Linie, Polygon und Schraffur haben ausschließlich die vier
+            Grundarten oben. Bestehende Objekte bleiben unverändert. */}
+        {kind === "free" && (
+          <>
+            <div className="mt-2 grid grid-cols-2 gap-1">
+              {BRUSH_PRESETS.map((b) => (
+                <BrushButton
+                  key={b.id}
+                  id={b.id}
+                  label={b.label}
+                  active={activeBrush === b.id}
+                  onClick={() => selectBrush(activeBrush === b.id ? "" : b.id)}
+                  character={activeBrush === b.id ? brushCharacter : undefined}
                 />
-              )}
-              <div className="text-[11px] text-muted-foreground">
-                Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
-              </div>
+              ))}
             </div>
-          )}
-        </div>
+
+            <div className="mt-2">
+              {activeBrush && (
+                <div className="mt-2 space-y-2">
+                  <SliderField
+                    label="Charakter" unit="" value={brushCharacter} step={1} min={0} max={100}
+                    onChange={(v) => applyPattern({ brushCharacter: v })}
+                    onDragStart={dragStart} onDragEnd={dragEnd}
+                  />
+                  {brushInfo?.usesAngle && (
+                    <SliderField
+                      label="Federwinkel" unit="°" value={pattern.brushAngleDeg ?? 38} step={1} min={-180} max={180}
+                      onChange={(v) => applyPattern({ brushAngleDeg: v })}
+                      onDragStart={dragStart} onDragEnd={dragEnd}
+                    />
+                  )}
+                  <div className="text-[11px] text-muted-foreground">
+                    Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
 
       </div>
 
