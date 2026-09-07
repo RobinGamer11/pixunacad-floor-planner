@@ -114,7 +114,10 @@ export class IdPanel {
     try {
       const titleEl = this.root.querySelector(".id-title") as HTMLElement | null;
       if (titleEl) {
-        titleEl.textContent = `▤ Bezeichnungs-ID (${groups.length})`;
+        titleEl.innerHTML =
+          `<span class="id-title-icon">▤</span>` +
+          `<span class="id-title-text">Bezeichnungs-ID</span>` +
+          `<span class="id-title-badge">${groups.length}</span>`;
         titleEl.style.cursor = "pointer";
         titleEl.title = "Ebenen-Panel öffnen/schließen";
         if (!(titleEl as any).__pixunaLayerToggle) {
