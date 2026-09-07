@@ -2,12 +2,12 @@
  * Projektbezogene Team-Ansicht (Reiter „Team“ auf der Projektstartseite).
  *
  * Bewusst ohne eigene Datenhaltung: Mitglieder, Rollen und Einzelrechte
- * kommen aus derselben gemeinsamen Datenbasis (`project_members`, Ownership
- * aus `network_projects`) wie das Netzwerk; Einladungen aus
- * `project_invitations`. Rechteänderungen prüft zusätzlich die RLS.
+ * kommen aus derselben gemeinsamen Datenbasis wie das Netzwerk
+ * (`network_projects`, `project_members`, `profiles`, `presence`).
+ * Rechteänderungen prüft zusätzlich die serverseitige RLS.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Crown, Mail, MoreHorizontal, Search, UserMinus, UserPlus, X } from "lucide-react";
+import { Crown, MoreHorizontal, Search, UserMinus, UserPlus, X } from "lucide-react";
 import { useNetwork, presenceColor, presenceLabel, type NetworkPerson } from "@/lib/networkStore";
 import {
   ROLE_LABEL,
@@ -16,7 +16,6 @@ import {
   type ProjectPermissions,
   type ProjectRole,
 } from "@/lib/projectAccess";
-import { INVITATION_STATUS_LABEL, useProjectInvitations } from "@/lib/projectInvitations";
 import { useProjectCommentOverview } from "@/lib/commentsStore";
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 
@@ -65,22 +64,22 @@ function PermissionChip({
 export function ProjectTeamTab({ projectId, projectName }: { projectId: string; projectName: string }) {
   const localProjects = useMemo(() => [{ id: projectId, name: projectName }], [projectId, projectName]);
   const net = useNetwork(localProjects);
-  const invites = useProjectInvitations(projectId);
   const { statsByUser } = useProjectCommentOverview(projectId);
 
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const sharedRow = net.sharedProjects.find((p) => p.id === projectId);
-  const ownerId = sharedRow?.owner_id ?? net.myId ?? null;
+  /** Besitzer nur aus der Projektfreigabe – niemals lokal geraten. */
+  const ownerId = sharedRow?.owner_id ?? null;
 
   const memberRow = (userId: string) =>
     net.members.find((m) => m.project_id === projectId && m.user_id === userId);
 
+  /** Verwaltungsrechte ausschließlich aus der gemeinsamen Datenbasis. */
   const canManage = useMemo(() => {
-    if (!sharedRow) return true; // rein lokales Projekt gehört mir.
+    if (!net.ready || !sharedRow) return false;
     if (sharedRow.owner_id === net.myId) return true;
     const mine = net.members.find((m) => m.project_id === projectId && m.user_id === (net.myId ?? ""));
     if (!mine) return false;
@@ -122,10 +121,15 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         .includes(term));
   }, [people, query]);
 
-  const invitedIds = new Set(invites.pending.map((i) => i.invitee_id));
-  const available = net.contacts.filter((c) => !people.some((p) => p.person.id === c.id) && !invitedIds.has(c.id));
+  const available = net.contacts.filter((c) => !people.some((p) => p.person.id === c.id));
 
-  const nameOf = (id: string) => net.peopleById.get(id)?.name ?? "Unbekannt";
+  /** Mitglied über den bestehenden Weg (`project_members`) aufnehmen. */
+  const addMember = async (userId: string, role: AssignableRole, perms: ProjectPermissionOverrides) => {
+    await net.addMember(projectId, userId);
+    if (role !== "member") await net.setMemberRole(projectId, userId, role);
+    if (Object.keys(perms).length > 0) await net.setMemberPermissions(projectId, userId, perms);
+  };
+
 
   useEffect(() => {
     if (!menuFor) return;
@@ -153,19 +157,6 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         >
           <UserPlus size={18} /> Mitglied hinzufügen
         </button>
-        <button
-          type="button"
-          onClick={() => setInviteOpen(true)}
-          className="flex h-14 min-h-[44px] items-center justify-center gap-2 rounded-xl border px-6 text-base font-semibold"
-          style={{ borderColor: LINE }}
-        >
-          <Mail size={18} /> Einladungen
-          {invites.pending.length > 0 && (
-            <span className="rounded-full px-2 text-xs font-bold" style={{ background: GOLD, color: "hsl(var(--ink))" }}>
-              {invites.pending.length}
-            </span>
-          )}
-        </button>
         <label className="relative lg:ml-auto lg:w-[420px]">
           <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={19} />
           <input
@@ -179,9 +170,33 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         </label>
       </div>
 
-      {(net.error || invites.error) && (
-        <div className="mt-4 rounded-xl border p-3 text-xs" style={{ background: CARD, borderColor: "hsl(0 70% 55% / 0.4)" }}>
-          {net.error ?? invites.error}
+      {net.error && (
+        <div
+          className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border p-4 text-sm"
+          style={{ background: CARD, borderColor: "hsl(0 70% 55% / 0.4)" }}
+        >
+          <span className="min-w-0 flex-1">{net.error}</span>
+          <button
+            type="button"
+            onClick={() => net.reload()}
+            className="h-11 rounded-lg border px-4 text-sm font-medium"
+            style={{ borderColor: LINE }}
+          >
+            Erneut laden
+          </button>
+        </div>
+      )}
+
+      {!net.error && net.loading && !net.ready && (
+        <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground" style={{ background: CARD, borderColor: LINE }}>
+          Team wird geladen …
+        </div>
+      )}
+
+      {!net.error && net.ready && !sharedRow && (
+        <div className="mt-4 rounded-xl border p-4 text-sm text-muted-foreground" style={{ background: CARD, borderColor: LINE }}>
+          Für dieses Projekt liegt noch keine Freigabe vor. Besitzer und Rechte werden angezeigt, sobald das Projekt
+          im Netzwerk verfügbar ist.
         </div>
       )}
 
@@ -342,38 +357,14 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         </ul>
       </div>
 
-      {/* --------------------------------------- Einladungen (Kurzinfo) */}
-      {invites.pending.length === 0 && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl border px-5 py-4" style={{ background: CARD, borderColor: LINE }}>
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border" style={{ borderColor: LINE }}>
-            <Mail size={17} className="text-muted-foreground" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold">Keine offenen Einladungen</div>
-            <div className="text-xs text-muted-foreground">Es sind derzeit keine Einladungen ausstehend.</div>
-          </div>
-        </div>
-      )}
-
       {addOpen && (
         <AddMemberDialog
           available={available}
           onClose={() => setAddOpen(false)}
-          onInvite={async (userId, role, perms) => {
-            await invites.invite(userId, role, perms);
+          onAdd={async (userId, role, perms) => {
+            await addMember(userId, role, perms);
             setAddOpen(false);
           }}
-        />
-      )}
-
-      {inviteOpen && (
-        <InvitationsDialog
-          rows={invites.pending}
-          canManage={canManage}
-          nameOf={nameOf}
-          onRevoke={(id) => void invites.revoke(id)}
-          onResend={(id) => void invites.resend(id)}
-          onClose={() => setInviteOpen(false)}
         />
       )}
     </div>
@@ -411,11 +402,11 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function AddMemberDialog({
-  available, onClose, onInvite,
+  available, onClose, onAdd,
 }: {
   available: NetworkPerson[];
   onClose: () => void;
-  onInvite: (userId: string, role: AssignableRole, perms: ProjectPermissionOverrides) => Promise<void> | void;
+  onAdd: (userId: string, role: AssignableRole, perms: ProjectPermissionOverrides) => Promise<void> | void;
 }) {
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState<AssignableRole>("member");
@@ -438,7 +429,7 @@ function AddMemberDialog({
           </select>
           {available.length === 0 && (
             <span className="mt-1 block text-xs text-muted-foreground">
-              Alle Kontakte sind bereits im Projekt oder eingeladen.
+              Alle Kontakte sind bereits im Projekt.
             </span>
           )}
         </label>
@@ -474,62 +465,14 @@ function AddMemberDialog({
           <button
             type="button"
             disabled={!userId}
-            onClick={() => void onInvite(userId, role, perms)}
+            onClick={() => void onAdd(userId, role, perms)}
             className="h-12 rounded-lg px-5 text-sm font-semibold disabled:opacity-50"
             style={{ background: GOLD, color: "hsl(var(--ink))" }}
           >
-            Einladung absenden
+            Mitglied hinzufügen
           </button>
         </div>
       </div>
-    </Shell>
-  );
-}
-
-function InvitationsDialog({
-  rows, canManage, nameOf, onRevoke, onResend, onClose,
-}: {
-  rows: { id: string; invitee_id: string; role: AssignableRole; status: keyof typeof INVITATION_STATUS_LABEL; created_at: string }[];
-  canManage: boolean;
-  nameOf: (id: string) => string;
-  onRevoke: (id: string) => void;
-  onResend: (id: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <Shell title="Einladungen" onClose={onClose}>
-      {rows.length === 0 ? (
-        <div className="flex items-center gap-3 rounded-xl border px-4 py-4" style={{ borderColor: LINE }}>
-          <Mail size={18} className="text-muted-foreground" />
-          <div>
-            <div className="text-sm font-semibold">Keine offenen Einladungen</div>
-            <div className="text-xs text-muted-foreground">Es sind derzeit keine Einladungen ausstehend.</div>
-          </div>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {rows.map((r) => (
-            <li key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: LINE }}>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{nameOf(r.invitee_id)}</div>
-                <div className="text-xs text-muted-foreground">
-                  {INVITATION_STATUS_LABEL[r.status]} · {ROLE_LABEL[r.role]} · {new Date(r.created_at).toLocaleDateString("de-DE")}
-                </div>
-              </div>
-              {canManage && (
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => onResend(r.id)} className="h-11 rounded-lg border px-3 text-xs" style={{ borderColor: LINE }}>
-                    Erneut senden
-                  </button>
-                  <button type="button" onClick={() => onRevoke(r.id)} className="h-11 rounded-lg border px-3 text-xs" style={{ borderColor: LINE }}>
-                    Zurückziehen
-                  </button>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
     </Shell>
   );
 }
