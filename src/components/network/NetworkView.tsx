@@ -91,9 +91,11 @@ export function NetworkView({
   }, [net.ready, myStatus]);
 
   const [tab, setTab] = useState<TabId>("teams");
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<NetworkProfile[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addEmail, setAddEmail] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addHint, setAddHint] = useState<string | null>(null);
+  const [addFound, setAddFound] = useState<NetworkProfile | null>(null);
   const [chat, setChat] = useState<ChatTarget | null>(null);
   const [details, setDetails] = useState<NetworkPerson | null>(null);
   const [confirmContact, setConfirmContact] = useState<{ person: NetworkPerson; projects: string[] } | null>(null);
@@ -194,7 +196,10 @@ export function NetworkView({
     for (const p of projects) map.set(p.id, p);
     for (const p of net.sharedProjects) {
       if (map.has(p.id)) continue;
-      const mine = p.owner_id === net.myId || net.members.some((m) => m.project_id === p.id && m.user_id === net.myId);
+      // Eigene Projekte kommen ausschließlich aus der lokalen Projektliste –
+      // so verschwinden gelöschte Projekte auch hier sofort.
+      if (p.owner_id === net.myId) continue;
+      const mine = net.members.some((m) => m.project_id === p.id && m.user_id === net.myId);
       if (mine) map.set(p.id, { id: p.id, name: p.name || "Projekt" });
     }
     return [...map.values()];
@@ -213,10 +218,28 @@ export function NetworkView({
     setChat({ kind: "project", projectId: p.id, title: p.name });
   };
 
-  const runSearch = async () => {
-    setSearching(true);
-    setResults(await net.searchUsers(query));
-    setSearching(false);
+  /** Kontaktanfrage per vollständiger E-Mail-Adresse (serverseitige Auflösung). */
+  const lookupEmail = async () => {
+    const value = addEmail.trim().toLowerCase();
+    setAddFound(null);
+    setAddHint(null);
+    if (!value.includes("@") || value.length < 5) {
+      setAddHint("Bitte die vollständige E-Mail-Adresse angeben.");
+      return;
+    }
+    setAddBusy(true);
+    try {
+      const found = await net.findUserByEmail(value);
+      if (!found) { setAddHint("Zu dieser E-Mail-Adresse wurde kein Konto gefunden."); return; }
+      if (found.id === net.myId) { setAddHint("Das ist deine eigene Adresse."); return; }
+      if (net.contacts.some((c) => c.id === found.id)) { setAddHint("Diese Person ist bereits dein Kontakt."); return; }
+      if (pendingContactIds.has(found.id)) { setAddHint("Zu dieser Person gibt es bereits eine offene Anfrage."); return; }
+      setAddFound(found);
+    } catch {
+      setAddHint("Suche derzeit nicht möglich.");
+    } finally {
+      setAddBusy(false);
+    }
   };
 
 
@@ -308,6 +331,14 @@ export function NetworkView({
 
           {!net.loading && tab === "requests" && (
             <div className="space-y-4">
+              <button
+                onClick={() => { setAddOpen(true); setAddEmail(""); setAddHint(null); setAddFound(null); }}
+                className="h-10 px-4 rounded-lg text-sm font-semibold flex items-center gap-2"
+                style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
+              >
+                <UserPlus size={15} /> Freund hinzufügen
+              </button>
+
               <div>
                 <div className="text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground">
                   Eingehende Anfragen
@@ -360,52 +391,8 @@ export function NetworkView({
                   ))}
                 </div>
               )}
-
-              <div>
-                <div className="text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground">
-                  Personen suchen
-                </div>
-                <div className="mt-1.5 flex gap-2">
-                  <div
-                    className="flex-1 h-9 rounded-md border flex items-center gap-2 px-2.5"
-                    style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}
-                  >
-                    <Search size={14} className="text-muted-foreground" />
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") void runSearch(); }}
-                      placeholder="Anzeigename (min. 2 Zeichen)"
-                      className="flex-1 bg-transparent text-sm outline-none"
-                    />
-                  </div>
-                  <button
-                    onClick={() => void runSearch()}
-                    className="h-9 px-3 rounded-md border text-xs font-medium"
-                    style={{ borderColor: "hsl(var(--hairline))" }}
-                  >
-                    Suchen
-                  </button>
-                </div>
-                {searching && <div className="mt-2 text-[11px] text-muted-foreground">Suche läuft …</div>}
-                {!searching && results.map((r) => (
-                  <div key={r.id} className="flex items-center gap-2.5 px-2 py-1.5">
-                    <Avatar name={r.display_name} url={r.avatar_url} />
-                    <span className="flex-1 min-w-0 text-sm truncate">{r.display_name || "Unbekannt"}</span>
-                    <button
-                      onClick={() => net.sendRequest(r.id)}
-                      className="h-7 px-2 rounded-md border text-xs flex items-center gap-1"
-                      style={{ borderColor: "hsl(var(--accent-gold))" }}
-                    >
-                      <UserPlus size={13} /> Anfragen
-                    </button>
-                  </div>
-                ))}
-              </div>
             </div>
           )}
-
-
 
         </div>
 
@@ -418,6 +405,67 @@ export function NetworkView({
           />
         )}
       </div>
+
+      {/* Freund hinzufügen – ausschließlich über die vollständige E-Mail-Adresse */}
+      {addOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setAddOpen(false)}>
+          <div className="rounded-xl border p-4 w-[360px]" style={surface} onClick={(e) => e.stopPropagation()}>
+            <div className="text-sm font-semibold">Freund hinzufügen</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              Kontaktanfragen laufen ausschließlich über die vollständige E-Mail-Adresse des Kontos.
+            </div>
+            <div
+              className="mt-3 h-9 rounded-md border flex items-center gap-2 px-2.5"
+              style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}
+            >
+              <Search size={14} className="text-muted-foreground" />
+              <input
+                type="email"
+                autoFocus
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void lookupEmail(); }}
+                placeholder="name@beispiel.de"
+                className="flex-1 bg-transparent text-sm outline-none text-foreground"
+              />
+            </div>
+            {addHint && <div className="mt-2 text-[11px] text-muted-foreground">{addHint}</div>}
+            {addFound && (
+              <div className="mt-3 flex items-center gap-2.5">
+                <Avatar name={addFound.display_name || "?"} url={addFound.avatar_url} />
+                <span className="flex-1 min-w-0 text-sm truncate">{addFound.display_name || "Unbekannt"}</span>
+              </div>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setAddOpen(false)}
+                className="h-8 px-3 rounded-md border text-xs"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                Abbrechen
+              </button>
+              {addFound ? (
+                <button
+                  onClick={() => { void net.sendRequest(addFound.id); setAddOpen(false); }}
+                  className="h-8 px-3 rounded-md text-xs font-semibold"
+                  style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
+                >
+                  Anfrage senden
+                </button>
+              ) : (
+                <button
+                  onClick={() => void lookupEmail()}
+                  disabled={addBusy}
+                  className="h-8 px-3 rounded-md border text-xs disabled:opacity-50"
+                  style={{ borderColor: "hsl(var(--accent-gold))" }}
+                >
+                  {addBusy ? "Sucht …" : "Suchen"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Personendetails */}
       {details && (

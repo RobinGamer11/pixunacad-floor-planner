@@ -37,8 +37,8 @@ export function MemberRoleControls({
         <select
           value={role}
           onChange={(e) => onRole(e.target.value as Exclude<ProjectRole, "owner">)}
-          className="h-6 rounded border px-1 text-[10px]"
-          style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+          className="h-6 rounded border px-1 text-[10px] bg-background text-foreground [&>option]:bg-background [&>option]:text-foreground"
+          style={{ borderColor: "hsl(var(--hairline))" }}
         >
           <option value="admin">{ROLE_LABEL.admin}</option>
           <option value="member">{ROLE_LABEL.member}</option>

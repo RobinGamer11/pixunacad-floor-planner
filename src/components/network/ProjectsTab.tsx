@@ -263,8 +263,8 @@ export function ProjectsTab(props: ProjectsTabProps) {
                     if (e.target.value) props.onAddMember(selected.id, e.target.value);
                     e.target.value = "";
                   }}
-                  className="mt-2 h-8 w-full rounded-md border px-2 text-xs"
-                  style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}
+                  className="mt-2 h-8 w-full rounded-md border px-2 text-xs bg-background text-foreground [&>option]:bg-background [&>option]:text-foreground"
+                  style={{ borderColor: "hsl(var(--hairline))" }}
                 >
                   <option value="">Person hinzufügen …</option>
                   {available.map((c) => (

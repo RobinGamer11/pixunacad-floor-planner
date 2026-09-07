@@ -67,7 +67,6 @@ import {
   QUICK_CATEGORY_ID,
   type TlKind,
 } from "@/lib/timelineStore";
-import { WeatherStrip } from "@/components/project/WeatherStrip";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
 import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverview";
@@ -1081,9 +1080,6 @@ export default function ProjectsHome() {
               {settingsOpen && (
                 <ProjectSettingsPanel project={selected} onClose={() => setSettingsOpen(false)} />
               )}
-
-              {/* Wetter für Projektort */}
-              <WeatherStrip ort={selected.ort} />
 
               {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
