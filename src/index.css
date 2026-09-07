@@ -1183,6 +1183,14 @@
   display: none;
 }
 
+/* Auf Handy und Tablet keine sichtbaren Scrollleisten */
+@media (max-width: 1023px) {
+  * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
+  *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+}
+
+
+
 /* Beim Drucken: Papier ohne grauen Rand/Schatten */
 @media print {
   .page-sheet { border: none !important; box-shadow: none !important; }
