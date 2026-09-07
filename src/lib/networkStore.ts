@@ -355,6 +355,20 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
       if (error) return [];
       return (data ?? []) as NetworkProfile[];
     },
+    /**
+     * Kontaktsuche ausschließlich über die vollständige E-Mail-Adresse.
+     * Die Auflösung passiert serverseitig (`find_profile_by_email`);
+     * im Browser ist kein E-Mail-Verzeichnis verfügbar.
+     */
+    findUserByEmail: async (email: string): Promise<NetworkProfile | null> => {
+      const client = getNetworkClient();
+      const value = email.trim().toLowerCase();
+      if (!client || !value.includes("@")) return null;
+      const { data, error } = await client.rpc("find_profile_by_email", { email: value });
+      if (error) throw error;
+      const row = (Array.isArray(data) ? data[0] : data) as NetworkProfile | undefined;
+      return row ?? null;
+    },
     sendRequest: (userId: string) =>
       run(async (client) => {
         const session = authClient.getSession();

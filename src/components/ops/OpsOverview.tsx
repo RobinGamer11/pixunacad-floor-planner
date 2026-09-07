@@ -260,7 +260,7 @@ export function OpsOverview({
         <OpsActionBar
           projects={projects}
           fixedProjectId={fixedProjectId}
-          showContribution
+          
           onChanged={() => setOpsNonce((n) => n + 1)}
         />
       </div>

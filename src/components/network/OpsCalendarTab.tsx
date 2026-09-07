@@ -25,7 +25,8 @@ import {
 } from "@/lib/opsStore";
 import { effectiveStatusId, subscribeTimeline, timelineStore, type TlItem } from "@/lib/timelineStore";
 
-const inputCls = "h-9 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring";
+const inputCls =
+  "h-9 rounded-md border bg-background text-foreground px-2 text-xs outline-none focus:ring-1 focus:ring-ring [&>option]:bg-background [&>option]:text-foreground";
 const LINE = "hsl(var(--hairline))";
 const SOFT = "hsl(var(--ink-soft))";
 
