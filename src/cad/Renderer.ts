@@ -3287,6 +3287,29 @@ export class Renderer {
   }
 
   /**
+   * Umrechnungsfaktor „1 CSS-Bildschirmpixel → Canvas-Zeichnungseinheiten“.
+   *
+   * Er ergibt sich ausschließlich aus dem Verhältnis von Backing-Store zu
+   * sichtbarer CSS-Größe, abzüglich einer bereits aktiven Canvas-Transformation.
+   * Der Kamera- bzw. Seitenzoom ist bewusst NICHT enthalten. Dadurch liefern
+   * die große CAD-Fläche (setTransform(dpr)) und das eingebettete MiniCad
+   * (Backing-Store × renderScale) dieselben CSS-Bildschirmgrößen.
+   */
+  private _screenPxScale(): number {
+    const cv = this.ctx?.canvas as HTMLCanvasElement | undefined;
+    if (!cv) return this.uiScale || 1;
+    const cssW = cv.clientWidth || (parseFloat(cv.style.width) || 0) || cv.width;
+    const backing = cssW > 0 ? cv.width / cssW : (this.uiScale || 1);
+    let tScale = 1;
+    try {
+      const t = (this.ctx as any).getTransform?.();
+      if (t) tScale = Math.hypot(t.a, t.b) || 1;
+    } catch { /* getTransform optional */ }
+    const k = backing / (tScale || 1);
+    return Number.isFinite(k) && k > 0 ? k : 1;
+  }
+
+  /**
    * Füllt ein Band mit variabler Halbbreite entlang der Punktfolge.
    * Nutzt gemittelte Normalen + quadratische Glättung für elegante Schwünge.
    */
@@ -3563,10 +3586,14 @@ export class Renderer {
     const totalUnits = lenM * per;
     const pxPerUnit = lenPx / Math.max(1e-9, totalUnits);
 
-    // Feste Bildschirmgrößen (Canvas-Einheiten → durch uiScale korrigiert).
-    const k = this.uiScale || 1;
-    const bandPx = 38 * k;
-    const fontPx = 10 * k;
+    // Feste Bildschirmgrößen: Verhältnis Backing-Store ↔ sichtbare CSS-Größe,
+    // bereinigt um eine bereits gesetzte Canvas-Transformation. Der Kamera-
+    // bzw. Seitenzoom steckt hier bewusst NICHT drin — dadurch bleiben Schrift,
+    // Linealbreite, Teilstriche, Kontur und Griffe auf jeder Zoomstufe
+    // (25 %, 50 %, 100 %, 200 %, 400 %) exakt gleich groß auf dem Bildschirm.
+    const k = this._screenPxScale();
+    const bandPx = 40 * k;
+    const fontPx = 12.5 * k;
     const hairline = 1 * k;
 
     // Körperlage relativ zur Zeichenkante (im gedrehten System zeigt -y "links").
@@ -3597,7 +3624,19 @@ export class Renderer {
     const dir = bodyTop < 0 && side !== "center" ? -1 : 1; // "rechts": Körper oberhalb
     const total = Math.floor(totalUnits + 1e-6);
     const showFine = pxPerUnit >= 26 * k;
-    const labelEvery = pxPerUnit >= 26 * k ? 1 : pxPerUnit >= 12 * k ? 5 : pxPerUnit >= 4 * k ? 10 : 50;
+    // Beschriftungen werden bei Platzmangel ausgelassen (jede 2./5./10. …),
+    // NIEMALS verkleinert und niemals in eine andere Einheit umgerechnet.
+    ctx.font = `${fontPx}px system-ui, sans-serif`;
+    const sampleW = Math.max(
+      ctx.measureText(String(Math.max(1, Math.floor(totalUnits)))).width,
+      fontPx
+    );
+    const needPx = sampleW + 8 * k;
+    let labelEvery = 1;
+    for (const step of [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000]) {
+      labelEvery = step;
+      if (step * pxPerUnit >= needPx) break;
+    }
     ctx.strokeStyle = "rgba(30,70,120,0.85)";
     ctx.fillStyle = "rgba(30,70,120,0.95)";
     ctx.lineWidth = hairline;

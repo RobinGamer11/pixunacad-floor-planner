@@ -7,6 +7,7 @@
  * erhaltene Belege erfasst werden; ein Erzeugen eigener Dokumente entfällt.
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
@@ -151,10 +152,13 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         <div key={n.id}>
           <div
             onClick={() => openNode(n.id)}
-            className="group flex items-center gap-1 px-2 py-2 rounded-md cursor-pointer text-[13px] min-h-[44px]"
+            className={`group flex items-center gap-1 px-2 py-2 rounded-md cursor-pointer text-[13px] min-h-[44px] ${active ? "font-semibold" : ""}`}
             style={{
               paddingLeft: 8 + depth * 14,
-              background: active ? "hsl(var(--surface-muted))" : undefined,
+              background: active ? "hsl(var(--accent-gold) / 0.18)" : undefined,
+              border: active ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
+              boxShadow: active ? "inset 3px 0 0 hsl(var(--accent-gold))" : undefined,
+              color: active ? "hsl(var(--accent-gold))" : undefined,
               opacity: n.enabled ? 1 : 0.45,
             }}
           >
@@ -166,7 +170,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
             ) : <span className="h-8 w-8 -ml-1 shrink-0" />}
             {n.type === "overview"
               ? <Folder size={14} style={{ color: "hsl(var(--accent-gold))" }} />
-              : <Building2 size={14} style={{ color: "hsl(var(--ink-soft))" }} />}
+              : <Building2 size={14} style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }} />}
             <span className="truncate flex-1">{n.name}</span>
             <NodeMenu
               projectId={pid}
@@ -182,9 +186,10 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
     });
 
   /** Strukturspalte – auf großen Bildschirmen fest, sonst als Panel. */
-  const structureFor = (showAdd: boolean) => (
+  const structureFor = (showAdd: boolean, showHeader = true) => (
     <div className="flex h-full min-h-0 flex-col overflow-hidden"
          style={{ background: "hsl(var(--surface-card))" }}>
+      {showHeader && (
       <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
              style={{ color: "hsl(var(--ink-soft))" }}>Struktur</div>
@@ -193,6 +198,8 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           <PanelLeftClose size={16} />
         </button>
       </div>
+      )}
+
 
       {showAdd && (
       <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -345,7 +352,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           {mobileNavOpen && (
             <div className="lg:hidden border-b max-h-[70vh] overflow-auto"
                  style={{ borderColor: "hsl(var(--hairline))" }}>
-              {structureFor(false)}
+              {structureFor(false, false)}
             </div>
           )}
 
@@ -382,53 +389,77 @@ const NodeMenu: React.FC<{
   onDuplicated: (id: string) => void;
 }> = ({ projectId, node, compact, onDeleted, onDuplicated }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement | null>(null);
   const label = node.type === "overview" ? "Ordner" : "Anlage";
 
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("pointerdown", onDown, true);
-    return () => window.removeEventListener("pointerdown", onDown, true);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
   const item = (icon: React.ReactNode, text: string, run: () => void, danger?: boolean) => (
     <button
       onClick={(e) => { e.stopPropagation(); setOpen(false); run(); }}
-      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-[12px] rounded-md hover:bg-muted text-left"
-      style={danger ? { color: "hsl(var(--destructive))" } : undefined}>
+      className="w-full flex items-center gap-2.5 px-3 h-12 text-[14px] rounded-lg border text-left hover:bg-muted"
+      style={{
+        borderColor: "hsl(var(--hairline))",
+        color: danger ? "hsl(var(--destructive))" : undefined,
+      }}>
       {icon}{text}
     </button>
   );
 
   return (
-    <div ref={ref} className="relative shrink-0" data-export-hide>
+    <div className="shrink-0" data-export-hide>
       <button
         title={`${label} verwalten`}
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        className={`h-6 w-6 rounded flex items-center justify-center hover:bg-muted ${compact ? "opacity-50 group-hover:opacity-100" : "opacity-60 hover:opacity-100"}`}
+        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
+        className={`h-8 w-8 rounded flex items-center justify-center hover:bg-muted ${compact ? "opacity-60 group-hover:opacity-100" : "opacity-70 hover:opacity-100"}`}
         style={{ color: "hsl(var(--ink-soft))" }}>
-        <MoreVertical size={14} />
+        <MoreVertical size={16} />
       </button>
-      {open && (
-        <div className="absolute right-0 top-7 z-50 min-w-[180px] rounded-lg border p-1 shadow-lg"
-             style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-          {item(<Pencil size={13} />, `${label} umbenennen`, () => {
-            const name = window.prompt(`${label} umbenennen`, node.name);
-            if (name && name.trim()) financeStore.updateNode(projectId, node.id, { name: name.trim() });
-          })}
-          {item(<Copy size={13} />, `${label} duplizieren`, () => {
-            const copy = financeStore.duplicateNode(projectId, node.id);
-            if (copy) onDuplicated(copy.id);
-          })}
-          {item(<Trash2 size={13} />, `${label} löschen`, () => {
-            if (!window.confirm(`\u201e${node.name}\u201c wirklich löschen?`)) return;
-            financeStore.deleteNode(projectId, node.id);
-            onDeleted();
-          }, true)}
-        </div>
+      {open && createPortal(
+        <div
+          className="fixed inset-0 z-[1400] flex items-center justify-center p-4"
+          style={{ background: "hsl(0 0% 0% / 0.55)" }}
+          onPointerDown={(e) => { e.stopPropagation(); setOpen(false); }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="w-full max-w-[360px] rounded-2xl border p-4 shadow-2xl space-y-2"
+            style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 pb-1">
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-semibold uppercase tracking-wider"
+                     style={{ color: "hsl(var(--ink-soft))" }}>{label}</div>
+                <div className="truncate text-[15px] font-semibold">{node.name}</div>
+              </div>
+              <button onClick={() => setOpen(false)}
+                className="h-9 w-9 rounded-lg flex items-center justify-center hover:bg-muted"
+                title="Schließen">
+                <X size={18} />
+              </button>
+            </div>
+            {item(<Pencil size={15} />, `${label} umbenennen`, () => {
+              const name = window.prompt(`${label} umbenennen`, node.name);
+              if (name && name.trim()) financeStore.updateNode(projectId, node.id, { name: name.trim() });
+            })}
+            {item(<Copy size={15} />, `${label} duplizieren`, () => {
+              const copy = financeStore.duplicateNode(projectId, node.id);
+              if (copy) onDuplicated(copy.id);
+            })}
+            {item(<Trash2 size={15} />, `${label} löschen`, () => {
+              if (!window.confirm(`\u201e${node.name}\u201c wirklich löschen?`)) return;
+              financeStore.deleteNode(projectId, node.id);
+              onDeleted();
+            }, true)}
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

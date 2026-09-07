@@ -68,7 +68,9 @@ export function snapRulerPoint(app: any, input: any): { x: number; y: number; sn
   try {
     const snap = app?.topology?.findBestSnap?.(
       { x: input.mouse.sx, y: input.mouse.sy },
-      raw
+      raw,
+      // Das Lineal darf niemals an sich selbst fangen.
+      { ruler: true }
     );
     if (snap?.world) return { x: snap.world.x, y: snap.world.y, snapped: true };
   } catch { /* Fangsystem optional */ }

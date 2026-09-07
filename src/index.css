@@ -261,6 +261,16 @@
       inset 0 1px 0 hsl(0 0% 100% / 0.3);
   }
 
+  /* Deutliches gelbes Aufleuchten (aktives Lineal-Werkzeug). */
+  .tool-glow-active {
+    color: hsl(48 96% 56%) !important;
+    background: hsl(48 96% 56% / 0.16) !important;
+    border: 1px solid hsl(48 96% 56% / 0.9) !important;
+    box-shadow: 0 0 0 2px hsl(48 96% 56% / 0.28), 0 0 14px 2px hsl(48 96% 56% / 0.55) !important;
+  }
+
+
+
 
 
   .cad-hub {
@@ -720,45 +730,70 @@
 
   .sheet-row {
     display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 6px;
+    grid-template-columns: auto 1fr auto;
+    gap: 9px;
     align-items: center;
-    padding: 6px;
-    border-radius: 10px;
-    background: hsl(var(--muted));
+    padding: 9px 10px;
+    border-radius: 12px;
+    background: hsl(var(--surface-card, var(--card)));
     border: 1px solid hsl(var(--border));
-    transition: transform 0.08s ease, opacity 0.12s ease;
+    box-shadow: 0 1px 2px hsl(0 0% 0% / 0.05);
+    transition: transform 0.08s ease, opacity 0.12s ease,
+                border-color 0.12s ease, background-color 0.12s ease;
     cursor: grab;
+    position: relative;
+    overflow: hidden;
   }
+  .sheet-row:hover { border-color: hsl(var(--accent-gold) / 0.4); }
   .sheet-row:active { cursor: grabbing; }
+  /* Aktives Blatt: kräftiger Goldrahmen + Goldbalken links — auf einen Blick erkennbar. */
   .sheet-row.active {
-    outline: 2px solid hsl(var(--accent-gold) / 0.32);
-    border-color: hsl(var(--accent-gold) / 0.55);
+    border-color: hsl(var(--accent-gold));
     background: hsl(var(--accent-gold) / 0.12);
+    box-shadow: inset 3px 0 0 hsl(var(--accent-gold)), 0 1px 3px hsl(0 0% 0% / 0.08);
   }
   .sheet-row.dragging { opacity: 0.55; }
 
+  /* Blatt-Symbol links */
+  .sheet-glyph {
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+  }
+  .sheet-row.active .sheet-glyph {
+    background: hsl(var(--accent-gold) / 0.2);
+    color: hsl(var(--accent-gold));
+  }
+
   .sheet-main { min-width: 0; cursor: pointer; }
   .sheet-name {
-    font-size: 12px;
+    font-size: 12.5px;
     color: hsl(var(--foreground));
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    line-height: 1.2;
+    line-height: 1.25;
   }
+  .sheet-row.active .sheet-name { color: hsl(var(--accent-gold)); }
   .sheet-sub {
-    font-size: 10px;
+    font-size: 10.5px;
     color: hsl(var(--muted-foreground));
-    margin-top: 1px;
+    margin-top: 2px;
   }
 
   .sheet-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
   }
+
 
   .sheet-scale-select {
     @apply rounded border bg-transparent;
@@ -784,14 +819,17 @@
   }
 
   .sheet-icon-btn {
-    @apply rounded border bg-transparent flex items-center justify-center;
-    width: 22px;
-    height: 22px;
+    @apply border bg-transparent flex items-center justify-center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
     padding: 0;
-    color: hsl(var(--foreground));
+    font-size: 12.5px;
+    line-height: 1;
+    color: hsl(var(--muted-foreground));
     border-color: hsl(var(--border));
     cursor: pointer;
-    transition: background-color 0.12s ease, border-color 0.12s ease;
+    transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
   }
   .sheet-icon-btn:hover:not(:disabled) {
     background: hsl(var(--accent));

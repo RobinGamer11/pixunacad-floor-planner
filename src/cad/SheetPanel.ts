@@ -174,6 +174,16 @@ export class SheetPanel {
         row.classList.remove("dragging");
       });
 
+      // Blatt-Symbol links — macht die Karte auf einen Blick erkennbar.
+      const glyph = document.createElement("div");
+      glyph.className = "sheet-glyph";
+      glyph.innerHTML = `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/>
+          <path d="M14 3v5h5"/>
+        </svg>
+      `;
+
       const main = document.createElement("div");
       main.className = "sheet-main";
       // Maßstab ist im Modellbereich immer 1:1 — Ausgabemaßstab wird erst
@@ -251,6 +261,7 @@ export class SheetPanel {
       actions.appendChild(editBtn);
       actions.appendChild(deleteBtn);
 
+      row.appendChild(glyph);
       row.appendChild(main);
       row.appendChild(actions);
       item.appendChild(row);
