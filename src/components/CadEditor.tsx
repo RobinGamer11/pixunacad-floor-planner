@@ -435,18 +435,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const leftSidebarRef = useRef<HTMLElement>(null);
   // Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne sichtbare Scrollbar.
   const leftRailScroll = useDragScroll<HTMLElement>("y");
-  // Outside-Klick schließt das Werkzeug-Flyout (Freihand/Radiergummi/Schraffur-Varianten …).
-  useEffect(() => {
-    if (!expandedTool) return;
-    const onDown = (e: MouseEvent | PointerEvent) => {
-      const el = leftSidebarRef.current;
-      if (!el) return;
-      if (el.contains(e.target as Node)) return;
-      setExpandedTool(null);
-    };
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
-  }, [expandedTool]);
+  // Outside-Klick und ESC schließen das Werkzeug-Flyout — siehe RailFlyout.
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
