@@ -131,6 +131,17 @@ export default function ProjectsHome() {
   const [shopOpen, setShopOpen] = useState(false);
   const [mobileShopOpen, setMobileShopOpen] = useState(false);
   const shopRef = useRef<HTMLDivElement | null>(null);
+  /** Drei-Punkte-Menü im Kopf (nur Handy): Organisation, Netzwerk, Shop. */
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const headerMenuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!headerMenuRef.current?.contains(e.target as Node)) setHeaderMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [headerMenuOpen]);
   // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
   useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
