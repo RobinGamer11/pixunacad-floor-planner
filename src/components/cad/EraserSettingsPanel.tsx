@@ -73,8 +73,16 @@ export const EraserModeSelect: React.FC<Props> = ({ app, rasterSelection = null 
 
   return (
     <div className="mb-2">
+      <div
+        className="mb-2 rounded-md border px-2 py-1.5 text-[10px] leading-snug"
+        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--muted-foreground))" }}
+      >
+        Hinweis: „Smooth“ funktioniert nur bei Pixel-Objekten (PNG/JPG bzw. Blätter im Pixel-Modus).
+        Zeichnungen und andere Vektor-Objekte werden immer hart radiert.
+      </div>
       <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
       <div className="grid grid-cols-2 gap-1">
+
         {MODES.map(({ id, label, Icon }) => {
           const disabled = id === "smooth" && !smoothAllowed;
           return (
