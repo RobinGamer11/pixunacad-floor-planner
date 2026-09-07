@@ -2,12 +2,12 @@
  * Projektbezogene Team-Ansicht (Reiter „Team“ auf der Projektstartseite).
  *
  * Bewusst ohne eigene Datenhaltung: Mitglieder, Rollen und Einzelrechte
- * kommen aus derselben gemeinsamen Datenbasis (`project_members`, Ownership
- * aus `network_projects`) wie das Netzwerk; Einladungen aus
- * `project_invitations`. Rechteänderungen prüft zusätzlich die RLS.
+ * kommen aus derselben gemeinsamen Datenbasis wie das Netzwerk
+ * (`network_projects`, `project_members`, `profiles`, `presence`).
+ * Rechteänderungen prüft zusätzlich die serverseitige RLS.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Crown, Mail, MoreHorizontal, Search, UserMinus, UserPlus, X } from "lucide-react";
+import { Crown, MoreHorizontal, Search, UserMinus, UserPlus, X } from "lucide-react";
 import { useNetwork, presenceColor, presenceLabel, type NetworkPerson } from "@/lib/networkStore";
 import {
   ROLE_LABEL,
