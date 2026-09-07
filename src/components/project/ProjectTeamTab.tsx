@@ -64,22 +64,22 @@ function PermissionChip({
 export function ProjectTeamTab({ projectId, projectName }: { projectId: string; projectName: string }) {
   const localProjects = useMemo(() => [{ id: projectId, name: projectName }], [projectId, projectName]);
   const net = useNetwork(localProjects);
-  const invites = useProjectInvitations(projectId);
   const { statsByUser } = useProjectCommentOverview(projectId);
 
   const [query, setQuery] = useState("");
   const [addOpen, setAddOpen] = useState(false);
-  const [inviteOpen, setInviteOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
 
   const sharedRow = net.sharedProjects.find((p) => p.id === projectId);
-  const ownerId = sharedRow?.owner_id ?? net.myId ?? null;
+  /** Besitzer nur aus der Projektfreigabe – niemals lokal geraten. */
+  const ownerId = sharedRow?.owner_id ?? null;
 
   const memberRow = (userId: string) =>
     net.members.find((m) => m.project_id === projectId && m.user_id === userId);
 
+  /** Verwaltungsrechte ausschließlich aus der gemeinsamen Datenbasis. */
   const canManage = useMemo(() => {
-    if (!sharedRow) return true; // rein lokales Projekt gehört mir.
+    if (!net.ready || !sharedRow) return false;
     if (sharedRow.owner_id === net.myId) return true;
     const mine = net.members.find((m) => m.project_id === projectId && m.user_id === (net.myId ?? ""));
     if (!mine) return false;
