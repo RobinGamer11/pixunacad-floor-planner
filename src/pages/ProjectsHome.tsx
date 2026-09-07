@@ -68,6 +68,10 @@ import {
   type TlKind,
 } from "@/lib/timelineStore";
 import { UebersichtView } from "@/components/project/UebersichtView";
+import {
+  ProjectEditDialog, draftFromProject, draftToPatch, emptyDraft, type ProjectDraft,
+} from "@/components/project/ProjectEditDialog";
+import { syncProjectPeriod } from "@/lib/projectPeriodSync";
 import { FileBrowser } from "@/components/project/FileBrowser";
 import { FinanceWorkspace } from "@/components/finance/FinanceWorkspace";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
