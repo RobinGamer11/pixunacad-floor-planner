@@ -147,6 +147,11 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
                 className={FIELD_CLASS} style={FIELD_STYLE} />
 
               <div className="flex items-center justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setOpenId(null)}
+                  className="h-9 px-3 rounded-md border flex items-center gap-2 text-xs mr-auto"
+                  style={{ borderColor: "hsl(var(--hairline))" }}>
+                  Zuklappen
+                </button>
                 {p.hasTemplate && (
                   <button type="button"
                     onClick={() => navigate(`/project/${projectId}?tpl=${encodeURIComponent(templateKeyOf(p.type, p.id))}&back=${nodeId}`)}
