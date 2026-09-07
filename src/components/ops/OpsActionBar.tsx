@@ -107,11 +107,12 @@ export function OpsActionBar({
         {extra}
         <button
           onClick={() => setOpen(true)}
-          className="h-12 px-5 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition hover:opacity-90"
+          className="h-14 min-h-[44px] px-6 rounded-xl text-base font-semibold flex items-center gap-2 shadow-md transition hover:opacity-90"
           style={{ background: GOLD, color: "hsl(var(--ink))" }}
         >
-          <ListPlus size={17} /> + Beitrag
+          <ListPlus size={20} /> + Beitrag
         </button>
+
       </div>
 
       {open && (
