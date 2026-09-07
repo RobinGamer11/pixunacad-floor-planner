@@ -795,7 +795,7 @@ export default function ProjectsHome() {
                               project={p}
                               active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
                               dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
-                              onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
+                              onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); closeSidebarOnCompact(); }}
                               onOpen={() => navigate(`/project/${p.id}/cad`)}
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                               onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
@@ -862,7 +862,7 @@ export default function ProjectsHome() {
                     project={p}
                     active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
                     dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
-                    onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
+                    onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); closeSidebarOnCompact(); }}
                     onOpen={() => navigate(`/project/${p.id}/cad`)}
                     onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                     onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
