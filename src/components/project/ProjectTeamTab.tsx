@@ -16,7 +16,6 @@ import {
   type ProjectPermissions,
   type ProjectRole,
 } from "@/lib/projectAccess";
-import { INVITATION_STATUS_LABEL, useProjectInvitations } from "@/lib/projectInvitations";
 import { useProjectCommentOverview } from "@/lib/commentsStore";
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 
