@@ -319,6 +319,14 @@ export default function ProjectsHome() {
     setDragOverProject(null);
   };
 
+  /** Verschieben ohne Ziehen – wichtig auf Tablets ohne Drag-and-drop. */
+  const moveProjectInList = (list: Project[], id: string, dir: -1 | 1) => {
+    const index = list.findIndex((p) => p.id === id);
+    const target = list[index + dir];
+    if (index < 0 || !target) return;
+    projectStore.reorderProject(id, target.id, dir === -1 ? "before" : "after");
+  };
+
   const handleDropOnFolder = (folderId: string | null) => {
     if (dragProjectId) {
       const sourceFolderId = projects.find((project) => project.id === dragProjectId)?.folderId ?? null;
@@ -757,6 +765,10 @@ export default function ProjectsHome() {
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                               onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                               onDelete={() => deleteProjectWithConfirm(p)}
+                    onMoveUp={() => moveProjectInList(rootProjects, p.id, -1)}
+                    onMoveDown={() => moveProjectInList(rootProjects, p.id, 1)}
+                              onMoveUp={() => moveProjectInList(inside, p.id, -1)}
+                              onMoveDown={() => moveProjectInList(inside, p.id, 1)}
                               onDragStart={() => setDragProjectId(p.id)}
                               onDragEnd={resetProjectDrag}
                               onDragOverCard={(place) => setDragOverProject({ id: p.id, place })}
@@ -1272,6 +1284,8 @@ function ProjectCard({
   onSettings,
   onDuplicate,
   onDelete,
+  onMoveUp,
+  onMoveDown,
   onDragStart,
   onDragEnd,
   onDragOverCard,
@@ -1285,6 +1299,8 @@ function ProjectCard({
   onSettings: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onDragOverCard?: (place: "before" | "after") => void;
@@ -1376,6 +1392,18 @@ function ProjectCard({
               className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
             >
               <Settings size={14} /> Einstellungen
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onMoveUp?.(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+            >
+              <ChevronUp size={14} /> Nach oben
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onMoveDown?.(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+            >
+              <ChevronDown size={14} /> Nach unten
             </button>
             <button
               onClick={() => { setMenuOpen(false); onDuplicate(); }}
