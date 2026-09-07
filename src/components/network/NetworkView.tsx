@@ -433,12 +433,11 @@ export function NetworkView({
   }, [folders, projects]);
 
   const tabs: { id: TabId; label: string; icon: typeof Users; badge?: number }[] = [
-    { id: "teams", label: "Projekte / Teams", icon: FolderKanban },
-    { id: "contacts", label: "Kontakte", icon: Users },
+    { id: "contacts", label: "Freunde", icon: Users },
+    { id: "teams", label: "Projekte", icon: FolderKanban },
     { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
-    { id: "devices", label: "Geräte & Werkzeuge", icon: Wrench },
-    { id: "comments", label: "Kommentare", icon: MessageSquare },
   ];
+
 
 
   return (
