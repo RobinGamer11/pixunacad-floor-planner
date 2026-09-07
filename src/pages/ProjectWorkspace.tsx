@@ -3044,8 +3044,12 @@ function PageCanvas({
   const [pendingStart, setPendingStart] = useState<{ x: number; y: number } | null>(null);
   const [hoverPt, setHoverPt] = useState<{ x: number; y: number } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  /** Radier-Stempel werden gesammelt und pro Frame einmal gespeichert. */
+  const eraseAccumRef = useRef<Map<string, { circles: { x: number; y: number; r: number; s: number; a?: number }[]; geom: { xMm: number; yMm: number; wMm: number; hMm: number }; at: number }>>(new Map());
+  const eraseRafRef = useRef<number | null>(null);
   /** Lokale Referenz auf die eingebettete CAD-Engine (für ESC-Stufen). */
   const localEngineRef = useRef<import("@/cad/embed/MiniCad").MiniCad | null>(null);
+
 
   const toPct = (clientX: number, clientY: number) => {
     const r = pageRef.current?.getBoundingClientRect();
