@@ -184,6 +184,24 @@ export function OpsCalendarTab({
     return out;
   }, [times.entries, times.myId, peopleById, projectNames, showTimes, personFilter, filteredBoards, showItems, onEditItem]);
 
+  /** Dieselben Zeiterfassungen als Zeitspannen für Ansichtstrahl und Gantt. */
+  const timeMarks: OpsTimeMark[] = useMemo(() => {
+    if (!showTimes) return [];
+    return times.entries
+      .filter((e) => !personFilter || e.user_id === personFilter)
+      .map((e) => ({
+        id: e.id,
+        projectId: e.project_id,
+        itemId: e.item_id ?? undefined,
+        project: projectNames.get(e.project_id) ?? "Projekt",
+        label: `${e.user_id === times.myId ? "Ich" : peopleById.get(e.user_id) ?? "Teammitglied"}: ${formatMinutes(netMinutes(e))}`,
+        from: Date.parse(e.started_at),
+        to: Date.parse(e.ended_at),
+      }))
+      .filter((m) => Number.isFinite(m.from) && Number.isFinite(m.to));
+  }, [times.entries, times.myId, showTimes, personFilter, peopleById, projectNames]);
+
+
   const reloadAll = () => { times.reload(); };
   const sources: { label: string; status: OpsStatus }[] = [{ label: "Arbeitszeiten", status: times.status }];
   const broken = sources.filter((s) => s.status !== "ready" && s.status !== "loading");
