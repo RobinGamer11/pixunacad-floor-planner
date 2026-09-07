@@ -1912,8 +1912,9 @@ function NewProjectSettingsDialog({
           <SettingsField label="PROJEKTNAME" value={name} onChange={setName} />
           <SettingsField label="BAUHERR" value={bauherr} onChange={setBauherr} />
           <div className="col-span-2">
-            <AddressField value={ort} onChange={setOrt} />
+            <SettingsField label="PROJEKTADRESSE" value={ort} onChange={setOrt} />
           </div>
+
           <SettingsField label="PROJEKTTYP" value={projektTyp} onChange={setProjektTyp} />
           <SettingsField label="STATUS" value={status} onChange={setStatus} />
           <SettingsField label="ERSTELLT AM" value={erstelltAm} onChange={setErstelltAm} />
