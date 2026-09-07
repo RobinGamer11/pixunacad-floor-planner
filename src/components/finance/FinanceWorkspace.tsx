@@ -355,15 +355,6 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         </section>
       </div>
 
-      {/* Struktur als seitliches Panel auf Tablet und Handy */}
-      {mobileNavOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNavOpen(false)} />
-          <div className="relative h-full w-[86vw] max-w-[340px] shadow-xl">
-            {structure}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
