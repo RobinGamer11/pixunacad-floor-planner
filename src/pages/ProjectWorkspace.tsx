@@ -6072,7 +6072,7 @@ function RightInspector({
           )}
           {tab === "layers" && page && (
             <div className="space-y-4">
-              {helpOn && <LayerHelpLegend />}
+              <LayersPanelHeader helpOn={helpOn} />
 
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
                  CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen
