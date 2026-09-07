@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import React, { useRef, useState } from "react";
-import { GripVertical, Trash2, Calendar, FileText } from "lucide-react";
+import { GripVertical, Trash2, Calendar, FileText, ChevronUp, ChevronDown } from "lucide-react";
 import {
   financeStore, formatEur, parseEur, templateKeyOf,
   type FinancePosition, type FinancePositionType,
@@ -55,11 +55,19 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
 
 
+  const move = (id: string, dir: -1 | 1) => {
+    const idx = positions.findIndex((p) => p.id === id);
+    const target = positions[idx + dir];
+    if (!target) return;
+    financeStore.reorderPositions(projectId, nodeId, id, target.id);
+  };
+
   return (
-    <div className="rounded-xl border overflow-hidden"
+    <div className="rounded-xl border overflow-x-auto"
          style={{ borderColor: "hsl(var(--hairline))", background: background ?? "hsl(var(--surface-card))" }}>
+      <div className="min-w-[760px]">
       <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
-           style={{ gridTemplateColumns: "24px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
+           style={{ gridTemplateColumns: "32px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
         <span />
         <span>Typ</span>
         <span>Datum</span>
@@ -86,10 +94,20 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => { if (dragId && dragId !== p.id) financeStore.reorderPositions(projectId, nodeId, dragId, p.id); setDragId(null); }}
             className="grid items-center px-3 py-1.5 border-b text-sm"
-            style={{ gridTemplateColumns: "24px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))" }}>
-            <span className="cursor-grab active:cursor-grabbing" title="Position verschieben">
-              <GripVertical size={14} style={{ color: "hsl(var(--ink-soft))" }} />
-            </span>
+            style={{ gridTemplateColumns: "32px 1.4fr 1fr 1.2fr 1fr 2fr 72px", borderColor: "hsl(var(--hairline))" }}>
+            <div className="flex flex-col items-center -ml-1">
+              <button type="button" onClick={() => move(p.id, -1)} title="Nach oben verschieben"
+                className="h-5 w-6 flex items-center justify-center rounded hover:bg-muted">
+                <ChevronUp size={13} style={{ color: "hsl(var(--ink-soft))" }} />
+              </button>
+              <span className="cursor-grab active:cursor-grabbing hidden sm:block" title="Position ziehen">
+                <GripVertical size={12} style={{ color: "hsl(var(--ink-soft))" }} />
+              </span>
+              <button type="button" onClick={() => move(p.id, 1)} title="Nach unten verschieben"
+                className="h-5 w-6 flex items-center justify-center rounded hover:bg-muted">
+                <ChevronDown size={13} style={{ color: "hsl(var(--ink-soft))" }} />
+              </button>
+            </div>
 
             <div className="flex items-center gap-1 min-w-0 pr-2">
               {p.type === "supplement" ? (
@@ -149,6 +167,7 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
           </div>
         );
       })}
+      </div>
     </div>
   );
 };

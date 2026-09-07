@@ -9,6 +9,7 @@
 import { useMemo, useState } from "react";
 import { TimelineNet } from "@/components/board/TimelineNet";
 import { OpsZoomPane } from "@/components/ops/OpsZoomPane";
+import { BoardRay } from "@/components/board/BoardRay";
 import { isPeriodItem, type TlItem, type TlState } from "@/lib/timelineStore";
 import { isItemSelected, isTimeSelected, type OpsSelection } from "@/components/ops/opsSelection";
 
@@ -68,116 +69,50 @@ function Empty({ text }: { text: string }) {
 
 /* ------------------------------------------------------------ Ansichtstrahl */
 
+/**
+ * Klassischer Ansichtstrahl je Projekt – dieselbe Optik wie im Board,
+ * ergänzt um Zoom und Verschieben.
+ */
 export function OpsRay({ boards, times = [], selection, onSelectItem, onSelectTime }: OpsViewProps) {
-  const marks = useMemo(() => {
-    const items: {
-      key: string; projectId: string; itemId: string; from: number; to: number;
-      period: boolean; title: string; color: string; project: string;
-    }[] = [];
-    for (const b of boards) {
-      for (const i of b.items) {
-        const from = parse(i.startDate);
-        if (!Number.isFinite(from)) continue;
-        const rawTo = parse(i.endDate);
-        const to = Number.isFinite(rawTo) ? Math.max(rawTo, from) : from;
-        items.push({
-          key: `${b.id}:${i.id}`,
-          projectId: b.id,
-          itemId: i.id,
-          from,
-          to,
-          // Projektverlauf: ein zusammenhängender Zeitraum, kein Tageseintrag.
-          period: isPeriodItem(i),
-          title: i.title || "Beitrag",
-          color: categoryColor(b, i),
-          project: b.name,
-        });
-      }
+  const timesByProject = useMemo(() => {
+    const map = new Map<string, OpsTimeMark[]>();
+    for (const t of times) {
+      const list = map.get(t.projectId) ?? [];
+      list.push(t);
+      map.set(t.projectId, list);
     }
-    return items.sort((a, b) => a.from - b.from);
-  }, [boards]);
+    return map;
+  }, [times]);
 
-  if (!marks.length && !times.length) return <Empty text="Keine Beiträge im aktuellen Filter." />;
-
-  const stamps = [...marks.flatMap((m) => [m.from, m.to]), ...times.flatMap((t) => [t.from, t.to]), Date.now()];
-  const min = Math.min(...stamps);
-  const max = Math.max(...stamps);
-  const span = Math.max(dayMs, max - min);
-  const pos = (t: number) => ((t - min) / span) * 100;
+  if (!boards.length) return <Empty text="Keine Projekte im aktuellen Filter." />;
 
   return (
-    <OpsZoomPane height={330}>
-      <div className="relative px-4" style={{ height: 330 }}>
-        <div className="absolute left-4 right-4 top-1/2 h-px" style={{ background: LINE }} />
-        <div className="absolute top-1/2 h-5 w-px -translate-y-1/2" style={{ left: `${pos(Date.now())}%`, background: "hsl(var(--accent-gold))" }} />
-
-        {marks.map((m, idx) =>
-          m.period ? (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => onSelectItem?.(m.projectId, m.itemId)}
-              className="absolute top-1/2 -translate-y-1/2 rounded-full"
-              style={{
-                left: `${pos(m.from)}%`,
-                width: `${Math.max(0.8, pos(m.to) - pos(m.from))}%`,
-                height: 10,
-                background: m.color,
-                opacity: isItemSelected(selection ?? null, m.projectId, m.itemId) ? 1 : 0.6,
-                outline: isItemSelected(selection ?? null, m.projectId, m.itemId) ? "2px solid hsl(var(--accent-gold))" : "none",
-              }}
-              title={`${m.title} · ${m.project} · ${fmt(m.from)} – ${fmt(m.to)}`}
-            />
-          ) : (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => onSelectItem?.(m.projectId, m.itemId)}
-              className="absolute -translate-x-1/2 flex flex-col items-center gap-1"
-              style={{ left: `${pos(m.from)}%`, top: idx % 2 ? "calc(50% + 14px)" : undefined, bottom: idx % 2 ? undefined : "calc(50% + 14px)" }}
-              title={`${m.title} · ${m.project} · ${fmt(m.from)}`}
-            >
-              {idx % 2 === 0 && <span className="max-w-[130px] truncate text-[10px]" style={{ color: SOFT }}>{m.title}</span>}
-              <span
-                className="rounded-full"
-                style={{
-                  background: m.color,
-                  width: isItemSelected(selection ?? null, m.projectId, m.itemId) ? 14 : 10,
-                  height: isItemSelected(selection ?? null, m.projectId, m.itemId) ? 14 : 10,
-                  boxShadow: isItemSelected(selection ?? null, m.projectId, m.itemId) ? "0 0 0 3px hsl(var(--accent-gold))" : "none",
-                }}
-              />
-              {idx % 2 === 1 && <span className="max-w-[130px] truncate text-[10px]" style={{ color: SOFT }}>{m.title}</span>}
-            </button>
-          ),
-        )}
-
-        {times.map((t) => (
-          <button
-            key={`time-${t.id}`}
-            type="button"
-            onClick={() => onSelectTime?.(t.projectId, t.id, t.itemId)}
-            className="absolute rounded"
-            style={{
-              left: `${pos(t.from)}%`,
-              width: `${Math.max(0.5, pos(t.to) - pos(t.from))}%`,
-              bottom: 18,
-              height: 8,
-              background: TIME_COLOR,
-              outline: isTimeSelected(selection ?? null, t.id) ? "2px solid hsl(var(--accent-gold))" : "none",
+    <div className="flex flex-col gap-3">
+      {boards.map((b) => (
+        <div key={b.id} className="flex flex-col gap-1">
+          {boards.length > 1 && (
+            <div className="text-[11px] font-medium" style={{ color: SOFT }}>{b.name}</div>
+          )}
+          <BoardRay
+            items={b.items}
+            categories={b.state.categories}
+            times={(timesByProject.get(b.id) ?? []).map((t) => ({
+              id: t.id, label: t.label, from: t.from, to: t.to,
+            }))}
+            selectedItemId={selection && selection.kind === "item" && selection.projectId === b.id ? selection.itemId : null}
+            selectedTimeId={selection && selection.kind === "time" ? selection.entryId : null}
+            onSelectItem={(id) => onSelectItem?.(b.id, id)}
+            onSelectTime={(id) => {
+              const mark = (timesByProject.get(b.id) ?? []).find((t) => t.id === id);
+              onSelectTime?.(b.id, id, mark?.itemId);
             }}
-            title={`${t.label} · ${t.project}`}
           />
-        ))}
-
-        <div className="absolute bottom-1 left-4 right-4 flex justify-between text-[10px]" style={{ color: SOFT }}>
-          <span>{fmt(min)}</span>
-          <span>{fmt(max)}</span>
         </div>
-      </div>
-    </OpsZoomPane>
+      ))}
+    </div>
   );
 }
+
 
 /* -------------------------------------------------------------- Projektnetz */
 

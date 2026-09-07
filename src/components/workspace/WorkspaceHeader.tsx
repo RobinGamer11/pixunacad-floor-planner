@@ -79,7 +79,6 @@ export function WorkspaceHeader({
 
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
-  const goFinance = () => projectId && navigate(`/project/${projectId}/finance`);
 
   return (
     <header
@@ -157,14 +156,6 @@ export function WorkspaceHeader({
             label="Mappe"
             active={mode === "workspace"}
             onClick={goWorkspace}
-          />
-
-          <ModeDivider />
-          <ModeButton
-            icon={<Wallet size={13} />}
-            label="Finanzen"
-            active={mode === "finance"}
-            onClick={goFinance}
           />
 
         </div>

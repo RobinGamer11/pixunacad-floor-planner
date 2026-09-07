@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LegalMenuPopover } from "@/components/legal/LegalMenu";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronUp,
   Plus,
@@ -69,7 +69,7 @@ import {
 } from "@/lib/timelineStore";
 import { UebersichtView } from "@/components/project/UebersichtView";
 import { FileBrowser } from "@/components/project/FileBrowser";
-import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverview";
+import { FinanceWorkspace } from "@/components/finance/FinanceWorkspace";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { isPlaceholderName } from "@/lib/accountProfile";
@@ -127,6 +127,19 @@ export default function ProjectsHome() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [shopOpen]);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  /** Direktaufruf, z. B. alte Finanzen-Links: /?project=<id>&tab=finanzen */
+  const [urlParams, setUrlParams] = useSearchParams();
+  useEffect(() => {
+    const wantProject = urlParams.get("project");
+    const wantTab = urlParams.get("tab") as Tab | null;
+    if (!wantProject && !wantTab) return;
+    if (wantProject) { setSelectedId(wantProject); setHub(null); setShowAllTasks(false); }
+    if (wantTab) setTab(wantTab);
+    const next = new URLSearchParams(urlParams);
+    next.delete("project");
+    next.delete("tab");
+    setUrlParams(next, { replace: true });
+  }, [urlParams, setUrlParams]);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
   const headerScrollRef = useDragScroll<HTMLElement>();
@@ -1145,7 +1158,7 @@ export default function ProjectsHome() {
               {tab === "uebersicht" && <UebersichtView project={selected} />}
               {tab === "aufgaben" && <AufgabenView project={selected} />}
               {tab === "finanzen" && (
-                <FinanceProjectOverview projectId={selected.id} projectName={selected.name} />
+                <FinanceWorkspace key={selected.id} projectId={selected.id} projectName={selected.name} />
               )}
               {tab === "dokumente" && (
                 <FileBrowser key={selected.id} project={selected} />

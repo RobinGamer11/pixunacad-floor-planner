@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,7 +11,6 @@ import ProjectsHome from "./pages/ProjectsHome";
 import Login from "./pages/Login";
 import ProjectWorkspace from "./pages/ProjectWorkspace";
 import CadPage from "./pages/CadPage";
-import FinancePage from "./pages/FinancePage";
 import BoardPage from "./pages/BoardPage";
 import PasswordReset from "./pages/PasswordReset";
 import Impressum from "./pages/Impressum";
@@ -19,6 +18,15 @@ import Datenschutz from "./pages/Datenschutz";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
+
+/**
+ * Die Finanzen liegen jetzt im Reiter „Finanzen“ der Projektstartseite.
+ * Alte Links auf /project/:projectId/finance führen dorthin.
+ */
+function FinanceRedirect() {
+  const { projectId } = useParams<{ projectId: string }>();
+  return <Navigate to={`/?project=${projectId ?? ""}&tab=finanzen`} replace />;
+}
 
 function RequireAuth() {
   const { configured, loading, session } = useAuth();
@@ -64,7 +72,7 @@ const App = () => (
               <Route path="/project/:projectId/cad" element={<CadPage />} />
               <Route path="/project/:projectId/cad/:sheetId" element={<CadPage />} />
               <Route path="/project/:projectId/board" element={<BoardPage />} />
-              <Route path="/project/:projectId/finance" element={<FinancePage />} />
+              <Route path="/project/:projectId/finance" element={<FinanceRedirect />} />
               <Route path="/cad" element={<CadPage />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

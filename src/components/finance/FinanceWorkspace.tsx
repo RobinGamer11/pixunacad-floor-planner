@@ -1,12 +1,16 @@
+/**
+ * Zentrale Finanzen-Oberfläche (projektbezogen).
+ *
+ * Wird im Reiter „Finanzen“ der Projektstartseite angezeigt und verwendet
+ * ausschließlich den bestehenden financeStore – es gibt keine zweite
+ * Datenhaltung. Angebote, Rechnungen und Nachträge können nur noch als
+ * erhaltene Belege erfasst werden; ein Erzeugen eigener Dokumente entfällt.
+ */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
-import { TabletAidWheel } from "@/components/TabletAidWheel";
-import { projectStore, useProject } from "@/lib/projectStore";
 import { exportElementToA4Pdf } from "@/lib/financePdfExport";
 import {
   financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
-  control, formatEur, formatPct, templateKeyOf, positionTotals, TEMPLATE_LABEL, getFavoriteTemplate,
+  control, formatEur, formatPct, positionTotals,
   type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
   type FinancePositionType,
 } from "@/lib/financeStore";
@@ -15,7 +19,7 @@ import { FinancePositionsTable } from "@/components/finance/FinancePositionsTabl
 import {
   Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
   Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2, Search, X,
-  MoreVertical, Copy, Pencil, Star, FileText,
+  MoreVertical, Copy, Pencil, FileDown, ListTree,
 } from "lucide-react";
 
 /** Filterbare Positionsarten (mehrfach kombinierbar). */
@@ -47,35 +51,31 @@ function useFinance(projectId?: string): FinanceState {
   return state;
 }
 
-export default function FinancePage() {
-  const { projectId } = useParams<{ projectId: string }>();
-  const project = useProject(projectId);
+export function FinanceWorkspace({ projectId, projectName }: { projectId: string; projectName?: string }) {
   const state = useFinance(projectId);
+  const pid = projectId;
 
-  /** null = Projektknoten. */
-  const [searchParams] = useSearchParams();
-  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("node"));
+  /** null = Projektknoten. Beim Projektwechsel immer zurücksetzen. */
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [leftOpen, setLeftOpen] = useState(true);
-  const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
-    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
-  });
+  /** Struktur als seitliches Panel auf Tablet und Handy. */
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   useEffect(() => {
-    try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch { /* ignore */ }
-  }, [tabletAidOn]);
-  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
+    setSelectedId(null);
+    setExpanded({});
+    setMobileNavOpen(false);
+  }, [projectId]);
 
   const selected = useMemo(
     () => (selectedId ? state.nodes.find((n) => n.id === selectedId) ?? null : null),
     [state.nodes, selectedId],
   );
-  const pid = projectId ?? "";
 
-  /* ---- Filter (linkes Fenster, Treffer im obersten Projektordner) ---- */
+  /* ---- Filter (Strukturspalte, Treffer im obersten Projektordner) ---- */
   const [filterQuery, setFilterQuery] = useState("");
   const [filterTypes, setFilterTypes] = useState<FilterKey[]>([]);
   const filterActive = filterQuery.trim() !== "" || filterTypes.length > 0;
-  // Sobald gefiltert wird, öffnet sich automatisch der oberste Projektordner.
   useEffect(() => { if (filterActive) setSelectedId(null); }, [filterActive, filterQuery, filterTypes]);
 
   const filterHits = useMemo(() => {
@@ -106,7 +106,7 @@ export default function FinancePage() {
     return hits;
   }, [state, filterActive, filterQuery, filterTypes]);
 
-  /* ---- PDF-Export des rechten Detailfensters (DIN A4) ---- */
+  /* ---- PDF-Export des Detailbereichs (DIN A4) ---- */
   const exportRef = useRef<HTMLDivElement | null>(null);
   const [exporting, setExporting] = useState(false);
   const handleExport = async () => {
@@ -116,7 +116,7 @@ export default function FinancePage() {
     el.classList.add("finance-exporting");
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
-      const title = selected?.name ?? project?.name ?? "Finanzen";
+      const title = selected?.name ?? projectName ?? "Finanzen";
       await exportElementToA4Pdf(el, `${title}.pdf`);
     } catch (e) {
       console.error("Finanz-Export fehlgeschlagen", e);
@@ -130,13 +130,15 @@ export default function FinancePage() {
     setExpanded((e) => ({ ...e, [id]: !(e[id] ?? true) }));
 
   const addNode = (type: "overview" | "action") => {
-    // Aktionen landen im ausgewählten Übersichtsordner, Übersichten auf dessen Ebene.
     let parent: string | null = null;
     if (selected) parent = selected.type === "overview" ? selected.id : selected.parentId;
     const node = financeStore.addNode(pid, type, parent);
     if (parent) setExpanded((e) => ({ ...e, [parent!]: true }));
     setSelectedId(node.id);
+    setMobileNavOpen(false);
   };
+
+  const openNode = (id: string | null) => { setSelectedId(id); setMobileNavOpen(false); };
 
   const renderTree = (parentId: string | null, depth: number): React.ReactNode =>
     childrenOf(state, parentId).map((n) => {
@@ -146,8 +148,8 @@ export default function FinancePage() {
       return (
         <div key={n.id}>
           <div
-            onClick={() => setSelectedId(n.id)}
-            className="group flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer text-[12px]"
+            onClick={() => openNode(n.id)}
+            className="group flex items-center gap-1 px-2 py-2 rounded-md cursor-pointer text-[13px] min-h-[44px]"
             style={{
               paddingLeft: 8 + depth * 14,
               background: active ? "hsl(var(--surface-muted))" : undefined,
@@ -156,20 +158,20 @@ export default function FinancePage() {
           >
             {kids.length > 0 ? (
               <button onClick={(e) => { e.stopPropagation(); toggleExpand(n.id); }}
-                className="h-4 w-4 flex items-center justify-center shrink-0">
-                {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                className="h-8 w-8 -ml-1 flex items-center justify-center shrink-0">
+                {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </button>
-            ) : <span className="h-4 w-4 shrink-0" />}
+            ) : <span className="h-8 w-8 -ml-1 shrink-0" />}
             {n.type === "overview"
-              ? <Folder size={13} style={{ color: "hsl(var(--accent-gold))" }} />
-              : <Building2 size={13} style={{ color: "hsl(var(--ink-soft))" }} />}
+              ? <Folder size={14} style={{ color: "hsl(var(--accent-gold))" }} />
+              : <Building2 size={14} style={{ color: "hsl(var(--ink-soft))" }} />}
             <span className="truncate flex-1">{n.name}</span>
             <NodeMenu
               projectId={pid}
               node={n}
               compact
               onDeleted={() => setSelectedId((cur) => (cur === n.id ? null : cur))}
-              onDuplicated={(id) => setSelectedId(id)}
+              onDuplicated={(id) => openNode(id)}
             />
           </div>
           {open && kids.length > 0 && renderTree(n.id, depth + 1)}
@@ -177,118 +179,110 @@ export default function FinancePage() {
       );
     });
 
-  return (
-    <div className="h-screen flex flex-col" style={{ background: "hsl(var(--surface-app))" }}>
-      <WorkspaceHeader
-        projectId={projectId}
-        projectName={project?.name}
-        mode="finance"
-        mappeHelpOn={mappeHelpOn}
-        onToggleMappeHelp={() => project && projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
-        tabletAidOn={tabletAidOn}
-        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
-        onExport={handleExport}
-        canDelete={!!selected}
-        onDelete={() => {
-          if (!selected) return;
-          financeStore.deleteNode(pid, selected.id);
-          setSelectedId(null);
-        }}
-      />
+  /** Strukturspalte – auf großen Bildschirmen fest, sonst als Panel. */
+  const structure = (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden"
+         style={{ background: "hsl(var(--surface-card))" }}>
+      <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
+             style={{ color: "hsl(var(--ink-soft))" }}>Struktur</div>
+        <button onClick={() => { setLeftOpen(false); setMobileNavOpen(false); }}
+          className="h-11 w-11 rounded flex items-center justify-center hover:bg-muted" title="Struktur einklappen">
+          <PanelLeftClose size={16} />
+        </button>
+      </div>
 
-      <main className="flex-1 min-h-0 flex">
-        {leftOpen && (
-          <aside className="w-[280px] shrink-0 min-h-0 flex flex-col border-r overflow-hidden"
-                 style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-            <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
-                   style={{ color: "hsl(var(--ink-soft))" }}>Struktur</div>
-              <button onClick={() => setLeftOpen(false)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Liste einklappen">
-                <PanelLeftClose size={15} />
-              </button>
-            </div>
+      <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <button onClick={() => addNode("overview")}
+          className="w-full h-12 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2"
+          style={{
+            borderColor: "hsl(var(--accent-gold))",
+            background: "hsl(var(--accent-gold) / 0.12)",
+            color: "hsl(var(--accent-gold))",
+          }}>
+          <Plus size={18} /> Ordner
+        </button>
+        <button onClick={() => addNode("action")}
+          className="w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
+          <Plus size={18} /> Anlage
+        </button>
+      </div>
 
-            {/* Anlegen-Buttons: groß und auffällig, direkt über der Suche */}
-            <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <button onClick={() => addNode("overview")}
-                className="w-full h-11 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+      <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="flex items-center gap-1.5 h-11 rounded-md border px-2"
+             style={{ borderColor: "hsl(var(--hairline))" }}>
+          <Search size={13} style={{ color: "hsl(var(--ink-soft))" }} />
+          <input value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)}
+            placeholder="Nr., Name, Notiz…"
+            className="flex-1 min-w-0 bg-transparent text-[13px] outline-none" />
+          {filterActive && (
+            <button title="Filter zurücksetzen" className="h-9 w-9 flex items-center justify-center"
+              onClick={() => { setFilterQuery(""); setFilterTypes([]); }}>
+              <X size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {FILTER_CHIPS.map(([key, label]) => {
+            const on = filterTypes.includes(key);
+            return (
+              <button key={key}
+                onClick={() => setFilterTypes((t) => on ? t.filter((x) => x !== key) : [...t, key])}
+                className="h-9 px-3 rounded-full border text-[11px] font-medium"
                 style={{
-                  borderColor: "hsl(var(--accent-gold))",
-                  background: "hsl(var(--accent-gold) / 0.12)",
-                  color: "hsl(var(--accent-gold))",
+                  borderColor: on ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  background: on ? "hsl(var(--accent-gold) / 0.14)" : undefined,
                 }}>
-                <Plus size={18} /> Ordner
+                {label}
               </button>
-              <button onClick={() => addNode("action")}
-                className="w-full h-11 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-                style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
-                <Plus size={18} /> Anlegen
-              </button>
-            </div>
+            );
+          })}
+        </div>
+      </div>
 
-            {/* Filter: Text (Nummern, Namen, Notizen) + Typ-Chips (mehrfach wählbar) */}
-            <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-              <div className="flex items-center gap-1.5 h-7 rounded-md border px-2"
-                   style={{ borderColor: "hsl(var(--hairline))" }}>
-                <Search size={12} style={{ color: "hsl(var(--ink-soft))" }} />
-                <input value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)}
-                  placeholder="Nr., Name, Notiz…"
-                  className="flex-1 min-w-0 bg-transparent text-[11px] outline-none" />
-                {filterActive && (
-                  <button title="Filter zurücksetzen"
-                    onClick={() => { setFilterQuery(""); setFilterTypes([]); }}>
-                    <X size={12} style={{ color: "hsl(var(--ink-soft))" }} />
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {FILTER_CHIPS.map(([key, label]) => {
-                  const on = filterTypes.includes(key);
-                  return (
-                    <button key={key}
-                      onClick={() => setFilterTypes((t) => on ? t.filter((x) => x !== key) : [...t, key])}
-                      className="h-6 px-2 rounded-full border text-[10px] font-medium"
-                      style={{
-                        borderColor: on ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                        background: on ? "hsl(var(--accent-gold) / 0.14)" : undefined,
-                      }}>
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      <div className="flex-1 overflow-auto py-1 px-1">
+        <div onClick={() => openNode(null)}
+          className="flex items-center gap-1.5 px-2 py-2 rounded-md cursor-pointer text-[13px] font-semibold min-h-[44px]"
+          style={{ background: selectedId === null ? "hsl(var(--surface-muted))" : undefined }}>
+          <Home size={14} style={{ color: "hsl(var(--accent-gold))" }} />
+          <span className="truncate">{projectName ?? "Projekt"}</span>
+        </div>
+        {renderTree(null, 1)}
+      </div>
+    </div>
+  );
 
-
-            <FavoriteTemplates projectId={pid} />
-
-            <div className="flex-1 overflow-auto py-1 px-1">
-              <div onClick={() => setSelectedId(null)}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md cursor-pointer text-[12px] font-semibold"
-                style={{ background: selectedId === null ? "hsl(var(--surface-muted))" : undefined }}>
-                <Home size={13} style={{ color: "hsl(var(--accent-gold))" }} />
-                <span className="truncate">{project?.name ?? "Projekt"}</span>
-              </div>
-              {renderTree(null, 1)}
-            </div>
+  return (
+    <div className="flex min-h-[60vh] w-full min-w-0 flex-col overflow-hidden rounded-xl border"
+         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-app))" }}>
+      <div className="flex min-h-0 flex-1">
+        {leftOpen && (
+          <aside className="hidden lg:flex w-[280px] shrink-0 min-h-0 flex-col border-r overflow-hidden"
+                 style={{ borderColor: "hsl(var(--hairline))" }}>
+            {structure}
           </aside>
         )}
 
         <section className="flex-1 min-w-0 min-h-0 overflow-auto">
-          <div className="sticky top-0 z-10 flex items-center gap-1 px-3 py-1.5 border-b"
+          <div className="sticky top-0 z-10 flex flex-wrap items-center gap-1.5 px-3 py-2 border-b"
                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+            <button onClick={() => setMobileNavOpen(true)}
+              className="lg:hidden h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium"
+              style={{ borderColor: "hsl(var(--hairline))" }}>
+              <ListTree size={16} /> Struktur
+            </button>
             {!leftOpen && (
               <button onClick={() => setLeftOpen(true)}
-                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Liste einblenden">
-                <PanelLeftOpen size={15} />
+                className="hidden lg:flex h-11 w-11 rounded items-center justify-center hover:bg-muted" title="Struktur einblenden">
+                <PanelLeftOpen size={16} />
               </button>
             )}
             <div className="text-[11px] font-semibold uppercase tracking-wider"
                  style={{ color: "hsl(var(--ink-soft))" }}>
               {selected ? (selected.type === "action" ? "Anlage" : "Ordner") : "Projekt"}
             </div>
-            {selected && <span className="text-sm font-medium truncate max-w-[280px]">{selected.name}</span>}
+            {selected && <span className="text-sm font-medium truncate max-w-[200px] sm:max-w-[280px]">{selected.name}</span>}
             {selected && (
               <NodeMenu
                 projectId={pid}
@@ -298,14 +292,32 @@ export default function FinancePage() {
               />
             )}
             <div className="flex-1" />
+            <button onClick={handleExport} disabled={exporting}
+              className="h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
+              style={{ borderColor: "hsl(var(--hairline))" }} title="Als PDF (DIN A4) exportieren">
+              <FileDown size={16} /> <span className="hidden sm:inline">PDF</span>
+            </button>
+            {selected && (
+              <button
+                onClick={() => {
+                  if (!window.confirm(`\u201e${selected.name}\u201c wirklich löschen?`)) return;
+                  financeStore.deleteNode(pid, selected.id);
+                  setSelectedId(null);
+                }}
+                className="h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium"
+                style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--destructive))" }}
+                title="Auswahl löschen">
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
 
-          <div ref={exportRef} className="p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
+          <div ref={exportRef} className="p-3 sm:p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
             {filterActive && (
               <FilterResults hits={filterHits} onOpen={(id) => { setFilterQuery(""); setFilterTypes([]); setSelectedId(id); }} />
             )}
             {!selected && !filterActive && (
-              <ProjectView projectId={pid} state={state} projectName={project?.name ?? "Projekt"}
+              <ProjectView projectId={pid} state={state} projectName={projectName ?? "Projekt"}
                            onSelect={setSelectedId} />
             )}
             {selected?.type === "overview" && (
@@ -316,8 +328,17 @@ export default function FinancePage() {
             )}
           </div>
         </section>
-      </main>
-      {tabletAidOn && <TabletAidWheel />}
+      </div>
+
+      {/* Struktur als seitliches Panel auf Tablet und Handy */}
+      {mobileNavOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileNavOpen(false)} />
+          <div className="relative h-full w-[86vw] max-w-[340px] shadow-xl">
+            {structure}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -385,75 +406,10 @@ const NodeMenu: React.FC<{
   );
 };
 
-/* ------------------------------------------------ Favoriten-Vorlagen (links) */
-
-/**
- * Zeigt je Belegart genau zwei mögliche Einträge:
- *  – die mitgelieferte Standard-Mustervorlage (immer vorhanden)
- *  – die vom Nutzer als Favorit gespeicherte Vorlage (nur wenn gesetzt)
- * Andere angelegte Belege erscheinen hier bewusst nicht.
- */
-const FavoriteTemplates: React.FC<{ projectId: string }> = ({ projectId }) => {
-  const [openType, setOpenType] = useState<FinancePositionType | null>(null);
-  const navigate = useNavigate();
-
-  const open = (type: FinancePositionType, variant: "default" | "favorite") => {
-    const key = templateKeyOf(type, variant === "favorite" ? "__favorite" : "__default");
-    navigate(`/project/${projectId}?tpl=${encodeURIComponent(key)}`);
-  };
-
-  return (
-    <div className="px-3 py-2 border-b space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1"
-           style={{ color: "hsl(var(--ink-soft))" }}>
-        <Star size={11} /> Vorlagen
-      </div>
-      {(["offer", "invoice", "supplement"] as FinancePositionType[]).map((type) => {
-        const hasFav = !!getFavoriteTemplate(projectId, type)?.length;
-        const isOpen = openType === type;
-        return (
-          <div key={type}>
-            <button
-              onClick={() => setOpenType(isOpen ? null : type)}
-              className="w-full h-7 px-2 rounded-md border flex items-center gap-1.5 text-[11px]"
-              style={{ borderColor: "hsl(var(--hairline))" }}>
-              <FileText size={11} style={{ color: "hsl(var(--accent-gold))" }} />
-              <span className="flex-1 text-left truncate">{TEMPLATE_LABEL[type]}</span>
-              <span className="tabular-nums" style={{ color: "hsl(var(--ink-soft))" }}>{hasFav ? 2 : 1}</span>
-              {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-            </button>
-            {isOpen && (
-              <div className="mt-1 ml-2 space-y-0.5">
-                {hasFav && (
-                  <button onClick={() => open(type, "favorite")}
-                    className="w-full text-left px-2 py-1 rounded-md text-[11px] hover:bg-muted truncate flex items-center gap-1.5">
-                    <Star size={10} style={{ color: "hsl(var(--accent-gold))" }} />
-                    Favorit-Vorlage
-                  </button>
-                )}
-                <button onClick={() => open(type, "default")}
-                  className="w-full text-left px-2 py-1 rounded-md text-[11px] hover:bg-muted truncate flex items-center gap-1.5">
-                  <FileText size={10} style={{ color: "hsl(var(--ink-soft))" }} />
-                  Standard-Mustervorlage
-                </button>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
 /* ----------------------------------------------------------------- Aktion */
 
 const ActionView: React.FC<{ projectId: string; state: FinanceState; node: FinanceNode }> =
 ({ projectId, state, node }) => {
-  const navigate = useNavigate();
-  /** Öffnet den Vorlagen-Editor in der Projektmappe (nur Vorlagenseiten sichtbar). */
-  const openTemplate = (pid: string, type: FinancePositionType, posId: string, nodeId: string) => {
-    navigate(`/project/${pid}?tpl=${encodeURIComponent(templateKeyOf(type, posId))}&back=${nodeId}`);
-  };
   const totals = actionTotals(state, node);
   const positions = positionsOf(state, node.id);
   const invoiceDetails = positions.filter((p) => p.type === "invoice" || p.type === "supplement");
@@ -514,21 +470,6 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
               className="h-9 px-3 rounded-lg border-2 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-muted"
               style={{ borderColor: "hsl(var(--hairline))" }}>
               <Plus size={15} /> {label} erhalten
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
-            <button key={`new-${t}`}
-              onClick={() => {
-                const pos = financeStore.addPosition(projectId, node.id, t);
-                financeStore.updatePosition(projectId, pos.id, { hasTemplate: true });
-                openTemplate(projectId, t, pos.id, node.id);
-              }}
-              title={`${label} als Vorlage in der Projektmappe anlegen`}
-              className="h-9 px-3 rounded-lg text-[13px] font-semibold flex items-center gap-1.5 hover:opacity-90"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
-              <Plus size={15} /> {label} anlegen
             </button>
           ))}
         </div>
