@@ -3663,8 +3663,18 @@ function PageCanvas({
               const lx = dx * cos - dy * sin + ew / 2;
               const ly = dx * sin + dy * cos + eh / 2;
               if (lx + rMm < 0 || lx - rMm > ew || ly + rMm < 0 || ly - rMm > eh) continue;
-              const prev = el.eraseCircles ?? [];
-              const last = prev[prev.length - 1];
+              // Puffer je Element: während eines Striches wird die Kreisliste
+              // im Ref fortgeschrieben (der Store hinkt sonst dem Zeichnen
+              // hinterher). Nach kurzer Pause wieder aus dem Store aufsetzen.
+              const now = performance.now();
+              let acc = eraseAccumRef.current.get(el.id);
+              if (!acc || now - acc.at > 400) {
+                acc = { circles: (el.eraseCircles ?? []).slice(), geom: { xMm: ex, yMm: ey, wMm: ew, hMm: eh }, at: now };
+                eraseAccumRef.current.set(el.id, acc);
+              }
+              acc.at = now;
+              acc.geom = { xMm: ex, yMm: ey, wMm: ew, hMm: eh };
+              const last = acc.circles[acc.circles.length - 1];
               // Smooth wirkt nur auf Rasterbilder (PNG/JPG).
               const smooth = mode === "smooth" && el.kind === "image";
               const s = smooth ? soft : 0;
@@ -3673,16 +3683,28 @@ function PageCanvas({
               const a = smooth ? Math.max(0.015, 0.12 * str * (1 - 0.7 * s)) : 1;
 
               // Nur exakte Doppelstempel überspringen; Überlappung darf akkumulieren.
-              const minStep = smooth ? rMm * 0.08 : rMm * 0.4;
+              const minStep = smooth ? rMm * 0.25 : rMm * 0.5;
               if (last && Math.hypot(last.x - lx, last.y - ly) < minStep && Math.abs(last.r - rMm) < 0.01) continue;
-              projectStore.updateElement(projectId, page.id, el.id, {
-                // mm-Geometrie sicherstellen, damit die Maske exakt im selben
-                // Koordinatenraum gerendert wird wie die Radier-Kreise.
-                xMm: ex, yMm: ey, wMm: ew, hMm: eh,
-                eraseCircles: [...prev.slice(-600), { x: lx, y: ly, r: rMm, s, a }],
+              acc.circles.push({ x: lx, y: ly, r: rMm, s, a });
+              if (acc.circles.length > 400) acc.circles = acc.circles.slice(-400);
+            }
+
+            // Ein Speicher-/Renderdurchgang pro Frame statt pro Stempel.
+            if (eraseRafRef.current == null) {
+              eraseRafRef.current = window.requestAnimationFrame(() => {
+                eraseRafRef.current = null;
+                for (const [elId, entry] of eraseAccumRef.current) {
+                  projectStore.updateElement(projectId, page.id, elId, {
+                    // mm-Geometrie sicherstellen, damit die Maske exakt im selben
+                    // Koordinatenraum gerendert wird wie die Radier-Kreise.
+                    ...entry.geom,
+                    eraseCircles: entry.circles.slice(),
+                  });
+                }
               });
             }
           }}
+
 
 
           // Hilfslinien beziehen ihre Farbe aus `guideColor` (MiniCad-Guide-Modus).
