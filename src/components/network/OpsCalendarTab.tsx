@@ -1,29 +1,34 @@
 /**
- * Paket 06 – projektübergreifender Kalender im Netzwerkbereich.
+ * Organisationsansicht mit Zeitachse.
  *
- * Vier Ebenen aus den Originaldaten: Beiträge bleiben im Projektkalender,
- * hier werden Arbeitszeiten, Abwesenheiten und Gerätebuchungen aller
- * Projekte gezeigt, an denen man beteiligt ist. Fremde Abwesenheiten
- * bleiben ohne Art und Bemerkung (Maskierung kommt serverseitig).
- * Zusätzlich lassen sich hier die eigenen Abwesenheiten pflegen.
+ * Datenquellen sind ausschließlich die vorhandenen Board-Beiträge und die
+ * erfassten Arbeitszeiten. Geräte/Werkzeuge und Abwesenheiten sind aus der
+ * Oberfläche entfernt (Daten in der Datenbank bleiben unangetastet).
+ *
+ * Über die Ansichtsauswahl wird der mittlere Bereich zwischen Kalender,
+ * Ansichtstrahl, Projektnetz und Gantt-Diagramm umgeschaltet. Projekt- und
+ * Personenfilter gelten für alle Ansichten.
  */
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import {
-  ABSENCE_LABEL,
   datesInRange,
   formatMinutes,
   isoDate,
   netMinutes,
-  useAbsences,
-  useDevices,
   useTimeEntriesForProjects,
   OPS_STATUS_TEXT,
-  type AbsenceKind,
   type OpsStatus,
 } from "@/lib/opsStore";
-import { effectiveStatusId, subscribeTimeline, timelineStore, type TlItem } from "@/lib/timelineStore";
+import {
+  effectiveStatusId,
+  isPeriodItem,
+  subscribeTimeline,
+  timelineStore,
+  type TlItem,
+} from "@/lib/timelineStore";
+import { OpsGantt, OpsNet, OpsRay, OPS_VIEWS, type OpsBoard, type OpsView } from "@/components/ops/OpsViews";
 
 const inputCls =
   "h-9 rounded-md border bg-background text-foreground px-2 text-xs outline-none focus:ring-1 focus:ring-ring [&>option]:bg-background [&>option]:text-foreground";
@@ -43,6 +48,13 @@ function useProjectItems(projectIds: string[]) {
   return useMemo(() => (key ? key.split("|") : []).map((id) => ({ id, state: timelineStore.getState(id) })), [key, setTick]);
 }
 
+/** Stabile Projektfarbe (identisch zur Projektliste). */
+function projectHue(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+  return `hsl(${h} 65% 55%)`;
+}
+
 export function OpsCalendarTab({
   projectIds,
   projectNames,
@@ -51,8 +63,9 @@ export function OpsCalendarTab({
   onSelectDate,
   hiddenProjects,
   onToggleProject,
-  allowAbsenceEntry = true,
   projectFilterAsDropdown = false,
+  calendarDefaultRange = "month",
+  onEditItem,
 }: {
   projectIds: string[];
   projectNames: Map<string, string>;
@@ -63,10 +76,12 @@ export function OpsCalendarTab({
   /** Optional: Projekt-Sichtbarkeit kontrolliert von außen führen. */
   hiddenProjects?: Set<string>;
   onToggleProject?: (id: string) => void;
-  /** Abwesenheiten hier eintragen/pflegen (Projektbereich). */
-  allowAbsenceEntry?: boolean;
   /** Projekte als Auswahlliste in der Filterzeile statt als Schaltflächenreihe. */
   projectFilterAsDropdown?: boolean;
+  /** Vorauswahl des Kalenderzeitraums beim ersten Öffnen. */
+  calendarDefaultRange?: "month" | "week" | "day";
+  /** Beitrag zum Bearbeiten öffnen. */
+  onEditItem?: (projectId: string, itemId: string) => void;
 }) {
 
   /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
@@ -77,45 +92,39 @@ export function OpsCalendarTab({
     [projectIds, hidden],
   );
 
-  const absences = useAbsences(activeProjects);
-  const devices = useDevices(undefined);
   const times = useTimeEntriesForProjects(activeProjects);
   const boards = useProjectItems(activeProjects);
 
-  const [showAbsences, setShowAbsences] = useState(true);
-  const [showBookings, setShowBookings] = useState(true);
   const [showTimes, setShowTimes] = useState(true);
   const [showItems, setShowItems] = useState(true);
   const [personFilter, setPersonFilter] = useState("");
-  const [deviceFilter, setDeviceFilter] = useState("");
+  const [view, setView] = useState<OpsView>("calendar");
 
   const [projectMenu, setProjectMenu] = useState(false);
-  const [form, setForm] = useState(false);
-  const [kind, setKind] = useState<AbsenceKind>("vacation");
-  const [from, setFrom] = useState(() => isoDate(new Date()));
-  const [to, setTo] = useState(() => isoDate(new Date()));
-  const [status, setStatus] = useState("planned");
-  const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
-  const mine = useMemo(
-    () => absences.absences.filter((a) => a.user_id === absences.myId),
-    [absences.absences, absences.myId],
+  /** Bereits nach Person gefilterte Beiträge – Grundlage aller Ansichten. */
+  const filteredBoards: OpsBoard[] = useMemo(
+    () =>
+      boards.map((b) => ({
+        id: b.id,
+        name: projectNames.get(b.id) ?? "Projekt",
+        color: projectHue(b.id),
+        state: b.state,
+        items: (b.state.items as TlItem[]).filter(
+          (i) => !personFilter || (i.assignees ?? []).includes(personFilter),
+        ),
+      })),
+    [boards, personFilter, projectNames],
   );
-
-  /** Zeitraumfilter entfällt – der Kalender selbst führt die Zeitachse. */
-  const inRange = (_day: string) => true;
 
   const entries: CalEntry[] = useMemo(() => {
     const out: CalEntry[] = [];
-    const seenAbsence = new Set<string>();
 
-    if (showTimes && !deviceFilter) {
+    if (showTimes) {
       for (const e of times.entries) {
         if (personFilter && e.user_id !== personFilter) continue;
         const who = e.user_id === times.myId ? "Ich" : peopleById.get(e.user_id) ?? "Teammitglied";
         for (const day of datesInRange(isoDate(new Date(e.started_at)), isoDate(new Date(e.ended_at)))) {
-          if (!inRange(day)) continue;
           out.push({
             id: `time-${e.id}-${day}`,
             date: day,
@@ -127,57 +136,35 @@ export function OpsCalendarTab({
       }
     }
 
-    if (showAbsences && !deviceFilter) {
-      for (const a of absences.absences) {
-        if (personFilter && a.user_id !== personFilter) continue;
-        // Dieselbe personenbezogene Abwesenheit nur einmal darstellen.
-        if (seenAbsence.has(a.id)) continue;
-        seenAbsence.add(a.id);
-        const who = a.user_id === absences.myId ? "Ich" : peopleById.get(a.user_id) ?? "Teammitglied";
-        for (const day of datesInRange(a.starts_on, a.ends_on)) {
-          if (!inRange(day)) continue;
-          out.push({
-            id: `abs-${a.id}-${day}`,
-            date: day,
-            title: a.masked ? `${who}: abwesend` : `${who}: ${ABSENCE_LABEL[a.kind ?? "other"]}`,
-            color: "#8b8178",
-          });
-        }
-      }
-    }
-
-    if (showBookings) {
-      for (const b of devices.bookings) {
-        if (deviceFilter && b.device_id !== deviceFilter) continue;
-        if (personFilter && b.responsible_id !== personFilter) continue;
-        if (b.project_id && hidden.has(b.project_id)) continue;
-        const name = devices.devices.find((d) => d.id === b.device_id)?.name ?? "Gerät";
-        for (const day of datesInRange(isoDate(new Date(b.starts_at)), isoDate(new Date(b.ends_at)))) {
-          if (!inRange(day)) continue;
-          out.push({
-            id: `dev-${b.id}-${day}`,
-            date: day,
-            title: name,
-            sub: projectNames.get(b.project_id ?? "") ?? "Projekt",
-            color: "#4da3ff",
-          });
-        }
-      }
-    }
-    if (showItems && !deviceFilter) {
-      for (const board of boards) {
-        for (const item of board.state.items as TlItem[]) {
-          if (personFilter && !(item.assignees ?? []).includes(personFilter)) continue;
+    if (showItems) {
+      for (const board of filteredBoards) {
+        for (const item of board.items) {
           const statusId = effectiveStatusId(item);
           const color = board.state.statuses.find((s) => s.id === statusId)?.color ?? "#c9a227";
+          const open = onEditItem ? () => onEditItem(board.id, item.id) : undefined;
+
+          // Projektzeitraum: nur Start- und Endmarkierung, kein Eintrag an
+          // jedem Tag dazwischen. Gewöhnliche Beiträge bleiben unverändert.
+          if (isPeriodItem(item)) {
+            const start = item.startDate;
+            const end = item.endDate || item.startDate;
+            if (start) {
+              out.push({ id: `period-start-${board.id}-${item.id}`, date: start, title: "Projektstart", sub: board.name, color, onOpen: open });
+            }
+            if (end && end !== start) {
+              out.push({ id: `period-end-${board.id}-${item.id}`, date: end, title: "Projektende", sub: board.name, color, onOpen: open });
+            }
+            continue;
+          }
+
           for (const day of datesInRange(item.startDate, item.endDate || item.startDate)) {
-            if (!inRange(day)) continue;
             out.push({
               id: `item-${board.id}-${item.id}-${day}`,
               date: day,
               title: item.title || "Beitrag",
-              sub: projectNames.get(board.id) ?? "Projekt",
+              sub: board.name,
               color,
+              onOpen: open,
             });
           }
         }
@@ -185,31 +172,11 @@ export function OpsCalendarTab({
     }
 
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [absences.absences, absences.myId, devices.bookings, devices.devices, times.entries, times.myId,
-      peopleById, projectNames, showAbsences, showBookings, showTimes, personFilter, deviceFilter,
-      hidden, boards, showItems]);
+  }, [times.entries, times.myId, peopleById, projectNames, showTimes, personFilter, filteredBoards, showItems, onEditItem]);
 
-  const save = async () => {
-    setError(null);
-    if (!from || !to || to < from) { setError("Bitte einen gültigen Zeitraum wählen."); return; }
-    try {
-      await absences.add({ kind, startsOn: from, endsOn: to, note, status });
-      setNote("");
-      setForm(false);
-    } catch (err) {
-      setError((err as Error)?.message ?? "Speichern nicht möglich.");
-    }
-  };
-
-  const reloadAll = () => { absences.reload(); devices.reload(); times.reload(); };
-  const sources: { label: string; status: OpsStatus }[] = [
-    { label: "Arbeitszeiten", status: times.status },
-    { label: "Abwesenheiten", status: absences.status },
-    { label: "Geräte", status: devices.status },
-  ];
+  const reloadAll = () => { times.reload(); };
+  const sources: { label: string; status: OpsStatus }[] = [{ label: "Arbeitszeiten", status: times.status }];
   const broken = sources.filter((s) => s.status !== "ready" && s.status !== "loading");
-  const cloudBlocked = broken.length === sources.length;
 
   const toggleProject = (id: string) => {
     if (onToggleProject) { onToggleProject(id); return; }
@@ -228,12 +195,8 @@ export function OpsCalendarTab({
         <div className="rounded-lg p-2.5 text-[11px] flex flex-wrap items-center gap-2"
              style={{ border: `1px solid ${LINE}`, color: SOFT }}>
           <div className="flex-1 min-w-[220px]">
-            {cloudBlocked
-              ? OPS_STATUS_TEXT[broken[0].status as Exclude<OpsStatus, "loading" | "ready">]
-              : `Teilweise nicht geladen: ${broken.map((b) => `${b.label} – ${OPS_STATUS_TEXT[b.status as Exclude<OpsStatus, "loading" | "ready">]}`).join(" · ")}`}
-            {cloudBlocked && broken.some((b) => b.status === "setup-missing") && (
-              <> Beiträge werden weiterhin angezeigt.</>
-            )}
+            {`Arbeitszeiten – ${OPS_STATUS_TEXT[broken[0].status as Exclude<OpsStatus, "loading" | "ready">]}`}
+            {" "}Beiträge werden weiterhin angezeigt.
           </div>
           <button onClick={reloadAll} className="h-8 px-2.5 rounded-md border" style={{ borderColor: LINE }}>
             Erneut laden
@@ -245,8 +208,6 @@ export function OpsCalendarTab({
         {([
           ["Beiträge", showItems, () => setShowItems((v) => !v), "#c9a227"],
           ["Arbeitszeiten", showTimes, () => setShowTimes((v) => !v), "#3f9c6a"],
-          ["Abwesenheiten", showAbsences, () => setShowAbsences((v) => !v), "#8b8178"],
-          ["Gerätebuchungen", showBookings, () => setShowBookings((v) => !v), "#4da3ff"],
         ] as [string, boolean, () => void, string][]).map(([label, on, toggle, color]) => (
           <button key={label} onClick={toggle} className="flex items-center gap-1.5 h-9 px-2.5 rounded-md border"
                   style={{ borderColor: on ? color : LINE, color: on ? "hsl(var(--ink))" : SOFT }}>
@@ -254,12 +215,6 @@ export function OpsCalendarTab({
             {label}
           </button>
         ))}
-        <div className="flex-1" />
-        {allowAbsenceEntry && (
-          <button onClick={() => setForm((v) => !v)} className="flex items-center gap-1 h-9 px-2.5 rounded-md border" style={{ borderColor: LINE }}>
-            <Plus size={11} /> Abwesenheit eintragen
-          </button>
-        )}
       </div>
 
       {/* Projekte ein-/ausblenden (Schaltflächenreihe) */}
@@ -277,7 +232,7 @@ export function OpsCalendarTab({
         </div>
       )}
 
-      {/* Filter: Zeitraum, Projekte, Person, Gerät */}
+      {/* Filter: Projekte, Person, Ansicht */}
       <div className="flex flex-wrap items-center gap-2">
         {projectFilterAsDropdown && projectIds.length > 0 && (
           <div className="relative">
@@ -309,67 +264,28 @@ export function OpsCalendarTab({
           <option value="">Alle Personen</option>
           {people.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
-        <select className={inputCls} value={deviceFilter} onChange={(e) => setDeviceFilter(e.target.value)}>
-          <option value="">Alle Geräte</option>
-          {devices.devices.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        {/* Ansichtsauswahl – schaltet den mittleren Bereich tatsächlich um. */}
+        <select
+          className={inputCls}
+          value={view}
+          onChange={(e) => setView(e.target.value as OpsView)}
+          title="Ansicht wählen"
+        >
+          {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
         </select>
       </div>
 
-
-      {form && (
-        <div className="rounded-lg p-2.5 flex flex-wrap items-end gap-2" style={{ border: `1px solid ${LINE}` }}>
-          <select className={inputCls} value={kind} onChange={(e) => setKind(e.target.value as AbsenceKind)}>
-            <option value="vacation">Urlaub</option>
-            <option value="sick">Krank</option>
-            <option value="other">Sonstige Abwesenheit</option>
-          </select>
-          <input type="date" className={inputCls} value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input type="date" className={inputCls} value={to} onChange={(e) => setTo(e.target.value)} />
-          <select className={inputCls} value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="planned">Geplant</option>
-            <option value="confirmed">Bestätigt</option>
-            <option value="cancelled">Abgesagt</option>
-          </select>
-          <input className={`${inputCls} min-w-[180px] flex-1`} value={note} onChange={(e) => setNote(e.target.value)}
-                 placeholder="Bemerkung (nur für dich sichtbar)" />
-          <button onClick={() => void save()} className="h-9 px-3 rounded-md border text-xs"
-                  style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}>
-            Speichern
-          </button>
-          {error && <div className="w-full text-[11px]" style={{ color: "#ef4444" }}>{error}</div>}
-        </div>
+      {view === "calendar" && (
+        <RangeCalendar
+          entries={entries}
+          selectedDates={selectedDates ?? []}
+          onSelectDate={onSelectDate ?? (() => {})}
+          defaultRange={calendarDefaultRange}
+        />
       )}
-
-      {allowAbsenceEntry && !!mine.length && (
-        <div className="rounded-lg p-2.5" style={{ border: `1px solid ${LINE}` }}>
-          <div className="text-[10px] uppercase tracking-wide mb-1.5" style={{ color: SOFT }}>Meine Abwesenheiten</div>
-          <div className="flex flex-col gap-1">
-            {mine.map((a) => (
-              <div key={a.id} className="flex items-center gap-2 text-[11px]">
-                <span className="flex-1 truncate">
-                  {ABSENCE_LABEL[a.kind ?? "other"]} · {a.starts_on} – {a.ends_on}
-                  {a.note ? ` · ${a.note}` : ""}
-                </span>
-                <select
-                  className="h-8 rounded-md border bg-background px-1 text-[11px]"
-                  value={a.status ?? "planned"}
-                  onChange={(e) => void absences.update(a.id, { status: e.target.value })}
-                >
-                  <option value="planned">Geplant</option>
-                  <option value="confirmed">Bestätigt</option>
-                  <option value="cancelled">Abgesagt</option>
-                </select>
-                <button className="h-8 w-8 flex items-center justify-center opacity-60 hover:opacity-100"
-                        title="Löschen" onClick={() => void absences.remove(a.id)}>
-                  <Trash2 size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <RangeCalendar entries={entries} selectedDates={selectedDates ?? []} onSelectDate={onSelectDate ?? (() => {})} />
+      {view === "ray" && <OpsRay boards={filteredBoards} onSelect={onEditItem} />}
+      {view === "net" && <OpsNet boards={filteredBoards} onSelect={onEditItem} />}
+      {view === "gantt" && <OpsGantt boards={filteredBoards} onSelect={onEditItem} />}
     </div>
   );
 }
