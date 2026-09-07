@@ -2544,6 +2544,7 @@ export class MiniCad {
               (this.freeDrawTool as any)?.cancel?.(); (this.eraserTool as any)?.cancel?.();
               (this.documentTool as any)?.cancel?.(); } catch {}
         try { this.selectTool.cancel(); } catch {}
+        try { this.globalGuides.clear(); } catch {}
         try { this.clearSelection(); } catch {}
         try { this.pointEditMenu.hide(); } catch {}
         try { this.onSelectionChange?.(); } catch {}
