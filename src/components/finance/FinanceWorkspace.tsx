@@ -673,6 +673,98 @@ const ProjectView: React.FC<{ projectId: string; state: FinanceState; projectNam
 
 /* ------------------------------------------------- Liste untergeordneter Knoten */
 
+/**
+ * Handy und Tablet: Ordner und Anlagen zeigen nur Name und Betrag.
+ * Ein Tippen öffnet ein Fenster mit den gegliederten Einzelheiten.
+ */
+const MobileNodeList: React.FC<{
+  projectId: string; state: FinanceState; nodes: FinanceNode[]; onSelect: (id: string) => void;
+}> = ({ projectId, state, nodes, onSelect }) => {
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = detailId ? nodes.find((n) => n.id === detailId) ?? null : null;
+  const dt = detail ? nodeTotals(state, detail) : null;
+
+  return (
+    <div className="space-y-2">
+      {nodes.map((n) => {
+        const t = nodeTotals(state, n);
+        return (
+          <button key={n.id} onClick={() => setDetailId(n.id)}
+            className="w-full flex items-center gap-2 rounded-xl border px-3 py-3 text-left"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: "hsl(var(--surface-card))",
+              opacity: n.enabled ? 1 : 0.45,
+            }}>
+            {n.type === "overview"
+              ? <Folder size={16} style={{ color: "hsl(var(--accent-gold))" }} />
+              : <Building2 size={16} style={{ color: "hsl(var(--ink-soft))" }} />}
+            <span className="flex-1 min-w-0 truncate text-sm font-medium">{n.name}</span>
+            <span className="tabular-nums text-sm font-semibold">{formatEur(t.invoices)}</span>
+            <ChevronRight size={16} style={{ color: "hsl(var(--ink-soft))" }} />
+          </button>
+        );
+      })}
+
+      {detail && dt && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+             style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setDetailId(null)}>
+          <div onClick={(e) => e.stopPropagation()}
+               className="w-full sm:max-w-md max-h-[85vh] overflow-auto rounded-t-2xl sm:rounded-2xl border p-4 space-y-3"
+               style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>
+                  {detail.type === "overview" ? "Ordner" : "Anlage"}
+                </div>
+                <div className="text-lg font-semibold truncate">{detail.name}</div>
+              </div>
+              <button onClick={() => setDetailId(null)} className="h-11 w-11 rounded-md flex items-center justify-center">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5 text-sm">
+              <DetailRow label="Kostenschätzung" value={formatEur(dt.estimate)} />
+              <DetailRow label="Angebote" value={formatEur(dt.offers)} />
+              <DetailRow label="Rechnungen" value={formatEur(dt.invoices)} />
+              <DetailRow label="Kontrolle Angebote" value={formatPct(control(dt.estimate, dt.offers).pct)} />
+              <DetailRow label="Kontrolle Rechnungen" value={formatPct(control(dt.estimate, dt.invoices).pct)} />
+            </div>
+
+            {detail.note && (
+              <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{detail.note}</div>
+            )}
+
+            <button
+              onClick={() => financeStore.updateNode(projectId, detail.id, { enabled: !detail.enabled })}
+              className="w-full h-11 rounded-lg border text-sm font-medium flex items-center justify-center gap-2"
+              style={{ borderColor: "hsl(var(--hairline))" }}>
+              {detail.enabled
+                ? <><ToggleRight size={18} style={{ color: "hsl(var(--accent-gold))" }} /> Wird berücksichtigt</>
+                : <><ToggleLeft size={18} /> Wird nicht berücksichtigt</>}
+            </button>
+
+            <button onClick={() => { setDetailId(null); onSelect(detail.id); }}
+              className="w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
+              style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}>
+              Öffnen <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const DetailRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex items-center gap-2 border-b pb-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+    <span className="flex-1" style={{ color: "hsl(var(--ink-soft))" }}>{label}</span>
+    <span className="tabular-nums font-medium">{value}</span>
+  </div>
+);
+
+
 const ChildList: React.FC<{
   projectId: string; state: FinanceState; nodes: FinanceNode[];
   onSelect: (id: string) => void; deep?: boolean;
