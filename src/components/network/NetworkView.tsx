@@ -98,6 +98,12 @@ export function NetworkView({
   const [results, setResults] = useState<NetworkProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [chat, setChat] = useState<ChatTarget | null>(null);
+  const [details, setDetails] = useState<NetworkPerson | null>(null);
+  const [confirmContact, setConfirmContact] = useState<{ person: NetworkPerson; projects: string[] } | null>(null);
+
+  const { unread, refreshUnread } = useUnreadChats(net.myId, net.ready);
+
+
 
   const contactsById = useMemo(() => new Map(net.contacts.map((c) => [c.id, c])), [net.contacts]);
 
