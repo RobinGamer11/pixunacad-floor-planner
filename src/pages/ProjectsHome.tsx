@@ -1156,6 +1156,13 @@ export default function ProjectsHome() {
 
 
 
+              <SectionHeading
+                size="tab"
+                className="mt-6"
+                title={TAB_HEADINGS[tab].title}
+                subtitle={TAB_HEADINGS[tab].subtitle}
+              />
+
               {tab === "uebersicht" && <UebersichtView project={selected} />}
               {tab === "aufgaben" && <AufgabenView project={selected} />}
               {tab === "finanzen" && (
@@ -1167,6 +1174,7 @@ export default function ProjectsHome() {
               {tab === "team" && (
                 <ProjectTeamTab key={selected.id} projectId={selected.id} projectName={selected.name} />
               )}
+
               
             </div>
           )}
@@ -2676,7 +2684,9 @@ function SharedView({
   const networkFolders = useMemo(() => folders.map((f) => ({ id: f.id, name: f.name })), [folders]);
   return (
     <div className="px-4 sm:px-6 xl:px-10 py-7 w-full">
-      <h1 className="text-2xl font-semibold tracking-tight">Netzwerk</h1>
+      <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Netzwerk</h1>
+      <p className="mt-1.5 text-sm text-muted-foreground">Kontakte, Freunde und Projektteams auf einen Blick.</p>
+
 
 
 
