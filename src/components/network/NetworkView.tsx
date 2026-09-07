@@ -4,21 +4,10 @@ import {
   FolderKanban,
   UserPlus,
   MessageSquare,
-  StickyNote,
-  ChevronDown,
-  ChevronRight,
   Check,
   X,
   Search,
-  UserMinus,
-  GripVertical,
-  Wrench,
-  FolderPlus,
-
 } from "lucide-react";
-import { DevicesTab } from "@/components/network/DevicesTab";
-import { CommentsTab } from "@/components/network/CommentsTab";
-import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
 import {
   useNetwork,
   presenceColor,
@@ -30,18 +19,16 @@ import {
 } from "@/lib/networkStore";
 import { useUnreadChats, type ChatTarget } from "@/lib/chatStore";
 import {
-  ROLE_LABEL,
   effectivePermissions,
-  permissionsForRole,
-  type ProjectPermissionOverrides,
   type ProjectRole,
 } from "@/lib/projectAccess";
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
 import { isPlaceholderName } from "@/lib/accountProfile";
-import { projectStore, useProfile } from "@/lib/projectStore";
+import { useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
-import { MemberRoleControls } from "@/components/network/MemberRoleControls";
 import { PeopleTab } from "@/components/network/PeopleTab";
+import { ProjectsTab } from "@/components/network/ProjectsTab";
+
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
 
@@ -61,156 +48,6 @@ function Avatar({ name, url, size = 34 }: { name: string; url?: string | null; s
   );
 }
 
-function ChatButton({
-  unread,
-  active,
-  onClick,
-  title,
-}: { unread?: boolean; active?: boolean; onClick: () => void; title: string }) {
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      title={unread ? `${title} · neue Nachricht` : title}
-      className={`relative h-9 w-9 shrink-0 rounded-lg grid place-items-center border hover:bg-[hsl(var(--surface-muted))] ${
-        unread ? "animate-pulse" : ""
-      }`}
-      style={
-        unread
-          ? {
-              color: "hsl(var(--accent-gold))",
-              borderColor: "hsl(var(--accent-gold))",
-              background: "hsl(var(--accent-gold) / 0.16)",
-              boxShadow: "0 0 0 3px hsl(var(--accent-gold) / 0.18)",
-            }
-          : active
-            ? {
-                color: "hsl(var(--accent-gold))",
-                borderColor: "hsl(var(--accent-gold))",
-                background: "hsl(var(--accent-gold) / 0.14)",
-              }
-            : { color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }
-      }
-    >
-      <MessageSquare size={20} />
-      {unread && (
-        <span
-          className="absolute -top-1 -right-1 w-3 h-3 rounded-full border"
-          style={{ background: "hsl(var(--accent-gold))", borderColor: "hsl(var(--surface-card))" }}
-        />
-      )}
-    </button>
-  );
-}
-
-/** Kommentare eines Projekts – gleiches Format wie der Chat, klar anderes Symbol. */
-function CommentsButton({
-  onClick,
-  title,
-  active,
-}: { onClick: () => void; title: string; active?: boolean }) {
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      title={title}
-      className="h-9 w-9 shrink-0 rounded-lg grid place-items-center border hover:bg-[hsl(var(--surface-muted))]"
-      style={
-        active
-          ? {
-              color: "hsl(var(--accent-gold))",
-              borderColor: "hsl(var(--accent-gold))",
-              background: "hsl(var(--accent-gold) / 0.14)",
-            }
-          : { color: "hsl(var(--ink-soft))", borderColor: "hsl(var(--hairline))" }
-      }
-    >
-      <StickyNote size={19} />
-    </button>
-  );
-}
-
-
-function PersonRow({
-  person,
-  chat,
-  right,
-  onClick,
-  draggable,
-  onDragStart,
-  handle,
-}: {
-  person: NetworkPerson;
-  /** Chat-Symbol – steht direkt neben dem Namen. */
-  chat?: React.ReactNode;
-  right?: React.ReactNode;
-  onClick?: () => void;
-  draggable?: boolean;
-  onDragStart?: (e: React.DragEvent) => void;
-  handle?: boolean;
-}) {
-  const offline = person.status === "offline";
-  return (
-    <div
-      className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-[hsl(var(--surface-muted))]"
-      draggable={draggable}
-      onDragStart={onDragStart}
-      onClick={onClick}
-      style={{ cursor: draggable ? "grab" : onClick ? "pointer" : undefined }}
-    >
-      {handle && <GripVertical size={13} className="text-muted-foreground shrink-0" />}
-      <div className="relative">
-        <Avatar name={person.name} url={person.avatarUrl} />
-        <span
-          className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2"
-          style={{ background: presenceColor(person.status), borderColor: "hsl(var(--surface-card))" }}
-        />
-      </div>
-      <div className="min-w-0 flex-1" style={{ opacity: offline ? 0.6 : 1 }}>
-        <div className="text-sm font-medium truncate flex items-center gap-2">
-          <span className="truncate">{person.name}</span>
-          {chat}
-        </div>
-        <div className="text-[11px] text-muted-foreground truncate">
-          {person.role?.trim() || presenceLabel(person.status)}
-        </div>
-      </div>
-      {right}
-    </div>
-  );
-}
-
-function Group({
-  title,
-  count,
-  total,
-  actions,
-  children,
-}: {
-  title: string;
-  count: number;
-  total: number;
-  actions?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="mb-1">
-      <div className="w-full flex items-center gap-1.5 px-1 py-1.5">
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-[11px] font-semibold tracking-[0.14em] uppercase text-muted-foreground hover:text-foreground min-w-0"
-        >
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <span className="truncate">{title}</span>
-          <span className="ml-1 opacity-70">({count}/{total})</span>
-        </button>
-        {/* Chat-Symbol direkt neben dem Projektnamen. */}
-        <div className="flex items-center gap-1">{actions}</div>
-      </div>
-
-      {open && <div className="pl-1">{children}</div>}
-    </div>
-  );
-}
 
 type TabId = "contacts" | "teams" | "requests" | "devices" | "comments";
 
@@ -258,29 +95,12 @@ export function NetworkView({
   const [results, setResults] = useState<NetworkProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [chat, setChat] = useState<ChatTarget | null>(null);
-  /** Kommentarübersicht eines Projekts (aus den Projektzeilen heraus geöffnet). */
-  const [commentsProject, setCommentsProject] = useState<string | undefined>();
-  const openComments = (id: string) => { setCommentsProject(id); setTab("comments"); };
-  /** Chat bzw. Kommentare direkt unter dem Projektnamen in „Projekte / Teams“. */
-  const [projectPanel, setProjectPanel] = useState<{ id: string; kind: "chat" | "comments" } | null>(null);
-  const toggleProjectPanel = (id: string, kind: "chat" | "comments") =>
-    setProjectPanel((cur) => (cur && cur.id === id && cur.kind === kind ? null : { id, kind }));
-
   const [details, setDetails] = useState<NetworkPerson | null>(null);
   const [confirmContact, setConfirmContact] = useState<{ person: NetworkPerson; projects: string[] } | null>(null);
-  const [dragOver, setDragOver] = useState<string | null>(null);
 
   const { unread, refreshUnread } = useUnreadChats(net.myId, net.ready);
 
-  /** Ordneranlage – exakt derselbe Ordnerbestand wie in der Projektliste links. */
-  const [creatingFolder, setCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const commitNewFolder = () => {
-    const name = newFolderName.trim();
-    if (name) projectStore.addProjectFolder(name);
-    setCreatingFolder(false);
-    setNewFolderName("");
-  };
+
 
   const contactsById = useMemo(() => new Map(net.contacts.map((c) => [c.id, c])), [net.contacts]);
 
@@ -299,22 +119,23 @@ export function NetworkView({
     return map;
   }, [contactsById, net.myId, net.myProfile, net.myStatus]);
 
-  const byProject = useMemo(() => {
-    const map = new Map<string, NetworkPerson[]>();
-    for (const p of projects) map.set(p.id, []);
-    const assigned = new Set<string>();
-    for (const m of net.members) {
-      if (!map.has(m.project_id)) continue;
-      if (m.user_id === net.myId) continue;
-      // Auch Projektmitglieder ohne persönlichen Kontakt gehören ins Team.
-      const person = contactsById.get(m.user_id) ?? net.peopleById.get(m.user_id);
-      if (!person) continue;
-      map.get(m.project_id)!.push(person);
-      assigned.add(person.id);
-    }
-    const general = net.contacts.filter((c) => !assigned.has(c.id));
-    return { map, general };
-  }, [contactsById, net.contacts, net.members, net.myId, net.peopleById, projects]);
+  /** Mitglieder eines Projekts (ohne mich) – aus der gemeinsamen Datenbasis. */
+  const membersOf = useMemo(() => {
+    const cache = new Map<string, NetworkPerson[]>();
+    return (projectId: string) => {
+      let hit = cache.get(projectId);
+      if (hit) return hit;
+      hit = [];
+      for (const m of net.members) {
+        if (m.project_id !== projectId || m.user_id === net.myId) continue;
+        const person = contactsById.get(m.user_id) ?? net.peopleById.get(m.user_id);
+        if (person) hit.push(person);
+      }
+      cache.set(projectId, hit);
+      return hit;
+    };
+  }, [contactsById, net.members, net.myId, net.peopleById]);
+
 
   /* Namensauflösung für die gemeinsamen Übersichten (Kalender, Geräte). */
   const projectNameMap = useMemo(() => {
@@ -398,47 +219,13 @@ export function NetworkView({
     setSearching(false);
   };
 
-  /* ------------------------------ Drag & Drop ----------------------------- */
-  const onDragStartPerson = (userId: string, fromProjectId: string | null) => (e: React.DragEvent) => {
-    e.dataTransfer.setData("text/plain", JSON.stringify({ userId, from: fromProjectId }));
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDrop = (toProjectId: string | null) => async (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(null);
-    try {
-      const { userId, from } = JSON.parse(e.dataTransfer.getData("text/plain")) as {
-        userId: string;
-        from: string | null;
-      };
-      if (from === toProjectId) return;
-      if (toProjectId) await net.addMember(toProjectId, userId);
-      if (from) await net.removeMember(from, userId);
-    } catch {
-      // Ungültiger Drop – ignorieren.
-    }
-  };
-
-  /** Ordner der Startseite – dieselbe Struktur, keine zweite Pflege. */
-  const folderGroups = useMemo(() => {
-    const groups = folders.map((f) => ({
-      key: f.id,
-      name: f.name,
-      items: projects.filter((p) => p.folderId === f.id),
-    }));
-    const rest = projects.filter((p) => !p.folderId || !folders.some((f) => f.id === p.folderId));
-    if (rest.length) groups.push({ key: "__root", name: "Ohne Ordner", items: rest });
-    return groups;
-  }, [folders, projects]);
 
   const tabs: { id: TabId; label: string; icon: typeof Users; badge?: number }[] = [
-    { id: "teams", label: "Projekte / Teams", icon: FolderKanban },
-    { id: "contacts", label: "Kontakte", icon: Users },
+    { id: "contacts", label: "Freunde", icon: Users },
+    { id: "teams", label: "Projekte", icon: FolderKanban },
     { id: "requests", label: "Kontaktanfragen", icon: UserPlus, badge: net.incoming.length },
-    { id: "devices", label: "Geräte & Werkzeuge", icon: Wrench },
-    { id: "comments", label: "Kommentare", icon: MessageSquare },
   ];
+
 
 
   return (
@@ -501,245 +288,23 @@ export function NetworkView({
           )}
 
           {!net.loading && tab === "teams" && (
-            <div className="space-y-4">
-              {/* Verwaltungsebene: Projekte, Teams, Rollen. Der projektübergreifende
-                  Kalender liegt in Startseite → Organisation. */}
-
-
-              <div className="text-[11px] text-muted-foreground px-1">
-                Personen per Drag &amp; Drop zwischen Projekten und „Allgemein“ verschieben – oder die Auswahl unten
-                verwenden. Mitglieder verwalten darf nur der Projektbesitzer.
-              </div>
-              <div className="flex flex-wrap items-center gap-2 px-1">
-                <button
-                  type="button"
-                  onClick={() => { setCreatingFolder(true); setNewFolderName(""); }}
-                  className="h-9 px-3 rounded-md border text-xs font-semibold flex items-center gap-2"
-                  style={{ background: "hsl(var(--accent-gold) / 0.14)", borderColor: "hsl(var(--accent-gold) / 0.4)" }}
-                >
-                  <FolderPlus size={14} style={{ color: "hsl(var(--accent-gold))" }} />
-                  + Ordner
-                </button>
-                {creatingFolder && (
-                  <div className="flex items-center gap-1 rounded-md border px-2 h-9" style={{ borderColor: "hsl(var(--hairline))" }}>
-                    <input
-                      autoFocus
-                      value={newFolderName}
-                      onChange={(e) => setNewFolderName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitNewFolder();
-                        if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
-                      }}
-                      placeholder="Ordnername"
-                      className="bg-transparent text-xs outline-none"
-                    />
-                    <button onClick={commitNewFolder} title="Anlegen"><Check size={13} /></button>
-                    <button onClick={() => { setCreatingFolder(false); setNewFolderName(""); }} title="Abbrechen"><X size={13} /></button>
-                  </div>
-                )}
-              </div>
-              {projects.length === 0 && (
-                <div className="p-4 text-sm text-muted-foreground">Noch keine Projekte vorhanden.</div>
-              )}
-              {folderGroups.map((g) => (
-                <div key={g.key} className="space-y-2">
-                  <div className="flex items-center gap-2 px-1">
-                    <FolderPlus size={16} style={{ color: "hsl(var(--accent-gold))" }} />
-                    <span className="text-base font-semibold tracking-tight">{g.name}</span>
-                    <span className="text-xs text-muted-foreground">({g.items.length})</span>
-                  </div>
-                  {g.items.length === 0 && (
-                    <div className="px-2 py-3 text-[11px] text-muted-foreground border border-dashed rounded-md"
-                         style={{ borderColor: "hsl(var(--hairline))" }}>
-                      Noch keine Projekte in diesem Ordner.
-                    </div>
-                  )}
-                  {g.items.map((p) => {
-                const list = byProject.map.get(p.id) ?? [];
-                const available = net.contacts.filter((c) => !list.some((m) => m.id === c.id));
-                return (
-                  <div
-                    key={p.id}
-                    className="rounded-lg border p-2.5"
-                    style={{
-                      borderColor: dragOver === p.id ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                      background: dragOver === p.id ? "hsl(var(--accent-gold) / 0.08)" : undefined,
-                    }}
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(p.id); }}
-                    onDragLeave={() => setDragOver((v) => (v === p.id ? null : v))}
-                    onDrop={handleDrop(p.id)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <FolderKanban size={14} className="text-muted-foreground" />
-                      <span className="text-sm font-semibold truncate">{p.name} ({list.length})</span>
-                      <ChatButton
-                        unread={unread[`p:${p.id}`]}
-                        active={projectPanel?.id === p.id && projectPanel.kind === "chat"}
-                        onClick={() => {
-                          toggleProjectPanel(p.id, "chat");
-                        }}
-                        title="Projektchat öffnen"
-                      />
-                      <CommentsButton
-                        active={projectPanel?.id === p.id && projectPanel.kind === "comments"}
-                        onClick={() => toggleProjectPanel(p.id, "comments")}
-                        title="Kommentare des Projekts"
-                      />
-                      <div className="ml-auto flex items-center gap-1">
-                        <span className="text-[11px] text-muted-foreground">
-                          Besitzer: {ownerOf(p.id).label}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Chat bzw. Kommentare dieses Projekts – direkt unter dem Namen. */}
-                    {projectPanel?.id === p.id && projectPanel.kind === "chat" && (
-                      <div className="mt-2">
-                        <ChatPanel
-                          target={{ kind: "project", projectId: p.id, title: p.name }}
-                          people={peopleById}
-                          onRead={() => void refreshUnread()}
-                          onClose={() => { setProjectPanel(null); void refreshUnread(); }}
-                        />
-                      </div>
-                    )}
-                    {projectPanel?.id === p.id && projectPanel.kind === "comments" && (
-                      <div
-                        className="mt-2 rounded-xl border p-3"
-                        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-                      >
-                        <div className="mb-2 flex items-center gap-2">
-                          <StickyNote size={14} />
-                          <span className="text-sm font-semibold truncate">Kommentare · {p.name}</span>
-                          <button
-                            onClick={() => setProjectPanel(null)}
-                            className="ml-auto h-7 w-7 rounded-md grid place-items-center hover:bg-[hsl(var(--surface-muted))]"
-                            title="Schließen"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                        <CommentsTab
-                          projects={[{ id: p.id, name: p.name }]}
-                          peopleById={peopleNameMap}
-                          initialProjectId={p.id}
-                        />
-                      </div>
-                    )}
-                    <ProjectTimeSummary projectId={p.id} peopleById={peopleNameMap} />
-
-                    <div className="mt-1.5">
-                      {list.length === 0 && (
-                        <div className="px-2 py-3 text-[11px] text-muted-foreground border border-dashed rounded-md text-center"
-                          style={{ borderColor: "hsl(var(--hairline))" }}>
-                          Person hierher ziehen
-                        </div>
-                      )}
-                      {list.map((person) => {
-                        const row = memberRow(p.id, person.id);
-                        const manage = canManageProject(p.id);
-                        return (
-                          <div key={person.id}>
-                            <PersonRow
-                              person={person}
-                              handle
-                              draggable
-                              onDragStart={onDragStartPerson(person.id, p.id)}
-                              right={
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                    {openContributions(p.id, person.id)} offen
-                                  </span>
-                                  {manage && (
-                                    <button
-                                      onClick={() => net.removeMember(p.id, person.id)}
-                                      title="Aus Projekt entfernen (Kontakt bleibt bestehen)"
-                                      className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground"
-                                    >
-                                      <UserMinus size={14} />
-                                    </button>
-                                  )}
-                                </div>
-                              }
-                            />
-                            <MemberRoleControls
-                              role={(row?.role as ProjectRole) ?? "member"}
-                              overrides={row?.permissions ?? {}}
-                              canManage={manage && !!row}
-                              onRole={(role) => net.setMemberRole(p.id, person.id, role)}
-                              onOverrides={(o) => net.setMemberPermissions(p.id, person.id, o)}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {canManageProject(p.id) && available.length > 0 && (
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          if (e.target.value) net.addMember(p.id, e.target.value);
-                          e.target.value = "";
-                        }}
-                        className="mt-2 h-8 w-full rounded-md border px-2 text-xs"
-                        style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}
-                      >
-                        <option value="">Person hinzufügen …</option>
-                        {available.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                );
-              })}
-                </div>
-              ))}
-
-
-              <div
-                className="rounded-lg border p-2.5"
-                style={{
-                  borderColor: dragOver === "__general" ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                  background: dragOver === "__general" ? "hsl(var(--accent-gold) / 0.08)" : undefined,
-                }}
-                onDragOver={(e) => { e.preventDefault(); setDragOver("__general"); }}
-                onDragLeave={() => setDragOver((v) => (v === "__general" ? null : v))}
-                onDrop={handleDrop(null)}
-              >
-                <div className="flex items-center gap-2">
-                  <Users size={14} className="text-muted-foreground" />
-                  <span className="text-sm font-semibold">Allgemein ({byProject.general.length})</span>
-                </div>
-                <div className="mt-1.5">
-                  {byProject.general.length === 0 ? (
-                    <div className="px-2 py-3 text-[11px] text-muted-foreground border border-dashed rounded-md text-center"
-                      style={{ borderColor: "hsl(var(--hairline))" }}>
-                      Person hierher ziehen, um sie aus allen Projekten zu nehmen.
-                    </div>
-                  ) : (
-                    byProject.general.map((person) => (
-                      <PersonRow
-                        key={person.id}
-                        person={person}
-                        handle
-                        draggable
-                        onDragStart={onDragStartPerson(person.id, null)}
-                        right={
-                          <button
-                            onClick={() => setConfirmContact({ person, projects: projectsOfPerson(person.id) })}
-                            title="Kontakt entfernen"
-                            className="h-7 w-7 rounded-md grid place-items-center text-muted-foreground hover:text-foreground"
-                          >
-                            <X size={14} />
-                          </button>
-                        }
-                      />
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
+            <ProjectsTab
+              projects={visibleProjects}
+              membersOf={membersOf}
+              memberRow={memberRow}
+              canManageProject={canManageProject}
+              ownerLabel={(id) => ownerOf(id).label}
+              contacts={net.contacts}
+              peopleNames={peopleNameMap}
+              unread={unread}
+              onOpenChat={(p) => openProject(p)}
+              onAddMember={(projectId, userId) => void net.addMember(projectId, userId)}
+              onRemoveMember={(projectId, userId) => void net.removeMember(projectId, userId)}
+              onSetRole={(projectId, userId, role) => void net.setMemberRole(projectId, userId, role)}
+              onSetPermissions={(projectId, userId, o) => void net.setMemberPermissions(projectId, userId, o)}
+            />
           )}
+
 
           {!net.loading && tab === "requests" && (
             <div className="space-y-4">
@@ -842,18 +407,6 @@ export function NetworkView({
 
 
 
-
-          {!net.loading && tab === "devices" && (
-            <DevicesTab projectNames={projectNameMap} peopleById={peopleNameMap} />
-          )}
-
-          {!net.loading && tab === "comments" && (
-            <CommentsTab
-              projects={Array.from(projectNameMap.entries()).map(([id, name]) => ({ id, name }))}
-              peopleById={peopleNameMap}
-              initialProjectId={commentsProject}
-            />
-          )}
         </div>
 
         {chat && (

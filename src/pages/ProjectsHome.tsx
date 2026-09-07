@@ -1912,8 +1912,9 @@ function NewProjectSettingsDialog({
           <SettingsField label="PROJEKTNAME" value={name} onChange={setName} />
           <SettingsField label="BAUHERR" value={bauherr} onChange={setBauherr} />
           <div className="col-span-2">
-            <AddressField value={ort} onChange={setOrt} />
+            <SettingsField label="PROJEKTADRESSE" value={ort} onChange={setOrt} />
           </div>
+
           <SettingsField label="PROJEKTTYP" value={projektTyp} onChange={setProjektTyp} />
           <SettingsField label="STATUS" value={status} onChange={setStatus} />
           <SettingsField label="ERSTELLT AM" value={erstelltAm} onChange={setErstelltAm} />
@@ -2667,15 +2668,7 @@ function SharedView({
     <div className="px-4 sm:px-6 xl:px-10 py-7 w-full">
       <h1 className="text-2xl font-semibold tracking-tight">Netzwerk</h1>
 
-      <div className="mt-5 max-w-xl">
-        <div className="text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">MEIN PROFIL</div>
-        <div
-          className="mt-2 rounded-xl border p-4"
-          style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
-        >
-          <ProfileEditor profile={profile} projectCount={projectCount} />
-        </div>
-      </div>
+
 
       <NetworkView
         projects={networkProjects}
@@ -2692,26 +2685,24 @@ function TrashView({ activeCount }: { activeCount: number }) {
   const full = activeCount >= MAX_PROJECTS;
   return (
     <div className="px-10 py-7">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Papierkorb</h1>
-        <div className="flex-1" />
-        <button
-          onClick={() => {
-            if (trashed.length === 0) return;
-            if (!confirm(`Alle ${trashed.length} Projekte im Papierkorb endgültig löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`)) return;
-            for (const p of trashed) projectStore.purgeProject(p.id);
-          }}
-          disabled={trashed.length === 0}
-          className="h-9 px-3 rounded-md border text-xs font-medium flex items-center gap-2 disabled:opacity-40"
-          style={{ borderColor: "hsl(0 70% 55% / 0.6)", color: "hsl(0 70% 52%)" }}
-          title="Papierkorb vollständig leeren"
-        >
-          <Trash2 size={14} /> Alle löschen
-        </button>
-      </div>
+      <h1 className="text-2xl font-semibold tracking-tight">Papierkorb</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         Gelöschte Projekte bleiben 30 Tage erhalten und können wiederhergestellt werden.
       </p>
+      <button
+        onClick={() => {
+          if (trashed.length === 0) return;
+          if (!confirm(`Alle ${trashed.length} Projekte im Papierkorb endgültig löschen?\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`)) return;
+          for (const p of trashed) projectStore.purgeProject(p.id);
+        }}
+        disabled={trashed.length === 0}
+        className="mt-3 h-10 px-4 rounded-md text-sm font-semibold flex items-center gap-2 disabled:opacity-40"
+        style={{ background: "hsl(0 72% 48%)", color: "#fff" }}
+        title="Papierkorb vollständig leeren"
+      >
+        <Trash2 size={16} /> Alle löschen
+      </button>
+
       <div className="mt-5 max-w-2xl">
         {full && (
           <div
