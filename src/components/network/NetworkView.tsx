@@ -98,29 +98,6 @@ export function NetworkView({
   const [results, setResults] = useState<NetworkProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [chat, setChat] = useState<ChatTarget | null>(null);
-  /** Kommentarübersicht eines Projekts (aus den Projektzeilen heraus geöffnet). */
-  const [commentsProject, setCommentsProject] = useState<string | undefined>();
-  const openComments = (id: string) => { setCommentsProject(id); setTab("comments"); };
-  /** Chat bzw. Kommentare direkt unter dem Projektnamen in „Projekte / Teams“. */
-  const [projectPanel, setProjectPanel] = useState<{ id: string; kind: "chat" | "comments" } | null>(null);
-  const toggleProjectPanel = (id: string, kind: "chat" | "comments") =>
-    setProjectPanel((cur) => (cur && cur.id === id && cur.kind === kind ? null : { id, kind }));
-
-  const [details, setDetails] = useState<NetworkPerson | null>(null);
-  const [confirmContact, setConfirmContact] = useState<{ person: NetworkPerson; projects: string[] } | null>(null);
-  const [dragOver, setDragOver] = useState<string | null>(null);
-
-  const { unread, refreshUnread } = useUnreadChats(net.myId, net.ready);
-
-  /** Ordneranlage – exakt derselbe Ordnerbestand wie in der Projektliste links. */
-  const [creatingFolder, setCreatingFolder] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const commitNewFolder = () => {
-    const name = newFolderName.trim();
-    if (name) projectStore.addProjectFolder(name);
-    setCreatingFolder(false);
-    setNewFolderName("");
-  };
 
   const contactsById = useMemo(() => new Map(net.contacts.map((c) => [c.id, c])), [net.contacts]);
 
@@ -239,39 +216,6 @@ export function NetworkView({
     setSearching(false);
   };
 
-  /* ------------------------------ Drag & Drop ----------------------------- */
-  const onDragStartPerson = (userId: string, fromProjectId: string | null) => (e: React.DragEvent) => {
-    e.dataTransfer.setData("text/plain", JSON.stringify({ userId, from: fromProjectId }));
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDrop = (toProjectId: string | null) => async (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(null);
-    try {
-      const { userId, from } = JSON.parse(e.dataTransfer.getData("text/plain")) as {
-        userId: string;
-        from: string | null;
-      };
-      if (from === toProjectId) return;
-      if (toProjectId) await net.addMember(toProjectId, userId);
-      if (from) await net.removeMember(from, userId);
-    } catch {
-      // Ungültiger Drop – ignorieren.
-    }
-  };
-
-  /** Ordner der Startseite – dieselbe Struktur, keine zweite Pflege. */
-  const folderGroups = useMemo(() => {
-    const groups = folders.map((f) => ({
-      key: f.id,
-      name: f.name,
-      items: projects.filter((p) => p.folderId === f.id),
-    }));
-    const rest = projects.filter((p) => !p.folderId || !folders.some((f) => f.id === p.folderId));
-    if (rest.length) groups.push({ key: "__root", name: "Ohne Ordner", items: rest });
-    return groups;
-  }, [folders, projects]);
 
   const tabs: { id: TabId; label: string; icon: typeof Users; badge?: number }[] = [
     { id: "contacts", label: "Freunde", icon: Users },
