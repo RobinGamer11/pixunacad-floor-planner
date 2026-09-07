@@ -109,7 +109,7 @@ function SummaryCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-[76px] min-w-[220px] flex-1 items-center gap-3 rounded-xl border px-3 py-3 text-left"
+      className="flex min-h-[76px] min-w-0 items-center gap-2 sm:gap-3 rounded-xl border px-2.5 sm:px-3 py-3 text-left"
       style={{
         borderColor: active ? GOLD : LINE,
         background: active ? "hsl(var(--accent-gold) / 0.12)" : CARD,
@@ -471,7 +471,7 @@ export function OpsOverview({
       {/* 3. Mein Überblick */}
       <div className="mb-4">
         <h2 className="mb-2 text-sm font-semibold">Mein Überblick</h2>
-        <div className="flex gap-3 overflow-x-auto pb-1 sm:grid sm:grid-cols-2 sm:overflow-visible xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
           <SummaryCard
             icon={<ListChecks size={18} />}
             label="Beiträge"
@@ -498,7 +498,7 @@ export function OpsOverview({
               onClick={() => setCard("projects")}
             />
           ) : (
-            <div className="flex min-h-[76px] min-w-[220px] flex-1 items-center gap-3 rounded-xl border px-3 py-3"
+            <div className="flex min-h-[76px] min-w-0 items-center gap-2 sm:gap-3 rounded-xl border px-2.5 sm:px-3 py-3"
                  style={{ borderColor: LINE, background: CARD }}>
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
                     style={{ background: "hsl(var(--surface-muted))" }}>
