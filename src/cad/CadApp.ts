@@ -37,6 +37,7 @@ import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedIt
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import { DocumentTool } from "./DocumentTool";
+import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 import { FreeDrawTool } from "./FreeDrawTool";
 import { RulerTool } from "./RulerTool";
 import { EraserTool } from "./EraserTool";
