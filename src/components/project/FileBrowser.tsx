@@ -616,7 +616,7 @@ export function FileBrowser({ project }: Props) {
       <ul>
         {group.folders.map((folder, index) => {
           if (ancestors.has(folder.id)) return null;
-          const expanded = expandedFolderIds.has(folder.id);
+          const expanded = Boolean(visibleNodeIds) || expandedFolderIds.has(folder.id);
           const folderDropActive = dropTarget?.mode === "inside" && dropTarget.folderId === folder.id;
           const nextAncestors = new Set(ancestors).add(folder.id);
 
