@@ -2589,7 +2589,6 @@ function ToolRailButton({
   onClick,
   showLabel,
   disabled,
-  glow,
 }: {
   icon: React.ReactNode;
   label: string;
