@@ -329,6 +329,14 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
             )}
           </div>
 
+          {/* Struktur klappt unterhalb des Kopfes auf (Tablet und Handy) */}
+          {mobileNavOpen && (
+            <div className="lg:hidden border-b max-h-[70vh] overflow-auto"
+                 style={{ borderColor: "hsl(var(--hairline))" }}>
+              {structure}
+            </div>
+          )}
+
           <div ref={exportRef} className="p-3 sm:p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
             {filterActive && (
               <FilterResults hits={filterHits} onOpen={(id) => { setFilterQuery(""); setFilterTypes([]); setSelectedId(id); }} />
