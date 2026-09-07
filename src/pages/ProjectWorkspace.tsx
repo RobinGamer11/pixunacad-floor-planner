@@ -1742,13 +1742,7 @@ export default function ProjectWorkspace() {
             showLabel
           />
           {hatchToolFlyoutOpen && (
-            <div
-              className="absolute top-0 left-full ml-1 flex flex-col gap-0.5 p-1 rounded-lg shadow-lg z-40"
-              style={{
-                background: "hsl(var(--surface-card))",
-                border: "1px solid hsl(var(--hairline))",
-              }}
-            >
+            <RailFlyout onClose={() => setHatchToolFlyoutOpen(false)}>
               {HATCH_MODE_VARIANTS.map((variant) => {
                 const Icon = variant.icon;
                 return (
