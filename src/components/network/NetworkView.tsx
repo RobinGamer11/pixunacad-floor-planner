@@ -265,21 +265,21 @@ export function NetworkView({
       </div>
 
       {/* Hauptbereiche */}
-      <div className="mt-5 -mx-1 px-1 flex gap-3 overflow-x-auto sm:grid sm:grid-cols-3 sm:overflow-visible">
+      <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
         {tabs.map((t) => {
           const active = tab === t.id;
           return (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className="h-[60px] min-w-[220px] sm:min-w-0 shrink-0 sm:shrink px-5 rounded-xl border flex items-center gap-3 text-left"
+              className="h-[60px] min-w-0 px-3 sm:px-5 rounded-xl border flex items-center gap-2 sm:gap-3 text-left"
               style={{
                 borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
                 background: active ? "hsl(var(--accent-gold) / 0.12)" : "hsl(var(--surface-card))",
               }}
             >
-              <t.icon size={22} style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }} />
-              <span className="flex-1 min-w-0 truncate text-base font-medium">{t.label}</span>
+              <t.icon size={20} className="shrink-0" style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }} />
+              <span className="flex-1 min-w-0 truncate text-sm sm:text-base font-medium">{t.label}</span>
               {!!t.badge && (
                 <span
                   className="min-w-[22px] h-[22px] px-1.5 rounded-full text-[11px] grid place-items-center"
@@ -288,7 +288,7 @@ export function NetworkView({
                   {t.badge}
                 </span>
               )}
-              <span className="text-xl font-semibold tabular-nums">{t.count}</span>
+              <span className="text-lg sm:text-xl font-semibold tabular-nums">{t.count}</span>
             </button>
           );
         })}

@@ -131,6 +131,17 @@ export default function ProjectsHome() {
   const [shopOpen, setShopOpen] = useState(false);
   const [mobileShopOpen, setMobileShopOpen] = useState(false);
   const shopRef = useRef<HTMLDivElement | null>(null);
+  /** Drei-Punkte-Menü im Kopf (nur Handy): Organisation, Netzwerk, Shop. */
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const headerMenuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!headerMenuRef.current?.contains(e.target as Node)) setHeaderMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [headerMenuOpen]);
   // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
   useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
@@ -432,8 +443,8 @@ export default function ProjectsHome() {
         </button>
 
 
-        {/* Nav-Icons mit feinen vertikalen Trennstrichen */}
-        <div className="ml-0 sm:ml-2 flex items-center h-10 shrink-0">
+        {/* Nav-Icons mit feinen vertikalen Trennstrichen (auf dem Handy im Drei-Punkte-Menü) */}
+        <div className="ml-0 sm:ml-2 hidden sm:flex items-center h-10 shrink-0">
           <NavIcon
             icon={<Home size={18} strokeWidth={1.5} />}
             label="Hauptseite"
@@ -455,6 +466,55 @@ export default function ProjectsHome() {
             active={hub === "shared"}
             onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); closeSidebarOnCompact(); }}
           />
+        </div>
+
+        {/* Handy: Hauptseite bleibt direkt erreichbar, der Rest im Drei-Punkte-Menü */}
+        <div className="sm:hidden flex items-center gap-1 shrink-0">
+          <NavIcon
+            icon={<Home size={18} strokeWidth={1.5} />}
+            label="Hauptseite"
+            active={hub === "home"}
+            onClick={() => { setShowAllTasks(false); setSettingsOpen(false); setHub("home"); closeSidebarOnCompact(); }}
+          />
+          <div className="relative" ref={headerMenuRef}>
+            <button
+              type="button"
+              onClick={() => setHeaderMenuOpen((v) => !v)}
+              aria-label="Weitere Bereiche"
+              aria-expanded={headerMenuOpen}
+              className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground"
+            >
+              <MoreHorizontal size={18} />
+            </button>
+            {headerMenuOpen && (
+              <div
+                className="fixed z-[90] left-2 right-2 top-[68px] rounded-xl border shadow-lg p-2"
+                style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => { setHeaderMenuOpen(false); setHub(null); setMode("projects"); setShowAllTasks(true); closeSidebarOnCompact(); }}
+                  className="h-11 w-full px-3 rounded-lg flex items-center gap-3 text-sm font-medium hover:bg-muted"
+                >
+                  <ListChecks size={17} /> Allg. Organisation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setHeaderMenuOpen(false); setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); closeSidebarOnCompact(); }}
+                  className="h-11 w-full px-3 rounded-lg flex items-center gap-3 text-sm font-medium hover:bg-muted"
+                >
+                  <Users size={17} /> Netzwerk
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setHeaderMenuOpen(false); setMobileShopOpen(true); }}
+                  className="h-11 w-full px-3 rounded-lg flex items-center gap-3 text-sm font-medium hover:bg-muted"
+                >
+                  <ShoppingBag size={17} /> Shop
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 min-w-0" />
@@ -609,14 +669,14 @@ export default function ProjectsHome() {
           <aside
             className={
               compact
-                ? "fixed inset-0 z-[85] w-full flex flex-col overflow-hidden"
+                ? "fixed left-0 right-0 bottom-0 top-16 z-[85] w-full flex flex-col overflow-hidden"
                 : "w-[300px] shrink-0 flex flex-col relative"
             }
             style={{
               background: "#0B0D10",
               color: "#E6E8EB",
               borderRight: compact ? "none" : "1px solid rgba(255,255,255,0.06)",
-              paddingTop: compact ? "env(safe-area-inset-top)" : undefined,
+              
             }}
           >
             <div className="px-5 pt-5 pb-3">
@@ -681,7 +741,7 @@ export default function ProjectsHome() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 pt-3 pb-4 space-y-1">
+            <div className={`flex-1 overflow-y-auto px-3 pt-3 pb-4 space-y-1 ${compact ? "no-scrollbar" : ""}`}>
               {/* Ordner */}
               {folders.map((f) => {
                 const inside = projectsByFolder.get(f.id) ?? [];
