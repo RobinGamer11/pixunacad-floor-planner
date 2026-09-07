@@ -607,11 +607,16 @@ export default function ProjectsHome() {
       <div className="flex flex-1 overflow-hidden">
         {leftOpen ? (
           <aside
-            className="w-[300px] shrink-0 flex flex-col relative"
+            className={
+              compact
+                ? "fixed inset-0 z-[85] w-full flex flex-col overflow-hidden"
+                : "w-[300px] shrink-0 flex flex-col relative"
+            }
             style={{
               background: "#0B0D10",
               color: "#E6E8EB",
-              borderRight: "1px solid rgba(255,255,255,0.06)",
+              borderRight: compact ? "none" : "1px solid rgba(255,255,255,0.06)",
+              paddingTop: compact ? "env(safe-area-inset-top)" : undefined,
             }}
           >
             <div className="px-5 pt-5 pb-3">
@@ -619,14 +624,24 @@ export default function ProjectsHome() {
                 <div className="text-[11px] font-semibold tracking-[0.22em]" style={{ color: "#8A9099" }}>
                   PROJEKTE
                 </div>
-                <button
-                  onClick={() => setLeftOpen(false)}
-                  title="Projekte einklappen"
-                  className="hover:opacity-100 opacity-70"
-                  style={{ color: "#8A9099" }}
-                >
-                  <PanelLeftClose size={15} />
-                </button>
+                {compact ? (
+                  <button
+                    onClick={() => setLeftOpen(false)}
+                    className="h-10 px-3 rounded-lg border flex items-center gap-2 text-sm font-semibold"
+                    style={{ borderColor: "rgba(255,255,255,0.14)", color: "#E6E8EB" }}
+                  >
+                    <X size={16} /> Schließen
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setLeftOpen(false)}
+                    title="Projekte einklappen"
+                    className="hover:opacity-100 opacity-70"
+                    style={{ color: "#8A9099" }}
+                  >
+                    <PanelLeftClose size={15} />
+                  </button>
+                )}
               </div>
               <div
                 className="flex items-center gap-2 h-9 rounded-md px-2.5"
@@ -909,7 +924,7 @@ export default function ProjectsHome() {
               </span>
             </div>
           </aside>
-        ) : (
+        ) : compact ? null : (
           <div
             className="w-8 shrink-0 flex items-start justify-center pt-4"
             style={{ background: "#0B0D10", borderRight: "1px solid rgba(255,255,255,0.06)" }}
