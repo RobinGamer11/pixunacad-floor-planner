@@ -22,7 +22,7 @@ function kindIcon(kind: TlKind, size = 12) {
 }
 
 export function TimelineNet({
-  projectName, items, categories, statuses, selectedId, onSelect, compact = false,
+  projectName, items, categories, statuses, selectedId, onSelect, compact = false, fitSignal,
 }: {
   projectName: string;
   items: TlItem[];
@@ -32,6 +32,8 @@ export function TimelineNet({
   onSelect?: (id: string) => void;
   /** Kompakte, nicht interaktive Vorschau (Startseite). */
   compact?: boolean;
+  /** Erhöhen setzt Zoom und Position zurück („Ansicht einpassen“). */
+  fitSignal?: number;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 560 });
@@ -49,6 +51,13 @@ export function TimelineNet({
     return () => ro.disconnect();
   }, []);
 
+  /** „Ansicht einpassen“ – Zoom und Position zurücksetzen. */
+  useEffect(() => {
+    if (fitSignal === undefined) return;
+    setView({ k: compact ? 0.55 : 1, tx: 0, ty: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitSignal]);
+
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
@@ -58,7 +67,8 @@ export function TimelineNet({
       const px = e.clientX - rect.left - rect.width / 2;
       const py = e.clientY - rect.top - rect.height / 2;
       const cur = viewRef.current;
-      const nk = clamp(cur.k * Math.exp(-e.deltaY * 0.0015), 0.3, 6);
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      const nk = clamp(cur.k * Math.exp(-dy * 0.0015), 0.3, 6);
       if (nk === cur.k) return;
       const ratio = nk / cur.k;
       setView({ k: nk, tx: px - (px - cur.tx) * ratio, ty: py - (py - cur.ty) * ratio });
@@ -68,6 +78,9 @@ export function TimelineNet({
   }, []);
 
   const drag = useRef({ on: false, sx: 0, sy: 0 });
+  /** Zwei Finger: gleichzeitig verschieben und zoomen. */
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; cx: number; cy: number } | null>(null);
 
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const statusMap = useMemo(() => new Map(statuses.map((s) => [s.id, s])), [statuses]);
