@@ -1169,7 +1169,9 @@ export default function ProjectsHome() {
                 subtitle={TAB_HEADINGS[tab].subtitle}
               />
 
-              {tab === "uebersicht" && <UebersichtView project={selected} />}
+              {tab === "uebersicht" && (
+                <UebersichtView project={selected} onEditProject={() => setSettingsOpen(true)} />
+              )}
               {tab === "aufgaben" && <AufgabenView project={selected} />}
               {tab === "finanzen" && (
                 <FinanceWorkspace key={selected.id} projectId={selected.id} projectName={selected.name} />
