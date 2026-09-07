@@ -2608,7 +2608,7 @@ function ToolRailButton({
       title={disabled ? `${label} — noch nicht verfügbar` : label}
       disabled={disabled}
       data-active={active ? "true" : undefined}
-      className={`cad-rail-btn${active && glow ? " tool-glow-active" : ""}`}
+      className="cad-rail-btn"
       style={{
         background: active ? "hsl(var(--surface-muted))" : "transparent",
         color: disabled
