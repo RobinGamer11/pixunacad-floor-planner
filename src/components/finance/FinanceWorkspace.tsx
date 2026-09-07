@@ -677,6 +677,7 @@ const ChildList: React.FC<{
   onSelect: (id: string) => void; deep?: boolean;
 }> = ({ projectId, state, nodes, onSelect }) => {
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const isMobile = useIsMobile();
   if (nodes.length === 0) {
     return (
       <div className="rounded-xl border px-4 py-6 text-xs"
@@ -684,6 +685,9 @@ const ChildList: React.FC<{
         Noch keine Einträge. Lege links „+ Ordner" oder „+ Anlegen" an.
       </div>
     );
+  }
+  if (isMobile) {
+    return <MobileNodeList projectId={projectId} state={state} nodes={nodes} onSelect={onSelect} />;
   }
   return (
     <div className="rounded-xl border overflow-hidden"
