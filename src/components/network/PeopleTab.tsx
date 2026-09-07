@@ -8,8 +8,8 @@
  * Diese Datei enthält ausschließlich Layout/Darstellung – alle Aktionen laufen
  * unverändert über die übergebenen Handler.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, MessageSquare, UserMinus, Lock, MoreHorizontal, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, MessageSquare, Lock, X } from "lucide-react";
 import {
   presenceColor,
   presenceLabel,
@@ -17,7 +17,6 @@ import {
   type LocalProjectRef,
 } from "@/lib/networkStore";
 import {
-  effectivePermissions,
   type ProjectPermissionOverrides,
   type ProjectRole,
 } from "@/lib/projectAccess";
@@ -80,17 +79,6 @@ export function PeopleTab(props: PeopleTabProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   /** Auf Handy/Tablet werden Details als eigenes Fenster geöffnet. */
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
-  }, [menuOpen]);
 
   const projectsOf = (userId: string) => projects.filter((p) => !!memberRow(p.id, userId));
 
@@ -113,7 +101,6 @@ export function PeopleTab(props: PeopleTabProps) {
 
   const pick = (person: NetworkPerson) => {
     setSelectedId(person.id);
-    setMenuOpen(false);
     if (window.matchMedia("(max-width: 1279px)").matches) setSheetOpen(true);
   };
 
@@ -136,29 +123,6 @@ export function PeopleTab(props: PeopleTabProps) {
         >
           <MessageSquare size={17} /> Direktchat
         </button>
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Weitere Aktionen"
-            className="h-12 w-12 min-w-[44px] rounded-xl border grid place-items-center"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <MoreHorizontal size={18} />
-          </button>
-          {menuOpen && (
-            <div
-              className="absolute right-0 top-[52px] z-30 w-56 rounded-xl border p-1.5 shadow-lg"
-              style={surface}
-            >
-              <button
-                onClick={() => { setMenuOpen(false); props.onRemoveContact(selected); }}
-                className="w-full h-10 px-3 rounded-lg text-left text-sm flex items-center gap-2 hover:bg-[hsl(var(--surface-muted))]"
-              >
-                <UserMinus size={15} /> Kontakt entfernen
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       <div>
@@ -179,7 +143,6 @@ export function PeopleTab(props: PeopleTabProps) {
             const manage = canManageProject(p.id);
             const isMember = !!row;
             const role = (row?.role as ProjectRole) ?? "member";
-            const eff = effectivePermissions(role, row?.permissions ?? undefined);
             return (
               <div key={p.id} className="rounded-xl border p-3" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <div className="flex items-center gap-3">
@@ -212,21 +175,6 @@ export function PeopleTab(props: PeopleTabProps) {
                       onRole={(r) => props.onSetRole(p.id, selected.id, r)}
                       onOverrides={(o) => props.onSetPermissions(p.id, selected.id, o)}
                     />
-                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-                      <span className="rounded-md border px-2 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-                        {eff.canEdit ? "Bearbeiten" : "Nur Ansicht"}
-                      </span>
-                      {eff.canManageMembers && (
-                        <span className="rounded-md border px-2 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-                          Mitglieder verwalten
-                        </span>
-                      )}
-                      {eff.canComment && (
-                        <span className="rounded-md border px-2 py-0.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-                          Kommentieren
-                        </span>
-                      )}
-                    </div>
                   </>
                 )}
                 {!manage && (

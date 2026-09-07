@@ -306,23 +306,6 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
                           className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-lg border text-sm shadow-lg"
                           style={{ background: CARD, borderColor: LINE }}
                         >
-                          <button
-                            type="button"
-                            onClick={() => { setMenuFor(null); setQuery(person.name); }}
-                            className="block w-full px-3 py-3 text-left hover:bg-muted/40"
-                          >
-                            Profil ansehen
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenuFor(null);
-                              window.dispatchEvent(new CustomEvent("pixuna:open-chat", { detail: { userId: person.id } }));
-                            }}
-                            className="block w-full px-3 py-3 text-left hover:bg-muted/40"
-                          >
-                            Direktchat öffnen
-                          </button>
                           {editable && (
                             <button
                               type="button"
