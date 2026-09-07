@@ -149,10 +149,16 @@ export class RulerTool {
     }
 
     const snap = snapRulerPoint(this.app, input);
-    const w = v(snap.x, snap.y);
+    let w = v(snap.x, snap.y);
     this._snapScreen = snap.snapped
       ? this.app.camera.worldToScreen(snap.x, snap.y)
       : null;
+    // Shift hält 0/45/90/135/180 … Grad.
+    if (this.phase === "end" && this._anchor && input.keys?.shift) {
+      const c = constrainRulerAngle(this._anchor, w);
+      w = v(c.x, c.y);
+      this._snapScreen = null;
+    }
 
     if (this.phase === "start") {
       if (input.mouse.left && input.clicked) {
