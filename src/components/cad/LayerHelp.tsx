@@ -34,6 +34,51 @@ export function LayerHelpLegend() {
 }
 
 /**
+ * Kopfbereich des Ebenen-Reiters (CAD + Projektmappe): Titel, kurze
+ * Beschreibung und ein aufklappbarer Block „Symbole & Bedienung“.
+ * Rein visuell — keine Funktionsänderung.
+ */
+export function LayersPanelHeader({ helpOn }: { helpOn?: boolean }) {
+  const [open, setOpen] = useState(!!helpOn);
+  useEffect(() => { if (helpOn) setOpen(true); }, [helpOn]);
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+          style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}
+        >
+          <Layers size={14} />
+        </span>
+        <div className="min-w-0">
+          <div className="text-[13px] font-semibold leading-tight">Ebenen</div>
+          <div className="text-[10.5px] text-muted-foreground leading-tight">
+            Zeichneninhalte organisieren
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-[11px] hover:bg-muted"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <Info size={12} className="text-muted-foreground" />
+        <span className="flex-1 text-left">Symbole &amp; Bedienung</span>
+        <ChevronDown
+          size={12}
+          className="text-muted-foreground transition-transform"
+          style={{ transform: open ? "rotate(180deg)" : "none" }}
+        />
+      </button>
+
+      {open && <LayerHelpLegend />}
+    </div>
+  );
+}
+
+/**
  * Werkzeugleiste über der Zeichenfläche (oben links): Ebenen, Kommentare …
  * Alle Schalter liegen in derselben Leiste und haben dieselbe Größe.
  */
