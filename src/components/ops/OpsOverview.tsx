@@ -30,6 +30,8 @@ import {
 } from "@/components/ops/OpsInsights";
 import { formatMinutes, netMinutes, useTimeEntriesForProjects } from "@/lib/opsStore";
 import { OpsItemEditDialog } from "@/components/ops/OpsItemEditDialog";
+import { CategoryManagerDialog, PriorityManagerDialog } from "@/components/ops/OpsTaxonomyDialogs";
+import { sameSelection, type OpsSelection } from "@/components/ops/opsSelection";
 
 export interface OpsOverviewProject {
   id: string;
@@ -54,7 +56,11 @@ function ProjectStandRow({
   onToggle,
   peopleById,
   onShowItem,
-  /** Ohne Kopfzeile: Inhalt (die drei Reiter) wird direkt angezeigt. */
+  selection,
+  onSelectTime,
+  onManageCategories,
+  onManagePriorities,
+  /** Ohne Kopfzeile: Inhalt (die Reiter) wird direkt angezeigt. */
   headless = false,
 }: {
   project: OpsOverviewProject;
@@ -62,6 +68,10 @@ function ProjectStandRow({
   onToggle: () => void;
   peopleById?: Map<string, string>;
   onShowItem?: (item: TlItem) => void;
+  selection?: OpsSelection;
+  onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
+  onManageCategories?: () => void;
+  onManagePriorities?: () => void;
   headless?: boolean;
 }) {
   const ids = useMemo(() => [project.id], [project.id]);
@@ -132,9 +142,22 @@ function ProjectStandRow({
           </div>
 
           {standTab === "items" && (
-            <CategoryInsights projectId={project.id} onSelectItem={(i) => onShowItem?.(i)} />
+            <CategoryInsights
+              projectId={project.id}
+              selection={selection}
+              onSelectItem={(i) => onShowItem?.(i)}
+              onManageCategories={onManageCategories}
+              onManagePriorities={onManagePriorities}
+            />
           )}
-          {standTab === "time" && <TimeInsights projectIds={ids} peopleById={peopleById} />}
+          {standTab === "time" && (
+            <TimeInsights
+              projectIds={ids}
+              peopleById={peopleById}
+              selection={selection}
+              onSelectTime={onSelectTime}
+            />
+          )}
         </div>
       )}
     </div>
@@ -167,7 +190,19 @@ export function OpsOverview({
   const [previewId, setPreviewId] = useState<string | null>(null);
   /** Offener Beitrag zum Bearbeiten (dieselben Board-Datensätze). */
   const [editing, setEditing] = useState<{ projectId: string; itemId: string } | null>(null);
-  const openItem = (projectId: string, itemId: string) => setEditing({ projectId, itemId });
+  /** Gemeinsame Auswahl über alle Ansichten und Listen hinweg. */
+  const [selection, setSelection] = useState<OpsSelection>(null);
+  /** Kategorien-/Prioritätenverwaltung (dieselbe Board-Datenbasis). */
+  const [taxonomy, setTaxonomy] = useState<{ kind: "category" | "priority"; projectId: string } | null>(null);
+  const openItem = (projectId: string, itemId: string) => {
+    setSelection((cur) =>
+      sameSelection(cur, { kind: "item", projectId, itemId }) ? cur : { kind: "item", projectId, itemId },
+    );
+    setEditing({ projectId, itemId });
+  };
+  const selectItem = (projectId: string, itemId: string) => setSelection({ kind: "item", projectId, itemId });
+  const selectTime = (projectId: string, entryId: string, itemId?: string) =>
+    setSelection({ kind: "time", projectId, entryId, itemId });
   // Board-Änderungen aller Projekte live übernehmen.
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -280,6 +315,8 @@ export function OpsOverview({
           projectFilterAsDropdown
           calendarDefaultRange="week"
           onEditItem={openItem}
+          onSelectTime={selectTime}
+          selection={selection}
         />
       </div>
 
@@ -358,7 +395,11 @@ export function OpsOverview({
               open
               onToggle={() => {}}
               peopleById={opsPeople}
+              selection={selection}
+              onSelectTime={selectTime}
               onShowItem={(i) => openItem(fixedProjectId, i.id)}
+              onManageCategories={() => setTaxonomy({ kind: "category", projectId: fixedProjectId })}
+              onManagePriorities={() => setTaxonomy({ kind: "priority", projectId: fixedProjectId })}
             />
           </div>
         ) : (
@@ -374,7 +415,11 @@ export function OpsOverview({
                     open={previewId === p.id}
                     onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
                     peopleById={opsPeople}
+                    selection={selection}
+                    onSelectTime={selectTime}
                     onShowItem={(i) => openItem(p.id, i.id)}
+                    onManageCategories={() => setTaxonomy({ kind: "category", projectId: p.id })}
+                    onManagePriorities={() => setTaxonomy({ kind: "priority", projectId: p.id })}
                   />
                 ))}
                 {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
@@ -391,6 +436,13 @@ export function OpsOverview({
           itemId={editing.itemId}
           onClose={() => setEditing(null)}
         />
+      )}
+
+      {taxonomy?.kind === "category" && (
+        <CategoryManagerDialog projects={projects} fixedProjectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
+      )}
+      {taxonomy?.kind === "priority" && (
+        <PriorityManagerDialog projects={projects} fixedProjectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
       )}
     </div>
   );

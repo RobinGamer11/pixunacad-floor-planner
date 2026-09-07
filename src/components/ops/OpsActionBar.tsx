@@ -7,7 +7,7 @@
  * einem normalen Beitrag und einer Zeiterfassung gewählt – beides schreibt
  * weiterhin in die bestehenden Datenquellen (Board-Beiträge, `time_entries`).
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, ListPlus } from "lucide-react";
 import {
   addTimeEntryFor,
@@ -129,7 +129,9 @@ export function OpsActionBar({
 
 /* ------------------------------------------------------------- Grundgerüst */
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Modal({
+  title, onClose, children, wide = true,
+}: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -142,7 +144,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
       onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full sm:max-w-[520px] max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-4"
+        className={`w-full ${wide ? "sm:max-w-[760px]" : "sm:max-w-[520px]"} max-h-[92vh] overflow-y-auto overflow-x-hidden rounded-t-2xl sm:rounded-2xl p-4`}
         style={{ background: "hsl(var(--card))", border: `1px solid ${LINE}` }}
       >
         <div className="flex items-center gap-2 mb-3">
@@ -164,6 +166,39 @@ export function Field({ label, children }: { label: string; children: React.Reac
       <span className="text-[10px] uppercase tracking-wide" style={{ color: SOFT }}>{label}</span>
       {children}
     </label>
+  );
+}
+
+/**
+ * Beschreibungsfeld: nutzt die volle Dialogbreite, bricht Text um, wächst
+ * beim Tippen mit und scrollt erst ab einer sinnvollen Höhe im Feld selbst.
+ */
+export function AutoTextarea({
+  value, onChange, placeholder, minRows = 3, maxHeight = 280,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  minRows?: number;
+  maxHeight?: number;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+  }, [value, maxHeight]);
+  return (
+    <textarea
+      ref={ref}
+      rows={minRows}
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full max-w-full block resize-none rounded-md border bg-background text-foreground px-2 py-1.5 text-xs leading-relaxed outline-none focus:ring-1 focus:ring-ring"
+      style={{ maxHeight, overflowY: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+    />
   );
 }
 
@@ -314,7 +349,7 @@ function ContributionDialog({
               <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Beitragsname" />
             </Field>
             <Field label="Beschreibung">
-              <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
+              <AutoTextarea value={description} onChange={setDescription} placeholder="optional" />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Field label="Kategorie">

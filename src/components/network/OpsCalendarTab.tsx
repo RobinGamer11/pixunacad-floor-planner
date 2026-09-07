@@ -28,7 +28,11 @@ import {
   timelineStore,
   type TlItem,
 } from "@/lib/timelineStore";
-import { OpsGantt, OpsNet, OpsRay, OPS_VIEWS, type OpsBoard, type OpsView } from "@/components/ops/OpsViews";
+import {
+  OpsGantt, OpsNet, OpsRay, OPS_VIEWS,
+  type OpsBoard, type OpsTimeMark, type OpsView,
+} from "@/components/ops/OpsViews";
+import type { OpsSelection } from "@/components/ops/opsSelection";
 
 const inputCls =
   "h-9 rounded-md border bg-background text-foreground px-2 text-xs outline-none focus:ring-1 focus:ring-ring [&>option]:bg-background [&>option]:text-foreground";
@@ -66,6 +70,8 @@ export function OpsCalendarTab({
   projectFilterAsDropdown = false,
   calendarDefaultRange = "month",
   onEditItem,
+  onSelectTime,
+  selection,
 }: {
   projectIds: string[];
   projectNames: Map<string, string>;
@@ -82,6 +88,10 @@ export function OpsCalendarTab({
   calendarDefaultRange?: "month" | "week" | "day";
   /** Beitrag zum Bearbeiten öffnen. */
   onEditItem?: (projectId: string, itemId: string) => void;
+  /** Zeiterfassung auswählen (gemeinsamer Auswahlzustand). */
+  onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
+  /** Gemeinsame Auswahl – in allen Ansichten gleich hervorgehoben. */
+  selection?: OpsSelection;
 }) {
 
   /* Nur ausgewählte Projekte laden – keine Komplettabfrage. */
@@ -173,6 +183,24 @@ export function OpsCalendarTab({
 
     return out;
   }, [times.entries, times.myId, peopleById, projectNames, showTimes, personFilter, filteredBoards, showItems, onEditItem]);
+
+  /** Dieselben Zeiterfassungen als Zeitspannen für Ansichtstrahl und Gantt. */
+  const timeMarks: OpsTimeMark[] = useMemo(() => {
+    if (!showTimes) return [];
+    return times.entries
+      .filter((e) => !personFilter || e.user_id === personFilter)
+      .map((e) => ({
+        id: e.id,
+        projectId: e.project_id,
+        itemId: e.item_id ?? undefined,
+        project: projectNames.get(e.project_id) ?? "Projekt",
+        label: `${e.user_id === times.myId ? "Ich" : peopleById.get(e.user_id) ?? "Teammitglied"}: ${formatMinutes(netMinutes(e))}`,
+        from: Date.parse(e.started_at),
+        to: Date.parse(e.ended_at),
+      }))
+      .filter((m) => Number.isFinite(m.from) && Number.isFinite(m.to));
+  }, [times.entries, times.myId, showTimes, personFilter, peopleById, projectNames]);
+
 
   const reloadAll = () => { times.reload(); };
   const sources: { label: string; status: OpsStatus }[] = [{ label: "Arbeitszeiten", status: times.status }];
@@ -283,9 +311,15 @@ export function OpsCalendarTab({
           defaultRange={calendarDefaultRange}
         />
       )}
-      {view === "ray" && <OpsRay boards={filteredBoards} onSelect={onEditItem} />}
-      {view === "net" && <OpsNet boards={filteredBoards} onSelect={onEditItem} />}
-      {view === "gantt" && <OpsGantt boards={filteredBoards} onSelect={onEditItem} />}
+      {view === "ray" && (
+        <OpsRay boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onSelectTime={onSelectTime} />
+      )}
+      {view === "net" && (
+        <OpsNet boards={filteredBoards} selection={selection} onSelectItem={onEditItem} />
+      )}
+      {view === "gantt" && (
+        <OpsGantt boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onSelectTime={onSelectTime} />
+      )}
     </div>
   );
 }

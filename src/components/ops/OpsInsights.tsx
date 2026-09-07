@@ -19,6 +19,15 @@ import {
 } from "@/lib/opsStore";
 import { useProjectsMemberOptions } from "@/lib/projectTeam";
 import { subscribeTimeline, timelineStore, type TlItem } from "@/lib/timelineStore";
+import {
+  isItemSelected,
+  isTimeSelected,
+  matchesQuery,
+  sortItems,
+  OPS_SORTS,
+  type OpsSelection,
+  type OpsSort,
+} from "@/components/ops/opsSelection";
 
 const LINE = "hsl(var(--hairline))";
 const SOFT = "hsl(var(--ink-soft))";
@@ -79,15 +88,18 @@ export function MiniPie({
   activeId = null,
   onSlice,
   onCenter,
+  size = 168,
 }: {
   slices: { id: string; value: number; color: string }[];
   activeId?: string | null;
   onSlice?: (id: string) => void;
   onCenter?: () => void;
+  /** Durchmesser in Pixeln – Organisation nutzt eine größere Darstellung. */
+  size?: number;
 }) {
   const total = slices.reduce((a, s) => a + s.value, 0);
-  const R = 74;
-  const C = 84;
+  const C = size / 2;
+  const R = C - 10;
   if (!total) {
     return (
       <svg width={C * 2} height={C * 2} aria-hidden>
@@ -123,7 +135,7 @@ export function MiniPie({
       <circle
         cx={C}
         cy={C}
-        r={36}
+        r={Math.max(28, R * 0.46)}
         fill="hsl(var(--surface-card))"
         style={{ cursor: onCenter ? "pointer" : "default" }}
         onClick={() => onCenter?.()}
@@ -175,24 +187,28 @@ const fmtDay = (iso: string) => {
     : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 };
 
-/* ------------------------------------------------------ Zeit + Abwesenheit */
+/* ------------------------------------------------------------------- Zeit */
 
 /**
  * Zeiterfassung je Person über die angegebenen Projekte.
- * Alle Projektbeteiligten erscheinen – auch mit 0 Minuten. Abwesenheiten
- * werden separat als Tage ausgewiesen (sie zählen nicht als Arbeitszeit).
+ * Alle Projektbeteiligten erscheinen – auch mit 0 Minuten. Jede einzelne
+ * Buchung im Verlauf ist anklickbar und teilt sich die Auswahl mit den
+ * übrigen Organisationsansichten.
  */
 export function TimeInsights({
   projectIds,
   projectNames,
   peopleById,
+  selection,
+  onSelectTime,
 }: {
   projectIds: string[];
   projectNames?: Map<string, string>;
   peopleById?: Map<string, string>;
+  selection?: OpsSelection;
+  onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
 }) {
   const times = useTimeEntriesForProjects(projectIds);
-  const absences = useAbsences(projectIds);
   const { byProject } = useProjectsMemberOptions(projectIds);
 
   const nameOf = (id: string) => {
@@ -209,20 +225,11 @@ export function TimeInsights({
       for (const m of byProject[id] ?? []) if (!minutes.has(m.id)) minutes.set(m.id, 0);
     }
     for (const e of times.entries) minutes.set(e.user_id, (minutes.get(e.user_id) ?? 0) + netMinutes(e));
-    const absenceDays = new Map<string, number>();
-    const seen = new Set<string>();
-    for (const a of absences.absences) {
-      if (seen.has(a.id)) continue;
-      seen.add(a.id);
-      if (a.status === "cancelled") continue;
-      absenceDays.set(a.user_id, (absenceDays.get(a.user_id) ?? 0) + datesInRange(a.starts_on, a.ends_on).length);
-      if (!minutes.has(a.user_id)) minutes.set(a.user_id, 0);
-    }
     return Array.from(minutes.entries())
-      .map(([id, m]) => ({ id, minutes: m, absenceDays: absenceDays.get(id) ?? 0 }))
+      .map(([id, m]) => ({ id, minutes: m }))
       .sort((a, b) => b.minutes - a.minutes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [times.entries, absences.absences, byProject, projectIds.join("|")]);
+  }, [times.entries, byProject, projectIds.join("|")]);
 
   const total = rows.reduce((s, r) => s + r.minutes, 0);
 
@@ -241,14 +248,6 @@ export function TimeInsights({
         .slice(0, 200),
     [times.entries, activeId],
   );
-  const absenceHistory = useMemo(() => {
-    const seen = new Set<string>();
-    return absences.absences
-      .filter((a) => (seen.has(a.id) ? false : (seen.add(a.id), true)))
-      .filter((a) => !activeId || a.user_id === activeId)
-      .sort((a, b) => b.starts_on.localeCompare(a.starts_on))
-      .slice(0, 100);
-  }, [absences.absences, activeId]);
 
   const activeRow = activeId ? rows.find((r) => r.id === activeId) : null;
 
@@ -269,7 +268,6 @@ export function TimeInsights({
             label: nameOf(r.id),
             color: insightColor(i),
             value: formatMinutes(r.minutes),
-            sub: r.absenceDays ? `${r.absenceDays} Tage abwesend` : undefined,
           }))}
         />
         <div className="text-[11px]" style={{ color: SOFT }}>
@@ -287,29 +285,34 @@ export function TimeInsights({
         </div>
       </div>
 
-      <Collapsible title="Verlauf" badge={history.length + absenceHistory.length} dense>
+      <Collapsible title="Verlauf" badge={history.length} dense defaultOpen>
         <div className="flex flex-col gap-1">
-          {history.map((e) => (
-            <div key={e.id} className="flex items-center gap-2 text-[11px]">
-              <span className="shrink-0 tabular-nums" style={{ color: SOFT }}>{fmtDay(e.started_at)}</span>
-              <span className="truncate flex-1">{nameOf(e.user_id)}</span>
-              {projectNames && (
-                <span className="truncate shrink-0" style={{ color: SOFT }}>
-                  {projectNames.get(e.project_id) ?? "Projekt"}
-                </span>
-              )}
-              <span className="tabular-nums shrink-0">{formatMinutes(netMinutes(e))}</span>
-            </div>
-          ))}
-          {absenceHistory.map((a) => (
-            <div key={`abs-${a.id}`} className="flex items-center gap-2 text-[11px]" style={{ color: SOFT }}>
-              <span className="shrink-0 tabular-nums">{a.starts_on} – {a.ends_on}</span>
-              <span className="truncate flex-1">{nameOf(a.user_id)}</span>
-              <span className="shrink-0">{a.masked ? "abwesend" : ABSENCE_LABEL[a.kind ?? "other"]}</span>
-            </div>
-          ))}
-          {!history.length && !absenceHistory.length && (
-            <div className="text-[11px]" style={{ color: SOFT }}>Kein Verlauf vorhanden.</div>
+          {history.map((e) => {
+            const on = isTimeSelected(selection ?? null, e.id);
+            return (
+              <button
+                key={e.id}
+                type="button"
+                onClick={() => onSelectTime?.(e.project_id, e.id, e.item_id ?? undefined)}
+                className="flex items-center gap-2 text-[11px] text-left rounded-md px-1.5 py-1"
+                style={{
+                  background: on ? "hsl(var(--accent-gold) / 0.16)" : "transparent",
+                  outline: on ? "1px solid hsl(var(--accent-gold))" : "none",
+                }}
+              >
+                <span className="shrink-0 tabular-nums" style={{ color: SOFT }}>{fmtDay(e.started_at)}</span>
+                <span className="truncate flex-1">{nameOf(e.user_id)}</span>
+                {projectNames && (
+                  <span className="truncate shrink-0" style={{ color: SOFT }}>
+                    {projectNames.get(e.project_id) ?? "Projekt"}
+                  </span>
+                )}
+                <span className="tabular-nums shrink-0">{formatMinutes(netMinutes(e))}</span>
+              </button>
+            );
+          })}
+          {!history.length && (
+            <div className="text-[11px]" style={{ color: SOFT }}>Noch keine Arbeitszeit erfasst.</div>
           )}
         </div>
       </Collapsible>
@@ -466,23 +469,31 @@ export function usePeopleCount(projectIds: string[]) {
 export function CategoryInsights({
   projectId,
   onSelectItem,
+  selection,
+  onManageCategories,
+  onManagePriorities,
 }: {
   projectId: string;
-  /** Beitrag anzeigen (z. B. im Kalender darüber) statt in die Projekt-Orga zu springen. */
+  /** Beitrag zum Bearbeiten öffnen. */
   onSelectItem?: (item: TlItem) => void;
+  selection?: OpsSelection;
+  onManageCategories?: () => void;
+  onManagePriorities?: () => void;
 }) {
   const [tick, setTick] = useState(0);
   useEffect(() => subscribeTimeline(projectId, () => setTick((t) => t + 1)), [projectId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const state = useMemo(() => {
     try { return timelineStore.getState(projectId); } catch { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, tick]);
 
   const categories = state?.categories ?? [];
+  const priorities = state?.priorities ?? [];
   const items = (state?.items ?? []) as TlItem[];
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [sort, setSort] = useState<OpsSort>("priority");
+  const [query, setQuery] = useState("");
   const toggle = (id: string) => setActiveId((cur) => (cur === id ? null : id));
   useEffect(() => {
     if (activeId && !categories.some((c) => c.id === activeId)) setActiveId(null);
@@ -493,12 +504,22 @@ export function CategoryInsights({
     [categories, items],
   );
   const total = stats.reduce((s, r) => s + r.count, 0);
-  const list = activeId ? items.filter((i) => i.categoryId === activeId) : items;
+
+  const list = useMemo(() => {
+    const base = items
+      .filter((i) => !activeId || i.categoryId === activeId)
+      .filter((i) => matchesQuery(i, query));
+    return sortItems(base, sort, priorities, categories);
+  }, [items, activeId, query, sort, priorities, categories]);
+
+  const labelOf = (id?: string, list2?: { id: string; label: string }[]) =>
+    list2?.find((x) => x.id === id)?.label;
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-6">
         <MiniPie
+          size={220}
           slices={stats.map((s) => ({ id: s.cat.id, value: s.count, color: s.cat.color }))}
           activeId={activeId}
           onSlice={toggle}
@@ -515,28 +536,83 @@ export function CategoryInsights({
             sub: total ? `${Math.round((s.count / total) * 100)}%` : undefined,
           }))}
         />
-        <div className="text-[11px]" style={{ color: SOFT }}>
-          Beiträge gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{total}</span>
+        <div className="flex flex-col gap-2">
+          <div className="text-[11px]" style={{ color: SOFT }}>
+            Beiträge gesamt: <span className="tabular-nums" style={{ color: "hsl(var(--ink))" }}>{total}</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {onManageCategories && (
+              <button type="button" onClick={onManageCategories}
+                      className="h-8 px-2.5 rounded-md border text-[11px]" style={{ borderColor: LINE }}>
+                + Kategorie
+              </button>
+            )}
+            {onManagePriorities && (
+              <button type="button" onClick={onManagePriorities}
+                      className="h-8 px-2.5 rounded-md border text-[11px]" style={{ borderColor: LINE }}>
+                + Priorität
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-1">
-        {list.slice(0, 200).map((i) => (
-          <button
-            key={i.id}
-            type="button"
-            onClick={() => onSelectItem?.(i)}
-            className="flex items-center gap-2 text-[11px] text-left rounded-md px-1.5 py-1 hover:bg-muted"
-          >
-            <span
-              className="h-2 w-2 rounded-full shrink-0"
-              style={{ background: categories.find((c) => c.id === i.categoryId)?.color ?? "hsl(var(--ink-soft))" }}
-            />
-            <span className="truncate flex-1">{i.title || "Ohne Titel"}</span>
-            <span className="shrink-0 tabular-nums" style={{ color: SOFT }}>{i.endDate || i.startDate || ""}</span>
-          </button>
-        ))}
-        {!list.length && <div className="text-[11px]" style={{ color: SOFT }}>Keine Beiträge.</div>}
+      {/* Sortierung und freie Textsuche über die Beiträge des Projekts. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Beiträge durchsuchen"
+          className="h-9 min-w-[200px] flex-1 rounded-md border bg-background px-2 text-xs outline-none focus:ring-1 focus:ring-ring"
+          style={{ borderColor: LINE }}
+        />
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as OpsSort)}
+          className="h-9 rounded-md border bg-background px-2 text-xs outline-none [&>option]:bg-background"
+          style={{ borderColor: LINE }}
+        >
+          {OPS_SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        {list.slice(0, 200).map((i) => {
+          const on = isItemSelected(selection ?? null, projectId, i.id);
+          return (
+            <button
+              key={i.id}
+              type="button"
+              onClick={() => onSelectItem?.(i)}
+              className="flex flex-col gap-0.5 rounded-lg border px-3 py-2 text-left"
+              style={{
+                borderColor: on ? "hsl(var(--accent-gold))" : LINE,
+                background: on ? "hsl(var(--accent-gold) / 0.12)" : "transparent",
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ background: categories.find((c) => c.id === i.categoryId)?.color ?? "hsl(var(--ink-soft))" }}
+                />
+                <span className="truncate flex-1 text-[12px]">{i.title || "Ohne Titel"}</span>
+                <span className="shrink-0 tabular-nums text-[11px]" style={{ color: SOFT }}>
+                  {i.endDate || i.startDate || ""}
+                </span>
+              </span>
+              <span className="text-[11px] truncate" style={{ color: SOFT }}>
+                {[labelOf(i.categoryId, categories), labelOf(i.priorityId, priorities), i.description]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            </button>
+          );
+        })}
+        {!list.length && (
+          <div className="text-[11px]" style={{ color: SOFT }}>
+            {query ? "Keine Treffer für diese Suche." : "Noch keine Beiträge – oben über „+ Beitrag“ anlegen."}
+          </div>
+        )}
       </div>
     </div>
   );

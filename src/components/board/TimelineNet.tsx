@@ -22,7 +22,7 @@ function kindIcon(kind: TlKind, size = 12) {
 }
 
 export function TimelineNet({
-  projectName, items, categories, statuses, selectedId, onSelect, compact = false,
+  projectName, items, categories, statuses, selectedId, onSelect, compact = false, fitSignal,
 }: {
   projectName: string;
   items: TlItem[];
@@ -32,6 +32,8 @@ export function TimelineNet({
   onSelect?: (id: string) => void;
   /** Kompakte, nicht interaktive Vorschau (Startseite). */
   compact?: boolean;
+  /** Erhöhen setzt Zoom und Position zurück („Ansicht einpassen“). */
+  fitSignal?: number;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 800, h: 560 });
@@ -49,6 +51,13 @@ export function TimelineNet({
     return () => ro.disconnect();
   }, []);
 
+  /** „Ansicht einpassen“ – Zoom und Position zurücksetzen. */
+  useEffect(() => {
+    if (fitSignal === undefined) return;
+    setView({ k: compact ? 0.55 : 1, tx: 0, ty: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitSignal]);
+
   useEffect(() => {
     const el = wrap.current;
     if (!el) return;
@@ -58,7 +67,8 @@ export function TimelineNet({
       const px = e.clientX - rect.left - rect.width / 2;
       const py = e.clientY - rect.top - rect.height / 2;
       const cur = viewRef.current;
-      const nk = clamp(cur.k * Math.exp(-e.deltaY * 0.0015), 0.3, 6);
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      const nk = clamp(cur.k * Math.exp(-dy * 0.0015), 0.3, 6);
       if (nk === cur.k) return;
       const ratio = nk / cur.k;
       setView({ k: nk, tx: px - (px - cur.tx) * ratio, ty: py - (py - cur.ty) * ratio });
@@ -68,6 +78,9 @@ export function TimelineNet({
   }, []);
 
   const drag = useRef({ on: false, sx: 0, sy: 0 });
+  /** Zwei Finger: gleichzeitig verschieben und zoomen. */
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; cx: number; cy: number } | null>(null);
 
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const statusMap = useMemo(() => new Map(statuses.map((s) => [s.id, s])), [statuses]);
@@ -119,16 +132,54 @@ export function TimelineNet({
       className="relative w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing"
       style={{ background: CANVAS, touchAction: "none" }}
       onPointerDown={(e) => {
+        if (e.pointerType === "touch") {
+          touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (touches.current.size === 2) {
+            const [a, b] = [...touches.current.values()];
+            pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+            drag.current.on = false;
+            return;
+          }
+        }
         drag.current = { on: true, sx: e.clientX - view.tx, sy: e.clientY - view.ty };
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
+        if (e.pointerType === "touch" && touches.current.has(e.pointerId)) {
+          touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (touches.current.size === 2 && pinch.current) {
+            const [a, b] = [...touches.current.values()];
+            const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+            const cxn = (a.x + b.x) / 2;
+            const cyn = (a.y + b.y) / 2;
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const px = pinch.current.cx - rect.left - rect.width / 2;
+            const py = pinch.current.cy - rect.top - rect.height / 2;
+            const cur = viewRef.current;
+            const nk = clamp(cur.k * (dist / pinch.current.dist), 0.3, 6);
+            const ratio = nk / cur.k;
+            setView({
+              k: nk,
+              tx: px - (px - cur.tx) * ratio + (cxn - pinch.current.cx),
+              ty: py - (py - cur.ty) * ratio + (cyn - pinch.current.cy),
+            });
+            pinch.current = { dist, cx: cxn, cy: cyn };
+            return;
+          }
+        }
         if (!drag.current.on) return;
         setView((v) => ({ ...v, tx: e.clientX - drag.current.sx, ty: e.clientY - drag.current.sy }));
       }}
       onPointerUp={(e) => {
+        touches.current.delete(e.pointerId);
+        if (touches.current.size < 2) pinch.current = null;
         drag.current.on = false;
         try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+      }}
+      onPointerCancel={(e) => {
+        touches.current.delete(e.pointerId);
+        pinch.current = null;
+        drag.current.on = false;
       }}
     >
       <svg width={size.w} height={size.h} className="absolute inset-0">
