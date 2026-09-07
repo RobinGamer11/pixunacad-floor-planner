@@ -779,7 +779,7 @@ export default function ProjectsHome() {
                   aria-expanded={legalOpen}
                   className="h-9 w-9 rounded-full flex items-center justify-center"
                   style={{ background: "rgba(255,255,255,0.05)", color: "#B7BCC2" }}
-                  title="Impressum & Datenschutz"
+                  title="Einstellungen"
                 >
                   <Settings size={15} />
                 </button>
