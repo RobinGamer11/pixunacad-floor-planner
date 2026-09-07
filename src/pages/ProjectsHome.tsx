@@ -109,26 +109,24 @@ export default function ProjectsHome() {
     () => projects.filter((p) => !p.isTemplate),
     [projects]
   );
-  // Startseite öffnet zuerst die projektübergreifende Aufgabenübersicht.
-  const [showAllTasks, setShowAllTasks] = useState(true);
+  // Die Startseite öffnet immer die Hauptseite – nie automatisch ein Projekt
+  // oder die Aufgabenübersicht.
+  const [showAllTasks, setShowAllTasks] = useState(false);
   /** Zusätzliche Kopf-Ansichten (Hauptseite, Netzwerk, Papierkorb). */
-  const [hub, setHub] = useState<null | "home" | "shared" | "trash">(null);
-  const [coinsOpen, setCoinsOpen] = useState(false);
+  const [hub, setHub] = useState<null | "home" | "shared" | "trash">("home");
   const [shopOpen, setShopOpen] = useState(false);
-  const coinsRef = useRef<HTMLDivElement | null>(null);
   const shopRef = useRef<HTMLDivElement | null>(null);
   // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
   useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
 
-    if (!coinsOpen && !shopOpen) return;
+    if (!shopOpen) return;
     const onDoc = (e: MouseEvent) => {
-      if (coinsOpen && !coinsRef.current?.contains(e.target as Node)) setCoinsOpen(false);
       if (shopOpen && !shopRef.current?.contains(e.target as Node)) setShopOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [coinsOpen, shopOpen]);
+  }, [shopOpen]);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
@@ -453,7 +451,7 @@ export default function ProjectsHome() {
             icon={<Home size={18} strokeWidth={1.5} />}
             label="Hauptseite"
             active={hub === "home"}
-            onClick={() => { setShowAllTasks(false); setHub(hub === "home" ? null : "home"); }}
+            onClick={() => { setShowAllTasks(false); setSettingsOpen(false); setHub("home"); }}
           />
           <HeaderDivider />
           <NavIcon
@@ -470,37 +468,9 @@ export default function ProjectsHome() {
             active={hub === "shared"}
             onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); }}
           />
-
-          <HeaderDivider />
-          <NavIcon
-            icon={<Trash2 size={18} strokeWidth={1.5} />}
-            label="Papierkorb"
-            active={hub === "trash"}
-            onClick={() => { setShowAllTasks(false); setHub(hub === "trash" ? null : "trash"); }}
-          />
         </div>
 
         <div className="flex-1" />
-
-        {/* Münzen-Pill (kompakt) mit + zum Kauf */}
-        <div className="relative" ref={coinsRef}>
-          <button
-            onClick={() => setCoinsOpen((v) => !v)}
-            className="flex items-center gap-1.5 h-9 pl-3 pr-1 rounded-full border hover:bg-muted/40 transition"
-            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
-            title="Münzen"
-          >
-            <Coins size={15} strokeWidth={1.5} className="text-muted-foreground" />
-            <span className="text-sm font-semibold">26</span>
-            <span
-              className="ml-1 h-6 w-6 rounded-full border flex items-center justify-center"
-              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-            >
-              <Plus size={12} strokeWidth={2} className="text-muted-foreground" />
-            </span>
-          </button>
-          {coinsOpen && <CoinsPanel anchor={coinsRef} />}
-        </div>
 
         {/* Shop (näher am Münzenfenster, ohne Rahmen) */}
         <div className="relative ml-1" ref={shopRef}>
@@ -546,25 +516,11 @@ export default function ProjectsHome() {
               className="fixed right-6 top-16 mt-2 w-80 rounded-xl border shadow-lg z-50 p-4"
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
-              <ProfileEditor profile={profile} projectCount={projectCount} />
+              <ProfileEditor profile={profile} projectCount={projectCount} showSignOut />
             </div>
           )}
         </div>
 
-        {/* Logout (ohne Rahmen) */}
-        <button
-          onClick={async () => {
-            await signOut();
-            // Store-Module lesen beim Import aus localStorage. Ein Reload verhindert,
-            // dass ein nachfolgender Account noch Daten im Arbeitsspeicher des
-            // vorherigen Accounts sieht.
-            window.location.assign("/login");
-          }}
-          className="ml-2 h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-foreground transition"
-          title="Abmelden"
-        >
-          <LogOut size={16} strokeWidth={1.5} />
-        </button>
       </header>
 
 
