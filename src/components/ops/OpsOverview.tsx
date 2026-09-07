@@ -147,8 +147,8 @@ function Panel({ title, right, children }: { title: string; right?: React.ReactN
 export function OpsOverview({
   projects,
   fixedProjectId,
-  title = "Organisation",
-  subtitle = "projektübergreifend",
+  title = "Organisation projektübergreifend",
+  subtitle = "Beiträge, Zeiten und Termine auf einen Blick.",
   showHeader = true,
   className = "px-4 py-5 sm:px-6 lg:px-10 lg:py-7",
 }: {
@@ -160,6 +160,7 @@ export function OpsOverview({
   showHeader?: boolean;
   className?: string;
 }) {
+
   const viewRef = useRef<HTMLDivElement>(null);
   const [opsNonce, setOpsNonce] = useState(0);
   const opsProjectIds = useMemo(() => projects.map((p) => p.id), [projects]);
