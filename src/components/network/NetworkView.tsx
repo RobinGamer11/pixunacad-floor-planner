@@ -41,6 +41,7 @@ import { isPlaceholderName } from "@/lib/accountProfile";
 import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
 import { MemberRoleControls } from "@/components/network/MemberRoleControls";
+import { PeopleTab } from "@/components/network/PeopleTab";
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
 
