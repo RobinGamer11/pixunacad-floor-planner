@@ -68,6 +68,10 @@ import {
   type TlKind,
 } from "@/lib/timelineStore";
 import { UebersichtView } from "@/components/project/UebersichtView";
+import {
+  ProjectEditDialog, draftFromProject, draftToPatch, emptyDraft, type ProjectDraft,
+} from "@/components/project/ProjectEditDialog";
+import { syncProjectPeriod } from "@/lib/projectPeriodSync";
 import { FileBrowser } from "@/components/project/FileBrowser";
 import { FinanceWorkspace } from "@/components/finance/FinanceWorkspace";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
@@ -98,7 +102,7 @@ type Tab = "uebersicht" | "aufgaben" | "finanzen" | "dokumente" | "team";
 
 /** Einheitlicher Kopfbereich der fünf Projektreiter. */
 const TAB_HEADINGS: Record<Tab, { title: string; subtitle: string }> = {
-  uebersicht: { title: "Übersicht", subtitle: "Allgemeine Beschreibung" },
+  uebersicht: { title: "Übersicht", subtitle: "Die wichtigsten Informationen und der aktuelle Stand des Projekts." },
   aufgaben: { title: "Organisation – projektintern", subtitle: "Beiträge, Zeiten und Termine auf einen Blick." },
   finanzen: { title: "Finanzen", subtitle: "Angebote, Rechnungen, Nachträge und Gesamtstand im Überblick" },
   dokumente: { title: "Dokumente", subtitle: "Projektbezogene Dateien und Ordner verwalten." },
@@ -284,16 +288,10 @@ export default function ProjectsHome() {
     setNewProjectDialogOpen(true);
   };
 
-  const finishCreateProject = (values: {
-    name: string;
-    bauherr: string;
-    ort: string;
-    projektTyp: string;
-    status: string;
-    erstelltAm: string;
-  }) => {
+  const finishCreateProject = (draft: ProjectDraft) => {
     const id = projectStore.createProject();
-    projectStore.updateProject(id, values);
+    projectStore.updateProject(id, draftToPatch(draft, "create"));
+    syncProjectPeriod(id, draft.projektStart, draft.projektEnde);
     setNewProjectDialogOpen(false);
     setMode("projects");
     setShowAllTasks(false);
@@ -1102,9 +1100,6 @@ export default function ProjectsHome() {
                 </div>
               </div>
 
-              {settingsOpen && (
-                <ProjectSettingsPanel project={selected} onClose={() => setSettingsOpen(false)} />
-              )}
 
               {/* Große Aktion links + Reiter rechts (eine Zeile, Reiter am Unterrand des Buttons ausgerichtet) */}
               <div
@@ -1174,7 +1169,9 @@ export default function ProjectsHome() {
                 subtitle={TAB_HEADINGS[tab].subtitle}
               />
 
-              {tab === "uebersicht" && <UebersichtView project={selected} />}
+              {tab === "uebersicht" && (
+                <UebersichtView project={selected} onEditProject={() => setSettingsOpen(true)} />
+              )}
               {tab === "aufgaben" && <AufgabenView project={selected} />}
               {tab === "finanzen" && (
                 <FinanceWorkspace key={selected.id} projectId={selected.id} projectName={selected.name} />
@@ -1193,9 +1190,27 @@ export default function ProjectsHome() {
       </div>
 
       {newProjectDialogOpen && (
-        <NewProjectSettingsDialog
+        <ProjectEditDialog
+          title="Neues Projekt"
+          submitLabel="Projekt anlegen"
+          initial={emptyDraft()}
           onCancel={() => setNewProjectDialogOpen(false)}
-          onCreate={finishCreateProject}
+          onSubmit={finishCreateProject}
+        />
+      )}
+
+      {settingsOpen && selected && (
+        <ProjectEditDialog
+          title="Projekt bearbeiten"
+          submitLabel="Speichern"
+          project={selected}
+          initial={draftFromProject(selected)}
+          onCancel={() => setSettingsOpen(false)}
+          onSubmit={(draft) => {
+            projectStore.updateProject(selected.id, draftToPatch(draft, "edit"));
+            syncProjectPeriod(selected.id, draft.projektStart, draft.projektEnde);
+            setSettingsOpen(false);
+          }}
         />
       )}
     </div>
