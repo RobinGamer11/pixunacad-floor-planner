@@ -430,10 +430,9 @@ export function OpsOverview({
 
 
       {/* 2. Hauptansicht */}
-      <div className="mb-2 flex items-center gap-3">
-        <div className="min-w-0 text-base font-medium">{viewLabel}</div>
+      <div className="mb-2 flex items-center justify-end gap-3">
         <select
-          className={`${inputCls} ml-auto h-11 min-w-[170px]`}
+          className={`${inputCls} h-11 min-w-[170px]`}
           value={view}
           onChange={(e) => setView(e.target.value as OpsView)}
           title="Ansicht wählen"
@@ -442,6 +441,7 @@ export function OpsOverview({
           {OPS_VIEWS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
         </select>
       </div>
+
       <div ref={viewRef} className="mb-5 rounded-xl border p-2 sm:p-3"
            style={{ borderColor: LINE, background: "hsl(var(--surface))" }}>
         <OpsCalendarTab
