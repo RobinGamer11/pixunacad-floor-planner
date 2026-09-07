@@ -357,38 +357,14 @@ export function ProjectTeamTab({ projectId, projectName }: { projectId: string; 
         </ul>
       </div>
 
-      {/* --------------------------------------- Einladungen (Kurzinfo) */}
-      {invites.pending.length === 0 && (
-        <div className="mt-4 flex items-center gap-3 rounded-xl border px-5 py-4" style={{ background: CARD, borderColor: LINE }}>
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border" style={{ borderColor: LINE }}>
-            <Mail size={17} className="text-muted-foreground" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold">Keine offenen Einladungen</div>
-            <div className="text-xs text-muted-foreground">Es sind derzeit keine Einladungen ausstehend.</div>
-          </div>
-        </div>
-      )}
-
       {addOpen && (
         <AddMemberDialog
           available={available}
           onClose={() => setAddOpen(false)}
-          onInvite={async (userId, role, perms) => {
-            await invites.invite(userId, role, perms);
+          onAdd={async (userId, role, perms) => {
+            await addMember(userId, role, perms);
             setAddOpen(false);
           }}
-        />
-      )}
-
-      {inviteOpen && (
-        <InvitationsDialog
-          rows={invites.pending}
-          canManage={canManage}
-          nameOf={nameOf}
-          onRevoke={(id) => void invites.revoke(id)}
-          onResend={(id) => void invites.resend(id)}
-          onClose={() => setInviteOpen(false)}
         />
       )}
     </div>
