@@ -987,6 +987,14 @@ export function FileBrowser({ project }: Props) {
         <button
           type="button"
           onClick={() => uploadRef.current?.click()}
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            if (!event.dataTransfer.files.length) return;
+            event.preventDefault();
+            uploadDocuments(event.dataTransfer.files);
+          }}
           className="mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-md border border-dashed px-4 text-sm text-muted-foreground transition-colors hover:bg-muted/30"
           style={{ borderColor: "hsl(var(--accent-gold) / 0.45)" }}
         >
