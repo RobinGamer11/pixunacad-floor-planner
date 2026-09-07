@@ -7707,85 +7707,110 @@ function CadToolSection({
 
 
 
-      {/* CAD-Blatt als PDF einfügen (verschoben aus dem Dokument-Werkzeug). */}
+      {/* CAD-Blatt einfügen — großer Knopf, Auswahl in eigenem Fenster. */}
       <div>
         <button
           type="button"
-          onClick={() => setPdfOpen((v) => !v)}
-          className="w-full h-9 rounded-md border text-xs flex items-center justify-between gap-2 px-2"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="Ein Zeichenblatt aus der CAD-Oberfläche als PDF einfügen"
+          onClick={() => setPdfOpen(true)}
+          className="w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-opacity hover:opacity-90"
+          style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}
+          title="Ein Zeichenblatt aus der CAD-Oberfläche einfügen"
         >
-          <span className="flex items-center gap-2"><CompassIcon size={14} /> CAD-Blatt als PDF einfügen</span>
-          <span className="text-muted-foreground">{pdfOpen ? "▴" : "▾"}</span>
+          <CompassIcon size={16} /> + CAD-Blatt
         </button>
-        {pdfOpen && (
-          <div className="mt-1 rounded-md border p-1.5 space-y-1" style={{ borderColor: "hsl(var(--hairline))" }}>
-            {project.sheets.length === 0 && (
-              <div className="text-[11px] text-muted-foreground px-1 py-2">
-                Noch keine Zeichenblätter. In der CAD-Oberfläche anlegen.
-              </div>
-            )}
-            {project.sheets.map((s) => {
-              const isActive = pdfPickedSheet === s.id;
-              const curScale = pickScale[s.id] ?? s.scale ?? "1:100";
-              const selectValue = PAGE_PLAN_SCALES.includes(curScale) ? curScale : "__other__";
-              return (
-                <div key={s.id} className="space-y-1">
-                  <div
-                    role="button"
-                    onClick={() => setPdfPickedSheet(isActive ? null : s.id)}
-                    className="w-full h-7 rounded-md text-[11px] flex items-center justify-between px-2 hover:bg-muted gap-2 cursor-pointer"
-                    style={{ background: isActive ? "hsl(var(--surface-strong))" : undefined }}
-                  >
-                    <span className="truncate flex-1 text-left">{s.name}</span>
-                    <select
-                      value={selectValue}
-                      onClick={(ev) => ev.stopPropagation()}
-                      onMouseDown={(ev) => ev.stopPropagation()}
-                      onChange={(ev) => {
-                        ev.stopPropagation();
-                        const v = ev.target.value;
-                        if (v === "frei") {
-                          const picked = askPlanScale(curScale);
-                          if (!picked) return;
-                          setPickScale((m) => ({ ...m, [s.id]: picked }));
-                        } else if (v !== "__other__") {
-                          setPickScale((m) => ({ ...m, [s.id]: v }));
-                        }
-                      }}
-                      className="h-6 px-1 rounded bg-transparent border text-[11px] text-muted-foreground"
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                    >
-                      {!PAGE_PLAN_SCALES.includes(curScale) && (
-                        <option value="__other__">{curScale}</option>
-                      )}
-                      {PAGE_PLAN_SCALES.map((sc) => (
-                        <option key={sc} value={sc}>{sc}</option>
-                      ))}
-                      <option value="frei">frei…</option>
-                    </select>
-                  </div>
-                  {isActive && (
-                    <div className="pl-2">
-                      <button
-                        type="button"
-                        onClick={() => goCadForSheetPdf(s.id, "frame", curScale)}
-                        className="h-7 w-full rounded-md border text-[10px] hover:bg-muted"
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                        title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
-                      >
-                        Rahmen
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+        <div className="mt-1 text-[11px] text-muted-foreground text-center">
+          Erstellt aus CAD-Oberfläche
+        </div>
 
+        {pdfOpen && (
+          <div
+            className="fixed inset-0 z-[3000] flex items-center justify-center p-4"
+            style={{ background: "hsl(0 0% 0% / 0.45)" }}
+            onClick={() => setPdfOpen(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl border shadow-xl overflow-hidden"
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b flex items-center justify-between" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <div>
+                  <div className="text-sm font-semibold">CAD-Blatt auswählen</div>
+                  <div className="text-[11px] text-muted-foreground">
+                    Blatt anklicken → Rahmen in der CAD-Oberfläche aufziehen.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPdfOpen(false)}
+                  className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"
+                  title="Schließen"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-3 space-y-2 max-h-[60vh] overflow-y-auto">
+                {project.sheets.length === 0 && (
+                  <div className="text-[12px] text-muted-foreground px-1 py-6 text-center">
+                    Noch keine Zeichenblätter. In der CAD-Oberfläche anlegen.
+                  </div>
+                )}
+                {project.sheets.map((s) => {
+                  const curScale = pickScale[s.id] ?? s.scale ?? "1:100";
+                  const selectValue = PAGE_PLAN_SCALES.includes(curScale) ? curScale : "__other__";
+                  return (
+                    <div
+                      key={s.id}
+                      role="button"
+                      onClick={() => { setPdfPickedSheet(s.id); setPdfOpen(false); goCadForSheetPdf(s.id, "frame", curScale); }}
+                      className="w-full rounded-lg border p-3 flex items-center gap-3 cursor-pointer hover:bg-muted transition-colors"
+                      style={{ borderColor: "hsl(var(--hairline))" }}
+                      title="Rahmen in CAD-Oberfläche aufziehen (mit Häkchen bestätigen)"
+                    >
+                      <div
+                        className="w-10 h-7 rounded bg-white border shrink-0 flex items-center justify-center"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                      >
+                        <CompassIcon size={13} className="text-muted-foreground" />
+                      </div>
+                      <span className="truncate flex-1 text-left text-sm">{s.name}</span>
+                      <span className="text-[11px] text-muted-foreground shrink-0">Maßstab</span>
+                      <select
+                        value={selectValue}
+                        onClick={(ev) => ev.stopPropagation()}
+                        onMouseDown={(ev) => ev.stopPropagation()}
+                        onChange={(ev) => {
+                          ev.stopPropagation();
+                          const v = ev.target.value;
+                          if (v === "frei") {
+                            const picked = askPlanScale(curScale);
+                            if (!picked) return;
+                            setPickScale((m) => ({ ...m, [s.id]: picked }));
+                          } else if (v !== "__other__") {
+                            setPickScale((m) => ({ ...m, [s.id]: v }));
+                          }
+                        }}
+                        className="h-7 px-1 rounded border text-[11px] bg-background text-foreground shrink-0"
+                        style={{ borderColor: "hsl(var(--hairline))" }}
+                      >
+                        {!PAGE_PLAN_SCALES.includes(curScale) && (
+                          <option value="__other__">{curScale}</option>
+                        )}
+                        {PAGE_PLAN_SCALES.map((sc) => (
+                          <option key={sc} value={sc}>{sc}</option>
+                        ))}
+                        <option value="frei">frei…</option>
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>
+
 
 
 
