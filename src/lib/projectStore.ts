@@ -409,13 +409,9 @@ function demoProjects(): Project[] {
     ...extra,
   });
 
-  return [
-    mk("p-wohnhaus", "Wohnhaus am See", "Starnberger See", {
-      favorite: true,
-      konzept:
-        "Die Variante A öffnet den Wohn-, Ess- und Kochbereich zum See hin und schafft eine fließende Verbindung zwischen Innen- und Außenraum.",
-    }),
-  ];
+  // Neue Konten starten bewusst ohne Beispielprojekte.
+  void mk;
+  return [];
 }
 
 interface State {
@@ -439,7 +435,8 @@ function load(): State {
     if (raw) {
       // Zentrale Schema-Migration des gesamten Persistenzstandes.
       const parsed = migrateProjectState(JSON.parse(raw));
-      if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
+      // Auch eine bewusst leere Projektliste bleibt nach dem Neuladen leer.
+      if (parsed && Array.isArray(parsed.projects)) {
         const cutoff = Date.now() - 30 * 86400000;
         return {
           projects: parsed.projects
@@ -2330,32 +2327,13 @@ export const projectStore = {
       };
     });
   },
-  /** Favorit umschalten; beim Entfernen rutscht das Projekt direkt unter die Favoriten. */
+  /** Favorit umschalten – die manuelle Position bleibt dabei unverändert. */
   toggleFavorite: (projectId: string) => {
-    setState((s) => {
-      const p = s.projects.find((x) => x.id === projectId);
-      if (!p) return {};
-      const nextFav = !p.favorite;
-      const folderId = p.folderId ?? null;
-      const group = s.projects
-        .filter((x) => !x.isTemplate && !x.deletedAt && (x.folderId ?? null) === folderId && x.id !== projectId)
-        .sort(byProjectOrder);
-      const nonFav = group.filter((x) => !x.favorite);
-      const favs = group.filter((x) => x.favorite);
-      const ordered = nextFav
-        ? [{ ...p, favorite: true }, ...favs, ...nonFav]
-        : [...favs, { ...p, favorite: false }, ...nonFav];
-      const order = new Map(ordered.map((x, i) => [x.id, i] as const));
-      return {
-        projects: s.projects.map((x) =>
-          x.id === projectId
-            ? { ...x, favorite: nextFav, sortIndex: order.get(x.id) ?? 0 }
-            : order.has(x.id)
-              ? { ...x, sortIndex: order.get(x.id)! }
-              : x
-        ),
-      };
-    });
+    setState((s) => ({
+      projects: s.projects.map((x) =>
+        x.id === projectId ? { ...x, favorite: !x.favorite } : x
+      ),
+    }));
   },
 
   /* ---------- Papierkorb (30 Tage) ---------- */
@@ -2387,11 +2365,11 @@ function bySortIndex(a: { sortIndex?: number }, b: { sortIndex?: number }) {
   return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
 }
 
-/** Favoriten immer oben, danach die manuelle Reihenfolge. */
+/**
+ * Ausschließlich die selbst festgelegte Reihenfolge. Favoriten bleiben
+ * markiert, verschieben ein Projekt aber nicht mehr automatisch nach oben.
+ */
 export function byProjectOrder(a: Project, b: Project) {
-  const fa = a.favorite ? 0 : 1;
-  const fb = b.favorite ? 0 : 1;
-  if (fa !== fb) return fa - fb;
   return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
 }
 
