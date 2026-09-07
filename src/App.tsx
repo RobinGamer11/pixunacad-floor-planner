@@ -11,7 +11,6 @@ import ProjectsHome from "./pages/ProjectsHome";
 import Login from "./pages/Login";
 import ProjectWorkspace from "./pages/ProjectWorkspace";
 import CadPage from "./pages/CadPage";
-import FinancePage from "./pages/FinancePage";
 import BoardPage from "./pages/BoardPage";
 import PasswordReset from "./pages/PasswordReset";
 import Impressum from "./pages/Impressum";
@@ -64,7 +63,7 @@ const App = () => (
               <Route path="/project/:projectId/cad" element={<CadPage />} />
               <Route path="/project/:projectId/cad/:sheetId" element={<CadPage />} />
               <Route path="/project/:projectId/board" element={<BoardPage />} />
-              <Route path="/project/:projectId/finance" element={<FinancePage />} />
+              <Route path="/project/:projectId/finance" element={<FinanceRedirect />} />
               <Route path="/cad" element={<CadPage />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
