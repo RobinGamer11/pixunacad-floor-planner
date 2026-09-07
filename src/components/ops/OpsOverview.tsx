@@ -439,10 +439,10 @@ export function OpsOverview({
       )}
 
       {taxonomy?.kind === "category" && (
-        <CategoryManagerDialog projectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
+        <CategoryManagerDialog projects={projects} fixedProjectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
       )}
       {taxonomy?.kind === "priority" && (
-        <PriorityManagerDialog projectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
+        <PriorityManagerDialog projects={projects} fixedProjectId={taxonomy.projectId} onClose={() => setTaxonomy(null)} />
       )}
     </div>
   );
