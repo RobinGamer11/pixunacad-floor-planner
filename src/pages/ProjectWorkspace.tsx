@@ -86,6 +86,7 @@ import {
   Layers,
   Star,
   Pentagon,
+  Ruler as RulerIcon,
 } from "lucide-react";
 
 import {
@@ -7138,38 +7139,6 @@ function GuideSettings({
         </button>
       </Row>
     </SettingsBlock>
-  );
-}
-
-/** Modus-Auswahl Linie / Freihand — Design analog zum Schraffurwerkzeug. */
-function LineModeSelect({
-  value,
-  onChange,
-}: {
-  value: LinePageTool;
-  onChange: (next: LinePageTool) => void;
-}) {
-  return (
-    <div>
-      <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
-      <div className="grid grid-cols-2 gap-1">
-        {LINE_TOOL_VARIANTS.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            title={label}
-            onClick={() => onChange(id)}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded border px-1 py-1.5 transition-colors ${
-              value === id ? "bg-accent" : "hover:bg-muted"
-            }`}
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <Icon size={14} />
-            <span className="text-[9px] leading-tight">{label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 
