@@ -104,7 +104,7 @@ export function ProjectsTab(props: ProjectsTabProps) {
 
   const pick = (p: LocalProjectRef) => {
     setSelectedId(p.id);
-    setMenuOpen(false);
+    
     setAddOpen(false);
     if (window.matchMedia("(max-width: 1279px)").matches) setSheetOpen(true);
   };
