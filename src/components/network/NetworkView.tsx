@@ -339,24 +339,27 @@ export function NetworkView({
           )}
 
           {!net.loading && tab === "teams" && (
-            <div className="rounded-2xl border p-4 sm:p-5" style={surface}>
-              <ProjectsTab
-                projects={visibleProjects}
-                membersOf={membersOf}
-                memberRow={memberRow}
-                canManageProject={canManageProject}
-                ownerLabel={(id) => ownerOf(id).label}
-                contacts={net.contacts}
-                peopleNames={peopleNameMap}
-                unread={unread}
-                onOpenChat={(p) => openProject(p)}
-                onAddMember={(projectId, userId) => void net.addMember(projectId, userId)}
-                onRemoveMember={(projectId, userId) => void net.removeMember(projectId, userId)}
-                onSetRole={(projectId, userId, role) => void net.setMemberRole(projectId, userId, role)}
-                onSetPermissions={(projectId, userId, o) => void net.setMemberPermissions(projectId, userId, o)}
-              />
-            </div>
+            <ProjectsTab
+              projects={visibleProjects}
+              membersOf={membersOf}
+              memberRow={memberRow}
+              canManageProject={canManageProject}
+              ownerLabel={(id) => ownerOf(id).label}
+              myRoleOf={(id) => {
+                if (ownerOf(id).id === net.myId || !net.sharedProjects.some((p) => p.id === id)) return "owner";
+                return ((memberRow(id, net.myId ?? "")?.role as ProjectRole) ?? "member");
+              }}
+              contacts={net.contacts}
+              peopleNames={peopleNameMap}
+              unread={unread}
+              onOpenChat={(p) => openProject(p)}
+              onAddMember={(projectId, userId) => void net.addMember(projectId, userId)}
+              onRemoveMember={(projectId, userId) => void net.removeMember(projectId, userId)}
+              onSetRole={(projectId, userId, role) => void net.setMemberRole(projectId, userId, role)}
+              onSetPermissions={(projectId, userId, o) => void net.setMemberPermissions(projectId, userId, o)}
+            />
           )}
+
 
 
           {!net.loading && tab === "requests" && (

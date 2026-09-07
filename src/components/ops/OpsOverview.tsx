@@ -430,7 +430,7 @@ export function OpsOverview({
 
 
       {/* 2. Hauptansicht */}
-      <div className="mb-2 flex items-center justify-end gap-3">
+      <div className="mb-2 flex items-center justify-start gap-3">
         <select
           className={`${inputCls} h-11 min-w-[170px]`}
           value={view}
