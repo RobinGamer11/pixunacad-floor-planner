@@ -70,6 +70,8 @@ export function OpsCalendarTab({
   projectFilterAsDropdown = false,
   calendarDefaultRange = "month",
   onEditItem,
+  onSelectTime,
+  selection,
 }: {
   projectIds: string[];
   projectNames: Map<string, string>;
