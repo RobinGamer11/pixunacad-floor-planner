@@ -178,6 +178,9 @@ export class EraserTool {
         patternEnabled: hatch.patternEnabled, patternId: hatch.patternId,
         patternScale: hatch.patternScale, patternAngleDeg: hatch.patternAngleDeg,
         patternSkewDeg: hatch.patternSkewDeg, patternStretch: hatch.patternStretch, patternOffsetX: hatch.patternOffsetX, patternOffsetY: hatch.patternOffsetY,
+        // Kontur-Effekte beim Ausschneiden unverändert übernehmen. Insbesondere
+        // darf aktiviertes Aufrauen durch den Radierer nicht verloren gehen.
+        ...copyStrokeEffects(hatch),
       };
 
       // Original-Ecken merken → nur die neuen (radierten) Kanten werden geglättet.
@@ -532,9 +535,9 @@ export class EraserTool {
 
 
 
-    const rOut = mode === "smooth" ? r * (1 + soft) : r;
+    const rOut = mode === "smooth" ? r * (1 + 2 * soft) : r;
     if (mode === "smooth") {
-      const g = ctx.createRadialGradient(c.x, c.y, rOut * Math.pow(1 - soft, 2) * 0.6, c.x, c.y, rOut);
+      const g = ctx.createRadialGradient(c.x, c.y, r * Math.pow(1 - soft, 2), c.x, c.y, rOut);
       g.addColorStop(0, "rgba(77,163,255,0.28)");
       g.addColorStop(1, "rgba(77,163,255,0)");
       ctx.fillStyle = g;

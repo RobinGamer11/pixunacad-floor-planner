@@ -844,7 +844,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       if (id === ToolIds.SELECT) setRightTab("sheets");
       else setRightTab("settings");
-      if (id === ToolIds.LINE || id === ToolIds.FREE || id === ToolIds.ERASER) {
+      if (id === ToolIds.LINE || id === ToolIds.FREE) {
         setLineVariant(id);
       }
       setStickerPhase(app.stickerTool.phase);
@@ -1348,7 +1348,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {CAD_TOOLS.map((t) => {
             const Icon = t.icon;
             const isActive = t.id === ToolIds.LINE
-              ? (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE || activeTool === ToolIds.ERASER)
+              ? (activeTool === ToolIds.LINE || activeTool === ToolIds.FREE)
               : activeTool === t.id;
             const variants = TOOL_VARIANTS[t.id];
             const isExpanded = expandedTool === t.id && !!variants;
