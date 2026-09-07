@@ -655,7 +655,6 @@ export default function BoardPage() {
                 peopleById={opsPeopleById}
                 selectedDates={calDay ? [calDay] : []}
                 onSelectDate={(d) => setCalDay((cur) => (cur === d ? undefined : d))}
-                allowAbsenceEntry={false}
               />
             </div>
           )}

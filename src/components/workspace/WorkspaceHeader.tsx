@@ -15,7 +15,6 @@ import {
   HelpCircle,
   TabletSmartphone,
   Wallet,
-  GanttChartSquare,
 } from "lucide-react";
 
 export type WorkspaceMode = "workspace" | "cad" | "finance" | "board";
@@ -81,7 +80,6 @@ export function WorkspaceHeader({
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
   const goFinance = () => projectId && navigate(`/project/${projectId}/finance`);
-  const goBoard = () => projectId && navigate(`/project/${projectId}/board`);
 
   return (
     <header
@@ -161,13 +159,6 @@ export function WorkspaceHeader({
             onClick={goWorkspace}
           />
 
-          <ModeDivider />
-          <ModeButton
-            icon={<GanttChartSquare size={13} />}
-            label="Orga"
-            active={mode === "board"}
-            onClick={goBoard}
-          />
           <ModeDivider />
           <ModeButton
             icon={<Wallet size={13} />}

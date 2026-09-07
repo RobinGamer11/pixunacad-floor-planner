@@ -24,11 +24,11 @@ import {
 } from "@/lib/timelineStore";
 import { useProjectsMemberOptions } from "@/lib/projectTeam";
 
-const inputCls =
+export const inputCls =
   "w-full h-9 rounded-md border bg-background text-foreground px-2 text-xs outline-none focus:ring-1 focus:ring-ring [&>option]:bg-background [&>option]:text-foreground";
-const LINE = "hsl(var(--hairline))";
-const SOFT = "hsl(var(--ink-soft))";
-const GOLD = "hsl(var(--accent-gold))";
+export const LINE = "hsl(var(--hairline))";
+export const SOFT = "hsl(var(--ink-soft))";
+export const GOLD = "hsl(var(--accent-gold))";
 
 export interface OpsProjectRef {
   id: string;
@@ -129,7 +129,7 @@ export function OpsActionBar({
 
 /* ------------------------------------------------------------- Grundgerüst */
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -158,7 +158,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-[10px] uppercase tracking-wide" style={{ color: SOFT }}>{label}</span>
@@ -167,7 +167,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Actions({ busy, onSave, onClose }: { busy: boolean; onSave: () => void; onClose: () => void }) {
+export function Actions({ busy, onSave, onClose }: { busy: boolean; onSave: () => void; onClose: () => void }) {
   return (
     <div className="flex items-center gap-2 mt-1">
       <button disabled={busy} onClick={onSave}

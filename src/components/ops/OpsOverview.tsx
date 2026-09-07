@@ -6,7 +6,8 @@
  *   * Projekt → Organisation (nur das geöffnete Projekt im Projektfilter)
  *
  * Es werden ausschließlich vorhandene Stores verwendet (Board-Beiträge,
- * `time_entries`, `absences`, `devices`/`device_bookings`).
+ * `time_entries`). Geräte/Werkzeuge und Abwesenheiten sind aus der
+ * Oberfläche entfernt.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronDown, ChevronRight } from "lucide-react";
@@ -24,11 +25,11 @@ import { useProjectsMemberOptions } from "@/lib/projectTeam";
 import {
   Collapsible,
   TimeInsights,
-  DeviceInsights,
   CategoryInsights,
   usePeopleCount,
 } from "@/components/ops/OpsInsights";
-import { formatMinutes, netMinutes, useDevices, useTimeEntriesForProjects } from "@/lib/opsStore";
+import { formatMinutes, netMinutes, useTimeEntriesForProjects } from "@/lib/opsStore";
+import { OpsItemEditDialog } from "@/components/ops/OpsItemEditDialog";
 
 export interface OpsOverviewProject {
   id: string;
@@ -45,7 +46,7 @@ export function projectColor(id: string): string {
 /**
  * Eine Zeile in „Projektstände“.
  * Kopf: Projektname, Projektstart/-ende und die insgesamt erfasste Arbeitszeit.
- * Aufgeklappt: Beiträge (Kategorien-Diagramm), Zeiterfassung und Geräte/Werkzeuge.
+ * Aufgeklappt: Beiträge (Kategorien-Diagramm) und Zeiterfassung.
  */
 function ProjectStandRow({
   project,
@@ -66,10 +67,9 @@ function ProjectStandRow({
   const ids = useMemo(() => [project.id], [project.id]);
   const times = useTimeEntriesForProjects(ids);
   const peopleCount = usePeopleCount(ids);
-  const devices = useDevices(project.id);
   const [tick, setTick] = useState(0);
   /** Reiter innerhalb einer Projektzeile – „Beiträge“ ist die Vorauswahl. */
-  const [standTab, setStandTab] = useState<"items" | "time" | "dev">("items");
+  const [standTab, setStandTab] = useState<"items" | "time">("items");
 
   useEffect(() => subscribeTimeline(project.id, () => setTick((t) => t + 1)), [project.id]);
 
@@ -87,7 +87,6 @@ function ProjectStandRow({
     [times.entries],
   );
   const items = state?.items ?? [];
-  const deviceCount = devices.devices.filter((d) => !d.archived).length;
 
   return (
     <div
@@ -116,7 +115,6 @@ function ProjectStandRow({
             {([
               ["items", "Beiträge", items.length],
               ["time", "Zeiterfassung", peopleCount],
-              ["dev", "Geräte/Werkzeuge", deviceCount],
             ] as const).map(([id, label, count]) => (
               <button
                 key={id}
@@ -137,7 +135,6 @@ function ProjectStandRow({
             <CategoryInsights projectId={project.id} onSelectItem={(i) => onShowItem?.(i)} />
           )}
           {standTab === "time" && <TimeInsights projectIds={ids} peopleById={peopleById} />}
-          {standTab === "dev" && <DeviceInsights projectIds={ids} peopleById={peopleById} />}
         </div>
       )}
     </div>
@@ -168,6 +165,9 @@ export function OpsOverview({
   const { namesById: opsPeople } = useProjectsMemberOptions(opsProjectIds);
   const [activeIds, setActiveIds] = useState<Set<string>>(() => new Set(opsProjectIds));
   const [previewId, setPreviewId] = useState<string | null>(null);
+  /** Offener Beitrag zum Bearbeiten (dieselben Board-Datensätze). */
+  const [editing, setEditing] = useState<{ projectId: string; itemId: string } | null>(null);
+  const openItem = (projectId: string, itemId: string) => setEditing({ projectId, itemId });
   // Board-Änderungen aller Projekte live übernehmen.
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -265,7 +265,7 @@ export function OpsOverview({
         />
       </div>
 
-      {/* Kalender: Beiträge, Arbeitszeiten, Abwesenheiten, Buchungen. */}
+      {/* Zeitachse: Beiträge und Arbeitszeiten in wählbarer Ansicht. */}
       <div ref={calendarRef} className="mb-6 rounded-xl border p-3"
            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
         <OpsCalendarTab
@@ -277,8 +277,9 @@ export function OpsOverview({
           onSelectDate={(d) => setSelectedDate((prev) => (prev === d ? undefined : d))}
           hiddenProjects={new Set(opsProjectIds.filter((id) => !activeIds.has(id)))}
           onToggleProject={toggle}
-          allowAbsenceEntry={false}
           projectFilterAsDropdown
+          calendarDefaultRange="week"
+          onEditItem={openItem}
         />
       </div>
 
@@ -314,9 +315,9 @@ export function OpsOverview({
                   />
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
                   <button
-                    onClick={() => showInCalendar(t.date)}
+                    onClick={() => openItem(t.projectId, t.id)}
                     className="flex-1 min-w-0 text-left"
-                    title="Im Kalender anzeigen"
+                    title="Beitrag bearbeiten"
                   >
                     <div className={`text-sm truncate flex items-center gap-2 ${t.done ? "line-through text-muted-foreground" : ""}`}>
                       {t.title}
@@ -357,16 +358,11 @@ export function OpsOverview({
               open
               onToggle={() => {}}
               peopleById={opsPeople}
-              onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
+              onShowItem={(i) => openItem(fixedProjectId, i.id)}
             />
           </div>
         ) : (
           <>
-            {/* Alle Gerätebuchungen: alle Geräte/Werkzeuge und ihre Gesamtnutzung */}
-            <Collapsible title="ALLE GERÄTEBUCHUNGEN">
-              <DeviceInsights projectNames={opsProjectNames} peopleById={opsPeople} />
-            </Collapsible>
-
             {/* Projektstände */}
             <div className="rounded-xl border p-4" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}>
               <div className="text-xs font-semibold tracking-widest text-muted-foreground mb-3">PROJEKTSTÄNDE</div>
@@ -378,7 +374,7 @@ export function OpsOverview({
                     open={previewId === p.id}
                     onToggle={() => setPreviewId((cur) => (cur === p.id ? null : p.id))}
                     peopleById={opsPeople}
-                    onShowItem={(i) => showInCalendar(i.endDate || i.startDate)}
+                    onShowItem={(i) => openItem(p.id, i.id)}
                   />
                 ))}
                 {projects.length === 0 && <div className="text-sm text-muted-foreground">Keine Projekte.</div>}
@@ -387,6 +383,15 @@ export function OpsOverview({
           </>
         )}
       </div>
+
+      {editing && (
+        <OpsItemEditDialog
+          projectId={editing.projectId}
+          projectName={opsProjectNames.get(editing.projectId)}
+          itemId={editing.itemId}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   );
 }
