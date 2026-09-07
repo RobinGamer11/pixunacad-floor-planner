@@ -2657,6 +2657,11 @@ export class CadApp {
           if (this.pipetteTool.hasSource) { this.pipetteTool.clearSource(); return; }
           this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return;
         }
+        if ((this.activeTool as any) === this.rulerTool) {
+          // 1. ESC: laufende Platzierung verwerfen — Werkzeug bleibt aktiv.
+          if (this.rulerTool.isDrawing()) { this.rulerTool.cancel(); return; }
+          this.setTool(ToolIds.SELECT); return;
+        }
         if (this.activeTool === this.wallTool) { this.wallTool.cancel(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.doorTool) {
           if (this.doorTool.selectedDoorId) { this.doorTool.selectDoor(null); return; }
