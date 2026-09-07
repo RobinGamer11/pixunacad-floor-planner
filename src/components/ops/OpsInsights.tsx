@@ -79,15 +79,18 @@ export function MiniPie({
   activeId = null,
   onSlice,
   onCenter,
+  size = 168,
 }: {
   slices: { id: string; value: number; color: string }[];
   activeId?: string | null;
   onSlice?: (id: string) => void;
   onCenter?: () => void;
+  /** Durchmesser in Pixeln – Organisation nutzt eine größere Darstellung. */
+  size?: number;
 }) {
   const total = slices.reduce((a, s) => a + s.value, 0);
-  const R = 74;
-  const C = 84;
+  const C = size / 2;
+  const R = C - 10;
   if (!total) {
     return (
       <svg width={C * 2} height={C * 2} aria-hidden>
