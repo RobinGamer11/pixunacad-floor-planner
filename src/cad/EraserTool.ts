@@ -423,9 +423,10 @@ export class EraserTool {
     // Schraffuren: Radier-Pfad sammeln und laufend (in kurzen Abschnitten)
     // wirklich boolesch ausschneiden — dadurch sieht man sofort das Endergebnis.
     const lastStamp = this._hatchStamps[this._hatchStamps.length - 1];
-    if (!lastStamp || dist(lastStamp.c, centerW) > r * 0.25) {
+    if (!lastStamp || dist(lastStamp.c, centerW) > r * 0.5) {
       this._hatchStamps.push({ c: v(centerW.x, centerW.y), r });
-      if (this._hatchStamps.length >= 8) {
+      if (this._hatchStamps.length >= 16) {
+
         const tail = this._hatchStamps[this._hatchStamps.length - 1];
         this._commitHatchErase();
         this._hatchStamps = [tail];
