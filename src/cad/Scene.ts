@@ -713,10 +713,14 @@ export class FreeStroke {
 
 }
 
-/** Hilfslinie (Lineal) für das Eraser-Tool. Optional, max. 1 pro Scene. */
+/** Zeichenlineal. Optional, max. 1 pro Scene. a→b ist immer die Zeichenkante. */
 export interface RulerGuide {
   a: Vec2;
   b: Vec2;
+  /** Lage des Linealkörpers zur Zeichenkante. Fehlt = "center". */
+  side?: import("./rulerModel").RulerSide;
+  /** Anzeigeeinheit der Teilung. Fehlt = "cm". */
+  unit?: import("./rulerModel").RulerUnit;
 }
 
 export type WallKind = "outer" | "inner";

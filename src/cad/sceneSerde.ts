@@ -1,4 +1,5 @@
 import { ANNOTATION_M_PER_MM } from "./textTypography";
+import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 /**
  * Standalone scene (de)serialization — extracted 1:1 from `CadApp` so that
  * the same JSON format can be restored in isolated contexts (Projektmappe-
@@ -66,6 +67,8 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
     scene.rulerGuide = {
       a: { x: data.rulerGuide.a.x, y: data.rulerGuide.a.y },
       b: { x: data.rulerGuide.b.x, y: data.rulerGuide.b.y },
+      side: rulerSideOf(data.rulerGuide),
+      unit: rulerUnitOf(data.rulerGuide),
     };
   }
   for (const s of data.segments || []) {

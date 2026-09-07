@@ -37,6 +37,7 @@ import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedIt
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import { DocumentTool } from "./DocumentTool";
+import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 import { FreeDrawTool } from "./FreeDrawTool";
 import { RulerTool } from "./RulerTool";
 import { EraserTool } from "./EraserTool";
@@ -844,6 +845,8 @@ export class CadApp {
       rulerGuide: scene.rulerGuide ? {
         a: { x: scene.rulerGuide.a.x, y: scene.rulerGuide.a.y },
         b: { x: scene.rulerGuide.b.x, y: scene.rulerGuide.b.y },
+        side: rulerSideOf(scene.rulerGuide),
+        unit: rulerUnitOf(scene.rulerGuide),
       } : null,
       doors: scene.doors.map(d => ({
         id: d.id, wallId: d.wallId, posM: d.posM, widthM: d.widthM, heightM: d.heightM,

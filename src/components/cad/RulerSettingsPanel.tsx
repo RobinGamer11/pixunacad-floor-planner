@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
+import {
+  RULER_SIDES, RULER_UNITS, rulerDecimals,
+  type RulerSide, type RulerUnit,
+} from "@/cad/rulerModel";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -10,17 +14,10 @@ const STEPS = [
   "Verschieben, drehen, Länge ändern (ziehen)",
 ];
 
-const SIDES: { value: "left" | "center" | "right"; label: string }[] = [
-  { value: "left", label: "Links" },
-  { value: "center", label: "Mittig" },
-  { value: "right", label: "Rechts" },
-];
-
 /**
- * Einstellungen des eigenständigen Lineal-Werkzeugs.
- * Aufbau wie beim Pipetten-Werkzeug: Schrittanzeige plus die wenigen
- * Werte, die das Lineal selbst betreffen (Länge in Zentimetern,
- * Zeichenseite, Entfernen).
+ * Einstellungen des eigenständigen Lineal-Werkzeugs:
+ * Schrittanzeige, Länge in der gewählten Einheit, Zeichenseite,
+ * Maßeinheit und Entfernen.
  */
 export const RulerSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = ({ app }) => {
   const a: any = app;
@@ -38,14 +35,16 @@ export const RulerSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = ({
 
   const tool = a.rulerTool;
   const hasRuler = !!a.scene?.rulerGuide;
-  const lengthCm = tool?.getLengthCm?.() ?? 0;
+  const unit: RulerUnit = tool?.getUnit?.() ?? "cm";
+  const side: RulerSide = tool?.getSide?.() ?? "center";
+  const decimals = rulerDecimals(unit);
+  const length = tool?.getLengthInUnit?.() ?? 0;
   const phase: string = tool?.phase ?? "start";
   const current = phase === "start" ? 0 : phase === "end" ? 1 : 2;
-  const side: string = a.defaultFreeRulerSide ?? "center";
 
   const commitLength = () => {
     const n = parseFloat(lenText.replace(",", "."));
-    if (Number.isFinite(n) && n > 0) tool?.setLengthCm?.(n);
+    if (Number.isFinite(n) && n > 0) tool?.setLengthInUnit?.(n);
     setEditing(false);
   };
 
@@ -87,36 +86,56 @@ export const RulerSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = ({
             type="text"
             inputMode="decimal"
             disabled={!hasRuler}
-            value={editing ? lenText : (hasRuler ? lengthCm.toFixed(1) : "")}
+            value={editing ? lenText : (hasRuler ? length.toFixed(decimals) : "")}
             placeholder="–"
-            onFocus={() => { setEditing(true); setLenText(lengthCm.toFixed(1)); }}
+            onFocus={() => { setEditing(true); setLenText(length.toFixed(decimals)); }}
             onChange={(e) => setLenText(e.target.value)}
             onBlur={commitLength}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitLength(); (e.target as HTMLInputElement).blur(); } }}
             className="h-8 w-24 rounded border bg-transparent px-2 text-sm tabular-nums"
             style={{ borderColor: HAIRLINE }}
           />
-          <span className="text-[11px] text-muted-foreground">cm</span>
+          <span className="text-[11px] text-muted-foreground">{unit}</span>
         </div>
         <div className="text-[11px] text-muted-foreground">
-          Immer echte Zentimeter der Zeichnung — der Zoom ändert nur die Bildschirmgröße.
+          Echte Länge der Zeichnung — der Zoom ändert nur die Bildschirmgröße.
+        </div>
+      </div>
+
+      <div className="space-y-2 border-t pt-2" style={{ borderColor: HAIRLINE }}>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">MASSEINHEIT</div>
+        <div className="grid grid-cols-3 gap-1">
+          {RULER_UNITS.map((u) => (
+            <button
+              key={u.value}
+              type="button"
+              onClick={() => { tool?.setUnit?.(u.value); force((n) => n + 1); }}
+              className={`rounded border px-1 py-1.5 text-[10px] transition-colors ${unit === u.value ? "bg-accent" : "hover:bg-muted"}`}
+              style={{ borderColor: HAIRLINE }}
+            >
+              {u.label}
+            </button>
+          ))}
         </div>
       </div>
 
       <div className="space-y-2 border-t pt-2" style={{ borderColor: HAIRLINE }}>
         <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">ZEICHENSEITE</div>
         <div className="grid grid-cols-3 gap-1">
-          {SIDES.map((s) => (
+          {RULER_SIDES.map((s) => (
             <button
               key={s.value}
               type="button"
-              onClick={() => { a.defaultFreeRulerSide = s.value; force((n) => n + 1); }}
+              onClick={() => { tool?.setSide?.(s.value); force((n) => n + 1); }}
               className={`rounded border px-1 py-1.5 text-[10px] transition-colors ${side === s.value ? "bg-accent" : "hover:bg-muted"}`}
               style={{ borderColor: HAIRLINE }}
             >
               {s.label}
             </button>
           ))}
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          Die gesetzte Strecke bleibt an ihrem Platz; nur der Linealkörper wechselt die Seite.
         </div>
       </div>
 

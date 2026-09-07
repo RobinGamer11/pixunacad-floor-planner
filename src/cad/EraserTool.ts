@@ -12,13 +12,12 @@ import { copyStrokeEffects } from "./Scene";
 
 import { splitPolylineByCircle, splitSegmentByCircle, projectPointToInfiniteLineFromTwoPoints } from "./freeGeom";
 import { eraseDocCircle } from "./documentMask";
-import { RulerDragController } from "./rulerInteraction";
 
 
 /**
  * Radiergummi-Werkzeug (Hotkey: E).
  * - Linke Maustaste gehalten → radiert FreeStrokes UND Liniensegmente entlang Pfad.
- * - Optional Lineal-Snap (rulerGuide).
+ * - Optional Führung an einem vorhandenen Lineal (rulerGuide, nur lesend).
  * - Splittet Linien an Kreis-Schnittpunkten; Hatches/Texte/Maße bleiben unberührt.
  */
 export class EraserTool {
@@ -27,7 +26,6 @@ export class EraserTool {
 
   private _erasing = false;
   private _lastWorld: Vec2 | null = null;
-  private _rulerDrag!: RulerDragController;
   /** Weicher Modus: pro Objekt akkumulierte Abtragung (0..1) innerhalb eines Striches. */
   private _acc = new Map<string, number>();
   /** Gesammelter Radier-Pfad des aktuellen Striches (Preview + Schraffur-Schnitt). */
@@ -35,7 +33,6 @@ export class EraserTool {
 
   constructor(app: CadApp) {
     this.app = app;
-    this._rulerDrag = new RulerDragController(app, { handlesOnly: true });
   }
 
   activate() {
@@ -43,7 +40,6 @@ export class EraserTool {
     this._lastWorld = null;
     this._acc.clear();
     this._hatchStamps = [];
-    this._rulerDrag.reset();
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     this.app.renderer.setHoverSegmentId(null);
@@ -62,32 +58,16 @@ export class EraserTool {
   /** True, solange aktiv radiert wird (für ESC-Stufe 1). */
   isDrawing() { return this._erasing; }
   getCursor() {
-    const c = this._rulerDrag.hoverCursor(this.app.input);
-    return c || "none";
+    return "none";
   }
 
 
   update(input: Input) {
-    if (this._rulerDrag.update(input)) {
-      this._erasing = false;
-      this._lastWorld = null;
-      return;
-    }
+    // Der Radiergummi nutzt ein vorhandenes Lineal nur als Führung. Verschieben,
+    // Drehen oder Löschen ist ausschließlich im Werkzeug "Lineal" möglich.
     const ruler = this.app.scene.rulerGuide;
     const rawW = v(input.mouse.wx, input.mouse.wy);
-    let projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
-    // Radierseite relativ zum Lineal: links / mittig / rechts der Linienführung.
-    const side = (this.app as any).defaultEraserRulerSide ?? "center";
-    if (ruler && side !== "center") {
-      const dx = ruler.b.x - ruler.a.x, dy = ruler.b.y - ruler.a.y;
-      const len = Math.hypot(dx, dy);
-      if (len > 1e-9) {
-        const r = this.app.defaultEraserRadiusM;
-        const nx = -dy / len, ny = dx / len; // Linke Normale (bezogen auf a→b)
-        const s = side === "left" ? 1 : -1;
-        projW = v(projW.x + nx * r * s, projW.y + ny * r * s);
-      }
-    }
+    const projW = ruler ? projectPointToInfiniteLineFromTwoPoints(rawW, ruler.a, ruler.b) : rawW;
 
     if (input.mouse.left) {
       if (!this._erasing) {

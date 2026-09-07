@@ -28,6 +28,7 @@ import { Input, setLmbHint } from "../Input";
 import { drawPendingPointHint } from "../pendingPointHint";
 import { LabelManager } from "../LabelManager";
 import { IdPanel } from "../IdPanel";
+import { GlobalGuides } from "../globalGuides";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
 import { RasterLayers, cadRasterPxPerMForReference } from "../RasterLayers";
@@ -185,6 +186,8 @@ export class MiniCad {
   readonly camera: Camera;
   readonly input: Input;
   readonly topology: TopologyEngine;
+  /** Werkzeugübergreifende Hilfslinien (R-Klick auf Fangpunkt) — wie im CAD. */
+  globalGuides!: GlobalGuides;
   readonly renderer: Renderer;
   readonly hub: LineHub;
   readonly pointEditMenu: PointEditMenu;
@@ -392,6 +395,8 @@ export class MiniCad {
     this.input = new Input(this.dom.canvas);
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
+    this.globalGuides = new GlobalGuides();
+    this.topology.guides = this.globalGuides;
     const ctx = this.dom.canvas.getContext("2d")!;
     this.renderer = new Renderer(ctx, this.camera, this.scene, this.labelManager);
     // Rasterinhalt in die normale Ebenenreihenfolge des Renderers einhängen.
@@ -1292,6 +1297,7 @@ export class MiniCad {
       this.renderer.setViewport(wPx, hPx);
     }
 
+    this.renderer.uiScale = k;
     this.camera.scale = this.basePxPerMm * 1000 * zoom * k;
     this.camera.offsetX = FRAME_PAD_PX * k;
     this.camera.offsetY = FRAME_PAD_PX * k;
@@ -2538,6 +2544,7 @@ export class MiniCad {
               (this.freeDrawTool as any)?.cancel?.(); (this.eraserTool as any)?.cancel?.();
               (this.documentTool as any)?.cancel?.(); } catch {}
         try { this.selectTool.cancel(); } catch {}
+        try { this.globalGuides.clear(); } catch {}
         try { this.clearSelection(); } catch {}
         try { this.pointEditMenu.hide(); } catch {}
         try { this.onSelectionChange?.(); } catch {}
@@ -3082,6 +3089,23 @@ export class MiniCad {
 
       this.input.update(this.camera);
 
+      // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
+      // werkzeugübergreifend, identisch zur großen CAD-Oberfläche.
+      if (this.input.rightClicked) {
+        const ownGuides = this._activeTool === "line" || this._activeTool === "guide"
+          || (this._activeTool === "select" && !!this.selectTool?.isEditing?.());
+        if (!ownGuides) {
+          const snap = this.topology.findBestSnap(
+            { x: this.input.mouse.sx, y: this.input.mouse.sy },
+            { x: this.input.mouse.wx, y: this.input.mouse.wy },
+          );
+          if (snap?.world && (snap.type === "POINT" || snap.type === "GUIDE_POINT")) {
+            this.globalGuides.toggleAt(snap.world);
+            this.input.rightClicked = false;
+          }
+        }
+      }
+
       if (this._activeTool === "line" || this._activeTool === "guide") this.lineTool.update(this.input);
       else if (this._activeTool === "text") this.textTool.update(this.input);
       else if (this._activeTool === "select") this.selectTool.update(this.input);
@@ -3117,6 +3141,7 @@ export class MiniCad {
       this._emitExternalDocChanges();
 
       this.renderer.render();
+      this.globalGuides.draw(this.renderer.ctx, this.camera, this.renderer.vw, this.renderer.vh);
       // Tablet-Hilfsrad: gelber Visierpunkt an der vorgemerkten Position
       // (identische Logik wie in der eigenständigen CAD-Oberfläche).
       drawPendingPointHint(this.renderer.ctx, this.input.mouse.sx, this.input.mouse.sy);
