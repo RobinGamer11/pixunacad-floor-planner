@@ -135,7 +135,8 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
     const node = financeStore.addNode(pid, type, parent);
     if (parent) setExpanded((e) => ({ ...e, [parent!]: true }));
     setSelectedId(node.id);
-    setMobileNavOpen(false);
+    // Auf Tablet und Handy klappt der Strukturbaum sofort auf.
+    setMobileNavOpen(true);
   };
 
   const openNode = (id: string | null) => { setSelectedId(id); setMobileNavOpen(false); };
@@ -180,7 +181,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
     });
 
   /** Strukturspalte – auf großen Bildschirmen fest, sonst als Panel. */
-  const structure = (
+  const structureFor = (showAdd: boolean) => (
     <div className="flex h-full min-h-0 flex-col overflow-hidden"
          style={{ background: "hsl(var(--surface-card))" }}>
       <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -192,6 +193,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         </button>
       </div>
 
+      {showAdd && (
       <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
         <button onClick={() => addNode("overview")}
           className="w-full h-12 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2"
@@ -208,6 +210,8 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           <Plus size={18} /> Anlage
         </button>
       </div>
+      )}
+
 
       <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="flex items-center gap-1.5 h-11 rounded-md border px-2"
@@ -260,7 +264,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
         {leftOpen && (
           <aside className="hidden lg:flex w-[280px] shrink-0 min-h-0 flex-col border-r overflow-hidden"
                  style={{ borderColor: "hsl(var(--hairline))" }}>
-            {structure}
+            {structureFor(true)}
           </aside>
         )}
 
@@ -285,9 +289,16 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b"
                style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
             <button onClick={() => setMobileNavOpen((v) => !v)}
-              className="lg:hidden h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium"
-              style={{ borderColor: "hsl(var(--hairline))" }}>
-              <ListTree size={16} /> Struktur
+              aria-expanded={mobileNavOpen}
+              className="lg:hidden order-first basis-full h-14 rounded-xl border-2 flex items-center gap-2 px-4 text-sm font-semibold"
+              style={{
+                borderColor: "hsl(var(--accent-gold))",
+                background: "hsl(var(--accent-gold) / 0.12)",
+                color: "hsl(var(--accent-gold))",
+              }}>
+              <ListTree size={20} />
+              <span className="flex-1 text-left">Strukturbaum</span>
+              {mobileNavOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
             </button>
             {!leftOpen && (
               <button onClick={() => setLeftOpen(true)}
@@ -333,7 +344,7 @@ export function FinanceWorkspace({ projectId, projectName }: { projectId: string
           {mobileNavOpen && (
             <div className="lg:hidden border-b max-h-[70vh] overflow-auto"
                  style={{ borderColor: "hsl(var(--hairline))" }}>
-              {structure}
+              {structureFor(false)}
             </div>
           )}
 
@@ -480,12 +491,16 @@ const ActionView: React.FC<{ projectId: string; state: FinanceState; node: Finan
 
       {/* Erhalten = bestehende Belege erfassen; darunter das Anlegen neuer Belege */}
       <div className="space-y-1.5" data-export-hide>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
             <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
-              className="h-9 px-3 rounded-lg border-2 text-[13px] font-semibold flex items-center gap-1.5 hover:bg-muted"
-              style={{ borderColor: "hsl(var(--hairline))" }}>
-              <Plus size={15} /> {label} erhalten
+              className="h-14 px-4 rounded-xl border-2 text-[15px] font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors"
+              style={{
+                borderColor: "hsl(var(--accent-gold))",
+                background: "hsl(var(--accent-gold) / 0.14)",
+                color: "hsl(var(--accent-gold))",
+              }}>
+              <Plus size={20} /> {label} erhalten
             </button>
           ))}
         </div>
