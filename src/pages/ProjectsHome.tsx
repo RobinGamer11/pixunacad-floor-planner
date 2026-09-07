@@ -85,6 +85,7 @@ import { ProjectTeamTab } from "@/components/project/ProjectTeamTab";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import { clearMappeClipboard } from "@/lib/mappeClipboard";
+import { SectionHeading } from "@/components/layout/SectionHeading";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -94,6 +95,16 @@ const Pixuna = () => (
 );
 
 type Tab = "uebersicht" | "aufgaben" | "finanzen" | "dokumente" | "team";
+
+/** Einheitlicher Kopfbereich der fünf Projektreiter. */
+const TAB_HEADINGS: Record<Tab, { title: string; subtitle: string }> = {
+  uebersicht: { title: "Übersicht", subtitle: "Allgemeine Beschreibung" },
+  aufgaben: { title: "Organisation – projektintern", subtitle: "Beiträge, Zeiten und Termine auf einen Blick." },
+  finanzen: { title: "Finanzen", subtitle: "Angebote, Rechnungen, Nachträge und Gesamtstand im Überblick" },
+  dokumente: { title: "Dokumente", subtitle: "Projektbezogene Dateien" },
+  team: { title: "Netzwerk – projektintern", subtitle: "Überblick über dein Team" },
+};
+
 
 export default function ProjectsHome() {
   const projects = useProjects();
