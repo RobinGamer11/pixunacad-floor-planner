@@ -1,4 +1,5 @@
-import { Layers, Lock, Eye, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Layers, Lock, Eye, Pencil, Trash2, Info, ChevronDown } from "lucide-react";
 
 /**
  * Gemeinsame Ebenen-Legende (Hilfe-Modus) für CAD-Oberfläche und Projektmappe.
