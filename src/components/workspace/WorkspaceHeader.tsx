@@ -148,18 +148,19 @@ export function WorkspaceHeader({
              style={{ background: "hsl(var(--surface-muted))" }}>
 
           <ModeButton
-            icon={<FolderKanban size={13} />}
-            label="Mappe"
-            active={mode === "workspace"}
-            onClick={goWorkspace}
-          />
-          <ModeDivider />
-          <ModeButton
             icon={<Compass size={13} />}
             label="CAD"
             active={mode === "cad"}
             onClick={goCad}
           />
+          <ModeDivider />
+          <ModeButton
+            icon={<FolderKanban size={13} />}
+            label="Mappe"
+            active={mode === "workspace"}
+            onClick={goWorkspace}
+          />
+
           <ModeDivider />
           <ModeButton
             icon={<GanttChartSquare size={13} />}
