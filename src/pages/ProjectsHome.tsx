@@ -669,7 +669,7 @@ export default function ProjectsHome() {
           <aside
             className={
               compact
-                ? "fixed inset-0 z-[85] w-full flex flex-col overflow-hidden"
+                ? "fixed left-0 right-0 bottom-0 top-16 z-[85] w-full flex flex-col overflow-hidden"
                 : "w-[300px] shrink-0 flex flex-col relative"
             }
             style={{
@@ -741,7 +741,7 @@ export default function ProjectsHome() {
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto px-3 pt-3 pb-4 space-y-1">
+            <div className={`flex-1 overflow-y-auto px-3 pt-3 pb-4 space-y-1 ${compact ? "no-scrollbar" : ""}`}>
               {/* Ordner */}
               {folders.map((f) => {
                 const inside = projectsByFolder.get(f.id) ?? [];
