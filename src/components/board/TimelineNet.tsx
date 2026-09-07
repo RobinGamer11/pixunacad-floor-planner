@@ -132,16 +132,54 @@ export function TimelineNet({
       className="relative w-full h-full overflow-hidden select-none cursor-grab active:cursor-grabbing"
       style={{ background: CANVAS, touchAction: "none" }}
       onPointerDown={(e) => {
+        if (e.pointerType === "touch") {
+          touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (touches.current.size === 2) {
+            const [a, b] = [...touches.current.values()];
+            pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+            drag.current.on = false;
+            return;
+          }
+        }
         drag.current = { on: true, sx: e.clientX - view.tx, sy: e.clientY - view.ty };
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
+        if (e.pointerType === "touch" && touches.current.has(e.pointerId)) {
+          touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (touches.current.size === 2 && pinch.current) {
+            const [a, b] = [...touches.current.values()];
+            const dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+            const cxn = (a.x + b.x) / 2;
+            const cyn = (a.y + b.y) / 2;
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const px = pinch.current.cx - rect.left - rect.width / 2;
+            const py = pinch.current.cy - rect.top - rect.height / 2;
+            const cur = viewRef.current;
+            const nk = clamp(cur.k * (dist / pinch.current.dist), 0.3, 6);
+            const ratio = nk / cur.k;
+            setView({
+              k: nk,
+              tx: px - (px - cur.tx) * ratio + (cxn - pinch.current.cx),
+              ty: py - (py - cur.ty) * ratio + (cyn - pinch.current.cy),
+            });
+            pinch.current = { dist, cx: cxn, cy: cyn };
+            return;
+          }
+        }
         if (!drag.current.on) return;
         setView((v) => ({ ...v, tx: e.clientX - drag.current.sx, ty: e.clientY - drag.current.sy }));
       }}
       onPointerUp={(e) => {
+        touches.current.delete(e.pointerId);
+        if (touches.current.size < 2) pinch.current = null;
         drag.current.on = false;
         try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+      }}
+      onPointerCancel={(e) => {
+        touches.current.delete(e.pointerId);
+        pinch.current = null;
+        drag.current.on = false;
       }}
     >
       <svg width={size.w} height={size.h} className="absolute inset-0">
