@@ -95,13 +95,18 @@ export class EraserTool {
         this._lastWorld = v(projW.x, projW.y);
         this._eraseAt(projW);
       } else {
-        // Sample entlang der Bewegung (in r/2-Schritten)
+        // Sample entlang der Bewegung. Der Schritt ist zusätzlich an die
+        // Bildschirmauflösung gekoppelt und die Anzahl der Stempel pro Frame
+        // begrenzt — sonst erzeugen kleine Radien tausende Stempel je Bewegung
+        // und die Oberfläche hakt.
         const r = this.app.defaultEraserRadiusM;
-        const stepM = Math.max(r * 0.25, 0.005);
+        const camScale = Math.max(1e-6, (this.app.camera as any)?.scale ?? 1);
+        const minPxStep = 3 / camScale; // mindestens ~3 Bildschirmpixel
+        const stepM = Math.max(r * 0.5, minPxStep, 0.002);
         const last = this._lastWorld!;
         const d = dist(last, projW);
         if (d > stepM) {
-          const n = Math.ceil(d / stepM);
+          const n = Math.min(32, Math.ceil(d / stepM));
           for (let i = 1; i <= n; i++) {
             const t = i / n;
             this._eraseAt(v(last.x + (projW.x - last.x) * t, last.y + (projW.y - last.y) * t));
@@ -109,6 +114,7 @@ export class EraserTool {
         } else {
           this._eraseAt(projW);
         }
+
         this._lastWorld = v(projW.x, projW.y);
       }
     } else {
