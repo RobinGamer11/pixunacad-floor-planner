@@ -364,7 +364,7 @@ export function useNetwork(localProjects: LocalProjectRef[]) {
       const client = getNetworkClient();
       const value = email.trim().toLowerCase();
       if (!client || !value.includes("@")) return null;
-      const { data, error } = await client.rpc("find_profile_by_email", { email: value });
+      const { data, error } = await client.rpc("find_profile_by_email", { p_email: value });
       if (error) throw error;
       const row = (Array.isArray(data) ? data[0] : data) as NetworkProfile | undefined;
       return row ?? null;

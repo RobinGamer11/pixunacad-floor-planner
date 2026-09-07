@@ -39,6 +39,12 @@ export interface TlItem {
   updatedAt: number;
   /** Von der Startseite angelegt/bearbeitet – im Board blau hervorgehoben, bis angeklickt. */
   fresh?: boolean;
+  /**
+   * Projektzeitraum: wird im Kalender nur als „Projektstart" und
+   * „Projektende" markiert (nicht an jedem Tag dazwischen) und im
+   * Gantt-Diagramm weiterhin als durchgehender Balken gezeigt.
+   */
+  isPeriod?: boolean;
 }
 
 /** Projektzeitraum – wird prominent am Projekt angezeigt. */
@@ -74,6 +80,15 @@ export const DEFAULT_STATUSES: TlStatus[] = [
   { id: "wip", label: "In Bearbeitung", color: "#f59e0b" },
   { id: "done", label: "Erledigt", color: "#10b981" },
 ];
+
+/**
+ * Projektzeitraum erkennen. Neue Einträge tragen `isPeriod`; Altbestand wird
+ * über den festen Titel „Projektverlauf" erkannt, damit gewöhnliche
+ * mehrtägige Beiträge unverändert bleiben.
+ */
+export function isPeriodItem(item: { isPeriod?: boolean; title?: string }): boolean {
+  return item.isPeriod === true || (item.title ?? "").trim().toLowerCase() === "projektverlauf";
+}
 
 /** Radius eines Kreises aus der Priorität (Prozent). */
 export function priorityRadius(percent: number | undefined): number {
@@ -179,6 +194,7 @@ export const timelineStore = {
       id: uid(),
       kind: "event",
       title: "Projektverlauf",
+      isPeriod: true,
       description: "",
       done: false,
       statusId: "open",
