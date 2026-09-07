@@ -193,21 +193,8 @@ export default function ProjectsHome() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [profileOpen]);
 
-  // "+ Projekt"-Popup (Neu / Vorlage)
-  const [newProjectOpen, setNewProjectOpen] = useState(false);
-  const [newProjectMode, setNewProjectMode] = useState<"choice" | "fromTemplate">("choice");
-  const newProjectRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (!newProjectOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!newProjectRef.current?.contains(e.target as Node)) {
-        setNewProjectOpen(false);
-        setNewProjectMode("choice");
-      }
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [newProjectOpen]);
+  // „+ Projekt“ öffnet direkt die Projekteinstellungen (kein Zwischenfenster).
+
 
   // "Vorlage +"-Popup im Vorlagen-Hub
   const [saveAsTplOpen, setSaveAsTplOpen] = useState(false);
