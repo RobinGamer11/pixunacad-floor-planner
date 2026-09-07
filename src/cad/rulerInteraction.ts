@@ -1,6 +1,7 @@
 import { Vec2, v, dist, projectPointToSegment } from "./geometry";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
+import { snapRulerPoint } from "./rulerModel";
 
 export type RulerHit = { kind: "a" | "b" | "body" } | null;
 
@@ -34,10 +35,16 @@ export class RulerDragController {
 
   /** true = nur die beiden Endpunkte lassen sich ziehen (Linie selbst fängt). */
   handlesOnly: boolean;
+  /** true = Endpunkte rasten an den vorhandenen CAD-Fangpunkten ein. */
+  useSnap: boolean;
 
-  constructor(app: CadApp, opts?: { handlesOnly?: boolean }) {
+  /** Bildschirmposition des zuletzt genutzten Fangpunkts (für die Anzeige). */
+  lastSnapScreen: { x: number; y: number } | null = null;
+
+  constructor(app: CadApp, opts?: { handlesOnly?: boolean; snap?: boolean }) {
     this.app = app;
     this.handlesOnly = !!opts?.handlesOnly;
+    this.useSnap = !!opts?.snap;
   }
 
   reset() {
@@ -45,6 +52,7 @@ export class RulerDragController {
     this._startMouseW = null;
     this._startA = null;
     this._startB = null;
+    this.lastSnapScreen = null;
   }
 
   /** True = Tool soll Drawing/Erasing in dieser Frame überspringen. */
@@ -52,10 +60,17 @@ export class RulerDragController {
     const g = this.app.scene.rulerGuide;
     if (!g) { this.reset(); return false; }
 
+    const snapped = () => {
+      if (!this.useSnap) { this.lastSnapScreen = null; return v(input.mouse.wx, input.mouse.wy); }
+      const s = snapRulerPoint(this.app, input);
+      this.lastSnapScreen = s.snapped ? this.app.camera.worldToScreen(s.x, s.y) : null;
+      return v(s.x, s.y);
+    };
+
     // Aktiv? -> verarbeite Drag
     if (this._mode) {
       if (!input.mouse.left) { this.reset(); return false; }
-      const mw = v(input.mouse.wx, input.mouse.wy);
+      const mw = snapped();
       if (this._mode === "a") {
         g.a = v(mw.x, mw.y);
       } else if (this._mode === "b") {
@@ -74,12 +89,15 @@ export class RulerDragController {
       const hit = hitRulerAtScreen(this.app, input.mouse.sx, input.mouse.sy);
       if (hit && !(this.handlesOnly && hit.kind === "body")) {
         this._mode = hit.kind;
+        // Beim Verschieben über einen Endpunkt bleibt der Bezug der Endpunkt,
+        // damit das ganze Lineal an Fangpunkten einrasten kann.
         this._startMouseW = v(input.mouse.wx, input.mouse.wy);
         this._startA = v(g.a.x, g.a.y);
         this._startB = v(g.b.x, g.b.y);
         return true;
       }
     }
+    this.lastSnapScreen = null;
     return false;
   }
 
