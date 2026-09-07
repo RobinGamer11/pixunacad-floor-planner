@@ -3569,6 +3569,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="id-add-wrap">
                 <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
               </div>
+              <div className="id-hint">Oben = Vordergrund</div>
               <div ref={idListRef} className="id-list" />
             </div>
           </div>
