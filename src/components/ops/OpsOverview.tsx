@@ -377,7 +377,7 @@ export function OpsOverview({
 
   const pieTotal = pie.rows.reduce((s, r) => s + r.value, 0);
   const activeFilterCount = Object.entries(filters).filter(([, v]) => v).length;
-  const viewLabel = OPS_VIEWS.find((v) => v.id === view)?.label ?? "Organisation";
+  
 
   /** Alle wirksamen Einschränkungen – auch Zeitraum und Projektauswahl. */
   const hiddenProjectCount = fixedProjectId ? 0 : hiddenProjects.size;
