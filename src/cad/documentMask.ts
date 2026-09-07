@@ -101,17 +101,18 @@ export function eraseDocCircle(doc: DocumentObject, centerW: Vec2, radiusM: numb
     ctx.fillStyle = `rgba(0,0,0,${a})`;
   } else {
     // Vignette: Kern hart, nach außen nebelartig ausblendend.
-    // Höhere Weichheit = kleinerer Kern, deutlich breiterer Auslauf (bis 2x
-    // Radius) und geringere Deckkraft pro Strich.
+    // Bei 100 % reicht der sichtbare Auslauf bis zum Dreifachen des
+    // Werkzeugradius. Der Mittelpunkt bleibt wirksam, während der wesentlich
+    // breitere Rand weich ausläuft.
     const soft = Math.max(0.05, Math.min(1, softness));
-    pr = prBase * (1 + soft);
-    const core = pr * Math.pow(1 - soft, 2) * 0.6;
-    const aSoft = a * Math.pow(1 - 0.97 * soft, 1.4);
+    pr = prBase * (1 + 2 * soft);
+    const core = prBase * Math.pow(1 - soft, 2);
+    const aSoft = a * (1 - 0.65 * soft);
     const grad = ctx.createRadialGradient(px, py, Math.max(0, core), px, py, Math.max(core + 0.01, pr));
     grad.addColorStop(0, `rgba(0,0,0,${aSoft})`);
-    grad.addColorStop(0.25, `rgba(0,0,0,${aSoft * (1 - 0.75 * soft)})`);
-    grad.addColorStop(0.55, `rgba(0,0,0,${aSoft * (1 - 0.92 * soft) * 0.5})`);
-    grad.addColorStop(0.8, `rgba(0,0,0,${aSoft * 0.06 * (1 - 0.95 * soft)})`);
+    grad.addColorStop(0.2, `rgba(0,0,0,${aSoft * (1 - 0.35 * soft)})`);
+    grad.addColorStop(0.5, `rgba(0,0,0,${aSoft * (1 - 0.75 * soft) * 0.55})`);
+    grad.addColorStop(0.8, `rgba(0,0,0,${aSoft * 0.08})`);
     grad.addColorStop(1, "rgba(0,0,0,0)");
 
     ctx.fillStyle = grad;

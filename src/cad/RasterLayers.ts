@@ -231,18 +231,25 @@ export class RasterLayer {
     if (r <= 0) return;
     const alpha = Math.max(0.05, Math.min(1, mode === "hard" ? 1 : strength || 1));
     const soft = Math.max(0.05, Math.min(1, softness));
-    this._forRect(cx - r, cy - r, r * 2, r * 2, false, (tile, ox, oy) => {
+    // Der weiche Rand wächst bis auf den dreifachen Werkzeugradius. Dadurch
+    // unterscheidet sich 100 % Weichheit auch bei kleinen Radierern klar von
+    // einer harten Kante.
+    const outerR = mode === "smooth" ? r * (1 + 2 * soft) : r;
+    this._forRect(cx - outerR, cy - outerR, outerR * 2, outerR * 2, false, (tile, ox, oy) => {
       const ctx = tile.ctx;
       const px = (cx - ox) * this.pxPerM;
       const py = (cy - oy) * this.pxPerM;
-      const pr = r * this.pxPerM;
+      const pr = outerR * this.pxPerM;
       ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       if (mode === "smooth") {
-        const inner = pr * (1 - soft);
+        const inner = r * this.pxPerM * Math.pow(1 - soft, 2);
+        const softAlpha = alpha * (1 - 0.65 * soft);
         const g = ctx.createRadialGradient(px, py, Math.max(0, inner), px, py, pr);
-        g.addColorStop(0, `rgba(0,0,0,${alpha})`);
-        g.addColorStop(0.65, `rgba(0,0,0,${alpha * 0.45})`);
+        g.addColorStop(0, `rgba(0,0,0,${softAlpha})`);
+        g.addColorStop(0.2, `rgba(0,0,0,${softAlpha * (1 - 0.35 * soft)})`);
+        g.addColorStop(0.5, `rgba(0,0,0,${softAlpha * (1 - 0.75 * soft) * 0.55})`);
+        g.addColorStop(0.8, `rgba(0,0,0,${softAlpha * 0.08})`);
         g.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = g;
       } else {
