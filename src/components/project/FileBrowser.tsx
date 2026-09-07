@@ -377,6 +377,12 @@ export function FileBrowser({ project }: Props) {
     }
   };
 
+  /** Ordner öffnen: bei aktiver Suche auf-/zuklappen, sonst hineinnavigieren. */
+  const openFolder = (folderId: string) => {
+    if (visibleNodeIds) toggleFolder(folderId);
+    else setCurrentFolderId(folderId);
+  };
+
   const toggleFolder = (folderId: string) => {
     setExpandedFolderIds((current) => {
       const next = new Set(current);
@@ -919,32 +925,32 @@ export function FileBrowser({ project }: Props) {
 
   return (
     <div>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center">
         <button
           type="button"
           onClick={() => uploadRef.current?.click()}
-          className="flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold"
+          className="flex h-14 min-h-[44px] items-center justify-center gap-2 rounded-xl px-6 text-base font-semibold"
           style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--ink))" }}
         >
-          <FileText size={16} /> + Dokument
+          <FileText size={18} /> + Dokument
         </button>
         <button
           type="button"
-          onClick={() => addFolder(null)}
-          className="flex h-11 items-center justify-center gap-2 rounded-md border px-5 text-sm font-semibold"
+          onClick={() => addFolder(currentFolderId)}
+          className="flex h-14 min-h-[44px] items-center justify-center gap-2 rounded-xl border px-6 text-base font-semibold"
           style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}
         >
-          <Folder size={16} /> + Ordner
+          <Folder size={18} /> + Ordner
         </button>
-        <label className="relative sm:ml-auto sm:w-[360px]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={17} />
+        <label className="relative lg:ml-auto lg:w-[420px]">
+          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={19} />
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Dokumente durchsuchen …"
             aria-label="Dokumente durchsuchen"
-            className="h-11 w-full rounded-md border bg-transparent pl-10 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+            className="h-14 w-full rounded-xl border bg-transparent pl-12 pr-4 text-base outline-none focus:ring-1 focus:ring-ring"
             style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted) / 0.45)" }}
           />
         </label>
@@ -961,9 +967,35 @@ export function FileBrowser({ project }: Props) {
         />
       </div>
 
-      <div className="rounded-md border p-4 sm:p-5" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-        <div className="mb-3 border-b pb-3 text-sm font-medium" style={{ borderColor: "hsl(var(--hairline))" }}>
-          Alle Dokumente
+      <div className="rounded-xl border p-4 sm:p-6" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+        <nav aria-label="Ordnerpfad" className="flex flex-wrap items-center gap-1.5 text-sm">
+          <button
+            type="button"
+            onClick={() => setCurrentFolderId(null)}
+            className="min-h-[32px] rounded-md px-1 font-medium hover:underline"
+            style={{ color: currentFolderId ? "hsl(var(--muted-foreground))" : "hsl(var(--accent-gold))" }}
+          >
+            Alle Dokumente
+          </button>
+          {trail.map((folder, index) => (
+            <Fragment key={folder.id}>
+              <span className="text-muted-foreground">/</span>
+              <button
+                type="button"
+                onClick={() => setCurrentFolderId(folder.id)}
+                className="min-h-[32px] max-w-[220px] truncate rounded-md px-1 font-medium hover:underline"
+                style={{ color: index === trail.length - 1 ? "hsl(var(--accent-gold))" : "hsl(var(--muted-foreground))" }}
+              >
+                {folder.name}
+              </button>
+            </Fragment>
+          ))}
+        </nav>
+        <div
+          className="mb-3 mt-3 border-b pb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          Name
         </div>
         {draggingFromFolder && (
           <div
