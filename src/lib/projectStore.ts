@@ -1026,6 +1026,7 @@ export const projectStore = {
       name: "Neues Projekt",
       ort: "",
       thumbnail: placeholder("Neues Projekt"),
+      createdAtIso: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       pages: [
         { id: firstPageId, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
