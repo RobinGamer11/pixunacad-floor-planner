@@ -1,4 +1,5 @@
 import { ANNOTATION_M_PER_MM } from "./textTypography";
+import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 /**
  * Standalone scene (de)serialization — extracted 1:1 from `CadApp` so that
  * the same JSON format can be restored in isolated contexts (Projektmappe-
