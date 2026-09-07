@@ -368,54 +368,9 @@ const placeholder = (label: string) =>
     `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 260'><rect width='400' height='260' fill='%23efe9df'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Inter,sans-serif' font-size='22' fill='%238a7a5f'>${label}</text></svg>`
   )}`;
 
+/** Neue Konten starten bewusst ohne Beispielprojekte. */
 function demoProjects(): Project[] {
-  const now = new Date().toISOString();
-  const mk = (
-    id: string,
-    name: string,
-    ort: string,
-    extra: Partial<Project> = {}
-  ): Project => ({
-    id,
-    name,
-    ort,
-    thumbnail: placeholder(name),
-    updatedAt: now,
-    erstelltAm: "03.06.2026",
-    bauherr: "Familie Müller",
-    projektTyp: "Neubau Einfamilienhaus",
-    status: "In Bearbeitung",
-    pages: [
-      { id: `${id}-p1`, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p2`, title: "02 Bestand", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p3`, title: "03 Analyse", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p4`, title: "04 Variante A", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p5`, title: "05 Variante B", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p6`, title: "06 Präsentation", format: "A3-quer", margins: 20, background: false, elements: [] },
-      { id: `${id}-p7`, title: "07 Kostenübersicht", format: "A3-quer", margins: 20, background: false, elements: [] },
-    ],
-    sheets: [],
-    tasks: [
-      { id: `${id}-t1`, title: "Bestandsaufnahme prüfen", done: true, date: "2026-06-03", time: "09:00", priority: "medium" },
-      { id: `${id}-t2`, title: "Entwurf Variante A fertigstellen", done: true, date: "2026-06-07", time: "14:00", priority: "high" },
-      { id: `${id}-t3`, title: "Variante B ausarbeiten", done: false, date: "2026-06-15", time: "10:00", priority: "high" },
-      { id: `${id}-t4`, title: "Bauherrengespräch vorbereiten", done: false, date: "2026-06-18", time: "11:30", priority: "medium" },
-      { id: `${id}-t5`, title: "Materialkonzept abstimmen", done: false, date: "2026-06-22", time: "15:00", priority: "low" },
-    ],
-    events: [
-      { id: `${id}-e1`, date: "2026-06-12", time: "10:00", title: "Bauherrengespräch", location: "Besprechungsraum 1" },
-      { id: `${id}-e2`, date: "2026-06-18", time: "14:00", title: "Materialpräsentation", location: "Showroom" },
-    ],
-    ...extra,
-  });
-
-  return [
-    mk("p-wohnhaus", "Wohnhaus am See", "Starnberger See", {
-      favorite: true,
-      konzept:
-        "Die Variante A öffnet den Wohn-, Ess- und Kochbereich zum See hin und schafft eine fließende Verbindung zwischen Innen- und Außenraum.",
-    }),
-  ];
+  return [];
 }
 
 interface State {
@@ -439,7 +394,8 @@ function load(): State {
     if (raw) {
       // Zentrale Schema-Migration des gesamten Persistenzstandes.
       const parsed = migrateProjectState(JSON.parse(raw));
-      if (parsed && Array.isArray(parsed.projects) && parsed.projects.length) {
+      // Auch eine bewusst leere Projektliste bleibt nach dem Neuladen leer.
+      if (parsed && Array.isArray(parsed.projects)) {
         const cutoff = Date.now() - 30 * 86400000;
         return {
           projects: parsed.projects
@@ -2330,32 +2286,13 @@ export const projectStore = {
       };
     });
   },
-  /** Favorit umschalten; beim Entfernen rutscht das Projekt direkt unter die Favoriten. */
+  /** Favorit umschalten – die manuelle Position bleibt dabei unverändert. */
   toggleFavorite: (projectId: string) => {
-    setState((s) => {
-      const p = s.projects.find((x) => x.id === projectId);
-      if (!p) return {};
-      const nextFav = !p.favorite;
-      const folderId = p.folderId ?? null;
-      const group = s.projects
-        .filter((x) => !x.isTemplate && !x.deletedAt && (x.folderId ?? null) === folderId && x.id !== projectId)
-        .sort(byProjectOrder);
-      const nonFav = group.filter((x) => !x.favorite);
-      const favs = group.filter((x) => x.favorite);
-      const ordered = nextFav
-        ? [{ ...p, favorite: true }, ...favs, ...nonFav]
-        : [...favs, { ...p, favorite: false }, ...nonFav];
-      const order = new Map(ordered.map((x, i) => [x.id, i] as const));
-      return {
-        projects: s.projects.map((x) =>
-          x.id === projectId
-            ? { ...x, favorite: nextFav, sortIndex: order.get(x.id) ?? 0 }
-            : order.has(x.id)
-              ? { ...x, sortIndex: order.get(x.id)! }
-              : x
-        ),
-      };
-    });
+    setState((s) => ({
+      projects: s.projects.map((x) =>
+        x.id === projectId ? { ...x, favorite: !x.favorite } : x
+      ),
+    }));
   },
 
   /* ---------- Papierkorb (30 Tage) ---------- */
@@ -2387,11 +2324,11 @@ function bySortIndex(a: { sortIndex?: number }, b: { sortIndex?: number }) {
   return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
 }
 
-/** Favoriten immer oben, danach die manuelle Reihenfolge. */
+/**
+ * Ausschließlich die selbst festgelegte Reihenfolge. Favoriten bleiben
+ * markiert, verschieben ein Projekt aber nicht mehr automatisch nach oben.
+ */
 export function byProjectOrder(a: Project, b: Project) {
-  const fa = a.favorite ? 0 : 1;
-  const fb = b.favorite ? 0 : 1;
-  if (fa !== fb) return fa - fb;
   return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
 }
 

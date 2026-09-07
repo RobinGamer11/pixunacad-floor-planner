@@ -37,6 +37,7 @@ import {
   type ProjectRole,
 } from "@/lib/projectAccess";
 import { timelineStore, effectiveStatusId } from "@/lib/timelineStore";
+import { isPlaceholderName } from "@/lib/accountProfile";
 import { projectStore, useProfile } from "@/lib/projectStore";
 import ChatPanel from "@/components/network/ChatPanel";
 import { MemberRoleControls } from "@/components/network/MemberRoleControls";
@@ -229,6 +230,8 @@ export function NetworkView({
   // Anzeigename/Funktion/Avatar in die gemeinsame Profiltabelle spiegeln.
   useEffect(() => {
     if (!net.ready || !profile) return;
+    // Ein Platzhaltername darf einen echten Kontonamen niemals überschreiben.
+    if (isPlaceholderName(profile.name)) return;
     const avatar = profile.avatarUrl && profile.avatarUrl.length < 200_000 ? profile.avatarUrl : null;
     const key = `${profile.name}|${profile.role ?? ""}|${avatar ? avatar.length : 0}`;
     if (key === lastPushed.current) return;

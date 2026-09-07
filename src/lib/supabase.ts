@@ -10,6 +10,7 @@ export type SupabaseUser = {
   id: string;
   email?: string | null;
   email_confirmed_at?: string | null;
+  user_metadata?: Record<string, unknown> | null;
 };
 
 export type SupabaseSession = {
@@ -220,10 +221,19 @@ class PixunaSupabaseClient {
     return session;
   }
 
-  async signUp(email: string, password: string, redirectTo: string): Promise<{ requiresEmailConfirmation: boolean }> {
+  async signUp(
+    email: string,
+    password: string,
+    redirectTo: string,
+    displayName?: string,
+  ): Promise<{ requiresEmailConfirmation: boolean }> {
+    // Der Anzeigename wandert in die Benutzer-Metadaten und überlebt damit
+    // E-Mail-Bestätigung, Neuladen und einen Gerätewechsel.
+    const name = (displayName ?? "").trim();
+    const data = name ? { display_name: name, full_name: name } : {};
     const response = await this.request<AuthResponse>("/auth/v1/signup", {
       method: "POST",
-      body: JSON.stringify({ email, password, data: {}, email_redirect_to: redirectTo }),
+      body: JSON.stringify({ email, password, data, email_redirect_to: redirectTo }),
     });
 
     if (response.access_token && response.refresh_token && response.user?.id) {
@@ -239,6 +249,19 @@ class PixunaSupabaseClient {
       method: "POST",
       body: JSON.stringify({ email, redirect_to: redirectTo }),
     });
+  }
+
+  /** Anzeigename dauerhaft in den Benutzer-Metadaten hinterlegen. */
+  async updateDisplayName(displayName: string) {
+    const name = displayName.trim();
+    if (!name) return;
+    const user = await this.authenticatedRequest<SupabaseUser>("/auth/v1/user", {
+      method: "PUT",
+      body: JSON.stringify({ data: { display_name: name, full_name: name } }),
+    });
+    if (this.session && user?.id) {
+      this.setSession({ ...this.session, user: { ...this.session.user, ...user } });
+    }
   }
 
   async updatePassword(password: string) {

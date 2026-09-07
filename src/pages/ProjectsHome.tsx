@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LegalMenuPopover } from "@/components/legal/LegalMenu";
 import { useNavigate } from "react-router-dom";
 import {
+  ChevronUp,
   Plus,
   Search,
   Settings,
@@ -73,6 +74,7 @@ import { FileBrowser } from "@/components/project/FileBrowser";
 import { FinanceProjectOverview } from "@/components/finance/FinanceProjectOverview";
 import { geocodeSearch, type GeoHit } from "@/lib/weather";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { isPlaceholderName } from "@/lib/accountProfile";
 import { setExternalContentConsent, useExternalContentConsent } from "@/lib/externalContent";
 import { NetworkView } from "@/components/network/NetworkView";
 import { OpsActionBar } from "@/components/ops/OpsActionBar";
@@ -98,7 +100,6 @@ type Tab = "uebersicht" | "aufgaben" | "finanzen" | "dokumente" | "team";
 export default function ProjectsHome() {
   const projects = useProjects();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
   const [mode, setMode] = useState<"projects" | "templates">("projects");
   const visibleProjects = useMemo(
     () => projects.filter((p) => (mode === "templates" ? p.isTemplate : !p.isTemplate)),
@@ -109,26 +110,24 @@ export default function ProjectsHome() {
     () => projects.filter((p) => !p.isTemplate),
     [projects]
   );
-  // Startseite öffnet zuerst die projektübergreifende Aufgabenübersicht.
-  const [showAllTasks, setShowAllTasks] = useState(true);
+  // Die Startseite öffnet immer die Hauptseite – nie automatisch ein Projekt
+  // oder die Aufgabenübersicht.
+  const [showAllTasks, setShowAllTasks] = useState(false);
   /** Zusätzliche Kopf-Ansichten (Hauptseite, Netzwerk, Papierkorb). */
-  const [hub, setHub] = useState<null | "home" | "shared" | "trash">(null);
-  const [coinsOpen, setCoinsOpen] = useState(false);
+  const [hub, setHub] = useState<null | "home" | "shared" | "trash">("home");
   const [shopOpen, setShopOpen] = useState(false);
-  const coinsRef = useRef<HTMLDivElement | null>(null);
   const shopRef = useRef<HTMLDivElement | null>(null);
   // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
   useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
 
-    if (!coinsOpen && !shopOpen) return;
+    if (!shopOpen) return;
     const onDoc = (e: MouseEvent) => {
-      if (coinsOpen && !coinsRef.current?.contains(e.target as Node)) setCoinsOpen(false);
       if (shopOpen && !shopRef.current?.contains(e.target as Node)) setShopOpen(false);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [coinsOpen, shopOpen]);
+  }, [shopOpen]);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("uebersicht");
@@ -226,7 +225,7 @@ export default function ProjectsHome() {
   // Drag & Drop von Projekten in Ordner
   const [dragProjectId, setDragProjectId] = useState<string | null>(null);
   const [dragOverFolder, setDragOverFolder] = useState<string | "root" | null>(null);
-  const [dragOverProjectId, setDragOverProjectId] = useState<string | null>(null);
+  const [dragOverProject, setDragOverProject] = useState<{ id: string; place: "before" | "after" } | null>(null);
   const [dragFolderId, setDragFolderId] = useState<string | null>(null);
   const [dragOverFolderSlot, setDragOverFolderSlot] = useState<string | null>(null);
 
@@ -318,7 +317,15 @@ export default function ProjectsHome() {
   const resetProjectDrag = () => {
     setDragProjectId(null);
     setDragOverFolder(null);
-    setDragOverProjectId(null);
+    setDragOverProject(null);
+  };
+
+  /** Verschieben ohne Ziehen – wichtig auf Tablets ohne Drag-and-drop. */
+  const moveProjectInList = (list: Project[], id: string, dir: -1 | 1) => {
+    const index = list.findIndex((p) => p.id === id);
+    const target = list[index + dir];
+    if (index < 0 || !target) return;
+    projectStore.reorderProject(id, target.id, dir === -1 ? "before" : "after");
   };
 
   const handleDropOnFolder = (folderId: string | null) => {
@@ -453,7 +460,7 @@ export default function ProjectsHome() {
             icon={<Home size={18} strokeWidth={1.5} />}
             label="Hauptseite"
             active={hub === "home"}
-            onClick={() => { setShowAllTasks(false); setHub(hub === "home" ? null : "home"); }}
+            onClick={() => { setShowAllTasks(false); setSettingsOpen(false); setHub("home"); }}
           />
           <HeaderDivider />
           <NavIcon
@@ -470,37 +477,9 @@ export default function ProjectsHome() {
             active={hub === "shared"}
             onClick={() => { setShowAllTasks(false); setHub(hub === "shared" ? null : "shared"); }}
           />
-
-          <HeaderDivider />
-          <NavIcon
-            icon={<Trash2 size={18} strokeWidth={1.5} />}
-            label="Papierkorb"
-            active={hub === "trash"}
-            onClick={() => { setShowAllTasks(false); setHub(hub === "trash" ? null : "trash"); }}
-          />
         </div>
 
         <div className="flex-1" />
-
-        {/* Münzen-Pill (kompakt) mit + zum Kauf */}
-        <div className="relative" ref={coinsRef}>
-          <button
-            onClick={() => setCoinsOpen((v) => !v)}
-            className="flex items-center gap-1.5 h-9 pl-3 pr-1 rounded-full border hover:bg-muted/40 transition"
-            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
-            title="Münzen"
-          >
-            <Coins size={15} strokeWidth={1.5} className="text-muted-foreground" />
-            <span className="text-sm font-semibold">26</span>
-            <span
-              className="ml-1 h-6 w-6 rounded-full border flex items-center justify-center"
-              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
-            >
-              <Plus size={12} strokeWidth={2} className="text-muted-foreground" />
-            </span>
-          </button>
-          {coinsOpen && <CoinsPanel anchor={coinsRef} />}
-        </div>
 
         {/* Shop (näher am Münzenfenster, ohne Rahmen) */}
         <div className="relative ml-1" ref={shopRef}>
@@ -546,28 +525,64 @@ export default function ProjectsHome() {
               className="fixed right-6 top-16 mt-2 w-80 rounded-xl border shadow-lg z-50 p-4"
               style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
             >
-              <ProfileEditor profile={profile} projectCount={projectCount} />
+              <ProfileEditor profile={profile} projectCount={projectCount} showSignOut />
             </div>
           )}
         </div>
 
-        {/* Logout (ohne Rahmen) */}
-        <button
-          onClick={async () => {
-            await signOut();
-            // Store-Module lesen beim Import aus localStorage. Ein Reload verhindert,
-            // dass ein nachfolgender Account noch Daten im Arbeitsspeicher des
-            // vorherigen Accounts sieht.
-            window.location.assign("/login");
-          }}
-          className="ml-2 h-9 w-9 flex items-center justify-center text-muted-foreground hover:text-foreground transition"
-          title="Abmelden"
-        >
-          <LogOut size={16} strokeWidth={1.5} />
-        </button>
       </header>
 
 
+
+      {creatingFolder && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.45)" }}
+          onMouseDown={() => { setCreatingFolder(false); setNewFolderName(""); }}
+        >
+          <div
+            role="dialog"
+            aria-label="Neuen Ordner anlegen"
+            className="w-full max-w-sm rounded-xl border p-5 shadow-xl"
+            style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <FolderIcon size={15} style={{ color: "hsl(var(--accent-gold))" }} />
+              Neuen Ordner anlegen
+            </div>
+            <input
+              autoFocus
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitNewFolder();
+                if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
+              }}
+              placeholder="Ordnername"
+              className="mt-4 h-10 w-full rounded-md border bg-transparent px-3 text-sm outline-none"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}
+                className="h-9 px-4 rounded-md border text-sm hover:bg-muted"
+                style={{ borderColor: "hsl(var(--hairline))" }}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={commitNewFolder}
+                disabled={!newFolderName.trim()}
+                className="h-9 px-4 rounded-md text-sm font-semibold disabled:opacity-50"
+                style={{ background: "hsl(var(--accent-gold))", color: "#1A1A1A" }}
+              >
+                Anlegen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ============= BODY (Left panel + Main) ============= */}
       <div className="flex flex-1 overflow-hidden">
@@ -609,12 +624,11 @@ export default function ProjectsHome() {
               </div>
               <button
                 type="button"
-                disabled={creatingFolder}
                 onClick={() => {
                   setCreatingFolder(true);
                   setNewFolderName("");
                 }}
-                aria-expanded={creatingFolder}
+                aria-haspopup="dialog"
                 className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md border text-xs font-semibold transition disabled:cursor-default disabled:opacity-50"
                 style={{
                   background: "hsl(var(--accent-gold) / 0.14)",
@@ -625,36 +639,6 @@ export default function ProjectsHome() {
                 <FolderPlus size={14} style={{ color: "hsl(var(--accent-gold))" }} />
                 + Ordner
               </button>
-              {creatingFolder && (
-                <div
-                  className="flex items-center gap-1 mt-2 rounded-md px-2 py-1"
-                  style={{ background: "rgba(255,255,255,0.05)" }}
-                >
-                  <FolderIcon size={13} style={{ color: "hsl(var(--accent-gold))" }} />
-                  <input
-                    autoFocus
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") commitNewFolder();
-                      if (e.key === "Escape") { setCreatingFolder(false); setNewFolderName(""); }
-                    }}
-                    placeholder="Ordnername"
-                    className="flex-1 bg-transparent text-xs outline-none"
-                    style={{ color: "#E6E8EB" }}
-                  />
-                  <button onClick={commitNewFolder} title="Anlegen" style={{ color: "#8A9099" }}>
-                    <Check size={12} />
-                  </button>
-                  <button
-                    onClick={() => { setCreatingFolder(false); setNewFolderName(""); }}
-                    title="Abbrechen"
-                    style={{ color: "#8A9099" }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              )}
             </div>
 
             {folders.length > 0 && (
@@ -776,18 +760,20 @@ export default function ProjectsHome() {
                               key={p.id}
                               project={p}
                               active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
-                              dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProjectId === p.id}
+                              dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
                               onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                               onOpen={() => navigate(`/project/${p.id}`)}
                               onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                               onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                               onDelete={() => deleteProjectWithConfirm(p)}
+                              onMoveUp={() => moveProjectInList(inside, p.id, -1)}
+                              onMoveDown={() => moveProjectInList(inside, p.id, 1)}
                               onDragStart={() => setDragProjectId(p.id)}
                               onDragEnd={resetProjectDrag}
-                              onDragOverCard={() => setDragOverProjectId(p.id)}
-                              onDropOnCard={() => {
+                              onDragOverCard={(place) => setDragOverProject({ id: p.id, place })}
+                              onDropOnCard={(place) => {
                                 if (dragProjectId && dragProjectId !== p.id) {
-                                  projectStore.reorderProject(dragProjectId, p.id, "before");
+                                  projectStore.reorderProject(dragProjectId, p.id, place);
                                 }
                                 resetProjectDrag();
                               }}
@@ -841,18 +827,20 @@ export default function ProjectsHome() {
                     key={p.id}
                     project={p}
                     active={mode === "projects" && !showAllTasks && !hub && selected?.id === p.id}
-                    dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProjectId === p.id}
+                    dropIndicator={dragProjectId && dragProjectId !== p.id && dragOverProject?.id === p.id ? dragOverProject.place : null}
                     onSelect={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); }}
                     onOpen={() => navigate(`/project/${p.id}`)}
                     onSettings={() => { setHub(null); setMode("projects"); setShowAllTasks(false); setSelectedId(p.id); setSettingsOpen(true); }}
                     onDuplicate={() => { const nid = projectStore.duplicateProject(p.id); if (nid) setSelectedId(nid); }}
                     onDelete={() => deleteProjectWithConfirm(p)}
+                    onMoveUp={() => moveProjectInList(rootProjects, p.id, -1)}
+                    onMoveDown={() => moveProjectInList(rootProjects, p.id, 1)}
                     onDragStart={() => setDragProjectId(p.id)}
                     onDragEnd={resetProjectDrag}
-                    onDragOverCard={() => setDragOverProjectId(p.id)}
-                    onDropOnCard={() => {
+                    onDragOverCard={(place) => setDragOverProject({ id: p.id, place })}
+                    onDropOnCard={(place) => {
                       if (dragProjectId && dragProjectId !== p.id) {
-                        projectStore.reorderProject(dragProjectId, p.id, "before");
+                        projectStore.reorderProject(dragProjectId, p.id, place);
                       }
                       resetProjectDrag();
                     }}
@@ -860,6 +848,22 @@ export default function ProjectsHome() {
                 ))}
               </div>
             </div>
+            <div className="px-3 pb-2">
+              <button
+                type="button"
+                onClick={() => { setShowAllTasks(false); setHub("trash"); }}
+                className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-xs font-medium transition"
+                style={{
+                  background: hub === "trash" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
+                  color: hub === "trash" ? "#E6E8EB" : "#B7BCC2",
+                }}
+                title="Gelöschte Projekte wiederherstellen"
+              >
+                <Trash2 size={14} style={{ color: "#8A9099" }} />
+                Projektpapierkorb
+              </button>
+            </div>
+
             {/* Fuß-Zeile mit Einstellungen-Icon */}
             <div
               className="px-4 py-3 flex items-center justify-between"
@@ -909,7 +913,9 @@ export default function ProjectsHome() {
               <AuroraBackground />
               <div className="relative px-10 py-7">
                 <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "#F3F6FF" }}>
-                  Hauptseite
+                  {isPlaceholderName(profile.name) || !profile.name.trim()
+                    ? "Willkommen"
+                    : `Willkommen ${profile.name.trim()}`}
                 </h1>
 
                 {/* Platzhalter für das kommende Tutorial-Video (noch ausgegraut) */}
@@ -1279,6 +1285,8 @@ function ProjectCard({
   onSettings,
   onDuplicate,
   onDelete,
+  onMoveUp,
+  onMoveDown,
   onDragStart,
   onDragEnd,
   onDragOverCard,
@@ -1286,17 +1294,23 @@ function ProjectCard({
 }: {
   project: Project;
   active: boolean;
-  dropIndicator?: boolean;
+  dropIndicator?: "before" | "after" | null | false;
   onSelect: () => void;
   onOpen: () => void;
   onSettings: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
-  onDragOverCard?: () => void;
-  onDropOnCard?: () => void;
+  onDragOverCard?: (place: "before" | "after") => void;
+  onDropOnCard?: (place: "before" | "after") => void;
 }) {
+  const placeFromEvent = (e: React.DragEvent<HTMLDivElement>): "before" | "after" => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return e.clientY - r.top > r.height / 2 ? "after" : "before";
+  };
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -1316,15 +1330,16 @@ function ProjectCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      onDragOver={(e) => { if (onDragOverCard) { e.preventDefault(); e.stopPropagation(); onDragOverCard(); } }}
-      onDrop={(e) => { if (onDropOnCard) { e.preventDefault(); e.stopPropagation(); onDropOnCard(); } }}
+      onDragOver={(e) => { if (onDragOverCard) { e.preventDefault(); e.stopPropagation(); onDragOverCard(placeFromEvent(e)); } }}
+      onDrop={(e) => { if (onDropOnCard) { e.preventDefault(); e.stopPropagation(); onDropOnCard(placeFromEvent(e)); } }}
       onClick={onSelect}
       onDoubleClick={onOpen}
       className="w-full text-left rounded-lg p-2 flex gap-2.5 transition cursor-pointer"
       style={{
         background: active ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
         border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.55)" : "rgba(255,255,255,0.04)"}`,
-        borderTop: dropIndicator ? "2px solid hsl(var(--accent-gold))" : undefined,
+        borderTop: dropIndicator === "before" ? "2px solid hsl(var(--accent-gold))" : undefined,
+        borderBottom: dropIndicator === "after" ? "2px solid hsl(var(--accent-gold))" : undefined,
       }}
     >
       <div className="w-12 h-12 shrink-0 group/thumb" style={{ perspective: "300px" }}>
@@ -1378,6 +1393,18 @@ function ProjectCard({
               className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
             >
               <Settings size={14} /> Einstellungen
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onMoveUp?.(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+            >
+              <ChevronUp size={14} /> Nach oben
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); onMoveDown?.(); }}
+              className="w-full px-3 py-1.5 flex items-center gap-2 hover:bg-muted text-left"
+            >
+              <ChevronDown size={14} /> Nach unten
             </button>
             <button
               onClick={() => { setMenuOpen(false); onDuplicate(); }}
@@ -2550,7 +2577,17 @@ const ALL_STATUS: ProfileStatus[] = ["online", "away", "busy", "offline"];
  * Gemeinsamer Profil-Editor für das Kopf-Dropdown und die Netzwerk-Seite.
  * Beide schreiben in denselben Store, dadurch sind sie immer synchron.
  */
-function ProfileEditor({ profile, projectCount }: { profile: UserProfile; projectCount: number }) {
+function ProfileEditor({
+  profile,
+  projectCount,
+  showSignOut,
+}: {
+  profile: UserProfile;
+  projectCount: number;
+  /** Abmelden nur im Profilfenster der Kopfzeile anbieten. */
+  showSignOut?: boolean;
+}) {
+  const { signOut } = useAuth();
   return (
     <>
       <div className="flex items-center gap-4">
@@ -2632,6 +2669,20 @@ function ProfileEditor({ profile, projectCount }: { profile: UserProfile; projec
           {projectCount} / {MAX_PROJECTS}
         </span>
       </div>
+      {showSignOut && (
+        <button
+          onClick={async () => {
+            await signOut();
+            // Ein Neuladen verhindert, dass Daten des vorherigen Kontos im
+            // Arbeitsspeicher sichtbar bleiben.
+            window.location.assign("/login");
+          }}
+          className="mt-3 h-9 w-full rounded-md border text-sm flex items-center justify-center gap-2 hover:bg-muted"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <LogOut size={14} /> Abmelden
+        </button>
+      )}
     </>
   );
 }
@@ -2667,42 +2718,6 @@ const popupStyle: React.CSSProperties = {
   boxShadow: "0 18px 48px rgba(0,0,0,0.18)",
 };
 
-/** Münzen-Popup – Kaufoptionen sind vorbereitet, aber deaktiviert. */
-function CoinsPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
-  const pos = useAnchorPos(anchor, 288);
-  return (
-    <div
-      className="fixed z-[60] w-72 rounded-xl p-4"
-      style={{ ...popupStyle, top: pos.top, left: pos.left }}
-    >
-      <div className="flex items-center gap-2">
-        <Coins size={16} className="text-muted-foreground" />
-        <span className="text-sm font-semibold">Münzen</span>
-        <span className="ml-auto text-sm font-semibold">26</span>
-      </div>
-      <div className="mt-3 opacity-40 pointer-events-none select-none">
-        <button
-          className="w-full h-9 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          disabled
-        >
-          <Plus size={13} /> Coins
-        </button>
-        <div
-          className="mt-3 rounded-lg p-3 text-xs space-y-1"
-          style={{ background: "hsl(var(--surface-muted))", border: "1px solid hsl(var(--hairline))" }}
-        >
-          <div className="font-medium">Währungsumrechner</div>
-          <div className="text-muted-foreground">1 Coin = 1,50 €</div>
-          <div className="text-muted-foreground">10 Coins = 15,00 €</div>
-        </div>
-      </div>
-      <p className="mt-3 text-[11px] text-muted-foreground">Kauf von Coins ist bald verfügbar.</p>
-    </div>
-  );
-}
-
-/** Shop-Popup – Abos und Einzelkapazitäten, vollständig ausgegraut. */
 function ShopPanel({ anchor }: { anchor: React.RefObject<HTMLElement> }) {
   const pos = useAnchorPos(anchor, 320);
   const items = [
