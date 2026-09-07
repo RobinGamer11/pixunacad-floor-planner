@@ -1432,7 +1432,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                         </button>
                       );
                     })}
-                  </div>
+                  </RailFlyout>
                 )}
               </div>
             );
