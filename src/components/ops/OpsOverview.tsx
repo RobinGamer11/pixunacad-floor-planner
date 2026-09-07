@@ -54,7 +54,11 @@ function ProjectStandRow({
   onToggle,
   peopleById,
   onShowItem,
-  /** Ohne Kopfzeile: Inhalt (die drei Reiter) wird direkt angezeigt. */
+  selection,
+  onSelectTime,
+  onManageCategories,
+  onManagePriorities,
+  /** Ohne Kopfzeile: Inhalt (die Reiter) wird direkt angezeigt. */
   headless = false,
 }: {
   project: OpsOverviewProject;
@@ -62,6 +66,10 @@ function ProjectStandRow({
   onToggle: () => void;
   peopleById?: Map<string, string>;
   onShowItem?: (item: TlItem) => void;
+  selection?: OpsSelection;
+  onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
+  onManageCategories?: () => void;
+  onManagePriorities?: () => void;
   headless?: boolean;
 }) {
   const ids = useMemo(() => [project.id], [project.id]);
@@ -132,9 +140,22 @@ function ProjectStandRow({
           </div>
 
           {standTab === "items" && (
-            <CategoryInsights projectId={project.id} onSelectItem={(i) => onShowItem?.(i)} />
+            <CategoryInsights
+              projectId={project.id}
+              selection={selection}
+              onSelectItem={(i) => onShowItem?.(i)}
+              onManageCategories={onManageCategories}
+              onManagePriorities={onManagePriorities}
+            />
           )}
-          {standTab === "time" && <TimeInsights projectIds={ids} peopleById={peopleById} />}
+          {standTab === "time" && (
+            <TimeInsights
+              projectIds={ids}
+              peopleById={peopleById}
+              selection={selection}
+              onSelectTime={onSelectTime}
+            />
+          )}
         </div>
       )}
     </div>
