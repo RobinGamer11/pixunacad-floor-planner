@@ -3535,9 +3535,11 @@ export class Renderer {
 
   // ---- Ruler Guide ----
   /**
-   * Zeichenlineal: transparenter Körper mit Zentimeter-Teilung.
-   * Die Teilung folgt immer den Weltkoordinaten (1 cm = 0.01 Welteinheiten),
-   * der Zoom verändert nur die Bildschirmgröße.
+   * Zeichenlineal: transparenter Körper mit Maßteilung in der gewählten Einheit.
+   * Die Strecke a→b ist immer die Zeichenkante; "links / mittig / rechts"
+   * verschiebt nur den Körper. Schrift, Körperhöhe, Strichstärken und Griffe
+   * bleiben in Bildschirmgröße konstant — nur Länge und Teilungsabstände
+   * folgen dem Zeichnungsmaßstab.
    */
   private _drawRulerGuide() {
     const g = this.scene.rulerGuide;
@@ -3551,8 +3553,21 @@ export class Renderer {
     if (lenPx < 1) return;
     const ang = Math.atan2(dy, dx);
     const lenM = Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y);
-    const pxPerCm = (lenPx / Math.max(1e-9, lenM)) * 0.01;
-    const bandPx = 38;
+
+    const side = rulerSideOf(g);
+    const unit = rulerUnitOf(g);
+    const per = unitsPerMeter(unit);
+    const totalUnits = lenM * per;
+    const pxPerUnit = lenPx / Math.max(1e-9, totalUnits);
+
+    // Feste Bildschirmgrößen (Canvas-Einheiten → durch uiScale korrigiert).
+    const k = this.uiScale || 1;
+    const bandPx = 38 * k;
+    const fontPx = 10 * k;
+    const hairline = 1 * k;
+
+    // Körperlage relativ zur Zeichenkante (im gedrehten System zeigt -y "links").
+    const bodyTop = side === "center" ? -bandPx / 2 : side === "left" ? 0 : -bandPx;
 
     ctx.save();
     ctx.translate(a.x, a.y);
@@ -3561,54 +3576,55 @@ export class Renderer {
     // Körper (transparent)
     ctx.fillStyle = "rgba(180, 210, 255, 0.14)";
     ctx.strokeStyle = "rgba(77,163,255,0.75)";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = hairline;
     ctx.beginPath();
-    ctx.rect(0, -bandPx / 2, lenPx, bandPx);
+    ctx.rect(0, bodyTop, lenPx, bandPx);
     ctx.fill();
     ctx.stroke();
 
-    // Messkante
+    // Zeichenkante hervorheben
     ctx.strokeStyle = "rgba(77,163,255,0.95)";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.5 * k;
     ctx.beginPath();
-    ctx.moveTo(0, -bandPx / 2);
-    ctx.lineTo(lenPx, -bandPx / 2);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(lenPx, 0);
     ctx.stroke();
 
-    // Teilung
-    const totalCm = Math.floor(lenM * 100 + 1e-6);
-    const showMm = pxPerCm >= 26;
-    const labelEvery = pxPerCm >= 26 ? 1 : pxPerCm >= 12 ? 5 : pxPerCm >= 4 ? 10 : 50;
+    // Teilung — beginnt an der Zeichenkante und läuft in den Körper hinein.
+    const dir = bodyTop < 0 && side !== "center" ? -1 : 1; // "rechts": Körper oberhalb
+    const total = Math.floor(totalUnits + 1e-6);
+    const showFine = pxPerUnit >= 26 * k;
+    const labelEvery = pxPerUnit >= 26 * k ? 1 : pxPerUnit >= 12 * k ? 5 : pxPerUnit >= 4 * k ? 10 : 50;
     ctx.strokeStyle = "rgba(30,70,120,0.85)";
     ctx.fillStyle = "rgba(30,70,120,0.95)";
-    ctx.lineWidth = 1;
-    ctx.font = "9px system-ui, sans-serif";
+    ctx.lineWidth = hairline;
+    ctx.font = `${fontPx}px system-ui, sans-serif`;
     ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    const top = -bandPx / 2;
-    for (let c = 0; c <= totalCm; c++) {
-      const x = c * pxPerCm;
+    ctx.textBaseline = dir > 0 ? "top" : "bottom";
+    const base = side === "center" ? -bandPx / 2 : 0;
+    for (let c = 0; c <= total; c++) {
+      const x = c * pxPerUnit;
       if (x > lenPx + 0.5) break;
       const major = c % 10 === 0;
       const mid = c % 5 === 0;
-      const h = major ? bandPx * 0.55 : mid ? bandPx * 0.38 : bandPx * 0.22;
+      const h = (major ? bandPx * 0.55 : mid ? bandPx * 0.38 : bandPx * 0.22) * (side === "center" ? 1 : 1);
       ctx.beginPath();
-      ctx.moveTo(x, top);
-      ctx.lineTo(x, top + h);
+      ctx.moveTo(x, base);
+      ctx.lineTo(x, base + h * dir);
       ctx.stroke();
-      if (showMm && c < totalCm) {
+      if (showFine && c < total) {
         for (let m = 1; m < 10; m++) {
-          const mx = x + (m / 10) * pxPerCm;
+          const mx = x + (m / 10) * pxPerUnit;
           if (mx > lenPx) break;
           ctx.beginPath();
-          ctx.moveTo(mx, top);
-          ctx.lineTo(mx, top + bandPx * 0.14);
+          ctx.moveTo(mx, base);
+          ctx.lineTo(mx, base + bandPx * 0.14 * dir);
           ctx.stroke();
         }
       }
       if (c % labelEvery === 0) {
         ctx.save();
-        ctx.translate(x, top + bandPx * 0.6);
+        ctx.translate(x, base + bandPx * 0.6 * dir);
         if (Math.abs(ang) > Math.PI / 2) ctx.rotate(Math.PI);
         ctx.fillText(String(c), 0, 0);
         ctx.restore();
@@ -3621,9 +3637,9 @@ export class Renderer {
       ctx.save();
       ctx.fillStyle = "rgba(77,163,255,0.95)";
       ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.5 * k;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 5 * k, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.restore();
