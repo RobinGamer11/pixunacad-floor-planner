@@ -140,13 +140,6 @@ export function ProjectsTab(props: ProjectsTabProps) {
 
       {/* Hauptaktionen */}
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          onClick={() => props.onOpenChat(selected)}
-          className="h-12 min-h-[44px] flex-1 min-w-[160px] rounded-xl border text-sm font-semibold flex items-center justify-center gap-2"
-          style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.12)" }}
-        >
-          <MessageSquare size={17} /> Projektchat
-        </button>
         {props.onOpenProject && (
           <button
             onClick={() => props.onOpenProject?.(selected)}
@@ -227,16 +220,6 @@ export function ProjectsTab(props: ProjectsTabProps) {
                   <span className="hidden sm:inline rounded-md border px-2 py-1 text-[11px] text-muted-foreground" style={hairline}>
                     {ROLE_LABEL[role] ?? role}
                   </span>
-                  {manage && (
-                    <button
-                      onClick={() => props.onRemoveMember(selected.id, person.id)}
-                      title="Aus Projekt entfernen (Kontakt bleibt bestehen)"
-                      className="h-11 w-11 min-w-[44px] rounded-xl border grid place-items-center text-muted-foreground hover:text-foreground"
-                      style={hairline}
-                    >
-                      <UserMinus size={16} />
-                    </button>
-                  )}
                 </div>
                 <MemberRoleControls
                   className="mt-3"
@@ -246,17 +229,6 @@ export function ProjectsTab(props: ProjectsTabProps) {
                   onRole={(r) => props.onSetRole(selected.id, person.id, r)}
                   onOverrides={(o) => props.onSetPermissions(selected.id, person.id, o)}
                 />
-                <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
-                  <span className="rounded-md border px-2 py-0.5" style={hairline}>
-                    {eff.canEdit ? "Bearbeiten" : "Nur Ansicht"}
-                  </span>
-                  {eff.canManageMembers && (
-                    <span className="rounded-md border px-2 py-0.5" style={hairline}>Mitglieder verwalten</span>
-                  )}
-                  {eff.canComment && (
-                    <span className="rounded-md border px-2 py-0.5" style={hairline}>Kommentieren</span>
-                  )}
-                </div>
               </div>
             );
           })}
