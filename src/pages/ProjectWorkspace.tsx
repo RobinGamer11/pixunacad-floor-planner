@@ -1574,7 +1574,6 @@ export default function ProjectWorkspace() {
           icon={<RulerIcon size={18} />}
           label="Lineal"
           active={activeTool === "ruler"}
-          glow
           onClick={() => setActiveToolAndTab(activeTool === "ruler" ? null : "ruler")}
           showLabel
         />
