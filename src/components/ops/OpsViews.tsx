@@ -9,6 +9,7 @@
 import { useMemo, useState } from "react";
 import { TimelineNet } from "@/components/board/TimelineNet";
 import { OpsZoomPane } from "@/components/ops/OpsZoomPane";
+import { BoardRay } from "@/components/board/BoardRay";
 import { isPeriodItem, type TlItem, type TlState } from "@/lib/timelineStore";
 import { isItemSelected, isTimeSelected, type OpsSelection } from "@/components/ops/opsSelection";
 
