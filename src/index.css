@@ -618,6 +618,25 @@
     height: 26px;
   }
 
+  .id-primary-action {
+    width: 100%;
+    min-height: 40px;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 800;
+    touch-action: manipulation;
+  }
+
+  .cad-layer-panel .id-body {
+    padding-top: 8px;
+  }
+
+  .cad-layer-panel .id-add-wrap,
+  .cad-sheet-panel .id-add-wrap {
+    margin-bottom: 8px;
+  }
+
   .id-list {
     display: flex;
     flex-direction: column;
@@ -806,16 +825,16 @@
   .sheet-item {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
   }
 
   .sheet-row {
     display: grid;
     grid-template-columns: auto 1fr auto;
-    gap: 9px;
+    gap: 7px;
     align-items: center;
-    padding: 9px 10px;
-    border-radius: 12px;
+    padding: 7px 8px;
+    border-radius: 8px;
     background: hsl(var(--surface-card, var(--card)));
     border: 1px solid hsl(var(--border));
     box-shadow: 0 1px 2px hsl(0 0% 0% / 0.05);
@@ -837,10 +856,10 @@
 
   /* Blatt-Symbol links */
   .sheet-glyph {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
     flex: none;
-    border-radius: 9px;
+    border-radius: 7px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1073,7 +1092,26 @@
   }
   .plan-print-wrap { padding: 8px 0 0; }
 
-  /* ---- Seiten-Panel: Kopfbereich mit Untertitel und Goldknopf ---- */
+  /* ---- Seiten-Panel: ruhiger Kopfbereich und breite Hauptaktion ---- */
+  .cad-sheet-tab-head {
+    padding: 11px 10px 8px;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+
+  .cad-sheet-tab-title {
+    font-size: 14px;
+    line-height: 1.25;
+    font-weight: 800;
+    color: hsl(var(--foreground));
+  }
+
+  .cad-sheet-tab-subtitle {
+    margin-top: 2px;
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: hsl(var(--muted-foreground));
+  }
+
   .id-head-lead {
     align-items: flex-start;
     padding: 10px 10px 9px 10px;
@@ -1092,7 +1130,7 @@
   }
 
   .id-add-gold {
-    height: 26px;
+    height: 40px;
     padding: 0 10px;
     font-size: 11.5px;
     font-weight: 700;

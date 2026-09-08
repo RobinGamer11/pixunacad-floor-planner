@@ -3510,20 +3510,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
-          <div ref={sheetPanelRef} className="cad-id-panel w-full">
-            <div className="id-head id-head-lead">
-              <div className="min-w-0">
-                <div className="id-title id-title-lg">Seiten</div>
-                <div className="id-sub">Blätter und Druckpläne verwalten</div>
-              </div>
-              <div className="id-head-actions">
-                <button ref={sheetAddBtnRef} className="id-head-btn id-add-gold">+ Neue Seite</button>
-                <button ref={sheetToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-                  <span className="id-toggle-chevron" />
-                </button>
-              </div>
+          <div ref={sheetPanelRef} className="cad-id-panel cad-sheet-panel w-full">
+            <div className="cad-sheet-tab-head">
+              <div className="cad-sheet-tab-title">Seiten</div>
+              <div className="cad-sheet-tab-subtitle">Blätter und Druckpläne verwalten</div>
             </div>
+            <button ref={sheetToggleBtnRef} type="button" className="hidden" tabIndex={-1} aria-hidden="true" />
             <div ref={sheetBodyRef} className="id-body">
+              <div className="id-add-wrap">
+                <button ref={sheetAddBtnRef} className="id-head-btn id-add-gold id-primary-action">+ Neue Seite</button>
+              </div>
               <div ref={sheetListRef} className="id-list" />
             </div>
           </div>
@@ -3557,18 +3553,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
           <LayersPanelHeader helpOn={helpOn} />
 
-          <div ref={idPanelRef} className="cad-id-panel w-full">
-            <div className="id-head">
-              <div className="id-title">Bezeichnungs-ID</div>
-              <div className="id-head-actions">
-                <button ref={idToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-                  <span className="id-toggle-chevron" />
-                </button>
-              </div>
-            </div>
+          <div ref={idPanelRef} className="cad-id-panel cad-layer-panel w-full">
+            <button ref={idToggleBtnRef} type="button" className="hidden" tabIndex={-1} aria-hidden="true" />
             <div ref={idBodyRef} className="id-body">
               <div className="id-add-wrap">
-                <button ref={idAddBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+                <button ref={idAddBtnRef} className="id-head-btn id-add-btn id-primary-action">+ Ebene</button>
               </div>
               <div className="id-hint">Oben = Vordergrund</div>
               <div ref={idListRef} className="id-list" />
