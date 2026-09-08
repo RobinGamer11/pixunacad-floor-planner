@@ -40,18 +40,11 @@ export function CadIdPanelHost({ engine }: Props) {
   }, [engine]);
 
   return (
-    <div ref={rootRef} className="cad-id-panel w-full">
-      <div className="id-head">
-        <div className="id-title">Bezeichnungs-ID</div>
-        <div className="id-head-actions">
-          <button ref={toggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-            <span className="id-toggle-chevron" />
-          </button>
-        </div>
-      </div>
+    <div ref={rootRef} className="cad-id-panel cad-layer-panel w-full">
+      <button ref={toggleBtnRef} type="button" className="hidden" tabIndex={-1} aria-hidden="true" />
       <div ref={bodyRef} className="id-body">
         <div className="id-add-wrap">
-          <button ref={addBtnRef} className="id-head-btn id-add-btn">+ ID</button>
+          <button ref={addBtnRef} className="id-head-btn id-add-btn id-primary-action">+ Ebene</button>
         </div>
         <div className="id-hint">Oben = Vordergrund</div>
         <div ref={listRef} className="id-list" />
