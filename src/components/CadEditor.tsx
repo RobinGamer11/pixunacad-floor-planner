@@ -3545,7 +3545,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div ref={planListRef} className="id-list" />
               <div className="plan-print-wrap">
                 <button ref={planPrintBtnRef} className="plan-print-btn" title="Ausgewählte Pläne als PDF drucken">
-                  🖨 PDF Drucken
+                  🖨 Als PDF drucken
                 </button>
               </div>
               <div className="text-[11px] leading-snug px-2 py-2 mt-2" style={{ color: "hsl(var(--ink-soft))" }}>
