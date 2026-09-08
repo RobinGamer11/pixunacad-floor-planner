@@ -3511,18 +3511,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
           <div ref={sheetPanelRef} className="cad-id-panel w-full">
-            <div className="id-head">
-              <div className="id-title">Seiten-ID</div>
+            <div className="id-head id-head-lead">
+              <div className="min-w-0">
+                <div className="id-title id-title-lg">Seiten</div>
+                <div className="id-sub">Blätter und Druckpläne verwalten</div>
+              </div>
               <div className="id-head-actions">
+                <button ref={sheetAddBtnRef} className="id-head-btn id-add-gold">+ Neue Seite</button>
                 <button ref={sheetToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
                   <span className="id-toggle-chevron" />
                 </button>
               </div>
             </div>
             <div ref={sheetBodyRef} className="id-body">
-              <div className="id-add-wrap">
-                <button ref={sheetAddBtnRef} className="id-head-btn id-add-btn">+ Seite</button>
-              </div>
               <div ref={sheetListRef} className="id-list" />
             </div>
           </div>
@@ -3539,12 +3540,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
             <div ref={planBodyRef} className="id-body">
               <div className="id-add-wrap">
-                <button ref={planAddBtnRef} className="id-head-btn id-add-btn">+ Plan</button>
+                <button ref={planAddBtnRef} className="id-head-btn id-add-btn id-add-outline">+ Druckplan</button>
               </div>
               <div ref={planListRef} className="id-list" />
               <div className="plan-print-wrap">
                 <button ref={planPrintBtnRef} className="plan-print-btn" title="Ausgewählte Pläne als PDF drucken">
-                  🖨 PDF Drucken
+                  🖨 Als PDF drucken
                 </button>
               </div>
               <div className="text-[11px] leading-snug px-2 py-2 mt-2" style={{ color: "hsl(var(--ink-soft))" }}>

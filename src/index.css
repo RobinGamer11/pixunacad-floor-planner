@@ -1071,7 +1071,49 @@
     text-align: center;
     font-style: italic;
   }
-  .plan-print-wrap { padding: 6px 0 0; }
+  .plan-print-wrap { padding: 8px 0 0; }
+
+  /* ---- Seiten-Panel: Kopfbereich mit Untertitel und Goldknopf ---- */
+  .id-head-lead {
+    align-items: flex-start;
+    padding: 10px 10px 9px 10px;
+  }
+
+  .id-title-lg {
+    font-size: 14px;
+    font-weight: 800;
+  }
+
+  .id-sub {
+    margin-top: 2px;
+    font-size: 10.5px;
+    line-height: 1.35;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .id-add-gold {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    background: hsl(var(--accent-gold) / 0.16);
+    color: hsl(var(--accent-gold));
+    border: 1px solid hsl(var(--accent-gold) / 0.55);
+  }
+
+  .id-add-gold:hover {
+    background: hsl(var(--accent-gold) / 0.26);
+  }
+
+  .id-add-outline {
+    background: transparent;
+    border: 1px solid hsl(var(--border));
+    height: 30px;
+  }
+
+  .id-add-outline:hover {
+    background: hsl(var(--accent));
+  }
   .plan-print-btn {
     width: 100%;
     height: 30px;
