@@ -7,9 +7,6 @@
  * niemals ersetzt – sie bleiben lesbar erhalten.
  */
 import type { Project } from "@/lib/projectStore";
-import gebaeudebauAsset from "@/assets/projekt-gebaeudebau.png.asset.json";
-import landschaftAsset from "@/assets/projekt-landschaft.png.asset.json";
-import sonstigesAsset from "@/assets/projekt-sonstiges.png.asset.json";
 
 export const PROJECT_TYPE_BUILDING = "Gebäudebau";
 export const PROJECT_TYPE_LANDSCAPE = "Landschaft/Freiraum";
@@ -30,21 +27,62 @@ export const PROJECT_STATUSES = [
   "Abgeschlossen",
 ] as const;
 
+/**
+ * Standard-Projektbilder liegen als echte Dateien im Ordner `public/` und
+ * funktionieren dadurch in jeder Umgebung (Lovable, Vercel, Self-Hosting).
+ */
+const THUMB_BUILDING = "/project-images/projekt-gebaeudebau.png";
+const THUMB_LANDSCAPE = "/project-images/projekt-landschaft.png";
+const THUMB_OTHER = "/project-images/projekt-sonstiges.png";
+
+/** Alte, nur intern gültige Bildadresse aus der Lovable-Vorschau. */
+const LEGACY_ASSET_PREFIX = "/__l5e/assets-v1/";
+
+export function isLegacyAssetThumbnail(src: string | undefined): boolean {
+  return !!src && src.startsWith(LEGACY_ASSET_PREFIX);
+}
+
 /** Standardbild je Projekttyp – wird nur bei neuen Projekten gesetzt. */
 export function defaultThumbnailForType(type: string | undefined): string {
   switch ((type ?? "").trim()) {
     case PROJECT_TYPE_LANDSCAPE:
-      return landschaftAsset.url;
+      return THUMB_LANDSCAPE;
     case PROJECT_TYPE_BUILDING:
-      return gebaeudebauAsset.url;
+      return THUMB_BUILDING;
     default:
-      return sonstigesAsset.url;
+      return THUMB_OTHER;
   }
+}
+
+/**
+ * Anzeigepfad eines Projektbildes: eigene Bilder bleiben erhalten, alte
+ * interne Verweise werden durch das Standardbild des Projekttyps ersetzt.
+ */
+export function projectThumbnailSrc(
+  src: string | undefined,
+  type?: string | undefined,
+): string {
+  if (!src || isLegacyAssetThumbnail(src) || src.startsWith("data:image/svg+xml")) {
+    return defaultThumbnailForType(type);
+  }
+  return src;
+}
+
+/** `onError`-Behandlung: ungültige Bildpfade fallen auf das Standardbild zurück. */
+export function thumbnailErrorFallback(
+  e: { currentTarget: HTMLImageElement },
+  type?: string | undefined,
+): void {
+  const fallback = defaultThumbnailForType(type);
+  const img = e.currentTarget;
+  if (img.getAttribute("src") === fallback) return;
+  img.src = fallback;
 }
 
 /** Erkennt Platzhalter-Thumbnails aus der Projektanlage (SVG-Data-URL). */
 export function isPlaceholderThumbnail(src: string | undefined): boolean {
   if (!src) return true;
+  if (isLegacyAssetThumbnail(src)) return true;
   return src.startsWith("data:image/svg+xml");
 }
 

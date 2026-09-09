@@ -90,6 +90,7 @@ import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import { clearMappeClipboard } from "@/lib/mappeClipboard";
 import { SectionHeading } from "@/components/layout/SectionHeading";
+import { projectThumbnailSrc, thumbnailErrorFallback } from "@/lib/projectMeta";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -1139,7 +1140,7 @@ export default function ProjectsHome() {
                     style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
                   >
                     <div className="aspect-[16/9] overflow-hidden" style={{ background: "hsl(var(--surface-muted))" }}>
-                      <img src={t.thumbnail} alt="" className="w-full h-full object-cover" />
+                      <img src={projectThumbnailSrc(t.thumbnail, t.projektTyp)} onError={(e) => thumbnailErrorFallback(e, t.projektTyp)} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="px-4 py-3">
                       <div className="text-sm font-semibold truncate">{t.name}</div>
@@ -1496,7 +1497,7 @@ function ProjectCard({
           }}
         >
           {p.thumbnail && (
-            <img src={p.thumbnail} alt="" className="w-full h-full object-cover" />
+            <img src={projectThumbnailSrc(p.thumbnail, p.projektTyp)} onError={(e) => thumbnailErrorFallback(e, p.projektTyp)} alt="" className="w-full h-full object-cover" />
           )}
         </div>
       </div>
@@ -1818,7 +1819,7 @@ function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage:
             transformStyle: "preserve-3d",
           }}
         >
-          <img src={project.thumbnail} alt="" className="w-full h-full object-cover" />
+          <img src={projectThumbnailSrc(project.thumbnail, project.projektTyp)} onError={(e) => thumbnailErrorFallback(e, project.projektTyp)} alt="" className="w-full h-full object-cover" />
 
           <button
             onClick={() => thumbInput.current?.click()}
@@ -2975,7 +2976,7 @@ function TrashView({ activeCount }: { activeCount: number }) {
             {trashed.map((p) => (
               <div key={p.id} className="flex items-center gap-3 p-3" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <div className="h-10 w-10 rounded-md overflow-hidden shrink-0" style={{ background: "hsl(var(--surface-muted))" }}>
-                  {p.thumbnail && <img src={p.thumbnail} alt="" className="h-full w-full object-cover" />}
+                  {p.thumbnail && <img src={projectThumbnailSrc(p.thumbnail, p.projektTyp)} onError={(e) => thumbnailErrorFallback(e, p.projektTyp)} alt="" className="h-full w-full object-cover" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">{p.name}</div>

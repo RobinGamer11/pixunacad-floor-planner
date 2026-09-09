@@ -49,7 +49,7 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
-import { CanvasFabBar, LayerFab, LayersPanelHeader } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayersHelpCard, LayersPanelTitle } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
@@ -3551,18 +3551,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
-          <LayersPanelHeader helpOn={helpOn} />
-
           <div ref={idPanelRef} className="cad-id-panel cad-layer-panel w-full">
+            <LayersPanelTitle />
             <button ref={idToggleBtnRef} type="button" className="hidden" tabIndex={-1} aria-hidden="true" />
             <div ref={idBodyRef} className="id-body">
               <div className="id-add-wrap">
-                <button ref={idAddBtnRef} className="id-head-btn id-add-btn id-primary-action">+ Ebene</button>
+                <button ref={idAddBtnRef} className="id-head-btn id-add-gold id-primary-action">+ Ebene</button>
               </div>
               <div className="id-hint">Oben = Vordergrund</div>
               <div ref={idListRef} className="id-list" />
             </div>
           </div>
+
+          <LayersHelpCard helpOn={helpOn} />
         </DragScrollDiv>
       </aside>
       ) : (

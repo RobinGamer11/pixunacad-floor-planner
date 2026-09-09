@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef } from "react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
+import { LayersPanelTitle } from "@/components/cad/LayerHelp";
 
 interface Props {
   engine: MiniCad | null;
@@ -41,10 +42,11 @@ export function CadIdPanelHost({ engine }: Props) {
 
   return (
     <div ref={rootRef} className="cad-id-panel cad-layer-panel w-full">
+      <LayersPanelTitle />
       <button ref={toggleBtnRef} type="button" className="hidden" tabIndex={-1} aria-hidden="true" />
       <div ref={bodyRef} className="id-body">
         <div className="id-add-wrap">
-          <button ref={addBtnRef} className="id-head-btn id-add-btn id-primary-action">+ Ebene</button>
+          <button ref={addBtnRef} className="id-head-btn id-add-gold id-primary-action">+ Ebene</button>
         </div>
         <div className="id-hint">Oben = Vordergrund</div>
         <div ref={listRef} className="id-list" />

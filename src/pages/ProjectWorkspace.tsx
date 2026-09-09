@@ -151,7 +151,7 @@ import { TextSpanAllPages } from "@/components/workspace/TextSpanAllPages";
 import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
-import { CanvasFabBar, LayerFab, LayersPanelHeader } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayersHelpCard } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
@@ -6071,8 +6071,7 @@ function RightInspector({
             <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
-            <div className="space-y-4">
-              <LayersPanelHeader helpOn={helpOn} />
+            <div className="space-y-2">
 
               {/* Ein einziges Ebenen-/Bezeichnungs-ID-System — identisch zur
                  CAD-Oberfläche. CAD-Blätter, Dokumente, Notizen, Tabellen
@@ -6080,6 +6079,7 @@ function RightInspector({
                  die jeweilige ID-Zeile eingezählt (siehe useEffect unten),
                  damit es kein Parallel-Panel gibt. */}
               {cadEngine && <CadIdPanelHost engine={cadEngine} />}
+              <LayersHelpCard helpOn={helpOn} />
               {cadEngine && (
                 <PageElementLabelCounterBridge engine={cadEngine} page={page} />
               )}

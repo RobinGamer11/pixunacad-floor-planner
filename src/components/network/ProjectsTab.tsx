@@ -13,6 +13,7 @@ import { presenceColor, presenceLabel, type NetworkPerson, type LocalProjectRef 
 import { type ProjectPermissionOverrides, type ProjectRole } from "@/lib/projectAccess";
 import { MemberRoleControls } from "@/components/network/MemberRoleControls";
 import { CommentsTab } from "@/components/network/CommentsTab";
+import { projectThumbnailSrc, thumbnailErrorFallback } from "@/lib/projectMeta";
 import { ProjectTimeSummary } from "@/components/network/ProjectTimeSummary";
 
 const surface = { background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" };
@@ -45,7 +46,12 @@ function ProjectMark({ name, url, size = 48 }: { name: string; url?: string | nu
       style={{ width: size, height: size, background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}
     >
       {url ? (
-        <img src={url} alt={name} className="h-full w-full object-cover" />
+        <img
+          src={projectThumbnailSrc(url)}
+          onError={(e) => thumbnailErrorFallback(e)}
+          alt={name}
+          className="h-full w-full object-cover"
+        />
       ) : (
         <FolderKanban size={Math.round(size * 0.42)} style={{ color: "hsl(var(--accent-gold))" }} />
       )}

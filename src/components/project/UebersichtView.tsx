@@ -5,7 +5,15 @@ import {
 import { projectStore, type Project } from "@/lib/projectStore";
 import { useTimeline } from "@/lib/timelineStore";
 import { nextAppointment } from "@/lib/projectPeriodSync";
-import { NOT_SET, createdAtLabel, formatDateDE, isPlaceholderThumbnail } from "@/lib/projectMeta";
+import {
+  NOT_SET,
+  createdAtLabel,
+  formatDateDE,
+  isLegacyAssetThumbnail,
+  isPlaceholderThumbnail,
+  projectThumbnailSrc,
+  thumbnailErrorFallback,
+} from "@/lib/projectMeta";
 
 interface Props {
   project: Project;
@@ -43,7 +51,10 @@ export function UebersichtView({ project, onEditProject }: Props) {
 function ProjectImageCard({ project }: { project: Project }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const hasImage = !isPlaceholderThumbnail(project.thumbnail);
+  // Alte interne Bildverweise gelten weiterhin als „Bild vorhanden“ und
+  // werden über `projectThumbnailSrc` auf das Standardbild aufgelöst.
+  const legacyThumb = isLegacyAssetThumbnail(project.thumbnail);
+  const hasImage = legacyThumb || !isPlaceholderThumbnail(project.thumbnail);
 
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -59,7 +70,13 @@ function ProjectImageCard({ project }: { project: Project }) {
     <section className="rounded-2xl overflow-hidden relative" style={CARD}>
       <div className="relative aspect-[16/10] w-full" style={{ background: "hsl(var(--surface-muted))" }}>
         {hasImage ? (
-          <img src={project.thumbnail} alt={`Projektbild ${project.name}`} className="w-full h-full object-cover" />
+          <img
+            src={projectThumbnailSrc(project.thumbnail, project.projektTyp)}
+            onError={(e) => thumbnailErrorFallback(e, project.projektTyp)}
+            alt={`Projektbild ${project.name}`}
+            className="w-full h-full object-cover"
+          />
+
         ) : (
           <button
             type="button"
