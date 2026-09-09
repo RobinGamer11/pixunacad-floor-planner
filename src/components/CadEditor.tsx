@@ -3529,7 +3529,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
 
           {/* Druckpläne — direkt im Sheets-Tab, unterhalb der Zeichenblätter. */}
-          <div ref={planPanelRef} className="cad-id-panel w-full">
+          <div ref={planPanelRef} className="cad-id-panel cad-plan-panel w-full">
             <div className="id-head">
               <div className="id-title">Druckpläne</div>
               <div className="id-head-actions">
