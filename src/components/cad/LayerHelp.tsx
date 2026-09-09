@@ -1,79 +1,78 @@
 import { useEffect, useState } from "react";
-import { Layers, Lock, Eye, Pencil, Trash2, Info, ChevronDown } from "lucide-react";
+import { Layers, Lock, Eye, Pencil, Trash2, ChevronDown } from "lucide-react";
+
+const HELP_ROWS: { icon: React.ReactNode; text: string }[] = [
+  { icon: <Lock size={14} />, text: "Ebene bearbeitbar / nicht bearbeitbar" },
+  { icon: <Eye size={14} />, text: "Ebene sichtbar / nicht sichtbar" },
+  { icon: <Pencil size={14} />, text: "Ebene umbenennen" },
+  { icon: <Trash2 size={14} />, text: "Ebene löschen" },
+];
 
 /**
  * Gemeinsame Ebenen-Legende (Hilfe-Modus) für CAD-Oberfläche und Projektmappe.
  * Jede Zeile: Symbol + Bedeutung, jeweils als eigener Absatz.
  */
 export function LayerHelpLegend() {
-  const rows: { icon: React.ReactNode; text: string }[] = [
-    { icon: <Lock size={13} />, text: "= Ebene bearbeitbar / nicht bearbeitbar" },
-    { icon: <Eye size={13} />, text: "= Ebene sichtbar / nicht sichtbar" },
-    { icon: <Pencil size={13} />, text: "= Ebene umbenennen" },
-    { icon: <Trash2 size={13} />, text: "= Ebene löschen" },
-  ];
   return (
-    <div
-      className="rounded-lg px-3 py-2 text-[11px] font-medium"
-      style={{ background: "hsl(220 18% 16%)", color: "hsl(0 0% 100% / 0.92)" }}
-    >
-      Höchste Ebene = Im Vordergrund
-      <div className="mt-2 space-y-1.5 font-normal" style={{ opacity: 0.9 }}>
-        {rows.map((r, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className="shrink-0 flex items-center justify-center h-5 w-5 rounded-md"
-              style={{ background: "hsl(0 0% 100% / 0.12)" }}>
-              {r.icon}
-            </span>
-            <span>{r.text}</span>
-          </div>
-        ))}
+    <div className="space-y-2.5 text-[11.5px]">
+      {HELP_ROWS.map((r, i) => (
+        <div key={i} className="flex items-center gap-2.5 text-muted-foreground">
+          <span className="shrink-0 flex items-center justify-center h-7 w-7 rounded-lg"
+            style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}>
+            {r.icon}
+          </span>
+          <span>{r.text}</span>
+        </div>
+      ))}
+      <div className="pt-1 text-[11.5px] font-semibold" style={{ color: "hsl(var(--foreground))" }}>
+        Höchste Ebene = im Vordergrund
       </div>
     </div>
   );
 }
 
+/** Titelzeile des Ebenen-Panels (Kopfbereich innerhalb der Karte). */
+export function LayersPanelTitle() {
+  return (
+    <div className="cad-sheet-tab-head">
+      <div className="cad-sheet-tab-title">Ebenen</div>
+      <div className="cad-sheet-tab-subtitle">Zeicheninhalte organisieren</div>
+    </div>
+  );
+}
+
 /**
- * Kopfbereich des Ebenen-Reiters (CAD + Projektmappe): Titel, kurze
- * Beschreibung und ein aufklappbarer Block „Symbole & Bedienung“.
- * Rein visuell — keine Funktionsänderung.
+ * Eigene Karte unterhalb der Ebenenliste: aufklappbarer Block
+ * „Symbole &amp; Bedienung“. Rein visuell — keine Funktionsänderung.
  */
-export function LayersPanelHeader({ helpOn }: { helpOn?: boolean }) {
+export function LayersHelpCard({ helpOn }: { helpOn?: boolean }) {
   const [open, setOpen] = useState(!!helpOn);
   useEffect(() => { if (helpOn) setOpen(true); }, [helpOn]);
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <span
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-          style={{ background: "hsl(var(--muted))", color: "hsl(var(--foreground))" }}
-        >
-          <Layers size={14} />
-        </span>
-        <div className="min-w-0">
-          <div className="text-[13px] font-semibold leading-tight">Ebenen</div>
-          <div className="text-[10.5px] text-muted-foreground leading-tight">
-            Zeichneninhalte organisieren
-          </div>
-        </div>
-      </div>
-
+    <div className="cad-id-panel w-full px-3 py-2.5">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-[11px] hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
+        className="flex w-full items-center gap-2 text-[12.5px] font-semibold"
       >
-        <Info size={12} className="text-muted-foreground" />
         <span className="flex-1 text-left">Symbole &amp; Bedienung</span>
         <ChevronDown
-          size={12}
+          size={14}
           className="text-muted-foreground transition-transform"
           style={{ transform: open ? "rotate(180deg)" : "none" }}
         />
       </button>
+      {open && <div className="mt-3">{<LayerHelpLegend />}</div>}
+    </div>
+  );
+}
 
-      {open && <LayerHelpLegend />}
+/** Rückwärtskompatibler Kopfbereich (Titel + Hilfe in einem Block). */
+export function LayersPanelHeader({ helpOn }: { helpOn?: boolean }) {
+  return (
+    <div className="space-y-2">
+      <LayersPanelTitle />
+      <LayersHelpCard helpOn={helpOn} />
     </div>
   );
 }

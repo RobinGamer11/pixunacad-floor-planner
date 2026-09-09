@@ -536,6 +536,11 @@
     width: 170px !important;
   }
 
+  /* Druckpläne-Panel bleibt auch eingeklappt über die volle Panelbreite. */
+  .cad-plan-panel.collapsed {
+    width: 100% !important;
+  }
+
   .id-head {
     display: flex;
     align-items: center;

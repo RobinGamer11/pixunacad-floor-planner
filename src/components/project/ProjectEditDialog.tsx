@@ -17,6 +17,8 @@ import {
   readAddress,
   composeAddress,
   EMPTY_ADDRESS,
+  projectThumbnailSrc,
+  thumbnailErrorFallback,
   type ProjectAddress,
 } from "@/lib/projectMeta";
 
@@ -176,8 +178,9 @@ export function draftToPatch(d: ProjectDraft, mode: "create" | "edit"): Partial<
     konzept: d.konzept,
   };
   if (composed) patch.ort = composed;
-  const thumb = d.thumbnail || (mode === "create" ? defaultThumbnailForType(d.projektTyp) : "");
-  if (thumb) patch.thumbnail = thumb;
+  // Ohne eigenes Bild wird immer das aktuelle Standardbild gespeichert – so
+  // verschwinden alte, nur intern gültige Bildadressen dauerhaft.
+  patch.thumbnail = d.thumbnail || defaultThumbnailForType(d.projektTyp);
   return patch;
 }
 
@@ -199,7 +202,7 @@ export function ProjectEditDialog({ title, submitLabel, initial, project, onCanc
   const setAddr = (k: keyof ProjectAddress, v: string) =>
     setD((s) => ({ ...s, address: { ...s.address, [k]: v } }));
 
-  const previewSrc = d.thumbnail || defaultThumbnailForType(d.projektTyp);
+  const previewSrc = projectThumbnailSrc(d.thumbnail || undefined, d.projektTyp);
   const customFields: CustomField[] = project?.customFields ?? [];
 
   const pickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -306,7 +309,12 @@ export function ProjectEditDialog({ title, submitLabel, initial, project, onCanc
                 className="w-full sm:w-64 aspect-[16/9] rounded-xl overflow-hidden shrink-0"
                 style={{ background: "hsl(var(--surface-muted))", border: `1px solid ${LINE}` }}
               >
-                <img src={previewSrc} alt="" className="w-full h-full object-cover" />
+                <img
+                  src={previewSrc}
+                  onError={(e) => thumbnailErrorFallback(e, d.projektTyp)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="flex flex-wrap gap-2">
                 <button

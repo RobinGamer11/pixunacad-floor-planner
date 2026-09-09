@@ -49,7 +49,7 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
-import { CanvasFabBar, LayerFab, LayersPanelHeader } from "@/components/cad/LayerHelp";
+import { CanvasFabBar, LayerFab, LayersHelpCard, LayersPanelTitle } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 
@@ -325,9 +325,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setRightTab("sheets");
       // Kleines Delay, damit der Sheets-Tab gerendert ist bevor wir hineinscrollen.
       setTimeout(() => {
-        const body = planBodyRef.current;
         // Sicherstellen, dass die Druckpläne-Sektion ausgeklappt ist.
-        if (body && body.classList.contains("collapsed")) {
+        if (planPanelRef.current?.classList.contains("collapsed")) {
           planToggleBtnRef.current?.click();
         }
         planPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -997,6 +996,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         planPrintBtnRef.current,
         planToggleBtnRef.current,
       );
+      // Druckpläne starten immer eingeklappt; sie öffnen sich erst über
+      // „Exportieren“ oder durch aktives Aufklappen im Panel.
+      if (!planPanelRef.current.classList.contains("collapsed")) {
+        planToggleBtnRef.current.click();
+      }
     }
 
     appRef.current = app;
@@ -3525,7 +3529,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
 
           {/* Druckpläne — direkt im Sheets-Tab, unterhalb der Zeichenblätter. */}
-          <div ref={planPanelRef} className="cad-id-panel w-full">
+          <div ref={planPanelRef} className="cad-id-panel cad-plan-panel w-full">
             <div className="id-head">
               <div className="id-title">Druckpläne</div>
               <div className="id-head-actions">
@@ -3551,18 +3555,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
-          <LayersPanelHeader helpOn={helpOn} />
-
           <div ref={idPanelRef} className="cad-id-panel cad-layer-panel w-full">
+            <LayersPanelTitle />
             <button ref={idToggleBtnRef} type="button" className="hidden" tabIndex={-1} aria-hidden="true" />
             <div ref={idBodyRef} className="id-body">
               <div className="id-add-wrap">
-                <button ref={idAddBtnRef} className="id-head-btn id-add-btn id-primary-action">+ Ebene</button>
+                <button ref={idAddBtnRef} className="id-head-btn id-add-gold id-primary-action">+ Ebene</button>
               </div>
               <div className="id-hint">Oben = Vordergrund</div>
               <div ref={idListRef} className="id-list" />
             </div>
           </div>
+
+          <LayersHelpCard helpOn={helpOn} />
         </DragScrollDiv>
       </aside>
       ) : (
