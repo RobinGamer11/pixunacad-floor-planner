@@ -325,9 +325,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setRightTab("sheets");
       // Kleines Delay, damit der Sheets-Tab gerendert ist bevor wir hineinscrollen.
       setTimeout(() => {
-        const body = planBodyRef.current;
         // Sicherstellen, dass die Druckpläne-Sektion ausgeklappt ist.
-        if (body && body.classList.contains("collapsed")) {
+        if (planPanelRef.current?.classList.contains("collapsed")) {
           planToggleBtnRef.current?.click();
         }
         planPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -997,6 +996,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         planPrintBtnRef.current,
         planToggleBtnRef.current,
       );
+      // Druckpläne starten immer eingeklappt; sie öffnen sich erst über
+      // „Exportieren“ oder durch aktives Aufklappen im Panel.
+      if (!planPanelRef.current.classList.contains("collapsed")) {
+        planToggleBtnRef.current.click();
+      }
     }
 
     appRef.current = app;
