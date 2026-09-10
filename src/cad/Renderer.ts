@@ -1,7 +1,7 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
-import { rulerSideOf, rulerUnitOf, unitsPerMeter } from "./rulerModel";
+import { rulerSideOf, rulerUnitOf, rulerPxPerUnit } from "./rulerModel";
 import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
@@ -3572,19 +3572,38 @@ export class Renderer {
     if (!g) return;
     const ctx = this.ctx;
     const cam = this.camera;
-    const a = cam.worldToScreen(g.a.x, g.a.y);
-    const b = cam.worldToScreen(g.b.x, g.b.y);
+    let a = cam.worldToScreen(g.a.x, g.a.y);
+    let b = cam.worldToScreen(g.b.x, g.b.y);
+
+    // Bildschirm-Verankerung: Hat sich nur die Kamera bewegt (Zoom/Pan), werden
+    // die Weltpunkte so nachgeführt, dass das Lineal exakt an derselben Stelle
+    // des Bildschirms und in derselben Größe stehen bleibt.
+    const lock = (this as any)._rulerScreenLock as
+      | { sc: number; ox: number; oy: number; a: { x: number; y: number }; b: { x: number; y: number } }
+      | undefined;
+    if (lock && (lock.sc !== cam.scale || lock.ox !== cam.offsetX || lock.oy !== cam.offsetY)) {
+      const wa = cam.screenToWorld(lock.a.x, lock.a.y);
+      const wb = cam.screenToWorld(lock.b.x, lock.b.y);
+      g.a = v(wa.x, wa.y);
+      g.b = v(wb.x, wb.y);
+      a = { x: lock.a.x, y: lock.a.y };
+      b = { x: lock.b.x, y: lock.b.y };
+    }
+    (this as any)._rulerScreenLock = {
+      sc: cam.scale, ox: cam.offsetX, oy: cam.offsetY,
+      a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y },
+    };
+
     const dx = b.x - a.x, dy = b.y - a.y;
     const lenPx = Math.hypot(dx, dy);
     if (lenPx < 1) return;
     const ang = Math.atan2(dy, dx);
-    const lenM = Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y);
 
     const side = rulerSideOf(g);
     const unit = rulerUnitOf(g);
-    const per = unitsPerMeter(unit);
-    const totalUnits = lenM * per;
-    const pxPerUnit = lenPx / Math.max(1e-9, totalUnits);
+    const kUnit = this._screenPxScale();
+    const pxPerUnit = rulerPxPerUnit(unit, kUnit);
+    const totalUnits = lenPx / pxPerUnit;
 
     // Feste Bildschirmgrößen: Verhältnis Backing-Store ↔ sichtbare CSS-Größe,
     // bereinigt um eine bereits gesetzte Canvas-Transformation. Der Kamera-

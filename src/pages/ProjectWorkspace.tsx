@@ -429,6 +429,14 @@ export default function ProjectWorkspace() {
   } | null>(null);
   // Force-re-render der ToolsTab, sobald die Engine bereit ist (für Panel-Wiring).
   const [, forceEngineTick] = useState(0);
+  // Lineal aktiv? (unabhängig vom gewählten Werkzeug — wie beim Raster)
+  const [rulerOn, setRulerOn] = useState(false);
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setRulerOn(!!(cadEngineApiRef.current?.engine as any)?.scene?.rulerGuide);
+    }, 250);
+    return () => window.clearInterval(t);
+  }, []);
   /** Engine übernehmen + Fangpunkt-Brücke registrieren (Linien, Texte,
    *  Freihand, Schraffuren, Dokumente werden so auch für CAD-Blätter fangbar). */
   const attachCadEngine = (api: {
@@ -1573,7 +1581,7 @@ export default function ProjectWorkspace() {
         <ToolRailButton
           icon={<RulerIcon size={18} />}
           label="Lineal"
-          active={activeTool === "ruler"}
+          active={activeTool === "ruler" || rulerOn}
           onClick={() => setActiveToolAndTab(activeTool === "ruler" ? null : "ruler")}
           showLabel
         />

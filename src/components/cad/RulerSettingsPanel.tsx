@@ -50,6 +50,23 @@ export const RulerSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = ({
 
   return (
     <div className="space-y-3">
+      <button
+        type="button"
+        onClick={() => {
+          if (hasRuler) tool?.deactivateRuler?.();
+          else tool?.activateRuler?.();
+          force((n) => n + 1);
+        }}
+        className="h-11 w-full rounded-lg text-sm font-semibold transition-colors"
+        style={
+          hasRuler
+            ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold-foreground, var(--background)))" }
+            : { border: `1px solid ${HAIRLINE}`, color: "hsl(var(--foreground))" }
+        }
+      >
+        {hasRuler ? "Lineal deaktivieren" : "Lineal aktivieren"}
+      </button>
+
       <div className="space-y-1.5">
         {STEPS.map((label, i) => {
           const active = i === current;
@@ -139,15 +156,6 @@ export const RulerSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = ({
         </div>
       </div>
 
-      <button
-        type="button"
-        disabled={!hasRuler}
-        onClick={() => { tool?.remove?.(); force((n) => n + 1); }}
-        className="h-8 w-full rounded-md border text-xs disabled:opacity-40"
-        style={{ borderColor: HAIRLINE }}
-      >
-        Lineal entfernen
-      </button>
     </div>
   );
 };

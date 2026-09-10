@@ -33,6 +33,27 @@ export function unitsPerMeter(unit: RulerUnit): number {
   return unit === "mm" ? 1000 : unit === "cm" ? 100 : 1;
 }
 
+/**
+ * Das Lineal ist eine Bildschirm-Zeichenhilfe: Eine Einheit belegt IMMER
+ * dieselbe Anzahl Bildschirmpixel — unabhängig vom Kamera-/Seitenzoom.
+ * Dadurch bleiben Länge, Teilstriche, Zahlen und Griffe optisch konstant.
+ */
+export const RULER_PX_PER_UNIT: Record<RulerUnit, number> = { mm: 6, cm: 40, m: 90 };
+
+/** Bildschirmpixel pro Einheit (k = Backing-Store-Faktor der Zeichenfläche). */
+export function rulerPxPerUnit(unit: RulerUnit, k = 1): number {
+  return RULER_PX_PER_UNIT[unit] * k;
+}
+
+/** Backing-Store-Faktor der Zeichenfläche (1, wenn nicht ermittelbar). */
+export function rulerScreenScale(app: any): number {
+  try {
+    const k = app?.renderer?._screenPxScale?.();
+    if (Number.isFinite(k) && k > 0) return k;
+  } catch { /* optional */ }
+  return 1;
+}
+
 export function rulerSideOf(g: any): RulerSide {
   const s = g?.side;
   return s === "left" || s === "right" || s === "center" ? s : DEFAULT_RULER_SIDE;

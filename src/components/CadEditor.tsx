@@ -495,6 +495,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   // als Default-Vorauswahl beim PDF-Import.
   const drawingScale = 1;
 
+  // Lineal aktiv? (unabhängig vom gewählten Werkzeug — wie beim Raster)
+  const [rulerOn, setRulerOn] = useState(false);
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setRulerOn(!!(appRef.current as any)?.scene?.rulerGuide);
+    }, 250);
+    return () => window.clearInterval(t);
+  }, []);
+
   // Raster (Hintergrund-Grid) Einstellungen
   const [gridEnabled, setGridEnabled] = useState(true);
   const [gridPanelOpen, setGridPanelOpen] = useState(false);
@@ -821,8 +830,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setTableTool(id === ToolIds.TABLE);
       setTableEditId(null);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
-      if (id === ToolIds.SELECT) setRightTab("sheets");
-      else setRightTab("settings");
+      // Der Ebenen-Reiter bleibt dabei offen, wenn dort gerade gearbeitet wird.
+      setRightTab((prev) => (prev === "layers" ? prev : (id === ToolIds.SELECT ? "sheets" : "settings")));
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
@@ -922,7 +931,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // Auswahl-Werkzeug: bestehendes Objekt ausgewählt → automatisch in die
       // Werkzeugeinstellungen wechseln; ohne Auswahl zurück zu "Seiten".
       if (app.activeTool === app.selectTool) {
-        setRightTab(app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets");
+        // Der Ebenen-Reiter bleibt offen, wenn dort gerade gearbeitet wird.
+        setRightTab((prev) => (prev === "layers" ? prev : (app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets")));
       }
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
       setSelectedSegmentId(((app.selection as any)?.segmentId as string) || null);
@@ -1321,7 +1331,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             onClick={() => handleToolClick(ToolIds.RULER)}
             title="Lineal"
-            className={`cad-rail-btn ${activeTool === ToolIds.RULER ? "active" : ""}`}
+            className={`cad-rail-btn ${activeTool === ToolIds.RULER || rulerOn ? "active" : ""}`}
           >
             <RulerIcon size={18} />
             <span>Lineal</span>
