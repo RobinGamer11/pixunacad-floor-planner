@@ -495,6 +495,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   // als Default-Vorauswahl beim PDF-Import.
   const drawingScale = 1;
 
+  // Lineal aktiv? (unabhängig vom gewählten Werkzeug — wie beim Raster)
+  const [rulerOn, setRulerOn] = useState(false);
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setRulerOn(!!(appRef.current as any)?.scene?.rulerGuide);
+    }, 250);
+    return () => window.clearInterval(t);
+  }, []);
+
   // Raster (Hintergrund-Grid) Einstellungen
   const [gridEnabled, setGridEnabled] = useState(true);
   const [gridPanelOpen, setGridPanelOpen] = useState(false);
