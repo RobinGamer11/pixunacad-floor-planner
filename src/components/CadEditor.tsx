@@ -830,8 +830,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setTableTool(id === ToolIds.TABLE);
       setTableEditId(null);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
-      if (id === ToolIds.SELECT) setRightTab("sheets");
-      else setRightTab("settings");
+      // Der Ebenen-Reiter bleibt dabei offen, wenn dort gerade gearbeitet wird.
+      setRightTab((prev) => (prev === "layers" ? prev : (id === ToolIds.SELECT ? "sheets" : "settings")));
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
