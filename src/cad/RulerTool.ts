@@ -3,8 +3,9 @@ import type { Input } from "./Input";
 import { RulerDragController } from "./rulerInteraction";
 import { drawSnapDot } from "./snapDraw";
 import {
-  DEFAULT_RULER_SIDE, DEFAULT_RULER_UNIT, constrainRulerAngle, metersToUnit,
-  rulerSideOf, rulerUnitOf, snapRulerPoint, unitToMeters,
+  DEFAULT_RULER_SIDE, DEFAULT_RULER_UNIT, constrainRulerAngle,
+  rulerPxPerUnit, rulerScreenScale,
+  rulerSideOf, rulerUnitOf, snapRulerPoint,
   type RulerSide, type RulerUnit,
 } from "./rulerModel";
 
