@@ -91,9 +91,39 @@ export class RulerTool {
     this.app?.requestRender?.();
   }
 
-  /** Länge in der aktuell gewählten Anzeigeeinheit. */
-  getLengthInUnit(): number { return metersToUnit(this.getLengthM(), this.getUnit()); }
-  setLengthInUnit(value: number) { this.setLengthM(unitToMeters(value, this.getUnit())); }
+  /**
+   * Länge in der gewählten Anzeigeeinheit. Das Lineal ist eine Bildschirm-
+   * Zeichenhilfe: eine Einheit belegt immer gleich viele Bildschirmpixel,
+   * deshalb wird hier über die Bildschirmlänge gerechnet.
+   */
+  private _pxPerUnit(): number {
+    return rulerPxPerUnit(this.getUnit(), rulerScreenScale(this.app));
+  }
+
+  getLengthInUnit(): number {
+    const sc = this.app?.camera?.scale || 1;
+    return (this.getLengthM() * sc) / Math.max(1e-9, this._pxPerUnit());
+  }
+
+  setLengthInUnit(value: number) {
+    const sc = this.app?.camera?.scale || 1;
+    this.setLengthM((value * this._pxPerUnit()) / Math.max(1e-9, sc));
+  }
+
+  /** Lineal aktiv? (unabhängig vom gewählten Zeichenwerkzeug) */
+  isActive(): boolean { return !!this.app?.scene?.rulerGuide || this.phase === "end"; }
+
+  /** Aktivieren: startet die vorhandene Platzierung, dupliziert nie ein Lineal. */
+  activateRuler() {
+    if (this.app?.scene?.rulerGuide) { this.phase = "ready"; return; }
+    this._drag.reset();
+    this._anchor = null;
+    this.phase = "start";
+    this.app?.requestRender?.();
+  }
+
+  /** Deaktivieren: entfernt das vorhandene Lineal. */
+  deactivateRuler() { this.remove(); }
 
   getSide(): RulerSide {
     const g = this.app?.scene?.rulerGuide;

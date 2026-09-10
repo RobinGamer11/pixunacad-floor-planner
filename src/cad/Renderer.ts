@@ -1,7 +1,7 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
-import { rulerSideOf, rulerUnitOf, unitsPerMeter } from "./rulerModel";
+import { rulerSideOf, rulerUnitOf, rulerPxPerUnit } from "./rulerModel";
 import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
