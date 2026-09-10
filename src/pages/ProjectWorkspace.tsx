@@ -1581,7 +1581,7 @@ export default function ProjectWorkspace() {
         <ToolRailButton
           icon={<RulerIcon size={18} />}
           label="Lineal"
-          active={activeTool === "ruler"}
+          active={activeTool === "ruler" || rulerOn}
           onClick={() => setActiveToolAndTab(activeTool === "ruler" ? null : "ruler")}
           showLabel
         />
