@@ -931,7 +931,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // Auswahl-Werkzeug: bestehendes Objekt ausgewählt → automatisch in die
       // Werkzeugeinstellungen wechseln; ohne Auswahl zurück zu "Seiten".
       if (app.activeTool === app.selectTool) {
-        setRightTab(app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets");
+        // Der Ebenen-Reiter bleibt offen, wenn dort gerade gearbeitet wird.
+        setRightTab((prev) => (prev === "layers" ? prev : (app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets")));
       }
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
       setSelectedSegmentId(((app.selection as any)?.segmentId as string) || null);
@@ -1330,7 +1331,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             onClick={() => handleToolClick(ToolIds.RULER)}
             title="Lineal"
-            className={`cad-rail-btn ${activeTool === ToolIds.RULER ? "active" : ""}`}
+            className={`cad-rail-btn ${activeTool === ToolIds.RULER || rulerOn ? "active" : ""}`}
           >
             <RulerIcon size={18} />
             <span>Lineal</span>
