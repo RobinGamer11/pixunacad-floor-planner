@@ -17,7 +17,7 @@ const STEPS = [
 /**
  * Einstellungen des eigenständigen Lineal-Werkzeugs:
  * Schrittanzeige, Länge in der gewählten Einheit, Zeichenseite,
- * Maßeinheit und Entfernen.
+ * Maßeinheit und Deaktivieren eines bereits gesetzten Lineals.
  */
 export const RulerSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = ({ app }) => {
   const a: any = app;
@@ -50,22 +50,19 @@ export const RulerSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = ({
 
   return (
     <div className="space-y-3">
-      <button
-        type="button"
-        onClick={() => {
-          if (hasRuler) tool?.deactivateRuler?.();
-          else tool?.activateRuler?.();
-          force((n) => n + 1);
-        }}
-        className="h-11 w-full rounded-lg text-sm font-semibold transition-colors"
-        style={
-          hasRuler
-            ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold-foreground, var(--background)))" }
-            : { border: `1px solid ${HAIRLINE}`, color: "hsl(var(--foreground))" }
-        }
-      >
-        {hasRuler ? "Lineal deaktivieren" : "Lineal aktivieren"}
-      </button>
+      {hasRuler && (
+        <button
+          type="button"
+          onClick={() => {
+            tool?.deactivateRuler?.();
+            force((n) => n + 1);
+          }}
+          className="h-11 w-full rounded-lg text-sm font-semibold transition-colors"
+          style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold-foreground, var(--background)))" }}
+        >
+          Lineal deaktivieren
+        </button>
+      )}
 
       <div className="space-y-1.5">
         {STEPS.map((label, i) => {
