@@ -4,7 +4,7 @@ import { RulerDragController } from "./rulerInteraction";
 import { drawSnapDot } from "./snapDraw";
 import {
   DEFAULT_RULER_SIDE, DEFAULT_RULER_UNIT, constrainRulerAngle,
-  rulerPxPerUnit, rulerScreenScale,
+  metersToUnit, unitToMeters,
   rulerSideOf, rulerUnitOf, snapRulerPoint,
   type RulerSide, type RulerUnit,
 } from "./rulerModel";
@@ -92,23 +92,12 @@ export class RulerTool {
     this.app?.requestRender?.();
   }
 
-  /**
-   * Länge in der gewählten Anzeigeeinheit. Das Lineal ist eine Bildschirm-
-   * Zeichenhilfe: eine Einheit belegt immer gleich viele Bildschirmpixel,
-   * deshalb wird hier über die Bildschirmlänge gerechnet.
-   */
-  private _pxPerUnit(): number {
-    return rulerPxPerUnit(this.getUnit(), rulerScreenScale(this.app));
-  }
-
   getLengthInUnit(): number {
-    const sc = this.app?.camera?.scale || 1;
-    return (this.getLengthM() * sc) / Math.max(1e-9, this._pxPerUnit());
+    return metersToUnit(this.getLengthM(), this.getUnit());
   }
 
   setLengthInUnit(value: number) {
-    const sc = this.app?.camera?.scale || 1;
-    this.setLengthM((value * this._pxPerUnit()) / Math.max(1e-9, sc));
+    this.setLengthM(unitToMeters(value, this.getUnit()));
   }
 
   /** Lineal aktiv? (unabhängig vom gewählten Zeichenwerkzeug) */

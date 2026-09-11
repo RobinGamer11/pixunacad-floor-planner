@@ -3572,27 +3572,11 @@ export class Renderer {
     if (!g) return;
     const ctx = this.ctx;
     const cam = this.camera;
-    let a = cam.worldToScreen(g.a.x, g.a.y);
-    let b = cam.worldToScreen(g.b.x, g.b.y);
-
-    // Bildschirm-Verankerung: Hat sich nur die Kamera bewegt (Zoom/Pan), werden
-    // die Weltpunkte so nachgeführt, dass das Lineal exakt an derselben Stelle
-    // des Bildschirms und in derselben Größe stehen bleibt.
-    const lock = (this as any)._rulerScreenLock as
-      | { sc: number; ox: number; oy: number; a: { x: number; y: number }; b: { x: number; y: number } }
-      | undefined;
-    if (lock && (lock.sc !== cam.scale || lock.ox !== cam.offsetX || lock.oy !== cam.offsetY)) {
-      const wa = cam.screenToWorld(lock.a.x, lock.a.y);
-      const wb = cam.screenToWorld(lock.b.x, lock.b.y);
-      g.a = v(wa.x, wa.y);
-      g.b = v(wb.x, wb.y);
-      a = { x: lock.a.x, y: lock.a.y };
-      b = { x: lock.b.x, y: lock.b.y };
-    }
-    (this as any)._rulerScreenLock = {
-      sc: cam.scale, ox: cam.offsetX, oy: cam.offsetY,
-      a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y },
-    };
+    // Die Geometrie bleibt vollständig in Weltkoordinaten verankert. Kamera-
+    // Zoom und -Pan verändern ausschließlich die Projektion auf den Bildschirm,
+    // niemals die gespeicherten Endpunkte, Länge oder Drehung des Lineals.
+    const a = cam.worldToScreen(g.a.x, g.a.y);
+    const b = cam.worldToScreen(g.b.x, g.b.y);
 
     const dx = b.x - a.x, dy = b.y - a.y;
     const lenPx = Math.hypot(dx, dy);
