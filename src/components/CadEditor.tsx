@@ -397,6 +397,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   // ── Tabellen-Werkzeug (identisch zur Projektmappe, als DOM-Overlay) ──
   const [tableTool, setTableTool] = useState(false);
+  const [tablePlacementActive, setTablePlacementActive] = useState(false);
   const [tableSelectedId, setTableSelectedId] = useState<string | null>(null);
   const [tableEditId, setTableEditId] = useState<string | null>(null);
   const [tableSelection, setTableSelection] = useState<TableSelection | null>(null);
@@ -833,12 +834,18 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setActiveTool(id);
       // Engine-Werkzeug gewählt → Tabellen-Overlay-Werkzeug verlassen.
       setTableTool(id === ToolIds.TABLE);
+      if (id !== ToolIds.TABLE) setTablePlacementActive(false);
       setTableEditId(null);
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       // Der Ebenen-Reiter bleibt dabei offen, wenn dort gerade gearbeitet wird.
       setRightTab((prev) => (prev === "layers" ? prev : (id === ToolIds.SELECT ? "sheets" : "settings")));
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
+    };
+    (app as any).onTablePlaced = () => {
+      setTablePlacementActive(false);
+      setTableTool(true);
+      setRightTab("settings");
     };
     // CAD-State pro Projekt aus localStorage wiederherstellen
     const persistKey = `pixuna.cad.${projectId ?? "default"}`;
@@ -1450,6 +1457,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               if (tableTool) { app?.setTool(ToolIds.SELECT); setTableTool(false); return; }
               app?.setTool(ToolIds.TABLE);
               setTableTool(true);
+              setTablePlacementActive(true);
               setTableEditId(null);
               setRightTab("settings");
             }}
@@ -3449,6 +3457,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 pageId={tableSheetId}
                 tableElement={tableElement as any}
                 isPending={false}
+                placementActive={tablePlacementActive}
                 formulaFn={tableFormulaFn}
                 setFormulaFn={setTableFormulaFn}
                 onPatch={(patch) => {
@@ -3463,9 +3472,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   setTableSelection(null);
                   app?.setTool?.(ToolIds.TABLE);
                   setTableTool(true);
+                  setTablePlacementActive(true);
                   setRightTab("settings");
                 }}
-                onConfirm={() => { (appRef.current as any)?.setTool?.(ToolIds.SELECT); setTableTool(false); setTableEditId(null); }}
+                onConfirm={() => { (appRef.current as any)?.setTool?.(ToolIds.SELECT); setTableTool(false); setTablePlacementActive(false); setTableEditId(null); }}
                 onCancel={() => {
                   const app = appRef.current as any;
                   // Nur beim aktiven Tabellenwerkzeug wird die frisch gesetzte
@@ -3477,6 +3487,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   setTableSelectedId(null);
                   setTableEditId(null);
                   setTableTool(false);
+                  setTablePlacementActive(false);
                   app?.setTool?.(ToolIds.SELECT);
                 }}
               />

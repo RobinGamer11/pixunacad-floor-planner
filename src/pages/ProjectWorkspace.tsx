@@ -6786,6 +6786,7 @@ function ToolsTab({
           pageId={pageId}
           tableElement={element?.kind === "table" ? element : undefined}
           isPending={!!pendingTableId && element?.id === pendingTableId}
+          placementActive={!!tablePlacementActive}
           pageWmm={settingsPage ? getPageSizeMm(settingsPage).wMm : undefined}
           pageHmm={settingsPage ? getPageSizeMm(settingsPage).hMm : undefined}
           formulaFn={tableFormulaFn ?? null}
