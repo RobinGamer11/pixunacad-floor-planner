@@ -3012,7 +3012,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 {docToolPhase === "placing" && (
                   <StepHints
                     steps={["Position setzen – L-Klick", "Objekt setzen – Enter"]}
-                    current={0}
+                    current={docPlacePointSet ? 1 : 0}
                     footer="ESC: abbrechen"
                   />
                 )}
