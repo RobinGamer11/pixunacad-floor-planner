@@ -80,6 +80,20 @@ export function unitToMeters(value: number, unit: RulerUnit): number {
 }
 
 /**
+ * Zoomunabhängiger, gut lesbarer Teilungsschritt für eine feste Lineallänge.
+ * Der Schritt hängt ausschließlich von Länge und Einheit ab. Kamera-Zoom und
+ * -Position können daher weder Zahlenschritte noch Teilstrichanzahl verändern.
+ */
+export function rulerTickStep(totalUnits: number, targetIntervals = 100): number {
+  if (!Number.isFinite(totalUnits) || totalUnits <= 0) return 1;
+  const raw = totalUnits / Math.max(1, targetIntervals);
+  const magnitude = 10 ** Math.floor(Math.log10(Math.max(raw, Number.EPSILON)));
+  const normalized = raw / magnitude;
+  const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return nice * magnitude;
+}
+
+/**
  * Fangpunkt für das Lineal: nutzt dieselbe TopologyEngine wie alle anderen
  * Werkzeuge (Objektpunkte, Mittel-/Teilungspunkte, Wände, Texte, Tabellen,
  * Dokumente, Blattrahmen, Hilfslinien und deren Schnittpunkte).
