@@ -255,54 +255,41 @@ export function WarpSection({ engine, docId }: { engine: MiniCad | any; docId: s
   };
 
   return (
-    <div
-      className="rounded-md border p-2 space-y-1.5"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Bild verzerren
-      </div>
-
-      <button
-        type="button"
+    <div className="space-y-1.5">
+      <SettingsToggleButton
+        label="Bild verzerren"
+        active={active}
         onClick={toggle}
-        className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
-        style={{
-          borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-          background: active ? "hsl(var(--accent-gold-soft))" : "transparent",
-        }}
         title="Vier Eckpunkte frei ziehen (perspektivische Verzerrung)"
-      >
-        {active ? "Verzerren beenden" : "Verzerren"}
-      </button>
-
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground w-14">Achse</span>
-        <select
-          value={axis}
-          onChange={(e) => setAxis(e.target.value as any)}
-          className="flex-1 h-8 px-2 rounded bg-transparent border text-[11px]"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="Beschränkt die Ziehrichtung der Verzerr-Handles"
-        >
-          <option value="free">Frei (X + Y)</option>
-          <option value="x">Nur X (horizontal)</option>
-          <option value="y">Nur Y (vertikal)</option>
-        </select>
-      </div>
-
+      />
 
       {active && (
-        <div className="text-[10px] text-muted-foreground leading-relaxed">
-          Eckpunkte am Dokument ziehen · Snap aktiv · Fertig über „Verzerren beenden“.
-        </div>
+        <>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground w-14">Achse</span>
+            <select
+              value={axis}
+              onChange={(e) => setAxis(e.target.value as any)}
+              className="cad-settings-select flex-1"
+              title="Beschränkt die Ziehrichtung der Verzerr-Handles"
+            >
+              <option value="free">Frei (X + Y)</option>
+              <option value="x">Nur X (horizontal)</option>
+              <option value="y">Nur Y (vertikal)</option>
+            </select>
+          </div>
+
+          <div className="text-[10px] text-muted-foreground leading-relaxed">
+            Eckpunkte am Dokument ziehen · Snap aktiv · Fertig über „Bild verzerren“.
+          </div>
+        </>
       )}
 
       {hasWarp && (
         <button
           type="button"
           onClick={reset}
-          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+          className="w-full h-8 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >
           Verzerrung zurücksetzen
