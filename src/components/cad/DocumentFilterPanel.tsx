@@ -666,29 +666,38 @@ function AdjustEditor({ filter, onChange, onBeginDrag }: {
     onChange((cur) => ({ adjust: { ...DEFAULT_ADJUST, ...(cur.adjust || {}), ...patch } }));
   const applyPreset = (params: Partial<AdjustParams>) => onChange({ adjust: { ...DEFAULT_ADJUST, ...params } });
 
+  // Die vier alten Mustervorlagen werden in der Oberfläche nicht mehr angeboten.
+  const HIDDEN_PRESETS = new Set(["master", "trees", "architecture", "competition"]);
+  const presets = ADJUST_PRESETS.filter(p => !HIDDEN_PRESETS.has(p.key));
+
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1">
-        {ADJUST_PRESETS.map(p => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => applyPreset(p.values)}
-            className="cad-toolbar-btn h-6 px-2 text-[10px]"
-            title={`Preset "${p.name}" anwenden`}
-          >
-            {p.name}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => applyPreset({})}
-          className="cad-toolbar-btn h-6 px-2 text-[10px] ml-auto"
-          title="Alle Regler zurücksetzen"
+      {presets.length > 0 && (
+        <select
+          value=""
+          onChange={(e) => {
+            const p = presets.find(x => x.key === e.target.value);
+            if (p) applyPreset(p.values);
+          }}
+          className="cad-settings-select w-full"
+          title="Filter bearbeiten"
         >
-          Reset
-        </button>
-      </div>
+          <option value="">Filter bearbeiten …</option>
+          {presets.map(p => (
+            <option key={p.key} value={p.key}>{p.name}</option>
+          ))}
+        </select>
+      )}
+      <button
+        type="button"
+        onClick={() => applyPreset({})}
+        className="cad-toolbar-btn h-9 w-full justify-center text-[12px] font-semibold"
+        style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }}
+        title="Alle Regler zurücksetzen"
+      >
+        Reset
+      </button>
+
 
       {ADJUST_GROUPS.map(group => (
         <div key={group.title} className="space-y-1 pt-1" style={{ borderTop: "1px dashed hsl(var(--border))" }}>
