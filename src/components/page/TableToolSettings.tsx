@@ -182,6 +182,14 @@ export function TableToolSettings({
       {/* Rahmen & Hintergrund */}
       <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">RAHMEN &amp; HINTERGRUND</div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-muted-foreground">Rahmenbreite</span>
+          <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <button onClick={() => patchTable({ borderWidthPx: Math.max(0, borderWidthPx - 1) })} className="h-8 w-8 flex items-center justify-center hover:bg-muted"><Minus size={12} /></button>
+            <div className="w-9 text-center text-[11px] tabular-nums">{borderWidthPx}px</div>
+            <button onClick={() => patchTable({ borderWidthPx: Math.min(6, borderWidthPx + 1) })} className="h-8 w-8 flex items-center justify-center hover:bg-muted"><Plus size={12} /></button>
+          </div>
+        </div>
         <ColorRow label="Rahmenfarbe" value={borderColor} onChange={(v) => patchTable({ borderColor: v })} big />
         <ColorRow label="Hintergrund" value={background} onChange={setTableBackground} big />
         <div className="text-[10px] text-muted-foreground leading-snug">
