@@ -62,19 +62,22 @@ export function collectBoundaryEdges(scene: Scene): RawEdge[] {
       if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
     }
   }
+  // Schraffuren UND Polygone: exakt die sichtbare effektive Kontur (Bulges,
+  // Aufrauen, Löcher) — dieselbe Pipeline wie Renderer und Auswahl.
   for (const h of scene.hatches) {
-    const pts = h.points;
-    if (pts.length < 3) continue;
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length];
-      if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
+    if (!h.points || h.points.length < 2) continue;
+    const geom = getEffectiveContourGeometry(h as any);
+    if (geom.closed) {
+      for (const ring of geom.rings) pushPath(ring, true);
+    } else {
+      pushPath(geom.outer, false);
     }
   }
   for (const s of scene.freeStrokes) {
-    for (let i = 0; i < s.points.length - 1; i++) {
-      const a = s.points[i], b = s.points[i + 1];
-      if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
-    }
+    const pts = getEffectiveOpenGeometry(
+      s.points, (s as any).roughen, `free:${s.id}:${s.points.length}`, (s as any).sourceStartDistanceM || 0,
+    );
+    pushPath(pts, false);
   }
   return out;
 }
