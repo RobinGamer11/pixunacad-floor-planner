@@ -3,6 +3,7 @@ import { Check, Grid2X2, Move, CheckCheck } from "lucide-react";
 import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
 import { onPatternsChanged } from "@/cad/customHatchPatterns";
 import { defaultPatternScale } from "@/cad/hatchPatterns";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 /** Trennt eine Maßeinheit in Klammern vom Beschriftungstext ab. */
 const splitUnit = (label: string): [string, string | null] => {
