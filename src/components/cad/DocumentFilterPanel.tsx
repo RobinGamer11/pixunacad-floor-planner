@@ -366,7 +366,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
             </div>
             <input type="range" min={1} max={128} step={1} value={bg.tolerance}
               onChange={(e) => patchBg({ tolerance: parseInt(e.target.value, 10) })}
-              className="w-full" />
+              className="pixuna-range w-full" />
           </div>
 
           {/* Klick-Werkzeuge */}
@@ -396,7 +396,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
                 <button
                   type="button"
                   onClick={() => setBrushMode("bg")}
-                  className="cad-toolbar-btn h-5 px-1.5 text-[10px]"
+                  className="cad-toolbar-btn h-7 px-2 text-[11px]"
                   style={{
                     borderColor: brushMode === "bg" ? "hsl(var(--primary))" : undefined,
                     background: brushMode === "bg" ? "hsl(var(--primary) / 0.15)" : undefined,
@@ -406,7 +406,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
                 <button
                   type="button"
                   onClick={() => setBrushMode("fg")}
-                  className="cad-toolbar-btn h-5 px-1.5 text-[10px]"
+                  className="cad-toolbar-btn h-7 px-2 text-[11px]"
                   style={{
                     borderColor: brushMode === "fg" ? "hsl(var(--primary))" : undefined,
                     background: brushMode === "fg" ? "hsl(var(--primary) / 0.15)" : undefined,
@@ -428,7 +428,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
               </div>
               <input type="range" min={1} max={200} step={1} value={Math.round(bg.brushRadiusM * 100)}
                 onChange={(e) => patchBg({ brushRadiusM: parseInt(e.target.value, 10) / 100 })}
-                className="w-full" />
+                className="pixuna-range w-full" />
             </div>
           </div>
 
@@ -526,7 +526,7 @@ function ColorAlphaRow({ label, color, alpha, onChange, hint }: {
       </div>
       <input type="range" min={0} max={1} step={0.01} value={alpha}
         onChange={(e) => onChange(color, parseFloat(e.target.value))}
-        className="w-full" />
+        className="pixuna-range w-full" />
     </div>
   );
 }
