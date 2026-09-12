@@ -2611,7 +2611,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
 
                 <div className={measureIsAngle ? "hidden" : ""}>
-                <CadCheckboxProxy target={measureExtRef} label="Verlängerungslinien" />
+                <CadBigToggleProxy target={measureExtRef} label="Verlängerungslinien" />
                 </div>
                 <div ref={measureExtGroupRef} className={`hidden space-y-2 ${measureIsAngle ? "!hidden" : ""}`}>
                   <div>
@@ -2624,7 +2624,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <CadColorProxy label="Farbe Verlängerung" target={measureExtColorRef} />
                 </div>
 
-                <CadCheckboxProxy target={measureFreeTextToggleRef} label="Freier Text" />
+                <CadBigToggleProxy target={measureFreeTextToggleRef} label="Freier Text" />
                 <div ref={measureFreeTextGroupRef} className="hidden space-y-2">
                   <input
                     ref={measureFreeTextInputRef}
@@ -2640,7 +2640,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <CadColorProxy label="Farbe freier Text" target={measureFreeTextColorRef} />
                 </div>
 
-                <CadCheckboxProxy target={measureTextBgToggleRef} label="Text-Hintergrund" />
+                <CadBigToggleProxy target={measureTextBgToggleRef} label="Text-Hintergrund" />
                 <div ref={measureTextBgGroupRef} className="hidden space-y-2">
                   <CadColorProxy label="Hintergrundfarbe" target={measureTextBgColorRef} />
                 </div>
@@ -2656,6 +2656,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <CadEbeneSelect target={textIdSelectRef} />
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
                 <div className="hidden">
@@ -2673,7 +2674,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </CadToggleProxy>
                 </div>
               </div>
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
             </div>
             <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
             <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>TEXT</div>
@@ -2741,23 +2741,21 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
               </div>
               <div>
-                <div className="mb-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>Transparenz</span>
-                  <span className="flex overflow-hidden rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>
-                    {(["text", "bg"] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setTextAlphaTarget(t)}
-                        className="px-1.5 py-[1px] text-[9px]"
-                        style={textAlphaTarget === t
-                          ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
-                          : { background: "transparent" }}
-                      >
-                        {t === "text" ? "Text" : "Feld"}
-                      </button>
-                    ))}
-                  </span>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+                <div className="mb-2 grid grid-cols-2 gap-1">
+                  {(["text", "bg"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTextAlphaTarget(t)}
+                      className="flex h-9 items-center justify-center rounded-md border text-[12px] font-medium transition-colors"
+                      style={textAlphaTarget === t
+                        ? { borderColor: "hsl(var(--primary))", background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
+                        : { borderColor: "hsl(var(--hairline))", background: "transparent" }}
+                    >
+                      {t === "text" ? "Text" : "Feld"}
+                    </button>
+                  ))}
                 </div>
                 <div className="hidden">
                   <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} />
@@ -2776,11 +2774,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label className="!mb-0 cursor-pointer">Zeilenumbruch</label>
               </div>
               <div>
-                <div className="mb-1.5 text-[10px] text-muted-foreground">Rahmen</div>
                 <div className="hidden">
                   <input ref={textBorderToggleRef} type="checkbox" />
                 </div>
-                <CadCheckboxProxy target={textBorderToggleRef} label="Rahmen anzeigen" />
+                <CadBigToggleProxy target={textBorderToggleRef} label="Rahmen" />
               </div>
               <div ref={textBorderGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
@@ -2812,10 +2809,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     if (stickerPhase === "selecting") appRef.current!.stickerTool.cancel();
                     else appRef.current!.stickerTool.beginSelectionMode();
                   }}
-                  className={`cad-toolbar-btn w-full justify-center h-9 ${stickerPhase === "selecting" ? "active" : ""}`}
+                  className={`cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold ${stickerPhase === "selecting" ? "active" : ""}`}
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
                   title="Objekte für einen neuen Stempel auswählen"
                 >
-                  <Plus className="h-4 w-4" /> <span className="text-xs">Stempel</span>
+                  <Plus className="h-4 w-4" /> <span>Neuer Stempel</span>
                 </button>
 
                 {stickerPhase === "selecting" && (
