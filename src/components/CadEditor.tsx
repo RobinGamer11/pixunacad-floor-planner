@@ -41,6 +41,7 @@ import {
   CadToggleProxy,
   CadRangeProxy,
   CadCheckboxProxy,
+  CadBigToggleProxy,
   CadSegmentedProxy,
 } from "@/components/cad/CadFieldProxies";
 
