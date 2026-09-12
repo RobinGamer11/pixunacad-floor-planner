@@ -1,7 +1,7 @@
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
-import { rulerSideOf, rulerUnitOf, rulerPxPerUnit } from "./rulerModel";
+import { metersToUnit, rulerSideOf, rulerTickStep, rulerUnitOf } from "./rulerModel";
 import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
@@ -3585,9 +3585,8 @@ export class Renderer {
 
     const side = rulerSideOf(g);
     const unit = rulerUnitOf(g);
-    const kUnit = this._screenPxScale();
-    const pxPerUnit = rulerPxPerUnit(unit, kUnit);
-    const totalUnits = lenPx / pxPerUnit;
+    const lengthM = Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y);
+    const totalUnits = metersToUnit(lengthM, unit);
 
     // Feste Bildschirmgrößen: Verhältnis Backing-Store ↔ sichtbare CSS-Größe,
     // bereinigt um eine bereits gesetzte Canvas-Transformation. Der Kamera-
@@ -3625,21 +3624,13 @@ export class Renderer {
 
     // Teilung — beginnt an der Zeichenkante und läuft in den Körper hinein.
     const dir = bodyTop < 0 && side !== "center" ? -1 : 1; // "rechts": Körper oberhalb
-    const total = Math.floor(totalUnits + 1e-6);
-    const showFine = pxPerUnit >= 26 * k;
-    // Beschriftungen werden bei Platzmangel ausgelassen (jede 2./5./10. …),
-    // NIEMALS verkleinert und niemals in eine andere Einheit umgerechnet.
+    // Teilung und Zahlenabstand hängen ausschließlich von der gespeicherten
+    // Weltlänge und Maßeinheit ab. Damit bleibt ihre Anzahl beim Zoomen gleich;
+    // nur ihre Lage folgt den weltverankerten Endpunkten.
+    const tickStep = rulerTickStep(totalUnits, 100);
+    const labelStep = rulerTickStep(totalUnits, 10);
+    const totalTicks = Math.floor(totalUnits / tickStep + 1e-9);
     ctx.font = `${fontPx}px system-ui, sans-serif`;
-    const sampleW = Math.max(
-      ctx.measureText(String(Math.max(1, Math.floor(totalUnits)))).width,
-      fontPx
-    );
-    const needPx = sampleW + 8 * k;
-    let labelEvery = 1;
-    for (const step of [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000]) {
-      labelEvery = step;
-      if (step * pxPerUnit >= needPx) break;
-    }
     ctx.strokeStyle = "rgba(30,70,120,0.85)";
     ctx.fillStyle = "rgba(30,70,120,0.95)";
     ctx.lineWidth = hairline;
@@ -3647,31 +3638,24 @@ export class Renderer {
     ctx.textAlign = "center";
     ctx.textBaseline = dir > 0 ? "top" : "bottom";
     const base = side === "center" ? -bandPx / 2 : 0;
-    for (let c = 0; c <= total; c++) {
-      const x = c * pxPerUnit;
-      if (x > lenPx + 0.5) break;
-      const major = c % 10 === 0;
-      const mid = c % 5 === 0;
+    for (let i = 0; i <= totalTicks; i++) {
+      const value = i * tickStep;
+      const x = totalUnits > 0 ? (value / totalUnits) * lenPx : 0;
+      const labelRatio = value / labelStep;
+      const major = Math.abs(labelRatio - Math.round(labelRatio)) < 1e-7;
+      const halfRatio = value / (labelStep / 2);
+      const mid = !major && Math.abs(halfRatio - Math.round(halfRatio)) < 1e-7;
       const h = (major ? bandPx * 0.55 : mid ? bandPx * 0.38 : bandPx * 0.22) * (side === "center" ? 1 : 1);
       ctx.beginPath();
       ctx.moveTo(x, base);
       ctx.lineTo(x, base + h * dir);
       ctx.stroke();
-      if (showFine && c < total) {
-        for (let m = 1; m < 10; m++) {
-          const mx = x + (m / 10) * pxPerUnit;
-          if (mx > lenPx) break;
-          ctx.beginPath();
-          ctx.moveTo(mx, base);
-          ctx.lineTo(mx, base + bandPx * 0.14 * dir);
-          ctx.stroke();
-        }
-      }
-      if (c % labelEvery === 0) {
+      if (major) {
         ctx.save();
         ctx.translate(x, base + bandPx * 0.6 * dir);
         if (Math.abs(ang) > Math.PI / 2) ctx.rotate(Math.PI);
-        ctx.fillText(String(c), 0, 0);
+        const decimals = tickStep < 1 ? Math.min(3, Math.ceil(-Math.log10(tickStep))) : 0;
+        ctx.fillText(Number(value.toFixed(decimals)).toLocaleString("de-DE"), 0, 0);
         ctx.restore();
       }
     }
