@@ -47,6 +47,8 @@ export function TableToolSettings({
   onCancel: () => void;
   /** Alternative Persistenz (CAD-Oberfläche): ersetzt projectStore-Update. */
   onPatch?: (patch: Partial<PageElement>) => void;
+  /** Weitere Tabelle platzieren, während bereits eine Tabelle ausgewählt ist. */
+  onNewTable?: () => void;
 }) {
   const ctx = React.useContext(TableEditContext);
   const [infoOpen, setInfoOpen] = React.useState(false);
