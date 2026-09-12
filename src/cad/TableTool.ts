@@ -57,7 +57,7 @@ export class TableTool {
     // Ein weiterer Canvas-Klick darf keine zweite Tabelle erzeugen; dafür muss
     // „+ Neue Tabelle“ erneut ausdrücklich gestartet werden.
     this.awaitingPlacement = false;
-    (this.app as any).onTablePlaced?.(table.id);
+    this.app.onTablePlaced?.(table.id);
     // Sicherstellen, dass keine Cursor-Einstellung hängen bleibt.
     try { this.app.canvas.style.cursor = ""; } catch { /* noop */ }
     this.app.renderer.render();

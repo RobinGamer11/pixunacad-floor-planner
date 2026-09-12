@@ -1287,6 +1287,8 @@ export class CadApp {
 
   /** ID der Tabelle im internen Zellmodus (null = normaler CAD-Objektmodus). */
   tableEditId: string | null = null;
+  /** UI-Hook: native Tabellenplatzierung wurde abgeschlossen. */
+  onTablePlaced?: (id: string) => void;
   private _tableEditListeners = new Set<(id: string | null) => void>();
   onTableEditChange(fn: (id: string | null) => void) {
     this._tableEditListeners.add(fn);

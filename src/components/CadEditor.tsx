@@ -842,7 +842,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
-    (app as any).onTablePlaced = () => {
+    app.onTablePlaced = () => {
       setTablePlacementActive(false);
       setTableTool(true);
       setRightTab("settings");
@@ -1296,7 +1296,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   return (
     <TableEditContext.Provider value={{
       editId: tableEditId,
-      setEditId: setTableEditId,
+      setEditId: (id) => {
+        setTableEditId(id);
+        const app = appRef.current;
+        if (id) app?.beginTableEdit?.(id);
+        else app?.endTableEdit?.();
+      },
       selection: tableSelection,
       setSelection: setTableSelection,
       newCols: tableNewCols,
@@ -1454,10 +1459,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button
             onClick={() => {
               const app = appRef.current;
-              if (tableTool) { app?.setTool(ToolIds.SELECT); setTableTool(false); return; }
-              app?.setTool(ToolIds.TABLE);
+              if (tableTool) {
+                if (app?.activeTool === app.tableTool) app.setTool(ToolIds.SELECT);
+                setTableTool(false);
+                setTablePlacementActive(false);
+                return;
+              }
+              // Das Symbol öffnet nur die gemeinsamen Einstellungen. Erst die
+              // Hauptaktion „Neue Tabelle“ startet die eigentliche Platzierung.
               setTableTool(true);
-              setTablePlacementActive(true);
+              setTablePlacementActive(false);
               setTableEditId(null);
               setRightTab("settings");
             }}
