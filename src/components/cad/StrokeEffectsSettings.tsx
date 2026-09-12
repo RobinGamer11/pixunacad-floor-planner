@@ -8,6 +8,7 @@ import {
   type BrushPresetId,
 } from "@/cad/brushStrokes";
 import { applyBrushSizeDefaults } from "@/cad/brushSizeDefaults";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -131,7 +132,16 @@ const BrushButton: React.FC<{
  * Linien-, Polygon-, Schraffur- und Freihandwerkzeug. Ohne Auswahl werden die
  * Werkzeug-Standardwerte bearbeitet, mit Auswahl alle markierten Objekte.
  */
-export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind }> = ({ app, kind }) => {
+export type StrokeEffectSection = "roughen" | "pattern" | "brush";
+
+export const StrokeEffectsSettings: React.FC<{
+  app: any;
+  kind: StrokeEffectKind;
+  /** Welche Bereiche in welcher Reihenfolge gezeigt werden. */
+  sections?: StrokeEffectSection[];
+  /** true = ohne obere Trennlinie (wenn der Bereich mitten im Panel steht). */
+  bare?: boolean;
+}> = ({ app, kind, sections, bare = false }) => {
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   useEffect(() => {
