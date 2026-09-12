@@ -5988,6 +5988,7 @@ function RightInspector({
   updateToolSettings,
 
   pendingTableId,
+  tablePlacementActive,
   tableModifyMode,
   setTableModifyMode,
   tableFormulaFn,
@@ -6028,6 +6029,7 @@ function RightInspector({
   updateToolSettings: <K extends keyof ToolSettings>(k: K, patch: Partial<ToolSettings[K]>) => void;
 
   pendingTableId?: string | null;
+  tablePlacementActive?: boolean;
   tableModifyMode?: boolean;
   setTableModifyMode?: (v: boolean) => void;
   tableFormulaFn?: FormulaFn | null;
@@ -6099,6 +6101,7 @@ function RightInspector({
               onJumpCad={onJumpCad}
               cadEngine={cadEngine ?? null}
               pendingTableId={pendingTableId ?? null}
+              tablePlacementActive={tablePlacementActive}
               tableModifyMode={!!tableModifyMode}
               setTableModifyMode={setTableModifyMode}
               tableFormulaFn={tableFormulaFn ?? null}
@@ -6600,6 +6603,7 @@ function ToolsTab({
   onJumpCad,
   cadEngine,
   pendingTableId,
+  tablePlacementActive,
   tableModifyMode,
   setTableModifyMode,
   tableFormulaFn,
@@ -6635,6 +6639,7 @@ function ToolsTab({
   onJumpCad: (sheetId?: string) => void;
   cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
   pendingTableId?: string | null;
+  tablePlacementActive?: boolean;
   tableModifyMode?: boolean;
   setTableModifyMode?: (v: boolean) => void;
   tableFormulaFn?: FormulaFn | null;
