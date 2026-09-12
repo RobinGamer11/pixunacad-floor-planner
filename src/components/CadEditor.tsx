@@ -33,6 +33,7 @@ import { LineModeSelect } from "@/components/cad/LineModeSelect";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
+import { StepHints } from "@/components/cad/StepHints";
 import {
   CadEbeneSelect,
   CadThicknessMmInput,
