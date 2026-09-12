@@ -453,18 +453,19 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
-function Stepper({ label, value, min, max, onChange }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void;
+function Stepper({ label, value, min, max, onChange, big }: {
+  label: string; value: number; min: number; max: number; onChange: (v: number) => void; big?: boolean;
 }) {
+  const h = big ? "h-9" : "h-7";
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className={`${big ? "text-[12px] font-medium" : "text-[11px]"} text-muted-foreground`}>{label}</span>
       <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
         <button
           onClick={() => onChange(Math.max(min, value - 1))}
           disabled={value <= min}
-          className="h-7 w-7 flex items-center justify-center hover:bg-muted disabled:opacity-30"
-        ><Minus size={11} /></button>
+          className={`${h} ${big ? "w-9" : "w-7"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
+        ><Minus size={big ? 13 : 11} /></button>
         <input
           type="number"
           min={min}
@@ -474,13 +475,13 @@ function Stepper({ label, value, min, max, onChange }: {
             const n = Number(e.target.value);
             if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)));
           }}
-          className="w-10 h-7 text-center text-[11px] bg-transparent outline-none"
+          className={`${big ? "w-12 h-9 text-[13px]" : "w-10 h-7 text-[11px]"} text-center bg-transparent outline-none tabular-nums`}
         />
         <button
           onClick={() => onChange(Math.min(max, value + 1))}
           disabled={value >= max}
-          className="h-7 w-7 flex items-center justify-center hover:bg-muted disabled:opacity-30"
-        ><Plus size={11} /></button>
+          className={`${h} ${big ? "w-9" : "w-7"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
+        ><Plus size={big ? 13 : 11} /></button>
       </div>
     </div>
   );
