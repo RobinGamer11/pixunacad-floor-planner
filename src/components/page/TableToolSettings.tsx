@@ -61,19 +61,22 @@ export function TableToolSettings({
 
   if (!tableElement || tableElement.kind !== "table") {
     return (
-      <div className="space-y-3">
-        <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
-          <div
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border text-[12px] font-semibold"
+      <div className="space-y-3 cad-table-settings">
+        <button
+            type="button"
+            onClick={() => onNewTable?.()}
+            disabled={!onNewTable}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border px-3 text-[13px] font-semibold transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             style={{
-              borderColor: "hsl(var(--hairline))",
+              borderColor: "hsl(var(--accent-gold))",
               background: "hsl(var(--accent-gold-soft))",
               color: "hsl(var(--accent-gold))",
             }}
           >
-            <Plus size={14} /> Neue Tabelle
-          </div>
+            <Plus size={16} /> Neue Tabelle
+          </button>
+        <div className="rounded-md border p-2.5 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
           <Stepper label="Spalten" value={newCols} min={1} max={24} onChange={setNewCols} big />
           <Stepper label="Zeilen" value={newRows} min={1} max={200} onChange={setNewRows} big />
           <div className="text-[10px] text-muted-foreground leading-snug">
@@ -146,7 +149,7 @@ export function TableToolSettings({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 cad-table-settings">
       {onNewTable && (
         <button
           type="button"
@@ -159,11 +162,11 @@ export function TableToolSettings({
           }}
           title="Weitere Tabelle auf dieser Seite platzieren"
         >
-          <Plus size={15} /> Tabelle
+          <Plus size={16} /> Neue Tabelle
         </button>
       )}
       <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">TABELLE</div>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
 
 
         <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
@@ -233,7 +236,7 @@ export function TableToolSettings({
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] font-semibold text-muted-foreground">Struktur</div>
+            <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">TABELLENMODUS</div>
             <div className="flex items-center gap-1 text-[10px]">
               <span className="text-muted-foreground">Feld:</span>
               <span
@@ -267,7 +270,7 @@ export function TableToolSettings({
 
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[11px] font-semibold text-muted-foreground">Zellformat</div>
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">ZELLFORMAT</div>
           <div className="flex items-center gap-1">
             <Toggle active={fmt.align === "left"} onClick={() => format({ align: "left" as HAlign })}><AlignLeft size={11} /></Toggle>
             <Toggle active={fmt.align === "center"} onClick={() => format({ align: "center" as HAlign })}><AlignCenter size={11} /></Toggle>
@@ -415,7 +418,7 @@ function MiniBtn({ icon, label, onClick, disabled }: { icon: React.ReactNode; la
     <button
       onClick={onClick}
       disabled={disabled}
-      className="h-7 px-1.5 rounded-md border text-[10px] flex items-center gap-1 justify-center hover:bg-muted disabled:opacity-30"
+      className="min-h-10 px-2 rounded-md border text-[11px] flex items-center gap-1.5 justify-center hover:bg-muted disabled:opacity-30"
       style={{ borderColor: "hsl(var(--hairline))" }}
     >
       {icon}<span className="truncate">{label}</span>
@@ -427,7 +430,7 @@ function Toggle({ active, onClick, children }: { active?: boolean; onClick: () =
   return (
     <button
       onClick={onClick}
-      className="h-7 w-7 rounded-md border flex items-center justify-center hover:bg-muted"
+      className="h-10 min-w-10 flex-1 rounded-md border flex items-center justify-center hover:bg-muted"
       style={{
         borderColor: "hsl(var(--hairline))",
         background: active ? "hsl(var(--accent-gold-soft))" : undefined,

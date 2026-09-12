@@ -3457,6 +3457,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   if ((patch as any)?.tableData) t.setData((patch as any).tableData);
                   (appRef.current as any)?.renderer?.render?.();
                 }}
+                onNewTable={() => {
+                  const app = appRef.current as any;
+                  setTableEditId(null);
+                  setTableSelection(null);
+                  app?.setTool?.(ToolIds.TABLE);
+                  setTableTool(true);
+                  setRightTab("settings");
+                }}
                 onConfirm={() => { (appRef.current as any)?.setTool?.(ToolIds.SELECT); setTableTool(false); setTableEditId(null); }}
                 onCancel={() => {
                   const app = appRef.current as any;

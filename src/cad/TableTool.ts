@@ -6,7 +6,7 @@
  * Die Tabellengröße im Modellraum folgt der zentralen Annotationsskalierung
  * (`ANNOTATION_M_PER_MM`) und ist damit unabhängig vom späteren Druckmaßstab.
  */
-import { SelectionType, ToolIds } from "./constants";
+import { SelectionType } from "./constants";
 import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import { ANNOTATION_M_PER_MM } from "./textTypography";

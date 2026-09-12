@@ -2976,6 +2976,8 @@ function PageCanvas({
   activeTool,
   toolSettings,
   onCommitTool,
+  onPlaceTable,
+  tablePlacementActive,
   onSelect,
   onMultiSelect,
   onCadSelectionChange,
@@ -2996,6 +2998,8 @@ function PageCanvas({
   activeTool: PageTool;
   toolSettings: ToolSettings;
   onCommitTool: () => void;
+  onPlaceTable?: (pageId: string, xPct: number, yPct: number) => void;
+  tablePlacementActive?: boolean;
   onSelect: (id?: string, opts?: { shift?: boolean }) => void;
   onMultiSelect?: (ids: string[]) => void;
   onCadSelectionChange: (info: MiniCadSelectionInfo | null, count?: number) => void;
@@ -3100,6 +3104,11 @@ function PageCanvas({
     if (e.target !== e.currentTarget) return;
     if (e.button !== 0) {
       if (!selectedIsTableObject) onSelect(undefined);
+      return;
+    }
+    if (activeTool === "table" && tablePlacementActive) {
+      const point = toPct(e.clientX, e.clientY);
+      onPlaceTable?.(page.id, point.x, point.y);
       return;
     }
     if (activeTool !== null) { onSelect(undefined); return; }
@@ -3313,7 +3322,7 @@ function PageCanvas({
             height: displayHeight,
             background: "white",
             border: bare ? "none" : "1px solid hsl(var(--hairline))",
-            cursor: cursorStyle,
+            cursor: activeTool === "table" && tablePlacementActive ? "crosshair" : cursorStyle,
           }}
           onPointerDown={handlePagePointerDown}
           onPointerMove={handlePagePointerMove}
