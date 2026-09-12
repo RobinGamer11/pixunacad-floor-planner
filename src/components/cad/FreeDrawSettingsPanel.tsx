@@ -4,6 +4,7 @@ import type { MiniCad } from "@/cad/embed/MiniCad";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 type FreeStyle = "solid" | "image";
 
