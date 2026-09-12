@@ -5,6 +5,8 @@ import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
+import { StepHints } from "@/components/cad/StepHints";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
