@@ -928,7 +928,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     };
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
-    app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
+    app.documentTool.onPhaseChange = () => {
+      setDocToolPhase(app.documentTool.phase);
+      setDocPlacePointSet(app.documentTool.hasPlacedPosition());
+    };
     app.onSelectionChange = () => {
       setSelectedWallId(app.getSelectedWall()?.id || null);
       // Auswahl-Werkzeug: bestehendes Objekt ausgewählt → automatisch in die
