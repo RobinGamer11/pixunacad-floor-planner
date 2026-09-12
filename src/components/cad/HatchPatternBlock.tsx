@@ -178,40 +178,28 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600, scaleU
 
   return (
     <div className="space-y-2 rounded border p-2" style={{ borderColor: hairline }}>
-      <button
-        type="button"
+      <SettingsToggleButton
+        label="Muster"
+        active={enabled}
         onClick={() => {
           const next = !enabled;
           setEnabled(next);
           apply((h) => { h.patternEnabled = next; }, () => { app.defaultHatchPatternEnabled = next; });
         }}
-        className="flex w-full items-center gap-2 text-[11px]"
-        aria-pressed={enabled}
-      >
-        <span
-          className="flex h-4 w-4 items-center justify-center rounded border"
-          style={{
-            borderColor: hairline,
-            background: enabled ? "hsl(var(--primary) / 0.16)" : "transparent",
-            color: "hsl(var(--primary))",
-          }}
-        >
-          {enabled && <Check size={11} />}
-        </span>
-        <span className="flex items-center gap-1.5"><Grid2X2 size={13} /> Muster</span>
-      </button>
+      />
 
+      {enabled && (
+        <>
       <select
         value={patternId}
-        disabled={!enabled}
         onChange={(e) => selectPattern(e.target.value)}
-        className={`w-full rounded border bg-transparent px-1.5 py-1 text-[11px] ${enabled ? "" : "opacity-50"}`}
-        style={{ borderColor: hairline }}
+        className="cad-settings-select w-full"
       >
         {patternOptions.map((p) => (
           <option key={p.id} value={p.id}>{p.label}</option>
         ))}
       </select>
+
 
       <HatchPatternManage
         patternId={patternId}
@@ -299,6 +287,8 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 600, scaleU
           </button>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };
