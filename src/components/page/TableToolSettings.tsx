@@ -258,32 +258,6 @@ export function TableToolSettings({
           <ColorRow label="Zellhintergrund" value={fmt.background ?? "#ffffff"} onChange={(v) => format({ background: v })} />
 
           <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
-            <div className="text-[10px] font-semibold text-muted-foreground">
-              Zahlenformat{numFormatSel === null ? " (gemischt)" : ""}
-            </div>
-            <div className="flex items-center gap-1">
-              {NUM_FORMATS.map((nf) => (
-                <button
-                  key={nf.key}
-                  onClick={() => format({ numFormat: nf.key })}
-                  className="h-7 flex-1 rounded-md border text-[10px]"
-                  style={{
-                    borderColor: "hsl(var(--hairline))",
-                    background: numFormatSel === nf.key ? "hsl(var(--accent-gold-soft))" : undefined,
-                    color: numFormatSel === nf.key ? "hsl(var(--accent-gold))" : undefined,
-                  }}
-                  title={nf.title}
-                >{nf.label}</button>
-              ))}
-            </div>
-            <div className="text-[10px] text-muted-foreground leading-snug">
-              Nur Anzeige — Formeln rechnen weiterhin mit dem Rohwert
-              (z. B. 0,19 mit „%“ = 19,00 %).
-            </div>
-          </div>
-
-
-          <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
             <div className="text-[10px] font-semibold text-muted-foreground">Zellrahmen</div>
             <div className="flex items-center gap-1">
               {(["top", "right", "bottom", "left"] as const).map((side) => (
@@ -310,7 +284,7 @@ export function TableToolSettings({
                 <button
                   key={st}
                   onClick={() => format({ borderStyle: st })}
-                  className="h-7 flex-1 rounded-md border text-[10px]"
+                  className="h-8 flex-1 rounded-md border text-[11px]"
                   style={{
                     borderColor: "hsl(var(--hairline))",
                     background: cellBorders.style === st ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -321,7 +295,7 @@ export function TableToolSettings({
             </div>
             <button
               onClick={() => format({ bottomDouble: !cellBorders.bottomDouble, borders: { ...(fmtRaw.borders ?? {}), bottom: true } })}
-              className="w-full h-7 rounded-md border text-[10px] flex items-center justify-center gap-1.5"
+              className="w-full h-8 rounded-md border text-[10px] flex items-center justify-center gap-1.5"
               style={{
                 borderColor: "hsl(var(--hairline))",
                 background: cellBorders.bottomDouble ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -331,45 +305,35 @@ export function TableToolSettings({
             >
               <Equal size={11} /> Summenlinie (untere Doppellinie)
             </button>
-            <UnitField
-              label="Rahmenstärke (Zelle)"
-              value={cellBorders.widthPx}
-              unit="px" min={0} max={8}
-              onChange={(v) => format({ borderWidthPx: Math.round(v) })}
-            />
+          </div>
+
+          <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
+            <div className="text-[10px] font-semibold text-muted-foreground">
+              Zahlenformat{numFormatSel === null ? " (gemischt)" : ""}
+            </div>
+            <div className="flex items-center gap-1">
+              {NUM_FORMATS.map((nf) => (
+                <button
+                  key={nf.key}
+                  onClick={() => format({ numFormat: nf.key })}
+                  className="h-8 flex-1 rounded-md border text-[11px]"
+                  style={{
+                    borderColor: "hsl(var(--hairline))",
+                    background: numFormatSel === nf.key ? "hsl(var(--accent-gold-soft))" : undefined,
+                    color: numFormatSel === nf.key ? "hsl(var(--accent-gold))" : undefined,
+                  }}
+                  title={nf.title}
+                >{nf.label}</button>
+              ))}
+            </div>
+            <div className="text-[10px] text-muted-foreground leading-snug">
+              Nur Anzeige — Formeln rechnen weiterhin mit dem Rohwert
+              (z. B. 0,19 mit „%“ = 19,00 %).
+            </div>
           </div>
         </div>
       )}
 
-      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[11px] font-semibold text-muted-foreground">Rahmen &amp; Hintergrund</div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted-foreground">Rahmenbreite</span>
-          <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <button onClick={() => patchTable({ borderWidthPx: Math.max(0, borderWidthPx - 1) })} className="h-7 w-7 flex items-center justify-center hover:bg-muted"><Minus size={11} /></button>
-            <div className="w-8 text-center text-[11px]">{borderWidthPx}px</div>
-            <button onClick={() => patchTable({ borderWidthPx: Math.min(6, borderWidthPx + 1) })} className="h-7 w-7 flex items-center justify-center hover:bg-muted"><Plus size={11} /></button>
-          </div>
-        </div>
-        <ColorRow label="Rahmenfarbe" value={borderColor} onChange={(v) => patchTable({ borderColor: v })} />
-        <ColorRow label="Hintergrund" value={background} onChange={setTableBackground} />
-        <div className="text-[10px] text-muted-foreground leading-snug">
-          „Hintergrund" gilt für die ganze Tabelle und überschreibt beim erneuten
-          Anwenden alle einzeln gesetzten Zellhintergründe.
-        </div>
-
-        <button
-          onClick={() => patchTable({ filtersEnabled: !filtersEnabled, filters: {} })}
-          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
-          style={{
-            borderColor: "hsl(var(--hairline))",
-            background: filtersEnabled ? "hsl(var(--accent-gold-soft))" : undefined,
-            color: filtersEnabled ? "hsl(var(--accent-gold))" : undefined,
-          }}
-        >
-          <Filter size={11} /> Filterfunktion {filtersEnabled ? "an" : "aus"}
-        </button>
-      </div>
 
       {setFormulaFn && editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
