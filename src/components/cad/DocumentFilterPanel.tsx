@@ -488,7 +488,7 @@ function ToolBtn({ active, onClick, label, title }: { active: boolean; onClick: 
       type="button"
       onClick={onClick}
       title={title}
-      className="cad-toolbar-btn h-7 px-2 text-[11px] justify-center"
+      className="cad-toolbar-btn h-9 px-2 text-[11px] font-medium justify-center"
       style={{
         borderColor: active ? "hsl(var(--primary))" : undefined,
         background: active ? "hsl(var(--primary) / 0.15)" : undefined,
