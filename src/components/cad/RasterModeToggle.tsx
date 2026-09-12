@@ -142,8 +142,7 @@ export const RasterModeToggle: React.FC<Props> = ({ app, projectId }) => {
                 setSupersamplingFactor(next);
                 saveQuality({ factor: next });
               }}
-              className="h-7 px-1 text-[11px] rounded border bg-transparent disabled:opacity-40"
-              style={{ borderColor: "hsl(var(--hairline))" }}
+              className="cad-settings-select h-7 w-auto disabled:opacity-40"
             >
               <option value={2}>2×</option>
               <option value={4}>4×</option>
