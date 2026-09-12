@@ -169,10 +169,8 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
           </select>
         </div>
 
-        <RasterModeToggle app={app} projectId={projectId} />
-
         <div>
-          <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>WANDART</div>
+          <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
           <div className="grid grid-cols-2 gap-1">
             <button
               type="button"
@@ -199,20 +197,15 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
       <div className="rounded-md border p-2 space-y-3" style={{ borderColor: HAIRLINE }}>
         {!selectedWall && (
           <div>
-            <label>Modus</label>
-            <div className="grid grid-cols-2 gap-1">
-              {(["chain", "single"] as const).map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => update({ inputMode: m })}
-                  className={`flex h-8 items-center justify-center rounded border text-[11px] transition-colors ${s.inputMode === m ? "bg-accent" : "hover:bg-muted"}`}
-                  style={{ borderColor: HAIRLINE }}
-                >
-                  {m === "chain" ? "Verkettet" : "Einzeln"}
-                </button>
-              ))}
-            </div>
+            <label>Auswahl</label>
+            <select
+              value={s.inputMode}
+              onChange={e => update({ inputMode: e.target.value as "chain" | "single" })}
+              className="cad-settings-select w-full"
+            >
+              <option value="chain">Verkettet</option>
+              <option value="single">Einzeln</option>
+            </select>
           </div>
         )}
 
@@ -240,45 +233,6 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
             value={thicknessValue}
             onChange={e => setThickness(parseFloat(e.target.value) || 0)}
           />
-        </div>
-
-        <div>
-          <label>Baustoff-Muster</label>
-          <select value={patternId} onChange={e => setPattern(e.target.value)} className="cad-settings-select w-full">
-            <option value="none">Ohne (nur Flächenfarbe)</option>
-            {WALL_PATTERNS.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}
-          </select>
-          <div className={patternDisabled ? "opacity-40 pointer-events-none" : ""}>
-            <div className="mt-2">
-              <label>Musterdichte (1 = auto, an Wanddicke)</label>
-              <input
-                type="number" step="0.05" min="0.1" max="10"
-                value={patternScale}
-                onChange={e => setPatternScale(parseFloat(e.target.value) || 1)}
-              />
-            </div>
-            <div className="mt-2">
-              <label>Muster-Drehung (°)</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range" min={-180} max={180} step={1}
-                  value={patternAngleDeg}
-                  onChange={e => setPatternAngle(parseFloat(e.target.value))}
-                  className="flex-1"
-                />
-                <input
-                  type="number" step="1" min="-180" max="180"
-                  value={patternAngleDeg}
-                  onChange={e => setPatternAngle(parseFloat(e.target.value) || 0)}
-                  className="w-16"
-                />
-              </div>
-            </div>
-            <label className="mt-2 flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={patternAlign} onChange={e => setPatternAlign(e.target.checked)} />
-              <span className="text-[11px]">Muster an Wandrichtung drehen</span>
-            </label>
-          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -317,12 +271,51 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
             if (selectedWall) updateSelected(() => { selectedWall.fillColor = def; });
             else update({ fillColor: def, fillColorAuto: true });
           }}
-          className="flex h-8 w-full items-center justify-center rounded border text-[11px] hover:bg-muted"
+          className="flex h-7 w-full items-center justify-center rounded border text-[10px] hover:bg-muted"
           style={{ borderColor: HAIRLINE }}
           title="Standard (dunkelgrau / hellgrau)"
         >
           Standard-Farbe
         </button>
+
+        <div>
+          <label>Baustoff-Muster</label>
+          <select value={patternId} onChange={e => setPattern(e.target.value)} className="cad-settings-select w-full">
+            <option value="none">Ohne (nur Flächenfarbe)</option>
+            {WALL_PATTERNS.map(p => (<option key={p.id} value={p.id}>{p.label}</option>))}
+          </select>
+          <div className={patternDisabled ? "opacity-40 pointer-events-none" : ""}>
+            <div className="mt-2">
+              <label>Musterdichte (1 = auto, an Wanddicke)</label>
+              <input
+                type="number" step="0.05" min="0.1" max="10"
+                value={patternScale}
+                onChange={e => setPatternScale(parseFloat(e.target.value) || 1)}
+              />
+            </div>
+            <div className="mt-2">
+              <label>Muster-Drehung (°)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="range" min={-180} max={180} step={1}
+                  value={patternAngleDeg}
+                  onChange={e => setPatternAngle(parseFloat(e.target.value))}
+                  className="pixuna-range flex-1"
+                />
+                <input
+                  type="number" step="1" min="-180" max="180"
+                  value={patternAngleDeg}
+                  onChange={e => setPatternAngle(parseFloat(e.target.value) || 0)}
+                  className="w-16"
+                />
+              </div>
+            </div>
+            <label className="mt-2 flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={patternAlign} onChange={e => setPatternAlign(e.target.checked)} />
+              <span className="text-[11px]">Muster an Wandrichtung drehen</span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
   );
