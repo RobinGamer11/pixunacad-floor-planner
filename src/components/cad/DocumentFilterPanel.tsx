@@ -335,29 +335,21 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
   const brushActive = isThisDoc && inter?.tool === "brush";
 
   return (
-    <div className="space-y-2" style={{ borderTop: "1px solid hsl(var(--border))", paddingTop: 10 }}>
-      <div className="flex items-center justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-          Hintergrund entfernen
-        </div>
-        <label className="flex items-center gap-1 text-[11px] cursor-pointer" title="Aktiviert das Ausschneiden. Beim ersten Einschalten wird der Hintergrund automatisch anhand der Bild-Ecken erkannt.">
-          <input type="checkbox" checked={!!bg?.enabled} onChange={enable} />
-          <span>Aktiv</span>
-        </label>
-      </div>
+    <div className="space-y-2">
+      <SettingsToggleButton
+        label="Hintergrund entfernen"
+        active={!!bg?.enabled}
+        onClick={enable}
+        title="Aktiviert das Ausschneiden. Beim ersten Einschalten wird der Hintergrund automatisch anhand der Bild-Ecken erkannt."
+      />
 
       {bg?.enabled && (
         <>
-          <p className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-            Klicke im Canvas auf einen Hintergrund­bereich, um ihn zu entfernen.
-            Mit dem Pinsel kannst du feine Kanten nachjustieren.
-          </p>
-
           {/* Auto-Button */}
           <button
             type="button"
             onClick={() => runAuto()}
-            className="cad-toolbar-btn h-8 w-full text-[11px] justify-center"
+            className="cad-toolbar-btn h-10 w-full text-[12px] font-semibold justify-center"
             style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }}
             title="Erkennt den Hintergrund automatisch anhand der 4 Bild-Ecken. Bei zu wenig/zu viel Wegschnitt die Genauigkeit unten anpassen und erneut klicken."
           >
