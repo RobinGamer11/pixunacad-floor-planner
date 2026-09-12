@@ -125,77 +125,88 @@ export function CadDocumentInspector({ engine }: Props) {
         Dokument-Eigenschaften
       </div>
 
-      <div className="text-[11px]">
-        <div className="font-medium truncate" title={sel.name}>
-          {sel.name}
-        </div>
-        <div className="text-muted-foreground">
-          {sel.widthM.toFixed(3)} × {sel.heightM.toFixed(3)} m
-        </div>
-      </div>
-
-
-      {scaling && (
-        <div
-          className="rounded-md p-2 text-[11px]"
-          style={{
-            background: "hsl(var(--primary) / 0.12)",
-            border: "1px solid hsl(var(--primary) / 0.4)",
-          }}
-        >
-          {phase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
-          {phase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
-          {phase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => (engine as any).documentTool?.beginScaleTwoPoints?.(sel.id)}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-start gap-2 px-2 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
-      >
-        <Maximize2 className="h-4 w-4" />
-        <span>Skalieren (2 Punkte)</span>
-      </button>
-
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-[10px] px-0.5 text-muted-foreground">
-          <span>Freie Skalierung</span>
-          <button
-            type="button"
-            className="hover:underline"
-            title="Zurück auf 100%"
-            onClick={() => applyScale(100)}
-          >
-            Reset
-          </button>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={1}
-            max={2000}
-            step={1}
-            value={Math.round(scalePct)}
-            onChange={(e) => applyScale(parseFloat(e.target.value))}
-            className="flex-1"
-          />
-          <span className="text-[10px] tabular-nums w-10 text-right text-muted-foreground">
-            {Math.round(scalePct)}%
-          </span>
-        </div>
-      </div>
-
+      {/* Objektart */}
       <DocumentPixelModeToggle app={engine as any} docId={sel.id} />
+
+      {/* Skalierung */}
+      <div className="space-y-2 pt-1">
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">SKALIERUNG</div>
+
+        <div className="text-[11px]">
+          <div className="font-medium truncate" title={sel.name}>
+            {sel.name}
+          </div>
+          <div className="text-muted-foreground">
+            {sel.widthM.toFixed(3)} × {sel.heightM.toFixed(3)} m
+          </div>
+        </div>
+
+        {scaling && (
+          <div
+            className="rounded-md p-2 text-[11px]"
+            style={{
+              background: "hsl(var(--primary) / 0.12)",
+              border: "1px solid hsl(var(--primary) / 0.4)",
+            }}
+          >
+            {phase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+            {phase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
+            {phase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => (engine as any).documentTool?.beginScaleTwoPoints?.(sel.id)}
+          className="w-full h-10 rounded-md border text-[12px] font-semibold flex items-center justify-center gap-2"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: "hsl(var(--primary))",
+            color: "hsl(var(--primary-foreground))",
+          }}
+          title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+        >
+          <Maximize2 className="h-4 w-4" />
+          <span>Skalieren (2 Punkte)</span>
+        </button>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[10px] px-0.5 text-muted-foreground">
+            <span>Freie Skalierung</span>
+            <button
+              type="button"
+              className="hover:underline"
+              title="Zurück auf 100%"
+              onClick={() => applyScale(100)}
+            >
+              Reset
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="range"
+              min={1}
+              max={2000}
+              step={1}
+              value={Math.round(scalePct)}
+              onChange={(e) => applyScale(parseFloat(e.target.value))}
+              className="pixuna-range flex-1"
+            />
+            <span className="text-[10px] tabular-nums w-10 text-right text-muted-foreground">
+              {Math.round(scalePct)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Transparenz */}
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} part="opacity" />
 
       <WarpSection engine={engine} docId={sel.id} />
 
       <FlipSection engine={engine} docId={sel.id} />
 
-      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
-
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} part="filters" showBgRemove={false} />
 
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
