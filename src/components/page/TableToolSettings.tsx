@@ -34,6 +34,7 @@ export function TableToolSettings({
   onCancel,
   onPatch,
   onNewTable,
+  placementActive = false,
 }: {
   projectId: string;
   pageId: string;
@@ -49,6 +50,8 @@ export function TableToolSettings({
   onPatch?: (patch: Partial<PageElement>) => void;
   /** Weitere Tabelle platzieren, während bereits eine Tabelle ausgewählt ist. */
   onNewTable?: () => void;
+  /** Wartet aktuell auf den Positionsklick in Zeichenfläche/Seite. */
+  placementActive?: boolean;
 }) {
   const ctx = React.useContext(TableEditContext);
   const [infoOpen, setInfoOpen] = React.useState(false);
@@ -69,18 +72,21 @@ export function TableToolSettings({
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border px-3 text-[13px] font-semibold transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             style={{
               borderColor: "hsl(var(--accent-gold))",
-              background: "hsl(var(--accent-gold-soft))",
-              color: "hsl(var(--accent-gold))",
+              background: placementActive ? "hsl(var(--accent-gold))" : "hsl(var(--accent-gold-soft))",
+              color: placementActive ? "hsl(var(--accent-gold-foreground))" : "hsl(var(--accent-gold))",
             }}
+            aria-pressed={placementActive}
           >
-            <Plus size={16} /> Neue Tabelle
+            <Plus size={16} /> {placementActive ? "Platzierung aktiv" : "Neue Tabelle"}
           </button>
         <div className="rounded-md border p-2.5 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
           <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
           <Stepper label="Spalten" value={newCols} min={1} max={24} onChange={setNewCols} big />
           <Stepper label="Zeilen" value={newRows} min={1} max={200} onChange={setNewRows} big />
           <div className="text-[10px] text-muted-foreground leading-snug">
-            Auf der Seite aufziehen oder einmal klicken, um die Tabelle in Standardgröße zu setzen.
+            {placementActive
+              ? "Einmal auf die gewünschte Position klicken, um die Tabelle in Standardgröße zu setzen."
+              : "„Neue Tabelle“ wählen und anschließend die gewünschte Position auf der Seite anklicken."}
           </div>
         </div>
       </div>
@@ -161,8 +167,9 @@ export function TableToolSettings({
             color: "hsl(var(--accent-gold))",
           }}
           title="Weitere Tabelle auf dieser Seite platzieren"
+          aria-pressed={placementActive}
         >
-          <Plus size={16} /> Neue Tabelle
+          <Plus size={16} /> {placementActive ? "Platzierung aktiv" : "Neue Tabelle"}
         </button>
       )}
       <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
