@@ -8,6 +8,7 @@ import {
   type BrushPresetId,
 } from "@/cad/brushStrokes";
 import { applyBrushSizeDefaults } from "@/cad/brushSizeDefaults";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -131,7 +132,16 @@ const BrushButton: React.FC<{
  * Linien-, Polygon-, Schraffur- und Freihandwerkzeug. Ohne Auswahl werden die
  * Werkzeug-Standardwerte bearbeitet, mit Auswahl alle markierten Objekte.
  */
-export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind }> = ({ app, kind }) => {
+export type StrokeEffectSection = "roughen" | "pattern" | "brush";
+
+export const StrokeEffectsSettings: React.FC<{
+  app: any;
+  kind: StrokeEffectKind;
+  /** Welche Bereiche in welcher Reihenfolge gezeigt werden. */
+  sections?: StrokeEffectSection[];
+  /** true = ohne obere Trennlinie (wenn der Bereich mitten im Panel steht). */
+  bare?: boolean;
+}> = ({ app, kind, sections, bare = false }) => {
   const [, force] = useState(0);
   const rerender = () => force((n) => n + 1);
   useEffect(() => {
@@ -222,167 +232,174 @@ export const StrokeEffectsSettings: React.FC<{ app: any; kind: StrokeEffectKind 
   };
 
 
-  return (
-    <div className="space-y-3 border-t pt-2" style={{ borderColor: HAIRLINE }}>
-      <div>
-        <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</div>
-        <button
-          type="button"
-          onClick={() => applyRoughen({ enabled: !roughen.enabled })}
-          className="mb-2 flex h-9 w-full items-center justify-center rounded-md border text-[12px] font-medium transition-colors hover:bg-muted"
-          style={{ borderColor: HAIRLINE, background: roughen.enabled ? "hsl(var(--surface-strong))" : "transparent" }}
-        >
-          {roughen.enabled ? "Aufrauen: Ein" : "Aufrauen: Aus"}
-        </button>
+  const roughenBlock = (
+    <div>
+      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</div>
+      <SettingsToggleButton
+        label="Aufrauen"
+        active={!!roughen.enabled}
+        onClick={() => applyRoughen({ enabled: !roughen.enabled })}
+      />
 
-        {roughen.enabled && (
+      {roughen.enabled && (
+        <div className="mt-2 space-y-2">
           <div className="space-y-2">
-            <div className="space-y-2">
-              <SliderField
-                label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0}
-                max={isEmbedded ? 50 : 300} inputMax={3000}
-                onChange={(v) => applyRoughen({ strengthMm: v })}
-                onDragStart={dragStart} onDragEnd={dragEnd}
-              />
-              {isEmbedded ? (
-                <>
-                  <SliderField
-                    label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={500}
-                    onChange={(v) => applyRoughen({ detailPer100Mm: v })}
-                    onDragStart={dragStart} onDragEnd={dragEnd}
-                  />
-                  <SliderField
-                    label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10}
-                    max={300} inputMax={1800}
-                    onChange={(v) => applyRoughen({ scalePercent: v })}
-                    onDragStart={dragStart} onDragEnd={dragEnd}
-                  />
-                </>
-              ) : (
-                <>
-                  <SliderField
-                    label="Detail" unit="" value={roughen.detailPer100Mm / CAD_DETAIL_UNIT} step={1} min={1} max={100} inputMax={1000}
-                    onChange={(v) => applyRoughen({ detailPer100Mm: v * CAD_DETAIL_UNIT })}
-                    onDragStart={dragStart} onDragEnd={dragEnd}
-                  />
-                  <SliderField
-                    label="Skalierung" unit="" value={(roughen.scalePercent ?? 100) / CAD_SCALE_UNIT} step={1} min={1} max={100} inputMax={225}
-                    onChange={(v) => applyRoughen({ scalePercent: v * CAD_SCALE_UNIT })}
-                    onDragStart={dragStart} onDragEnd={dragEnd}
-                  />
-                </>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-1">
-              {(["smooth", "corner"] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => applyRoughen({ mode: m })}
-                  className={`rounded border px-2 py-1 text-[10px] ${roughen.mode === m ? "bg-accent" : "hover:bg-muted"}`}
-                  style={{ borderColor: HAIRLINE }}
-                >
-                  {m === "smooth" ? "Weich" : "Eckig"}
-                </button>
-              ))}
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              Nicht-destruktiv: Die Originalgeometrie und alle Fangpunkte bleiben unverändert.
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div>
-        <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">LINIENART</div>
-        <div className="grid grid-cols-2 gap-1">
-          {PATTERNS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              onClick={() => {
-                const changed = pattern.kind !== p.value;
-                applyPattern({ kind: p.value });
-                // Jede Linienart bringt ihre eigene Strichstärke mit — ein
-                // vorher gewählter Stift (z. B. 50 cm) bleibt nicht bestehen.
-                if (changed) {
-                  applyBrushSizeDefaults(app, kind, "", targets);
-                  commit();
-                }
-              }}
-              className={`rounded border px-2 py-1 text-[10px] transition-colors ${
-                pattern.kind === p.value ? "bg-accent" : "hover:bg-muted"
-              }`}
-              style={{ borderColor: HAIRLINE }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        {pattern.kind !== "solid" && pattern.kind !== "brush" && (
-          <div className="mt-2 space-y-2">
             <SliderField
-              label="Strichlänge" unit="mm" value={pattern.dashLengthMm} step={dashStep} min={0.1} max={dashMax}
-              onChange={(v) => applyPattern({ dashLengthMm: v })}
+              label="Stärke" unit="mm" value={roughen.strengthMm} step={0.1} min={0}
+              max={isEmbedded ? 50 : 300} inputMax={3000}
+              onChange={(v) => applyRoughen({ strengthMm: v })}
               onDragStart={dragStart} onDragEnd={dragEnd}
             />
-            <SliderField
-              label="Abstand" unit="mm" value={pattern.gapLengthMm} step={dashStep} min={0.1} max={dashMax}
-              onChange={(v) => applyPattern({ gapLengthMm: v })}
-              onDragStart={dragStart} onDragEnd={dragEnd}
-            />
-          </div>
-        )}
-
-        {/* Pinsel-Linienarten gibt es nur beim Freihand-Werkzeug.
-            Linie, Polygon und Schraffur haben ausschließlich die vier
-            Grundarten oben. Bestehende Objekte bleiben unverändert. */}
-        {kind === "free" && (
-          <>
-            <div className="mt-2 grid grid-cols-2 gap-1">
-              {BRUSH_PRESETS.map((b) => (
-                <BrushButton
-                  key={b.id}
-                  id={b.id}
-                  label={b.label}
-                  active={activeBrush === b.id}
-                  onClick={() => selectBrush(activeBrush === b.id ? "" : b.id)}
-                  character={activeBrush === b.id ? brushCharacter : undefined}
+            {isEmbedded ? (
+              <>
+                <SliderField
+                  label="Detail" unit="je 100 mm" value={roughen.detailPer100Mm} step={1} min={1} max={500}
+                  onChange={(v) => applyRoughen({ detailPer100Mm: v })}
+                  onDragStart={dragStart} onDragEnd={dragEnd}
                 />
-              ))}
-            </div>
+                <SliderField
+                  label="Skalierung" unit="%" value={roughen.scalePercent ?? 100} step={1} min={10}
+                  max={300} inputMax={1800}
+                  onChange={(v) => applyRoughen({ scalePercent: v })}
+                  onDragStart={dragStart} onDragEnd={dragEnd}
+                />
+              </>
+            ) : (
+              <>
+                <SliderField
+                  label="Detail" unit="" value={roughen.detailPer100Mm / CAD_DETAIL_UNIT} step={1} min={1} max={100} inputMax={1000}
+                  onChange={(v) => applyRoughen({ detailPer100Mm: v * CAD_DETAIL_UNIT })}
+                  onDragStart={dragStart} onDragEnd={dragEnd}
+                />
+                <SliderField
+                  label="Skalierung" unit="" value={(roughen.scalePercent ?? 100) / CAD_SCALE_UNIT} step={1} min={1} max={100} inputMax={225}
+                  onChange={(v) => applyRoughen({ scalePercent: v * CAD_SCALE_UNIT })}
+                  onDragStart={dragStart} onDragEnd={dragEnd}
+                />
+              </>
+            )}
+          </div>
 
-            <div className="mt-2">
-              {activeBrush && (
-                <div className="mt-2 space-y-2">
-                  <SliderField
-                    label="Charakter" unit="" value={brushCharacter} step={1} min={0} max={100}
-                    onChange={(v) => applyPattern({ brushCharacter: v })}
-                    onDragStart={dragStart} onDragEnd={dragEnd}
-                  />
-                  {brushInfo?.usesAngle && (
-                    <SliderField
-                      label="Federwinkel" unit="°" value={pattern.brushAngleDeg ?? 38} step={1} min={-180} max={180}
-                      onChange={(v) => applyPattern({ brushAngleDeg: v })}
-                      onDragStart={dragStart} onDragEnd={dragEnd}
-                    />
-                  )}
-                  <div className="text-[11px] text-muted-foreground">
-                    Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+          <div className="grid grid-cols-2 gap-1">
+            {(["smooth", "corner"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => applyRoughen({ mode: m })}
+                className={`flex h-8 items-center justify-center rounded border px-2 text-[11px] transition-colors ${roughen.mode === m ? "bg-accent" : "hover:bg-muted"}`}
+                style={{ borderColor: HAIRLINE }}
+              >
+                {m === "smooth" ? "Weich" : "Eckig"}
+              </button>
+            ))}
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Nicht-destruktiv: Die Originalgeometrie und alle Fangpunkte bleiben unverändert.
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
+  const patternBlock = (
+    <div>
+      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">LINIENART</div>
+      <div className="grid grid-cols-2 gap-1">
+        {PATTERNS.map((p) => (
+          <button
+            key={p.value}
+            type="button"
+            onClick={() => {
+              const changed = pattern.kind !== p.value;
+              applyPattern({ kind: p.value });
+              // Jede Linienart bringt ihre eigene Strichstärke mit — ein
+              // vorher gewählter Stift (z. B. 50 cm) bleibt nicht bestehen.
+              if (changed) {
+                applyBrushSizeDefaults(app, kind, "", targets);
+                commit();
+              }
+            }}
+            className={`flex h-8 items-center justify-center rounded border px-2 text-[11px] transition-colors ${
+              pattern.kind === p.value ? "bg-accent" : "hover:bg-muted"
+            }`}
+            style={{ borderColor: HAIRLINE }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      {pattern.kind !== "solid" && pattern.kind !== "brush" && (
+        <div className="mt-2 space-y-2">
+          <SliderField
+            label="Strichlänge" unit="mm" value={pattern.dashLengthMm} step={dashStep} min={0.1} max={dashMax}
+            onChange={(v) => applyPattern({ dashLengthMm: v })}
+            onDragStart={dragStart} onDragEnd={dragEnd}
+          />
+          <SliderField
+            label="Abstand" unit="mm" value={pattern.gapLengthMm} step={dashStep} min={0.1} max={dashMax}
+            onChange={(v) => applyPattern({ gapLengthMm: v })}
+            onDragStart={dragStart} onDragEnd={dragEnd}
+          />
+        </div>
+      )}
+    </div>
+  );
 
+  {/* Pinsel-Linienarten gibt es nur beim Freihand-Werkzeug.
+      Linie, Polygon und Schraffur haben ausschließlich die vier
+      Grundarten oben. Bestehende Objekte bleiben unverändert. */}
+  const brushBlock = kind === "free" ? (
+    <div>
+      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">LINIENART – BESONDERS</div>
+      <div className="grid grid-cols-2 gap-1">
+        {BRUSH_PRESETS.map((b) => (
+          <BrushButton
+            key={b.id}
+            id={b.id}
+            label={b.label}
+            active={activeBrush === b.id}
+            onClick={() => selectBrush(activeBrush === b.id ? "" : b.id)}
+            character={activeBrush === b.id ? brushCharacter : undefined}
+          />
+        ))}
       </div>
 
+      {activeBrush && (
+        <div className="mt-2 space-y-2">
+          <SliderField
+            label="Charakter" unit="" value={brushCharacter} step={1} min={0} max={100}
+            onChange={(v) => applyPattern({ brushCharacter: v })}
+            onDragStart={dragStart} onDragEnd={dragEnd}
+          />
+          {brushInfo?.usesAngle && (
+            <SliderField
+              label="Federwinkel" unit="°" value={pattern.brushAngleDeg ?? 38} step={1} min={-180} max={180}
+              onChange={(v) => applyPattern({ brushAngleDeg: v })}
+              onDragStart={dragStart} onDragEnd={dragEnd}
+            />
+          )}
+          <div className="text-[11px] text-muted-foreground">
+            Farbe, Linienstärke und Deckkraft steuern den Stift; die Geometrie bleibt bearbeitbar.
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
 
+  const wanted = sections ?? ["roughen", "pattern", "brush"];
+  const blocks = wanted
+    .map((s) => (s === "roughen" ? roughenBlock : s === "pattern" ? patternBlock : brushBlock))
+    .filter(Boolean);
+  if (blocks.length === 0) return null;
+
+  return (
+    <div className={`space-y-3${bare ? "" : " border-t pt-2"}`} style={bare ? undefined : { borderColor: HAIRLINE }}>
+      {blocks.map((b, i) => (
+        <React.Fragment key={i}>{b}</React.Fragment>
+      ))}
     </div>
   );
 };
+
 
 export default StrokeEffectsSettings;

@@ -6686,8 +6686,8 @@ function ToolsTab({
       )}
       {settingsTool === "polygon" && cadEngine && (
         <>
-          <PolygonModeSelect app={cadEngine} />
           <RasterModeToggle app={cadEngine} projectId={projectId} />
+          <PolygonModeSelect app={cadEngine} />
           <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
             <PolygonSettingsPanel
               app={cadEngine}
@@ -6701,8 +6701,8 @@ function ToolsTab({
       )}
       {settingsTool === "hatch" && cadEngine && (
         <>
-          <HatchModeSelect app={cadEngine} />
           <RasterModeToggle app={cadEngine} projectId={projectId} />
+          <HatchModeSelect app={cadEngine} />
           <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
             <HatchSettingsPanel app={cadEngine} projectId={projectId} pxPerMm={guidePxPerMm} patternScaleUnit={0.02} hideChrome />
           </div>

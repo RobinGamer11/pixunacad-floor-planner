@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 /**
  * Spiegelt das engine-gebundene Ebenen-Dropdown der CAD-Oberfläche als
@@ -299,6 +300,14 @@ export function CadRangeProxy({
         <span className="pr-2 text-[10px] text-muted-foreground">{unit}</span>
       </label>
     </div>
+  );
+}
+
+/** Großer Aktiv/Aus-Schalter, gebunden an eine versteckte Engine-Checkbox. */
+export function CadBigToggleProxy({ target, label }: { target: React.RefObject<HTMLInputElement>; label: string }) {
+  const checked = usePolled(() => target.current?.checked ?? false, [target]) ?? false;
+  return (
+    <SettingsToggleButton label={label} active={checked} onClick={() => target.current?.click()} />
   );
 }
 

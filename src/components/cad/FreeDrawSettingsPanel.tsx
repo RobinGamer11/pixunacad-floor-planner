@@ -4,6 +4,7 @@ import type { MiniCad } from "@/cad/embed/MiniCad";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 type FreeStyle = "solid" | "image";
 
@@ -189,36 +190,9 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       />
 
       <div className="space-y-3">
-        <label className={`block text-xs${sheetMode ? " hidden" : ""}`}>
-          <span className="block mb-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Ebene{selectedStrokeId ? " (Auswahl)" : ""}</span>
-          <select
-            value={labelId || app.activeDrawLabelId}
-            onChange={(e) => {
-              const v = e.target.value;
-              setLabelId(v);
-              if (selectedStrokeId) {
-                applyToStroke((s) => { s.labelId = v; });
-              } else {
-                app.setActiveDrawLabelId(v);
-              }
-              app.refreshLabelUI();
-            }}
-            className="cad-settings-select w-full">
-            {labels.map(l => (<option key={l.id} value={l.id}>{l.name}</option>))}
-          </select>
-        </label>
-
         {sheetMode ? (
           <>
-            <ToolColorPicker
-              label="Farbe"
-              value={color}
-              onChange={(v) => {
-                setColor(v);
-                if (selectedStrokeId) applyToStroke((s) => { s.color = v; });
-                else app.defaultFreeColor = v;
-              }}
-            />
+            <StrokeEffectsSettings app={app} kind="free" sections={["pattern"]} bare />
 
             <div>
               <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
@@ -247,6 +221,16 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               </div>
             </div>
 
+            <ToolColorPicker
+              label="Farbe"
+              value={color}
+              onChange={(v) => {
+                setColor(v);
+                if (selectedStrokeId) applyToStroke((s) => { s.color = v; });
+                else app.defaultFreeColor = v;
+              }}
+            />
+
             <div>
               <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
               <input type="range" min={1} max={100} step={1} value={Math.round(opacity * 100)}
@@ -256,7 +240,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
                   if (selectedStrokeId) applyToStroke((s) => { s.opacity = v; });
                   else app.defaultFreeOpacity = v;
                 }}
-                className="w-full accent-foreground" />
+                className="pixuna-range w-full accent-foreground" />
               <label className="mt-1 flex h-7 items-center overflow-hidden rounded-md border" style={framedStyle}>
                 <input type="number" min={1} max={100} step={1} value={Math.round(opacity * 100)}
                   onChange={(e) => {
@@ -273,22 +257,22 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               </label>
             </div>
 
+            <StrokeEffectsSettings app={app} kind="free" sections={["roughen"]} />
 
-            <StrokeEffectsSettings app={app} kind="free" />
+            <SettingsToggleButton
+              label="Auto-Form"
+              active={autoShape}
+              onClick={() => { const v = !autoShape; setAutoShape(v); toggleAutoShape(v); }}
+              onLabel="An"
+              title="Beim Loslassen werden Geraden geradegezogen und Kreise zu echten Kreisen geformt."
+            />
 
-
-            <button type="button" onClick={onPickFile} className={framedBtn} style={framedStyle}>
-              <span>Bild laden</span>
-              {imageSrc && (
-                <img src={imageSrc} alt="Stempel" className="h-6 w-6 rounded border object-contain" style={{ background: "#fff" }} />
-              )}
-            </button>
             {imageSrc && (
               <button type="button" onClick={clearImage} className={framedBtn} style={framedStyle}>
                 <span>Bild entfernen</span>
+                <img src={imageSrc} alt="Stempel" className="h-6 w-6 rounded border object-contain" />
               </button>
             )}
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
 
             {style === "image" && imageSrc && (
               <label className="flex items-center gap-2 text-xs">
@@ -298,16 +282,7 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
               </label>
             )}
 
-            <button type="button"
-              onClick={() => { const v = !autoShape; setAutoShape(v); toggleAutoShape(v); }}
-              className={framedBtn} style={framedStyle}
-              title="Beim Loslassen werden Geraden geradegezogen und Kreise zu echten Kreisen geformt.">
-              <span>Auto-Form</span>
-              <span className="text-[11px] px-1.5 py-0.5 rounded border"
-                style={{ borderColor: "hsl(var(--hairline))", color: autoShape ? "hsl(var(--cad-accent))" : "hsl(var(--muted-foreground))" }}>
-                {autoShape ? "An" : "Aus"}
-              </span>
-            </button>
+            <StrokeEffectsSettings app={app} kind="free" sections={["brush"]} />
 
             {!framedCad && (
               <div className="text-[10px] leading-snug text-muted-foreground">
@@ -450,11 +425,16 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Hintergrund
-    ctx.fillStyle = "#ffffff";
+    // Hintergrund — folgt dem Design (auch im Nachtmodus lesbar)
+    const cssVar = (name: string, fallback: string) => {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      return v ? `hsl(${v})` : fallback;
+    };
+    ctx.fillStyle = cssVar("--card", "#ffffff");
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = "hsl(var(--border))";
+    ctx.strokeStyle = cssVar("--hairline", "#d1d5db");
     ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+
 
     // Beispielpfad: sanfte Sinuskurve
     const pad = 14;
