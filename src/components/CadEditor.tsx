@@ -2327,8 +2327,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
               </div>
-              {activeTool === ToolIds.POLYGON && <PolygonModeSelect app={appRef.current} />}
               <RasterModeToggle app={appRef.current} projectId={projectId} />
+              {activeTool === ToolIds.POLYGON && <PolygonModeSelect app={appRef.current} />}
               <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <PolygonSettingsPanel app={appRef.current} projectId={projectId} hideChrome variant="drawing" />
               </div>
@@ -2341,8 +2341,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
               </div>
-              {activeTool === ToolIds.HATCH && <HatchModeSelect app={appRef.current} />}
               <RasterModeToggle app={appRef.current} projectId={projectId} />
+              {activeTool === ToolIds.HATCH && <HatchModeSelect app={appRef.current} />}
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <HatchSettingsPanel
@@ -2350,7 +2350,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   projectId={projectId}
                   patternScaleMax={600}
                   hideChrome
-                  afterStroke={<CadCheckboxProxy target={areaShowRef} label="Flächenanzeige" />}
+                  afterStroke={<CadBigToggleProxy target={areaShowRef} label="Flächenanzeige" />}
                 />
               </div>
             </div>
