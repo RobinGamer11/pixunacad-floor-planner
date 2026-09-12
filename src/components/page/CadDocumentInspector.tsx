@@ -308,6 +308,7 @@ export function FlipSection({ engine, docId }: { engine: MiniCad | any; docId: s
   const tool: any = app.documentTool;
   const flipX = !!doc?.flipX;
   const flipY = !!doc?.flipY;
+  const [open, setOpen] = useState(flipX || flipY);
 
   const setFlip = (x: boolean, y: boolean) => {
     tool?.setDocFlip?.(docId, x, y);
@@ -315,40 +316,44 @@ export function FlipSection({ engine, docId }: { engine: MiniCad | any; docId: s
   };
 
   return (
-    <div
-      className="rounded-md border p-2 space-y-1.5"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Spiegeln
-      </div>
-      <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={() => setFlip(!flipX, flipY)}
-          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${flipX ? "active" : ""}`}
-          title="Links ↔ Rechts spiegeln"
-        >
-          Links ↔ Rechts
-        </button>
-        <button
-          type="button"
-          onClick={() => setFlip(flipX, !flipY)}
-          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${flipY ? "active" : ""}`}
-          title="Oben ↔ Unten spiegeln"
-        >
-          Oben ↔ Unten
-        </button>
-      </div>
-      {(flipX || flipY) && (
-        <button
-          type="button"
-          onClick={() => setFlip(false, false)}
-          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          Spiegelung zurücksetzen
-        </button>
+    <div className="space-y-1.5">
+      <SettingsToggleButton
+        label="Bild spiegeln"
+        active={open}
+        onClick={() => setOpen((v) => !v)}
+        title="Spiegel-Einstellungen anzeigen"
+      />
+      {open && (
+        <>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setFlip(!flipX, flipY)}
+              className={`cad-toolbar-btn flex-1 justify-center h-9 text-[11px] ${flipX ? "active" : ""}`}
+              title="Links ↔ Rechts spiegeln"
+            >
+              Links ↔ Rechts
+            </button>
+            <button
+              type="button"
+              onClick={() => setFlip(flipX, !flipY)}
+              className={`cad-toolbar-btn flex-1 justify-center h-9 text-[11px] ${flipY ? "active" : ""}`}
+              title="Oben ↔ Unten spiegeln"
+            >
+              Oben ↔ Unten
+            </button>
+          </div>
+          {(flipX || flipY) && (
+            <button
+              type="button"
+              onClick={() => setFlip(false, false)}
+              className="w-full h-8 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              Spiegelung zurücksetzen
+            </button>
+          )}
+        </>
       )}
     </div>
   );
