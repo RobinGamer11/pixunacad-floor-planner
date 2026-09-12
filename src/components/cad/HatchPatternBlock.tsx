@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Check, Grid2X2, Move, CheckCheck } from "lucide-react";
+import { Check, Move, CheckCheck } from "lucide-react";
 import { HatchPatternManage, useHatchPatternOptions } from "./useHatchPatternOptions";
 import { onPatternsChanged } from "@/cad/customHatchPatterns";
 import { defaultPatternScale } from "@/cad/hatchPatterns";
