@@ -510,6 +510,23 @@
     border-color: hsl(var(--ring));
   }
 
+  /* Tabellen-Bedienoberfläche: gleiche semantische Nachtmodus-Farben wie die
+     übrigen Werkzeuge, ohne die eigentlichen Tabellenfarben zu invertieren. */
+  .table-edit-overlay {
+    background: hsl(var(--surface-card));
+    color: hsl(var(--ink));
+  }
+
+  .table-element-view input,
+  .table-element-view button,
+  .table-element-view label {
+    color: inherit;
+  }
+
+  .cad-table-settings button {
+    touch-action: manipulation;
+  }
+
   .cad-kbd {
     @apply inline-flex items-center justify-center text-[10px] font-mono px-1.5 py-0.5 rounded border;
     min-width: 28px;

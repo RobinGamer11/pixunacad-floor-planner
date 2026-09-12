@@ -543,7 +543,7 @@ export function TableElementView({
   return (
     <div
       ref={rootRef}
-      className="w-full h-full relative select-none"
+      className="table-element-view w-full h-full relative select-none"
       style={{
         background,
         color: "#111111",
