@@ -160,14 +160,17 @@ export const PolygonSettingsPanel: React.FC<{
 
       <StrokeSettingsPanel
         title="POLYGON"
+        hideTitle
         colorLabel="Konturfarbe"
+        colorPosition="after"
         variant={variant}
         pxPerMm={pxPerMm}
         value={{ color, thicknessM, alphaPct }}
         onChange={applyStroke}
+        beforeStroke={<StrokeEffectsSettings app={app} kind="polygon" sections={["pattern"]} bare />}
       />
 
-      <StrokeEffectsSettings app={app} kind="polygon" />
+      <StrokeEffectsSettings app={app} kind="polygon" sections={["roughen"]} />
 
       {first && (
         <div className="space-y-2 border-t pt-2" style={{ borderColor: HAIRLINE }}>
