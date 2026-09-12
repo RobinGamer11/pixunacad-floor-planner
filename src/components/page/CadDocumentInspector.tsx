@@ -13,6 +13,7 @@ import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 interface Props {
   engine: MiniCad | null;
