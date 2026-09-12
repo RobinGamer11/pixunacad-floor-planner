@@ -33,6 +33,7 @@ export function TableToolSettings({
   onConfirm,
   onCancel,
   onPatch,
+  onNewTable,
 }: {
   projectId: string;
   pageId: string;
