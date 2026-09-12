@@ -6877,11 +6877,11 @@ function DocumentToolSettings({
         type="button"
         disabled={importing}
         onClick={onImport}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
-        style={{ borderColor: "hsl(var(--hairline))" }}
+        className="w-full h-11 rounded-md border text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"
+        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
         title="PDF, JPG oder PNG importieren"
       >
-        <FileImage size={14} />
+        <FileImage size={16} />
         {importing ? "Importiere…" : "Datei importieren"}
       </button>
 
@@ -6889,34 +6889,36 @@ function DocumentToolSettings({
         type="button"
         disabled={importing}
         onClick={onOpenLibrary}
-        className="w-full h-9 mt-1.5 rounded-md border text-xs flex items-center justify-center gap-2 disabled:opacity-50"
+        className="w-full h-11 mt-1.5 rounded-md border text-[13px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
         style={{ borderColor: "hsl(var(--hairline))" }}
         title="Dokumente aus der Projekt-Ablage (Startseite) einfügen"
       >
-        <FolderOpen size={14} />
+        <FolderOpen size={16} />
         Aus Projekt-Ablage
       </button>
 
-      <label
-        className="flex items-center gap-2 text-[11px] cursor-pointer select-none px-1 pt-2"
-        title="Ohne Häkchen wird das Dokument frei platziert (Originalgröße/auto-fit)."
-      >
-        <input
-          type="checkbox"
-          checked={useScale}
-          onChange={(e) => onFreePlaceChange?.(!e.target.checked)}
+      <div className="pt-2">
+        <SettingsToggleButton
+          label="Maßstab anwenden"
+          active={useScale}
+          onClick={() => onFreePlaceChange?.(useScale)}
+          title="Ohne Maßstab wird das Dokument frei platziert (Originalgröße/auto-fit)."
         />
-        <span>Maßstab anwenden</span>
-      </label>
-
-      <div className={useScale ? "" : "opacity-50 pointer-events-none"}>
-        <Row label="Maßstab">
-          <PlacedScaleInput
-            value={scale}
-            onCommit={(next) => onScaleChange?.(next)}
-          />
-        </Row>
       </div>
+
+      {useScale && (
+        <div
+          className="mt-2 rounded-md border p-2"
+          style={{ borderColor: "hsl(var(--primary) / 0.5)", background: "hsl(var(--primary) / 0.08)" }}
+        >
+          <Row label="Maßstab">
+            <PlacedScaleInput
+              value={scale}
+              onCommit={(next) => onScaleChange?.(next)}
+            />
+          </Row>
+        </div>
+      )}
 
     </SettingsBlock>
   );
