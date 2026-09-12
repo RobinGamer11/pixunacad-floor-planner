@@ -302,6 +302,14 @@ export function CadRangeProxy({
   );
 }
 
+/** Großer Aktiv/Aus-Schalter, gebunden an eine versteckte Engine-Checkbox. */
+export function CadBigToggleProxy({ target, label }: { target: React.RefObject<HTMLInputElement>; label: string }) {
+  const checked = usePolled(() => target.current?.checked ?? false, [target]) ?? false;
+  return (
+    <SettingsToggleButton label={label} active={checked} onClick={() => target.current?.click()} />
+  );
+}
+
 /** Checkbox mit Beschriftung, gebunden an eine versteckte Engine-Checkbox. */
 export function CadCheckboxProxy({ target, label }: { target: React.RefObject<HTMLInputElement>; label: string }) {
   const checked = usePolled(() => target.current?.checked ?? false, [target]) ?? false;
