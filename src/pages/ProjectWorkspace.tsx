@@ -2537,6 +2537,12 @@ export default function ProjectWorkspace() {
                 setPendingTableId(null);
                 setActiveTool(null);
               }}
+              onNewTable={() => {
+                setTableEditId(null);
+                setTableSelection(null);
+                setActiveToolAndTab("table");
+                placeTableOnPage();
+              }}
               onCancelTable={() => {
                 if (activePage && pendingTableId) {
                   projectStore.deleteElement(project.id, activePage.id, pendingTableId);
@@ -5966,6 +5972,7 @@ function RightInspector({
   setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
+  onNewTable,
 
   onJumpCad,
   onCollapse,
@@ -6005,6 +6012,7 @@ function RightInspector({
   setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
+  onNewTable?: () => void;
 
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
@@ -6075,6 +6083,7 @@ function RightInspector({
               setTableFormulaFn={setTableFormulaFn}
               onConfirmTable={onConfirmTable}
               onCancelTable={onCancelTable}
+              onNewTable={onNewTable}
             />
           )}
           {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "ruler" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && activeTool !== "hatch" && activeTool !== "polygon" && !isLinePageTool(activeTool) && (
@@ -6575,6 +6584,7 @@ function ToolsTab({
   setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
+  onNewTable,
 }: {
   projectId: string;
   pageId?: string;
@@ -6609,6 +6619,7 @@ function ToolsTab({
   setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
+  onNewTable?: () => void;
 }) {
   const cadDocSelected = useCadDocumentSelected(cadEngine ?? null);
 
@@ -6759,6 +6770,7 @@ function ToolsTab({
           setFormulaFn={(f) => setTableFormulaFn?.(f)}
           onConfirm={() => onConfirmTable?.()}
           onCancel={() => onCancelTable?.()}
+          onNewTable={onNewTable}
         />
       )}
 
