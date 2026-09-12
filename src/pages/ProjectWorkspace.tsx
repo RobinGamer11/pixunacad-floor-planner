@@ -2538,6 +2538,7 @@ export default function ProjectWorkspace() {
               updateToolSettings={updateToolSettings}
 
               pendingTableId={pendingTableId}
+              tablePlacementActive={tablePlacementActive}
               tableModifyMode={tableModifyMode}
               setTableModifyMode={setTableModifyMode}
               tableFormulaFn={tableFormulaFn}
