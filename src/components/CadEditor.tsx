@@ -477,6 +477,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
   const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
   const [docToolPhase, setDocToolPhase] = useState<string>("idle");
+  // Schrittanzeige beim Platzieren: true, sobald die Position per L-Klick steht.
+  const [docPlacePointSet, setDocPlacePointSet] = useState(false);
   const docFreeScaleBaseRef = useRef<{ id: string; w: number; h: number } | null>(null);
   const [docFreeScalePct, setDocFreeScalePct] = useState<number>(100);
   useEffect(() => {
@@ -928,7 +930,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     };
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
-    app.documentTool.onPhaseChange = () => setDocToolPhase(app.documentTool.phase);
+    app.documentTool.onPhaseChange = () => {
+      setDocToolPhase(app.documentTool.phase);
+      setDocPlacePointSet(app.documentTool.hasPlacedPosition());
+    };
     app.onSelectionChange = () => {
       setSelectedWallId(app.getSelectedWall()?.id || null);
       // Auswahl-Werkzeug: bestehendes Objekt ausgewählt → automatisch in die
@@ -3007,7 +3012,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 {docToolPhase === "placing" && (
                   <StepHints
                     steps={["Position setzen – L-Klick", "Objekt setzen – Enter"]}
-                    current={0}
+                    current={docPlacePointSet ? 1 : 0}
                     footer="ESC: abbrechen"
                   />
                 )}

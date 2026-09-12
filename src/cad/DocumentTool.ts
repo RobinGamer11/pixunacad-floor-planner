@@ -264,6 +264,8 @@ export class DocumentTool {
   }
 
   isPlacing() { return this.phase === "placing"; }
+  /** true, sobald während "placing" bereits eine Position per Linksklick gesetzt wurde. */
+  hasPlacedPosition() { return this.phase === "placing" && !!this.placedPos; }
   isScaling() { return this.phase === "scale-pick-1" || this.phase === "scale-pick-2" || this.phase === "scale-pick-3"; }
 
   update(input: Input) {

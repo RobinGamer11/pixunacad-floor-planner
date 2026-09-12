@@ -2537,6 +2537,12 @@ export default function ProjectWorkspace() {
                 setPendingTableId(null);
                 setActiveTool(null);
               }}
+              onNewTable={() => {
+                setTableEditId(null);
+                setTableSelection(null);
+                setActiveToolAndTab("table");
+                placeTableOnPage();
+              }}
               onCancelTable={() => {
                 if (activePage && pendingTableId) {
                   projectStore.deleteElement(project.id, activePage.id, pendingTableId);
@@ -5966,6 +5972,7 @@ function RightInspector({
   setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
+  onNewTable,
 
   onJumpCad,
   onCollapse,
@@ -6005,6 +6012,7 @@ function RightInspector({
   setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
+  onNewTable?: () => void;
 
   onJumpCad: (sheetId?: string) => void;
   onCollapse?: () => void;
@@ -6075,6 +6083,7 @@ function RightInspector({
               setTableFormulaFn={setTableFormulaFn}
               onConfirmTable={onConfirmTable}
               onCancelTable={onCancelTable}
+              onNewTable={onNewTable}
             />
           )}
           {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "ruler" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && activeTool !== "hatch" && activeTool !== "polygon" && !isLinePageTool(activeTool) && (
@@ -6575,6 +6584,7 @@ function ToolsTab({
   setTableFormulaFn,
   onConfirmTable,
   onCancelTable,
+  onNewTable,
 }: {
   projectId: string;
   pageId?: string;
@@ -6609,6 +6619,7 @@ function ToolsTab({
   setTableFormulaFn?: (f: FormulaFn | null) => void;
   onConfirmTable?: () => void;
   onCancelTable?: () => void;
+  onNewTable?: () => void;
 }) {
   const cadDocSelected = useCadDocumentSelected(cadEngine ?? null);
 
@@ -6743,7 +6754,7 @@ function ToolsTab({
         </>
       )}
       {settingsTool === "document" && !cadDocSelected && (
-        <DocumentToolSettings importing={!!documentImporting} onImport={onDocumentImport} onOpenLibrary={onDocumentLibrary} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
+        <DocumentToolSettings cadEngine={cadEngine ?? null} importing={!!documentImporting} onImport={onDocumentImport} onOpenLibrary={onDocumentLibrary} scale={docScale ?? "1:100"} onScaleChange={onDocScaleChange} freePlace={!!docFreePlace} onFreePlaceChange={onDocFreePlaceChange} />
       )}
 
       {/* Tabellen-Werkzeug — Placement-Preview + Modifikation */}
@@ -6759,6 +6770,7 @@ function ToolsTab({
           setFormulaFn={(f) => setTableFormulaFn?.(f)}
           onConfirm={() => onConfirmTable?.()}
           onCancel={() => onCancelTable?.()}
+          onNewTable={onNewTable}
         />
       )}
 
@@ -6853,8 +6865,27 @@ function useCadDocumentSelected(engine: any): boolean {
   return sel;
 }
 
+/** Platzierungsphase des gemeinsamen Dokument-Werkzeugs beobachten (nur Anzeige). */
+function useDocPlacementPhase(engine: import("@/cad/embed/MiniCad").MiniCad | null) {
+  const [state, setState] = React.useState({ placing: false, pointSet: false });
+  React.useEffect(() => {
+    const tool = (engine as any)?.documentTool;
+    if (!tool) { setState({ placing: false, pointSet: false }); return; }
+    const prev = tool.onPhaseChange;
+    const sync = () => setState({
+      placing: tool.phase === "placing",
+      pointSet: !!tool.hasPlacedPosition?.(),
+    });
+    tool.onPhaseChange = () => { prev?.(); sync(); };
+    sync();
+    return () => { tool.onPhaseChange = prev; };
+  }, [engine]);
+  return state;
+}
+
 function DocumentToolSettings({
   importing,
+  cadEngine,
   onImport,
   onOpenLibrary,
   scale,
@@ -6863,6 +6894,7 @@ function DocumentToolSettings({
   onFreePlaceChange,
 }: {
   importing: boolean;
+  cadEngine?: import("@/cad/embed/MiniCad").MiniCad | null;
   onImport?: () => void;
   onOpenLibrary?: () => void;
   scale: string;
@@ -6873,6 +6905,7 @@ function DocumentToolSettings({
   // Der Maßstab greift erst, wenn "Maßstab anwenden" gesetzt ist —
   // ohne Häkchen wird das Dokument frei (auto-fit) platziert.
   const useScale = !freePlace;
+  const placement = useDocPlacementPhase(cadEngine ?? null);
   return (
     <SettingsBlock title="DOKUMENT IMPORTIEREN">
       <button
@@ -6919,6 +6952,16 @@ function DocumentToolSettings({
               onCommit={(next) => onScaleChange?.(next)}
             />
           </Row>
+        </div>
+      )}
+
+      {placement.placing && (
+        <div className="pt-2">
+          <StepHints
+            steps={["Position setzen – L-Klick", "Objekt setzen – Enter"]}
+            current={placement.pointSet ? 1 : 0}
+            footer="ESC: abbrechen"
+          />
         </div>
       )}
 
