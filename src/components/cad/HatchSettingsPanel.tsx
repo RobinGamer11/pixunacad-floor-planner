@@ -7,6 +7,7 @@ import type { HatchDrawMode } from "@/cad/HatchTool";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 const MODES: { value: HatchDrawMode; label: string; Icon: React.ElementType }[] = [
   { value: "polygon", label: "Polygon", Icon: Spline },
@@ -164,12 +165,26 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
 
   return (
     <div className="space-y-3 text-xs">
-{!hideChrome && (
+      {!hideChrome && (
         <>
-          <HatchModeSelect app={app} />
           {/* OBJEKTART (Vektor / Pixel) */}
           <RasterModeToggle app={app} projectId={projectId} />
+          <HatchModeSelect app={app} />
         </>
+      )}
+
+      {/* Linienart direkt über der Strichstärke */}
+      <StrokeEffectsSettings app={app} kind="hatch" sections={["pattern"]} bare />
+
+      {/* Strichstärke px + mm */}
+      {strokeWidthPx > 0 && (
+        <div>
+          <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
+          <div className="grid grid-cols-2 gap-2">
+            <MeasureInput label="Bildschirm (px)" value={strokeWidthPx} digits={2} onChange={(v) => setStroke(v)} />
+            <MeasureInput label="Tatsächl. Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-2">
@@ -190,48 +205,6 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
           }}
         />
       </div>
-
-      {/* Rahmen (Kontur) an/aus */}
-      <div>
-        <div className="mb-1.5 text-[10px] text-muted-foreground">Rahmen</div>
-        <div className="grid grid-cols-2 gap-1">
-          {([
-            { on: true, label: "Anzeigen" },
-            { on: false, label: "Entfernen" },
-          ]).map(({ on, label }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => {
-                if (on) setStroke(lastStrokeRef.current > 0 ? lastStrokeRef.current : 1);
-                else { if (strokeWidthPx > 0) lastStrokeRef.current = strokeWidthPx; setStroke(0); }
-              }}
-              className={`h-8 rounded border text-[11px] transition-colors ${
-                (strokeWidthPx > 0) === on ? "bg-accent" : "hover:bg-muted"
-              }`}
-              style={{ borderColor: HAIRLINE }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Strichstärke px + mm */}
-      {strokeWidthPx > 0 && (
-        <div>
-          <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
-          <div className="grid grid-cols-2 gap-2">
-            <MeasureInput label="Bildschirm (px)" value={strokeWidthPx} digits={2} onChange={(v) => setStroke(v)} />
-            <MeasureInput label="Tatsächl. Größe (mm)" value={strokeMm} digits={3} onChange={(v) => setStroke(v * pxPerMm)} />
-          </div>
-        </div>
-      )}
-
-
-      <StrokeEffectsSettings app={app} kind="hatch" />
-
-      {afterStroke}
 
       {/* Transparenz */}
       <div>
@@ -262,6 +235,28 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
           <span className="pr-2 text-[9px] text-muted-foreground">%</span>
         </span>
       </div>
+
+      {/* Aufrauen */}
+      <StrokeEffectsSettings app={app} kind="hatch" sections={["roughen"]} />
+
+      {/* Rahmen (Kontur) an/aus */}
+      <SettingsToggleButton
+        label="Rahmen"
+        active={strokeWidthPx > 0}
+        onLabel="Anzeigen"
+        offLabel="Entfernt"
+        onClick={() => {
+          if (strokeWidthPx > 0) {
+            lastStrokeRef.current = strokeWidthPx;
+            setStroke(0);
+          } else {
+            setStroke(lastStrokeRef.current > 0 ? lastStrokeRef.current : 1);
+          }
+        }}
+      />
+
+      {/* Flächenanzeige (CAD) */}
+      {afterStroke}
 
       {/* Muster ganz unten */}
       <HatchPatternBlock app={app} scaleMax={patternScaleMax} scaleUnit={patternScaleUnit} />
