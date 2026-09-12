@@ -348,12 +348,12 @@ export function TableToolSettings({
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
             <Sigma size={11} /> Formel per Klick
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="grid grid-cols-3 gap-1.5">
             {fns.map((f) => (
               <button
                 key={f}
                 onClick={() => setFormulaFn(formulaFn === f ? null : f)}
-                className="h-6 px-2 text-[10px] rounded border"
+                className="h-9 px-2 text-[12px] font-semibold rounded-md border"
                 style={{
                   borderColor: "hsl(var(--hairline))",
                   background: formulaFn === f ? "hsl(var(--accent-gold-soft))" : undefined,
