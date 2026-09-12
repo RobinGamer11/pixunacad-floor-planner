@@ -143,29 +143,64 @@ export function TableToolSettings({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[11px] font-semibold text-muted-foreground">Tabelle</div>
+      <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">TABELLE</div>
 
-        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} />
-        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} />
+        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
+        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} big />
 
         <button
           onClick={() => setEditMode(!editMode)}
-          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
+          className="w-full h-11 rounded-md border text-[12px] font-semibold flex items-center justify-center gap-2"
           style={{
-            borderColor: "hsl(var(--hairline))",
-            background: editMode ? "hsl(var(--accent-gold-soft))" : undefined,
+            borderColor: editMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+            background: editMode ? "hsl(var(--accent-gold-soft))" : "hsl(var(--surface-strong))",
             color: editMode ? "hsl(var(--accent-gold))" : undefined,
           }}
           title="Doppelklick auf die Tabelle aktiviert den Tabellenmodus ebenfalls"
         >
-          <Pencil size={11} /> {editMode ? "Tabellenmodus aktiv" : "Tabelle bearbeiten"}
+          <Pencil size={13} /> {editMode ? "Tabellenmodus aktiv" : "Tabelle bearbeiten"}
         </button>
-        <div className="text-[10px] text-muted-foreground leading-snug">
-          Objektmodus: verschieben, drehen, skalieren. Tabellenmodus: Zellen bearbeiten,
-          Spalten-/Zeilengrenzen ziehen. ESC verlässt den Tabellenmodus.
-        </div>
+
+        <button
+          onClick={() => setInfoOpen((v) => !v)}
+          className="w-full h-8 rounded-md border text-[11px] flex items-center justify-between px-2 hover:bg-muted"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <span className="flex items-center gap-1.5"><Info size={12} /> Info</span>
+          <span className="text-muted-foreground">{infoOpen ? "▾" : "▸"}</span>
+        </button>
+        {infoOpen && (
+          <div className="text-[10px] text-muted-foreground leading-snug">
+            Objektmodus: verschieben, drehen, skalieren. Tabellenmodus: Zellen bearbeiten,
+            Spalten-/Zeilengrenzen ziehen. ESC verlässt den Tabellenmodus.
+          </div>
+        )}
       </div>
+
+      {/* Rahmen & Hintergrund */}
+      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">RAHMEN &amp; HINTERGRUND</div>
+        <ColorRow label="Rahmenfarbe" value={borderColor} onChange={(v) => patchTable({ borderColor: v })} big />
+        <ColorRow label="Hintergrund" value={background} onChange={setTableBackground} big />
+        <div className="text-[10px] text-muted-foreground leading-snug">
+          „Hintergrund" gilt für die ganze Tabelle und überschreibt beim erneuten
+          Anwenden alle einzeln gesetzten Zellhintergründe.
+        </div>
+
+        <button
+          onClick={() => patchTable({ filtersEnabled: !filtersEnabled, filters: {} })}
+          className="w-full h-9 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: filtersEnabled ? "hsl(var(--accent-gold-soft))" : undefined,
+            color: filtersEnabled ? "hsl(var(--accent-gold))" : undefined,
+          }}
+        >
+          <Filter size={12} /> Filterfunktion {filtersEnabled ? "an" : "aus"}
+        </button>
+      </div>
+
 
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
