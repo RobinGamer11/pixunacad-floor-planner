@@ -4,7 +4,6 @@ import type { WallToolSettings } from "@/cad/WallTool";
 import { Defaults } from "@/cad/constants";
 import { WALL_PATTERNS, normalizeWallPatternId } from "@/cad/hatchPatterns";
 import { runWallTopologyMaintenance } from "@/cad/wallTopologyMaintenance";
-import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 
 const HAIRLINE = "hsl(var(--hairline))";
