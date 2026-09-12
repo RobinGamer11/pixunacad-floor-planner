@@ -68,6 +68,7 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState<string>("");
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const filters: DocumentFilter[] = doc?.filters || [];
   const activeId: string | null = doc?.activeFilterId || null;
