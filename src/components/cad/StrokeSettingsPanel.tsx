@@ -121,6 +121,10 @@ export const StrokeSettingsPanel: React.FC<{
         </div>
       </div>
 
+      {colorPosition === "after" ? colorField : null}
+
+
+
       <div>
         <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
         <input
