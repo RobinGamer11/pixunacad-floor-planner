@@ -477,6 +477,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [docScaleChoice, setDocScaleChoice] = useState<string>("100");
   const [docScaleCustom, setDocScaleCustom] = useState<string>("100");
   const [docToolPhase, setDocToolPhase] = useState<string>("idle");
+  // Schrittanzeige beim Platzieren: true, sobald die Position per L-Klick steht.
+  const [docPlacePointSet, setDocPlacePointSet] = useState(false);
   const docFreeScaleBaseRef = useRef<{ id: string; w: number; h: number } | null>(null);
   const [docFreeScalePct, setDocFreeScalePct] = useState<number>(100);
   useEffect(() => {
