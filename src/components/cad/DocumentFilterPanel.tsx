@@ -145,6 +145,9 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
 
   if (!doc) return null;
 
+  const showOpacity = part !== "filters";
+  const showFilters = part !== "opacity";
+
   return (
     <div
       className="space-y-3"
@@ -153,13 +156,14 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
       onWheel={(e) => e.stopPropagation()}
     >
       {/* Opacity */}
+      {showOpacity && (
       <div>
         <span className="block mb-1 text-[11px] text-foreground">Transparenz</span>
         <input
           type="range" min={0} max={1} step={0.01} value={opacity}
           onPointerDown={beginDrag}
           onChange={(e) => setOpacity(parseFloat(e.target.value))}
-          className="w-full accent-foreground"
+          className="pixuna-range w-full"
         />
         <label
           className="mt-1 flex h-7 items-center overflow-hidden rounded-md border"
@@ -179,79 +183,94 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
           <span className="pr-2 text-[10px] text-muted-foreground">%</span>
         </label>
       </div>
-
-
-      {/* Filter-Liste */}
-      <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">Bildbearbeitung</span>
-
-          <button
-            type="button"
-            className="cad-toolbar-btn h-6 px-2 text-[11px]"
-            onClick={() => setAddOpen(v => !v)}
-            title="Neuen Filter erstellen"
-          >
-            <Plus className="h-3 w-3" /> Neu
-          </button>
-        </div>
-
-        {addOpen && (
-          <div className="mb-2 grid grid-cols-2 gap-1">
-            {MODE_OPTIONS.map(m => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => addFilter(m)}
-                className="cad-toolbar-btn h-7 px-2 text-[11px] justify-center"
-                title={`Filter "${filterModeLabel(m)}" hinzufügen`}
-              >
-                {filterModeLabel(m)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="space-y-1">
-          {/* Original */}
-          <FilterButton
-            active={activeId === null}
-            name="Original"
-            swatches={["#ffffff", "#808080", "#000000"]}
-            onSelect={() => setActive(null)}
-          />
-          {filters.map(f => (
-            <FilterButton
-              key={f.id}
-              active={activeId === f.id}
-              name={f.name}
-              swatches={swatchesFor(f)}
-              renaming={renamingId === f.id}
-              renameValue={renameValue}
-              onRenameChange={setRenameValue}
-              onRenameStart={() => { setRenamingId(f.id); setRenameValue(f.name); }}
-              onRenameCommit={() => { renameFilter(f.id, renameValue.trim() || f.name); setRenamingId(null); }}
-              onSelect={() => setActive(f.id)}
-              onEdit={() => setEditingId(editingId === f.id ? null : f.id)}
-              onDelete={() => { if (window.confirm(`Filter "${f.name}" löschen?`)) removeFilter(f.id); }}
-              isEditing={editingId === f.id}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Editor für aktiv editierten Filter */}
-      {editingFilter && (
-        <FilterEditor
-          filter={editingFilter}
-          onChange={(patch) => updateFilter(editingFilter.id, patch)}
-          onBeginDrag={beginDrag}
-          doc={doc}
-        />
       )}
 
-      {/* Hintergrund ausschneiden */}
-      {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
+      {showFilters && (
+      <div className="space-y-2">
+        <SettingsToggleButton
+          label="Erweiterte Bildbearbeitung"
+          active={editOpen}
+          onClick={() => setEditOpen((v) => !v)}
+          onLabel="Offen"
+          offLabel="Zu"
+        />
+
+        {editOpen && (
+          <>
+            {/* Hintergrund entfernen — erster Bereich der erweiterten Bearbeitung */}
+            {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
+
+            {/* Filter-Liste */}
+            <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">Filter</div>
+
+              {addOpen && (
+                <div className="mb-2 grid grid-cols-2 gap-1">
+                  {MODE_OPTIONS.map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => addFilter(m)}
+                      className="cad-toolbar-btn h-9 px-2 text-[11px] justify-center"
+                      title={`Filter "${filterModeLabel(m)}" hinzufügen`}
+                    >
+                      {filterModeLabel(m)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                {/* Original */}
+                <FilterButton
+                  active={activeId === null}
+                  name="Original"
+                  swatches={["#ffffff", "#808080", "#000000"]}
+                  onSelect={() => setActive(null)}
+                />
+                {filters.map(f => (
+                  <FilterButton
+                    key={f.id}
+                    active={activeId === f.id}
+                    name={f.name}
+                    swatches={swatchesFor(f)}
+                    renaming={renamingId === f.id}
+                    renameValue={renameValue}
+                    onRenameChange={setRenameValue}
+                    onRenameStart={() => { setRenamingId(f.id); setRenameValue(f.name); }}
+                    onRenameCommit={() => { renameFilter(f.id, renameValue.trim() || f.name); setRenamingId(null); }}
+                    onSelect={() => setActive(f.id)}
+                    onEdit={() => setEditingId(editingId === f.id ? null : f.id)}
+                    onDelete={() => { if (window.confirm(`Filter "${f.name}" löschen?`)) removeFilter(f.id); }}
+                    isEditing={editingId === f.id}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-md border text-[12px] font-semibold"
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+              onClick={() => setAddOpen(v => !v)}
+              title="Neuen Filter erstellen"
+            >
+              <Plus className="h-4 w-4" /> Neuer Filter
+            </button>
+
+            {/* Editor für aktiv editierten Filter */}
+            {editingFilter && (
+              <FilterEditor
+                filter={editingFilter}
+                onChange={(patch) => updateFilter(editingFilter.id, patch)}
+                onBeginDrag={beginDrag}
+                doc={doc}
+              />
+            )}
+          </>
+        )}
+      </div>
+      )}
     </div>
   );
 }
