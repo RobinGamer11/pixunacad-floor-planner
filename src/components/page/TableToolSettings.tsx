@@ -58,10 +58,20 @@ export function TableToolSettings({
   if (!tableElement || tableElement.kind !== "table") {
     return (
       <div className="space-y-3">
-        <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[11px] font-semibold text-muted-foreground">Neue Tabelle</div>
-          <Stepper label="Spalten" value={newCols} min={1} max={24} onChange={setNewCols} />
-          <Stepper label="Zeilen" value={newRows} min={1} max={200} onChange={setNewRows} />
+        <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
+          <div
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border text-[12px] font-semibold"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: "hsl(var(--accent-gold-soft))",
+              color: "hsl(var(--accent-gold))",
+            }}
+          >
+            <Plus size={14} /> Neue Tabelle
+          </div>
+          <Stepper label="Spalten" value={newCols} min={1} max={24} onChange={setNewCols} big />
+          <Stepper label="Zeilen" value={newRows} min={1} max={200} onChange={setNewRows} big />
           <div className="text-[10px] text-muted-foreground leading-snug">
             Auf der Seite aufziehen oder einmal klicken, um die Tabelle in Standardgröße zu setzen.
           </div>
