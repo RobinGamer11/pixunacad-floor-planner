@@ -11,9 +11,10 @@
  *  5) Faces traversieren (Standard-Faces-via-Twins-Rotation)
  *  6) Das kleinste finite Face wählen, das den Klickpunkt enthält
  */
-import { Vec2, v, dist, pointInPolygon, polygonSignedArea, polygonAreaAbs } from "./geometry";
+import { Vec2, v, dist, pointInPolygon, polygonSignedArea, polygonAreaAbs, tessellateWithBulges } from "./geometry";
 import type { Scene } from "./Scene";
 import { buildHealedWallSolidRing } from "./wallSolid";
+import { getEffectiveContourGeometry, getEffectiveOpenGeometry } from "./effectiveGeometry";
 
 export interface RawEdge { a: Vec2; b: Vec2; }
 
@@ -30,8 +31,21 @@ function quantKey(p: Vec2): string {
  */
 export function collectBoundaryEdges(scene: Scene): RawEdge[] {
   const out: RawEdge[] = [];
+  /** Offene Punktfolge als Kanten übernehmen. */
+  const pushPath = (pts: Vec2[], closed = false) => {
+    if (!pts || pts.length < 2) return;
+    const n = closed ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
+    }
+  };
   for (const seg of scene.segments) {
-    if (dist(seg.a, seg.b) > 1e-7) out.push({ a: v(seg.a.x, seg.a.y), b: v(seg.b.x, seg.b.y) });
+    // Sichtbare Kontur: Wölbung tesselliert, danach identisches Aufrauen wie im Renderer.
+    const bulge = (seg as any).bulge || 0;
+    const base = bulge ? tessellateWithBulges([seg.a, seg.b], [bulge], false, 32) : [seg.a, seg.b];
+    const cacheKey = seg.id ? `seg:${seg.id}:${seg.a.x},${seg.a.y},${seg.b.x},${seg.b.y},${bulge}` : "seg:anon";
+    pushPath(getEffectiveOpenGeometry(base, (seg as any).roughen, cacheKey));
   }
   // Wände: beide Wandseiten (Außen- + Innenkontur) als Begrenzung. Dadurch
   // schnappt die Flood-Fill an die innere Wandkante und überspringt den
@@ -48,19 +62,22 @@ export function collectBoundaryEdges(scene: Scene): RawEdge[] {
       if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
     }
   }
+  // Schraffuren UND Polygone: exakt die sichtbare effektive Kontur (Bulges,
+  // Aufrauen, Löcher) — dieselbe Pipeline wie Renderer und Auswahl.
   for (const h of scene.hatches) {
-    const pts = h.points;
-    if (pts.length < 3) continue;
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length];
-      if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
+    if (!h.points || h.points.length < 2) continue;
+    const geom = getEffectiveContourGeometry(h as any);
+    if (geom.closed) {
+      for (const ring of geom.rings) pushPath(ring, true);
+    } else {
+      pushPath(geom.outer, false);
     }
   }
   for (const s of scene.freeStrokes) {
-    for (let i = 0; i < s.points.length - 1; i++) {
-      const a = s.points[i], b = s.points[i + 1];
-      if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
-    }
+    const pts = getEffectiveOpenGeometry(
+      s.points, (s as any).roughen, `free:${s.id}:${s.points.length}`, (s as any).sourceStartDistanceM || 0,
+    );
+    pushPath(pts, false);
   }
   return out;
 }
