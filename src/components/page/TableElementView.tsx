@@ -579,9 +579,10 @@ export function TableElementView({
           {previewFormula && <span className="opacity-70 font-mono">{previewFormula.expr} = {previewFormula.value}</span>}
           <button
             onClick={() => formulaCtx?.setFn(null)}
-            className="w-4 h-4 flex items-center justify-center rounded hover:bg-black/10"
+            className="h-7 w-7 flex shrink-0 items-center justify-center rounded-md border hover:bg-muted"
+            style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink))" }}
             title="Abbrechen"
-          ><XIcon size={10} /></button>
+          ><XIcon size={13} /></button>
         </div>
       )}
 
@@ -700,10 +701,10 @@ export function TableElementView({
                     <button
                       onPointerDown={(e) => { e.stopPropagation(); }}
                       onClick={(e) => { e.stopPropagation(); setOpenFilter(openFilter === c ? null : c); }}
-                      className="ml-auto opacity-60 hover:opacity-100 shrink-0"
+                      className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded text-foreground/70 hover:bg-muted hover:text-foreground"
                       title="Spalte filtern"
                     >
-                      <Filter size={Math.max(8, 2.6 * pxPerMm)} className={filters[c] ? "text-primary" : undefined} />
+                      <Filter size={14} className={filters[c] ? "text-primary" : undefined} />
                     </button>
                   )}
                 </>
@@ -785,8 +786,8 @@ function FilterMenu({
   };
   return (
     <div
-      className="absolute z-30 top-full left-0 mt-1 rounded-md shadow-lg border p-2 min-w-[160px] text-[11px]"
-      style={{ background: "hsl(var(--surface))", borderColor: "hsl(var(--hairline))" }}
+      className="absolute z-30 top-full left-0 mt-1 min-w-[180px] rounded-md border p-2 text-[11px] text-foreground shadow-lg"
+      style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
@@ -802,12 +803,12 @@ function FilterMenu({
       <div className="flex flex-wrap gap-1">
         <button
           onClick={() => { onChange(local.size === values.length ? null : [...local]); onClose(); }}
-          className="h-6 px-2 text-[10px] rounded border"
+          className="h-9 min-w-20 px-3 text-[11px] rounded-md border hover:bg-muted"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >Übernehmen</button>
         <button
           onClick={() => { onChange(null); onClose(); }}
-          className="h-6 px-2 text-[10px] rounded border"
+          className="h-9 min-w-16 px-3 text-[11px] rounded-md border hover:bg-muted"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >Alle</button>
       </div>

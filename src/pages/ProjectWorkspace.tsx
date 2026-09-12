@@ -410,6 +410,7 @@ export default function ProjectWorkspace() {
   const [selectToolFlyoutOpen, setSelectToolFlyoutOpen] = useState(false);
   // Tabellen-Werkzeug: Placement-Preview vor Bestätigen.
   const [pendingTableId, setPendingTableId] = useState<string | null>(null);
+  const [tablePlacementActive, setTablePlacementActive] = useState(false);
   const [tableModifyMode, setTableModifyMode] = useState(false);
   const [tableFormulaFn, setTableFormulaFn] = useState<FormulaFn | null>(null);
   /** Tabellenmodus (Zellbearbeitung) — strikt getrennt vom Objektmodus. */
@@ -1441,19 +1442,21 @@ export default function ProjectWorkspace() {
     }
   }, [selectedElementId, tableEditId]);
 
-  /** Tabelle in Standardgröße (Papier-mm) mittig auf der aktiven Seite ablegen. */
-  function placeTableOnPage() {
-    if (!project || !activePage) return;
-    const fmt = getPageSizeMm(activePage);
+  /** Tabelle in Standardgröße am ausdrücklich angeklickten Seitenpunkt ablegen. */
+  function placeTableOnPage(pageId: string, xPct: number, yPct: number) {
+    if (!project) return;
+    const targetPage = project.pages.find((p) => p.id === pageId);
+    if (!targetPage) return;
+    const fmt = getPageSizeMm(targetPage);
     const data = createTableData(tableNewCols, tableNewRows);
     const wMm = (data.colWidthsMm ?? []).reduce((a, b) => a + b, 0);
     const hMm = (data.rowHeightsMm ?? []).reduce((a, b) => a + b, 0);
     const w = Math.max(4, Math.min(96, (wMm / fmt.wMm) * 100));
     const h = Math.max(2, Math.min(96, (hMm / fmt.hMm) * 100));
-    const id = projectStore.addElement(project.id, activePage.id, {
+    const id = projectStore.addElement(project.id, targetPage.id, {
       kind: "table",
-      x: Math.max(0, (100 - w) / 2),
-      y: Math.max(0, (100 - h) / 2),
+      x: Math.max(0, Math.min(100 - w, xPct)),
+      y: Math.max(0, Math.min(100 - h, yPct)),
       w,
       h,
       wMm,
@@ -1463,6 +1466,8 @@ export default function ProjectWorkspace() {
     } as any);
     setPendingTableId(id);
     setSelectedElementId(id);
+    setTablePlacementActive(false);
+    setRightTabState("tools");
   }
 
   return (
@@ -1778,7 +1783,7 @@ export default function ProjectWorkspace() {
             setTableEditId(null);
             setTableSelection(null);
             setActiveToolAndTab("table");
-            placeTableOnPage();
+            setTablePlacementActive(false);
           }}
         />
         <input
@@ -2329,6 +2334,8 @@ export default function ProjectWorkspace() {
                       polygonDrawMode={polygonDrawMode}
                       toolSettings={toolSettings}
                       onCommitTool={() => setActiveTool(null)}
+                      onPlaceTable={(pageId, xPct, yPct) => placeTableOnPage(pageId, xPct, yPct)}
+                      tablePlacementActive={tablePlacementActive}
                       selectedElementIds={selectedElementIds}
                       onSelect={handleSelect}
                       onMultiSelect={(ids) => {
@@ -2439,6 +2446,8 @@ export default function ProjectWorkspace() {
                               polygonDrawMode={polygonDrawMode}
                               toolSettings={toolSettings}
                               onCommitTool={() => setActiveTool(null)}
+                              onPlaceTable={(pageId, xPct, yPct) => placeTableOnPage(pageId, xPct, yPct)}
+                              tablePlacementActive={tablePlacementActive && isActiveMember}
                               selectedElementIds={isActiveMember ? selectedElementIds : []}
                               onSelect={handleSelect}
                               onCadSelectionChange={isActiveMember ? handleCadSelection : () => {}}
@@ -2535,19 +2544,23 @@ export default function ProjectWorkspace() {
               setTableFormulaFn={setTableFormulaFn}
               onConfirmTable={() => {
                 setPendingTableId(null);
+                setTablePlacementActive(false);
                 setActiveTool(null);
               }}
               onNewTable={() => {
                 setTableEditId(null);
                 setTableSelection(null);
                 setActiveToolAndTab("table");
-                placeTableOnPage();
+                setPendingTableId(null);
+                setSelectedElementId(undefined);
+                setTablePlacementActive(true);
               }}
               onCancelTable={() => {
                 if (activePage && pendingTableId) {
                   projectStore.deleteElement(project.id, activePage.id, pendingTableId);
                 }
                 setPendingTableId(null);
+                setTablePlacementActive(false);
                 setSelectedElementId(undefined);
                 setActiveTool(null);
                 setTableModifyMode(false);

@@ -17,12 +17,15 @@ export class TableTool {
   id = "table";
   cols = 3;
   rows = 4;
+  /** Nur ein ausdrücklicher Start der Platzierung darf eine Tabelle erzeugen. */
+  private awaitingPlacement = false;
 
   constructor(app: CadApp) {
     this.app = app;
   }
 
   activate() {
+    this.awaitingPlacement = true;
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
     (this.app.renderer as any).overlay = null;
@@ -31,12 +34,12 @@ export class TableTool {
     try { this.app.canvas.style.cursor = ""; } catch { /* noop */ }
   }
 
-  cancel() { try { this.app.canvas.style.cursor = ""; } catch { /* noop */ } }
-  finish() { try { this.app.canvas.style.cursor = ""; } catch { /* noop */ } }
+  cancel() { this.awaitingPlacement = false; try { this.app.canvas.style.cursor = ""; } catch { /* noop */ } }
+  finish() { this.awaitingPlacement = false; try { this.app.canvas.style.cursor = ""; } catch { /* noop */ } }
   getCursor() { return ""; }
 
   update(input: Input) {
-    if (!input.clicked) return;
+    if (!this.awaitingPlacement || !input.clicked) return;
 
     const data = createTableData(Math.max(1, this.cols), Math.max(1, this.rows));
     const model = normalizeTable(data);
@@ -50,8 +53,10 @@ export class TableTool {
     );
     this.app.setSelection({ type: SelectionType.TEXTBOX, textBoxId: table.id, handleIndex: null } as any);
     (this.app as any).pushHistory?.();
-    // Nach dem Setzen zurück ins Auswahlwerkzeug — Tabelle bleibt ausgewählt.
-    this.app.setTool(ToolIds.SELECT);
+    // Die Platzierung ist beendet, der Tabellenkontext bleibt jedoch geöffnet.
+    // Ein weiterer Canvas-Klick darf keine zweite Tabelle erzeugen; dafür muss
+    // „+ Neue Tabelle“ erneut ausdrücklich gestartet werden.
+    this.awaitingPlacement = false;
     // Sicherstellen, dass keine Cursor-Einstellung hängen bleibt.
     try { this.app.canvas.style.cursor = ""; } catch { /* noop */ }
     this.app.renderer.render();
