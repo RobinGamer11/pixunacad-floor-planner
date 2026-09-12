@@ -4,7 +4,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ArrowUpToLine, ArrowDownToLine, Combine, Split,
   Rows3, Columns3, Trash2, Filter, Equal,
-  SquareDashed, Square,
+  SquareDashed, Square, Info,
 } from "lucide-react";
 import { projectStore } from "@/lib/projectStore";
 import type { PageElement } from "@/lib/projectStore";
