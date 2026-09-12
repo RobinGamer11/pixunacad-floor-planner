@@ -30,8 +30,21 @@ function quantKey(p: Vec2): string {
  */
 export function collectBoundaryEdges(scene: Scene): RawEdge[] {
   const out: RawEdge[] = [];
+  /** Offene Punktfolge als Kanten übernehmen. */
+  const pushPath = (pts: Vec2[], closed = false) => {
+    if (!pts || pts.length < 2) return;
+    const n = closed ? pts.length : pts.length - 1;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length];
+      if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
+    }
+  };
   for (const seg of scene.segments) {
-    if (dist(seg.a, seg.b) > 1e-7) out.push({ a: v(seg.a.x, seg.a.y), b: v(seg.b.x, seg.b.y) });
+    // Sichtbare Kontur: Wölbung tesselliert, danach identisches Aufrauen wie im Renderer.
+    const bulge = (seg as any).bulge || 0;
+    const base = bulge ? tessellateWithBulges([seg.a, seg.b], [bulge], false, 32) : [seg.a, seg.b];
+    const cacheKey = seg.id ? `seg:${seg.id}:${seg.a.x},${seg.a.y},${seg.b.x},${seg.b.y},${bulge}` : "seg:anon";
+    pushPath(getEffectiveOpenGeometry(base, (seg as any).roughen, cacheKey));
   }
   // Wände: beide Wandseiten (Außen- + Innenkontur) als Begrenzung. Dadurch
   // schnappt die Flood-Fill an die innere Wandkante und überspringt den
