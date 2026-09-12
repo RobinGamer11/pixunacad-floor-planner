@@ -34,6 +34,7 @@ export function TableToolSettings({
   onCancel,
   onPatch,
   onNewTable,
+  placementActive = false,
 }: {
   projectId: string;
   pageId: string;
@@ -49,6 +50,8 @@ export function TableToolSettings({
   onPatch?: (patch: Partial<PageElement>) => void;
   /** Weitere Tabelle platzieren, während bereits eine Tabelle ausgewählt ist. */
   onNewTable?: () => void;
+  /** Wartet aktuell auf den Positionsklick in Zeichenfläche/Seite. */
+  placementActive?: boolean;
 }) {
   const ctx = React.useContext(TableEditContext);
   const [infoOpen, setInfoOpen] = React.useState(false);
@@ -61,23 +64,29 @@ export function TableToolSettings({
 
   if (!tableElement || tableElement.kind !== "table") {
     return (
-      <div className="space-y-3">
-        <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
-          <div
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border text-[12px] font-semibold"
+      <div className="space-y-3 cad-table-settings">
+        <button
+            type="button"
+            onClick={() => onNewTable?.()}
+            disabled={!onNewTable}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md border px-3 text-[13px] font-semibold transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             style={{
-              borderColor: "hsl(var(--hairline))",
-              background: "hsl(var(--accent-gold-soft))",
-              color: "hsl(var(--accent-gold))",
+              borderColor: "hsl(var(--accent-gold))",
+              background: placementActive ? "hsl(var(--accent-gold))" : "hsl(var(--accent-gold-soft))",
+              color: placementActive ? "hsl(var(--primary-foreground))" : "hsl(var(--accent-gold))",
             }}
+            aria-pressed={placementActive}
           >
-            <Plus size={14} /> Neue Tabelle
-          </div>
+            <Plus size={16} /> {placementActive ? "Platzierung aktiv" : "Neue Tabelle"}
+          </button>
+        <div className="rounded-md border p-2.5 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
           <Stepper label="Spalten" value={newCols} min={1} max={24} onChange={setNewCols} big />
           <Stepper label="Zeilen" value={newRows} min={1} max={200} onChange={setNewRows} big />
           <div className="text-[10px] text-muted-foreground leading-snug">
-            Auf der Seite aufziehen oder einmal klicken, um die Tabelle in Standardgröße zu setzen.
+            {placementActive
+              ? "Einmal auf die gewünschte Position klicken, um die Tabelle in Standardgröße zu setzen."
+              : "„Neue Tabelle“ wählen und anschließend die gewünschte Position auf der Seite anklicken."}
           </div>
         </div>
       </div>
@@ -146,7 +155,7 @@ export function TableToolSettings({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 cad-table-settings">
       {onNewTable && (
         <button
           type="button"
@@ -154,20 +163,17 @@ export function TableToolSettings({
           className="flex h-11 w-full items-center justify-center gap-2 rounded-md border text-[13px] font-semibold"
           style={{
             borderColor: "hsl(var(--accent-gold))",
-            background: "hsl(var(--accent-gold-soft))",
-            color: "hsl(var(--accent-gold))",
+            background: placementActive ? "hsl(var(--accent-gold))" : "hsl(var(--accent-gold-soft))",
+            color: placementActive ? "hsl(var(--primary-foreground))" : "hsl(var(--accent-gold))",
           }}
           title="Weitere Tabelle auf dieser Seite platzieren"
+          aria-pressed={placementActive}
         >
-          <Plus size={15} /> Tabelle
+          <Plus size={16} /> {placementActive ? "Platzierung aktiv" : "Neue Tabelle"}
         </button>
       )}
-      <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">TABELLE</div>
-
-
-        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
-        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} big />
+        <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
 
         <button
           onClick={() => setEditMode(!editMode)}
@@ -181,6 +187,9 @@ export function TableToolSettings({
         >
           <Pencil size={13} /> {editMode ? "Tabellenmodus aktiv" : "Tabelle bearbeiten"}
         </button>
+
+        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
+        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} big />
 
         <button
           onClick={() => setInfoOpen((v) => !v)}
@@ -233,7 +242,7 @@ export function TableToolSettings({
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] font-semibold text-muted-foreground">Struktur</div>
+            <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">TABELLENMODUS</div>
             <div className="flex items-center gap-1 text-[10px]">
               <span className="text-muted-foreground">Feld:</span>
               <span
@@ -267,16 +276,14 @@ export function TableToolSettings({
 
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[11px] font-semibold text-muted-foreground">Zellformat</div>
-          <div className="flex items-center gap-1">
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">ZELLFORMAT</div>
+          <div className="grid grid-cols-3 gap-1.5">
             <Toggle active={fmt.align === "left"} onClick={() => format({ align: "left" as HAlign })}><AlignLeft size={11} /></Toggle>
             <Toggle active={fmt.align === "center"} onClick={() => format({ align: "center" as HAlign })}><AlignCenter size={11} /></Toggle>
             <Toggle active={fmt.align === "right"} onClick={() => format({ align: "right" as HAlign })}><AlignRight size={11} /></Toggle>
-            <div className="w-1" />
             <Toggle active={fmt.valign === "top"} onClick={() => format({ valign: "top" as VAlign })}><ArrowUpToLine size={11} /></Toggle>
             <Toggle active={fmt.valign === "middle"} onClick={() => format({ valign: "middle" as VAlign })}><Minus size={11} /></Toggle>
             <Toggle active={fmt.valign === "bottom"} onClick={() => format({ valign: "bottom" as VAlign })}><ArrowDownToLine size={11} /></Toggle>
-            <div className="w-1" />
             <Toggle active={fmt.bold} onClick={() => format({ bold: !fmt.bold })}><Bold size={11} /></Toggle>
             <Toggle active={fmt.italic} onClick={() => format({ italic: !fmt.italic })}><Italic size={11} /></Toggle>
           </div>
@@ -286,7 +293,7 @@ export function TableToolSettings({
 
           <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
             <div className="text-[10px] font-semibold text-muted-foreground">Zellrahmen</div>
-            <div className="flex items-center gap-1">
+            <div className="grid grid-cols-3 gap-1.5">
               {(["top", "right", "bottom", "left"] as const).map((side) => (
                 <Toggle
                   key={side}
@@ -296,7 +303,6 @@ export function TableToolSettings({
                   <span className="text-[9px]">{SIDE_LABEL[side]}</span>
                 </Toggle>
               ))}
-              <div className="w-1" />
               <Toggle
                 active={cellBorders.top && cellBorders.right && cellBorders.bottom && cellBorders.left}
                 onClick={() => format({ borders: {} })}
@@ -311,7 +317,7 @@ export function TableToolSettings({
                 <button
                   key={st}
                   onClick={() => format({ borderStyle: st })}
-                  className="h-8 flex-1 rounded-md border text-[11px]"
+                   className="h-10 flex-1 rounded-md border text-[11px]"
                   style={{
                     borderColor: "hsl(var(--hairline))",
                     background: cellBorders.style === st ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -322,7 +328,7 @@ export function TableToolSettings({
             </div>
             <button
               onClick={() => format({ bottomDouble: !cellBorders.bottomDouble, borders: { ...(fmtRaw.borders ?? {}), bottom: true } })}
-              className="w-full h-8 rounded-md border text-[10px] flex items-center justify-center gap-1.5"
+              className="w-full h-10 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
               style={{
                 borderColor: "hsl(var(--hairline))",
                 background: cellBorders.bottomDouble ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -343,7 +349,7 @@ export function TableToolSettings({
                 <button
                   key={nf.key}
                   onClick={() => format({ numFormat: nf.key })}
-                  className="h-8 flex-1 rounded-md border text-[11px]"
+                 className="h-10 flex-1 rounded-md border text-[11px]"
                   style={{
                     borderColor: "hsl(var(--hairline))",
                     background: numFormatSel === nf.key ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -372,7 +378,7 @@ export function TableToolSettings({
               <button
                 key={f}
                 onClick={() => setFormulaFn(formulaFn === f ? null : f)}
-                className="h-9 px-2 text-[12px] font-semibold rounded-md border"
+                className="h-10 px-2 text-[12px] font-semibold rounded-md border"
                 style={{
                   borderColor: "hsl(var(--hairline))",
                   background: formulaFn === f ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -392,14 +398,14 @@ export function TableToolSettings({
         <div className="flex items-center gap-1.5">
           <button
             onClick={onConfirm}
-            className="flex-1 h-7 rounded text-[11px] font-medium flex items-center justify-center gap-1.5"
+            className="flex-1 h-10 rounded-md text-[12px] font-medium flex items-center justify-center gap-1.5"
             style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
           >
             <Check size={12} /> Bestätigen
           </button>
           <button
             onClick={onCancel}
-            className="h-7 px-2.5 rounded text-[11px] border flex items-center gap-1"
+            className="h-10 px-3 rounded-md text-[12px] border flex items-center gap-1"
             style={{ borderColor: "hsl(var(--hairline))" }}
           >
             <X size={12} /> Abbrechen
@@ -415,7 +421,7 @@ function MiniBtn({ icon, label, onClick, disabled }: { icon: React.ReactNode; la
     <button
       onClick={onClick}
       disabled={disabled}
-      className="h-7 px-1.5 rounded-md border text-[10px] flex items-center gap-1 justify-center hover:bg-muted disabled:opacity-30"
+      className="min-h-10 px-2 rounded-md border text-[11px] flex items-center gap-1.5 justify-center hover:bg-muted disabled:opacity-30"
       style={{ borderColor: "hsl(var(--hairline))" }}
     >
       {icon}<span className="truncate">{label}</span>
@@ -427,7 +433,7 @@ function Toggle({ active, onClick, children }: { active?: boolean; onClick: () =
   return (
     <button
       onClick={onClick}
-      className="h-7 w-7 rounded-md border flex items-center justify-center hover:bg-muted"
+      className="h-10 min-w-10 flex-1 rounded-md border flex items-center justify-center hover:bg-muted"
       style={{
         borderColor: "hsl(var(--hairline))",
         background: active ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -503,7 +509,7 @@ function ColorRow({ label, value, onChange, big }: { label: string; value: strin
 function Stepper({ label, value, min, max, onChange, big }: {
   label: string; value: number; min: number; max: number; onChange: (v: number) => void; big?: boolean;
 }) {
-  const h = big ? "h-9" : "h-7";
+  const h = big ? "h-10" : "h-9";
   return (
     <div className="flex items-center justify-between gap-2">
       <span className={`${big ? "text-[12px] font-medium" : "text-[11px]"} text-muted-foreground`}>{label}</span>
@@ -511,7 +517,7 @@ function Stepper({ label, value, min, max, onChange, big }: {
         <button
           onClick={() => onChange(Math.max(min, value - 1))}
           disabled={value <= min}
-          className={`${h} ${big ? "w-9" : "w-7"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
+          className={`${h} ${big ? "w-10" : "w-9"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
         ><Minus size={big ? 13 : 11} /></button>
         <input
           type="number"
@@ -522,12 +528,12 @@ function Stepper({ label, value, min, max, onChange, big }: {
             const n = Number(e.target.value);
             if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)));
           }}
-          className={`${big ? "w-12 h-9 text-[13px]" : "w-10 h-7 text-[11px]"} text-center bg-transparent outline-none tabular-nums`}
+          className={`${big ? "w-14 h-10 text-[13px]" : "w-11 h-9 text-[11px]"} text-center bg-transparent outline-none tabular-nums`}
         />
         <button
           onClick={() => onChange(Math.min(max, value + 1))}
           disabled={value >= max}
-          className={`${h} ${big ? "w-9" : "w-7"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
+          className={`${h} ${big ? "w-10" : "w-9"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
         ><Plus size={big ? 13 : 11} /></button>
       </div>
     </div>
