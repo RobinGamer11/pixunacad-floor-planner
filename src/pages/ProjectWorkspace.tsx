@@ -3108,6 +3108,8 @@ function PageCanvas({
       return;
     }
     if (activeTool === "table" && tablePlacementActive) {
+      e.stopPropagation();
+      e.preventDefault();
       const point = toPct(e.clientX, e.clientY);
       onPlaceTable?.(page.id, point.x, point.y);
       return;

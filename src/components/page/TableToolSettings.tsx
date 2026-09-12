@@ -172,12 +172,8 @@ export function TableToolSettings({
           <Plus size={16} /> {placementActive ? "Platzierung aktiv" : "Neue Tabelle"}
         </button>
       )}
-      <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
-
-
-        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
-        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} big />
 
         <button
           onClick={() => setEditMode(!editMode)}
@@ -191,6 +187,9 @@ export function TableToolSettings({
         >
           <Pencil size={13} /> {editMode ? "Tabellenmodus aktiv" : "Tabelle bearbeiten"}
         </button>
+
+        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
+        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} big />
 
         <button
           onClick={() => setInfoOpen((v) => !v)}
