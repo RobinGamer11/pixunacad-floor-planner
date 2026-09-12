@@ -442,10 +442,11 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
           <button
             type="button"
             onClick={() => setAdvancedOpen(v => !v)}
-            className="text-[11px] w-full text-left"
-            style={{ color: "hsl(var(--cad-toolbar-muted))" }}
+            className="flex h-9 w-full items-center justify-between gap-2 rounded-md border px-2 text-[11px] font-medium hover:bg-muted"
+            style={{ borderColor: "hsl(var(--hairline))" }}
           >
-            {advancedOpen ? "▾" : "▸"} Erweitert (Einfärben & Deckkraft)
+            <span>Erweitert (Einfärben &amp; Deckkraft)</span>
+            {advancedOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </button>
 
           {advancedOpen && (
