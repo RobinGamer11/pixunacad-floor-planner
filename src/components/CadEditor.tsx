@@ -3068,6 +3068,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           {/* Türen/Fenster Panel */}
           {(activeTool === ToolIds.DOOR || (activeTool === ToolIds.SELECT && doorSelectedId)) && (
             <div className="cad-settings-panel mb-2">
+              {/* EBENE — gemeinsame Reihenfolge aller Werkzeuge */}
+              <div className="mb-3">
+                <CadEbeneSelect target={idSelectRef} />
+              </div>
+
               {/* MODUS — außerhalb des Einstellungsrahmens */}
               <div className="mb-3">
                 <div className="mb-1.5 text-[10px] font-semibold tracking-wider" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
@@ -3084,7 +3089,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                         setDoorMode(mode);
                         if (!doorSelectedId) {
                           setDoorHeightM(mode === "window" ? 1.2 : 2.1);
-                          setDoorSashEnabled(mode === "door");
+                          setDoorSashEnabled(true);
                           setDoorJambThickM(mode === "window" ? 0.09 : 0.08);
                         }
                       }}
@@ -3144,115 +3149,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     />
                   )}
 
-                  {/* Türaufschlag (nur Tür) — blendet Türblatt + Öffnungsbogen aus */}
-                  {doorMode === "door" && (
-                    <button
-                      type="button"
-                      onClick={() => setDoorSashEnabled(!doorSashEnabled)}
-                      aria-pressed={doorSashEnabled}
-                      className={`flex h-9 w-full items-center justify-center rounded border text-[11px] transition-colors ${doorSashEnabled ? "bg-accent" : "hover:bg-muted"}`}
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                    >
-                      Türaufschlag {doorSashEnabled ? "aktiv" : "aus"}
-                    </button>
-                  )}
-
-                  {/* Laibung */}
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setDoorJambEnabled(!doorJambEnabled)}
-                      aria-pressed={doorJambEnabled}
-                      className={`flex h-9 w-full items-center justify-center rounded border text-[11px] transition-colors ${doorJambEnabled ? "bg-accent" : "hover:bg-muted"}`}
-                      style={{ borderColor: "hsl(var(--hairline))" }}
-                    >
-                      Laibung {doorJambEnabled ? "aktiv" : "aus"}
-                    </button>
-                    {doorJambEnabled && (
-                      <>
-                        <div className="grid grid-cols-2 gap-2">
-                          <DoorNumField label="Laibungslänge (je Seite)" value={doorJambLenM} min={0} onChange={(n) => setDoorJambLenM(n)} />
-                          <DoorNumField label="Laibungsdicke (0 = volle Wand)" value={doorJambThickM} min={0} onChange={(n) => setDoorJambThickM(n)} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <ToolColorPicker label="Laibungsfarbe" value={doorJambColor} onChange={setDoorJambColor} />
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Setzseite */}
-                  <div>
-                    <div className="mb-1.5 text-[10px] text-muted-foreground">Setzseite</div>
-                    <div className="grid grid-cols-3 gap-1">
-                      {([["inner", "Innen"], ["center", "Mitte"], ["outer", "Außen"]] as const).map(([v, label]) => (
-                        <button
-                          key={v}
-                          type="button"
-                          onClick={() => setDoorEdge(v)}
-                          className={`flex h-8 items-center justify-center rounded border text-[11px] transition-colors ${doorEdge === v ? "bg-accent" : "hover:bg-muted"}`}
-                          style={{ borderColor: "hsl(var(--hairline))" }}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {doorMode === "door" && (
-                    <>
-                      <div>
-                        <div className="mb-1.5 text-[10px] text-muted-foreground">Türaufschlag</div>
-                        <div className="grid grid-cols-2 gap-1">
-                          {([["inner", "Innen"], ["outer", "Außen"]] as const).map(([v, label]) => (
-                            <button
-                              key={v}
-                              type="button"
-                              onClick={() => setDoorSide(v)}
-                              className={`flex h-8 items-center justify-center rounded border text-[11px] transition-colors ${doorSide === v ? "bg-accent" : "hover:bg-muted"}`}
-                              style={{ borderColor: "hsl(var(--hairline))" }}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="mb-1.5 text-[10px] text-muted-foreground">Türrichtung</div>
-                        <div className="grid grid-cols-2 gap-1">
-                          {([["left", "Links"], ["right", "Rechts"]] as const).map(([v, label]) => (
-                            <button
-                              key={v}
-                              type="button"
-                              onClick={() => setDoorHand(v)}
-                              className={`flex h-8 items-center justify-center rounded border text-[11px] transition-colors ${doorHand === v ? "bg-accent" : "hover:bg-muted"}`}
-                              style={{ borderColor: "hsl(var(--hairline))" }}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {doorMode === "window" && (
-                    <div>
-                      <div className="mb-1.5 text-[10px] text-muted-foreground">Fensterflügel</div>
-                      <button
-                        type="button"
-                        onClick={() => setDoorSashEnabled(!doorSashEnabled)}
-                        aria-pressed={doorSashEnabled}
-                        className={`flex h-9 w-full items-center justify-center rounded border text-[11px] transition-colors ${doorSashEnabled ? "bg-accent" : "hover:bg-muted"}`}
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                      >
-                        Fensterflügel {doorSashEnabled ? "ein" : "aus"}
-                      </button>
-                    </div>
-                  )}
-
                   {/* Farben */}
-
                   <div className="grid grid-cols-2 gap-2">
                     {(doorMode === "door" || doorSashEnabled) && (
                       <ToolColorPicker
@@ -3266,17 +3163,110 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     )}
                   </div>
 
+                  {/* Setzseite (Fenster) bzw. Türposition (Tür) */}
+                  <div>
+                    <div className="mb-1.5 text-[10px] text-muted-foreground">
+                      {doorMode === "window" ? "Setzseite" : "Türposition"}
+                    </div>
+                    <div className="grid grid-cols-3 gap-1">
+                      {([["inner", "Innen"], ["center", "Mitte"], ["outer", "Außen"]] as const).map(([v, label]) => (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setDoorEdge(v)}
+                          className={`flex h-9 items-center justify-center rounded border text-[11px] transition-colors ${doorEdge === v ? "bg-accent" : "hover:bg-muted"}`}
+                          style={{ borderColor: "hsl(var(--hairline))" }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Laibung */}
+                  <div className="space-y-2">
+                    <SettingsToggleButton
+                      label="Laibung"
+                      active={doorJambEnabled}
+                      onClick={() => setDoorJambEnabled(!doorJambEnabled)}
+                      onLabel="Aktiv"
+                    />
+                    {doorJambEnabled && (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <DoorNumField label="Laibungslänge (je Seite)" value={doorJambLenM} min={0} onChange={(n) => setDoorJambLenM(n)} />
+                          <DoorNumField label="Laibungsdicke (0 = volle Wand)" value={doorJambThickM} min={0} onChange={(n) => setDoorJambThickM(n)} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <ToolColorPicker label="Laibungsfarbe" value={doorJambColor} onChange={setDoorJambColor} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Türaufschlag → Türrichtung (nur Tür) */}
+                  {doorMode === "door" && (
+                    <div className="space-y-2">
+                      <SettingsToggleButton
+                        label="Türaufschlag"
+                        active={doorSashEnabled}
+                        onClick={() => setDoorSashEnabled(!doorSashEnabled)}
+                        onLabel="Aktiv"
+                      />
+                      {doorSashEnabled && (
+                        <>
+                          <div>
+                            <div className="mb-1.5 text-[10px] text-muted-foreground">Türaufschlag</div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {([["inner", "Innen"], ["outer", "Außen"]] as const).map(([v, label]) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => setDoorSide(v)}
+                                  className={`flex h-9 items-center justify-center rounded border text-[11px] transition-colors ${doorSide === v ? "bg-accent" : "hover:bg-muted"}`}
+                                  style={{ borderColor: "hsl(var(--hairline))" }}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="mb-1.5 text-[10px] text-muted-foreground">Türrichtung</div>
+                            <div className="grid grid-cols-2 gap-1">
+                              {([["left", "Links"], ["right", "Rechts"]] as const).map(([v, label]) => (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => setDoorHand(v)}
+                                  className={`flex h-9 items-center justify-center rounded border text-[11px] transition-colors ${doorHand === v ? "bg-accent" : "hover:bg-muted"}`}
+                                  style={{ borderColor: "hsl(var(--hairline))" }}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {doorMode === "window" && (
+                    <SettingsToggleButton
+                      label="Fensterflügel"
+                      active={doorSashEnabled}
+                      onClick={() => setDoorSashEnabled(!doorSashEnabled)}
+                    />
+                  )}
+
                   {doorMode === "window" && (
                     <div className="space-y-2">
-                      <button
-                        type="button"
+                      <SettingsToggleButton
+                        label="Glasfüllung"
+                        active={!!doorGlassFillColor}
                         onClick={() => setDoorGlassFillColor(doorGlassFillColor ? "" : "#cfe2f3")}
-                        aria-pressed={!!doorGlassFillColor}
-                        className={`flex h-9 w-full items-center justify-center rounded border text-[11px] transition-colors ${doorGlassFillColor ? "bg-accent" : "hover:bg-muted"}`}
-                        style={{ borderColor: "hsl(var(--hairline))" }}
-                      >
-                        Glasfüllung {doorGlassFillColor ? "ein" : "aus"}
-                      </button>
+                      />
                       {doorGlassFillColor && (
                         <div className="grid grid-cols-2 gap-2">
                           <ToolColorPicker label="Glasfarbe" value={doorGlassFillColor} onChange={setDoorGlassFillColor} />
@@ -3284,26 +3274,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                       )}
                     </div>
                   )}
-
-                  {doorSelectedId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const app = appRef.current;
-                        if (!app) return;
-                        const d = app.scene.getDoorById(doorSelectedId);
-                        if (d) { app.scene.removeDoor(d); app.doorTool.selectDoor(null); }
-                      }}
-                      className="flex h-8 w-full items-center justify-center rounded border text-[11px]"
-                      style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--destructive))" }}
-                    >
-                      {doorMode === "window" ? "Fenster" : "Tür"} löschen
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
           )}
+
 
           {/* Document-Eigenschaften: nur im Auswahl-Tool, wenn Dokument selektiert */}
           {!!docSelected && (activeTool === ToolIds.SELECT || activeTool === ToolIds.DOCUMENT) && (
