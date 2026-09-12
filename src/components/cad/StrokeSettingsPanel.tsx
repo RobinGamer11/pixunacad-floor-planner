@@ -66,16 +66,30 @@ export const StrokeSettingsPanel: React.FC<{
   /** Bildschirm-Pixel pro Papiermillimeter (nur Variante "screen"). */
   pxPerMm?: number;
   colorLabel?: string;
+  /** Farbfeld über oder unter der Strichstärke. */
+  colorPosition?: "before" | "after";
+  /** Inhalt direkt über der Strichstärke (z. B. Linienart). */
+  beforeStroke?: React.ReactNode;
+  /** true = Titelzeile ausblenden. */
+  hideTitle?: boolean;
   children?: React.ReactNode;
-}> = ({ title, value, onChange, variant = "screen", pxPerMm = 1, colorLabel = "Farbe", children }) => {
+}> = ({ title, value, onChange, variant = "screen", pxPerMm = 1, colorLabel = "Farbe", colorPosition = "before", beforeStroke, hideTitle = false, children }) => {
   const mm = value.thicknessM * 1000;
   const alpha = Math.min(100, Math.max(1, Math.round(value.alphaPct)));
 
+  const colorField = (
+    <ToolColorPicker label={colorLabel} value={value.color} onChange={(v) => onChange({ color: v })} />
+  );
+
   return (
     <div className="space-y-3">
-      <div className="text-[10px] font-semibold tracking-wider mb-2 text-muted-foreground">{title}</div>
+      {!hideTitle && (
+        <div className="text-[10px] font-semibold tracking-wider mb-2 text-muted-foreground">{title}</div>
+      )}
 
-      <ToolColorPicker label={colorLabel} value={value.color} onChange={(v) => onChange({ color: v })} />
+      {beforeStroke}
+
+      {colorPosition === "before" ? colorField : null}
 
       <div>
         <div className="mb-1.5 text-[10px] text-muted-foreground">Strichstärke</div>
