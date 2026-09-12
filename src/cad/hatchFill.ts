@@ -11,9 +11,10 @@
  *  5) Faces traversieren (Standard-Faces-via-Twins-Rotation)
  *  6) Das kleinste finite Face wählen, das den Klickpunkt enthält
  */
-import { Vec2, v, dist, pointInPolygon, polygonSignedArea, polygonAreaAbs } from "./geometry";
+import { Vec2, v, dist, pointInPolygon, polygonSignedArea, polygonAreaAbs, tessellateWithBulges } from "./geometry";
 import type { Scene } from "./Scene";
 import { buildHealedWallSolidRing } from "./wallSolid";
+import { getEffectiveContourGeometry, getEffectiveOpenGeometry } from "./effectiveGeometry";
 
 export interface RawEdge { a: Vec2; b: Vec2; }
 
