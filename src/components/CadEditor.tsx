@@ -3308,113 +3308,98 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </label>
               <div className="space-y-3">
 
-                <div className="text-xs">
-                  <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
-                  <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                    {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
-                  </div>
-                </div>
-
-                {(docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input") && (
-                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
-                    {docToolPhase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
-                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
-                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
-                  title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                  <span className="text-xs">Skalieren (2 Punkte)</span>
-                </button>
-
-
-                {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl), ohne Rahmen. */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] px-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                    <span>Freie Skalierung</span>
-                    <button
-                      type="button"
-                      className="hover:underline"
-                      title="Zurück auf 100%"
-                      onClick={() => {
-                        const base = docFreeScaleBaseRef.current;
-                        if (!base) return;
-                        setDocFreeScalePct(100);
-                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, 1, base.w, base.h);
-                      }}
-                    >
-                      Reset
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="range"
-                      min={1}
-                      max={2000}
-                      step={1}
-                      value={Math.round(docFreeScalePct)}
-                      onChange={(e) => {
-                        const pct = Number(e.target.value);
-                        const base = docFreeScaleBaseRef.current;
-                        if (!base) return;
-                        setDocFreeScalePct(pct);
-                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
-                      }}
-                      className="flex-1 accent-foreground"
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      max={2000}
-                      step={1}
-                      value={Math.round(docFreeScalePct)}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (!Number.isFinite(v)) return;
-                        const pct = Math.max(1, Math.min(2000, v));
-                        const base = docFreeScaleBaseRef.current;
-                        if (!base) return;
-                        setDocFreeScalePct(pct);
-                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
-                      }}
-                      className="w-14 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
-                      style={{ borderColor: "hsl(var(--border))" }}
-                    />
-                    <span className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>%</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const app = appRef.current; if (!app) return;
-                    const doc = app.scene.getDocumentById(docSelected.id);
-                    if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
-                      app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
-                    }
-                  }}
-                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
-                  title="Dokument löschen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="text-xs">Löschen</span>
-                </button>
-
                 {!!docSelected.pdfSourceB64 && (
                   <DocumentPixelModeToggle app={appRef.current} docId={docSelected.id} />
                 )}
 
-                <WarpSection engine={appRef.current} docId={docSelected.id} />
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">SKALIERUNG</div>
 
-                <FlipSection engine={appRef.current} docId={docSelected.id} />
+                  <div className="text-xs">
+                    <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
+                    <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                      {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
+                    </div>
+                  </div>
 
-                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
+                  {(docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input") && (
+                    <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
+                      {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+                      {docToolPhase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
+                      {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
+                    className="cad-toolbar-btn w-full justify-center h-10 text-[12px] font-semibold"
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                    title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    <span>Skalieren (2 Punkte)</span>
+                  </button>
+
+                  {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl), ohne Rahmen. */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] px-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                      <span>Freie Skalierung</span>
+                      <button
+                        type="button"
+                        className="hover:underline"
+                        title="Zurück auf 100%"
+                        onClick={() => {
+                          const base = docFreeScaleBaseRef.current;
+                          if (!base) return;
+                          setDocFreeScalePct(100);
+                          (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, 1, base.w, base.h);
+                        }}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="range"
+                        min={1}
+                        max={2000}
+                        step={1}
+                        value={Math.round(docFreeScalePct)}
+                        onChange={(e) => {
+                          const pct = Number(e.target.value);
+                          const base = docFreeScaleBaseRef.current;
+                          if (!base) return;
+                          setDocFreeScalePct(pct);
+                          (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
+                        }}
+                        className="pixuna-range flex-1"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        max={2000}
+                        step={1}
+                        value={Math.round(docFreeScalePct)}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (!Number.isFinite(v)) return;
+                          const pct = Math.max(1, Math.min(2000, v));
+                          const base = docFreeScaleBaseRef.current;
+                          if (!base) return;
+                          setDocFreeScalePct(pct);
+                          (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
+                        }}
+                        className="w-14 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                      />
+                      <span className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transparenz */}
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="opacity" />
 
                 {!!docSelected.pdfSourceB64 && (
                   <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -3439,6 +3424,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     </button>
                   </div>
                 )}
+
+                <WarpSection engine={appRef.current} docId={docSelected.id} />
+
+                <FlipSection engine={appRef.current} docId={docSelected.id} />
+
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="filters" />
 
               </div>
             </div>
