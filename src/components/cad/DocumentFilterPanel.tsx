@@ -12,7 +12,8 @@ import {
   filterModeLabel,
   extractDominantColors,
 } from "@/cad/documentFilters";
-import { Plus, Trash2, Pencil, Check } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 interface Props {
   app: CadApp | null;
@@ -21,6 +22,8 @@ interface Props {
   sig: string;
   /** „Hintergrund entfernen"-Abschnitt anzeigen. Default: true. */
   showBgRemove?: boolean;
+  /** Teilbereich: nur Transparenz, nur Bildbearbeitung oder beides. */
+  part?: "all" | "opacity" | "filters";
 }
 
 /** Patch oder Updater auf Basis des aktuellen Filterzustands. */
@@ -30,7 +33,7 @@ export type FilterChange = (
 
 const MODE_OPTIONS: DocumentFilterMode[] = ["adjust", "bw", "grayscale", "tint", "free"];
 
-export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
+export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all" }: Props) {
   // Doc bei jedem Render frisch lesen (sig erzwingt Re-Render via parent state).
   void sig;
   const doc: any = app?.scene.getDocumentById(docId) || null;
@@ -65,6 +68,7 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState<string>("");
   const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const filters: DocumentFilter[] = doc?.filters || [];
   const activeId: string | null = doc?.activeFilterId || null;
@@ -145,6 +149,9 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
 
   if (!doc) return null;
 
+  const showOpacity = part !== "filters";
+  const showFilters = part !== "opacity";
+
   return (
     <div
       className="space-y-3"
@@ -153,13 +160,14 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
       onWheel={(e) => e.stopPropagation()}
     >
       {/* Opacity */}
+      {showOpacity && (
       <div>
         <span className="block mb-1 text-[11px] text-foreground">Transparenz</span>
         <input
           type="range" min={0} max={1} step={0.01} value={opacity}
           onPointerDown={beginDrag}
           onChange={(e) => setOpacity(parseFloat(e.target.value))}
-          className="w-full accent-foreground"
+          className="pixuna-range w-full"
         />
         <label
           className="mt-1 flex h-7 items-center overflow-hidden rounded-md border"
@@ -179,79 +187,94 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove }: Props) {
           <span className="pr-2 text-[10px] text-muted-foreground">%</span>
         </label>
       </div>
-
-
-      {/* Filter-Liste */}
-      <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">Bildbearbeitung</span>
-
-          <button
-            type="button"
-            className="cad-toolbar-btn h-6 px-2 text-[11px]"
-            onClick={() => setAddOpen(v => !v)}
-            title="Neuen Filter erstellen"
-          >
-            <Plus className="h-3 w-3" /> Neu
-          </button>
-        </div>
-
-        {addOpen && (
-          <div className="mb-2 grid grid-cols-2 gap-1">
-            {MODE_OPTIONS.map(m => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => addFilter(m)}
-                className="cad-toolbar-btn h-7 px-2 text-[11px] justify-center"
-                title={`Filter "${filterModeLabel(m)}" hinzufügen`}
-              >
-                {filterModeLabel(m)}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="space-y-1">
-          {/* Original */}
-          <FilterButton
-            active={activeId === null}
-            name="Original"
-            swatches={["#ffffff", "#808080", "#000000"]}
-            onSelect={() => setActive(null)}
-          />
-          {filters.map(f => (
-            <FilterButton
-              key={f.id}
-              active={activeId === f.id}
-              name={f.name}
-              swatches={swatchesFor(f)}
-              renaming={renamingId === f.id}
-              renameValue={renameValue}
-              onRenameChange={setRenameValue}
-              onRenameStart={() => { setRenamingId(f.id); setRenameValue(f.name); }}
-              onRenameCommit={() => { renameFilter(f.id, renameValue.trim() || f.name); setRenamingId(null); }}
-              onSelect={() => setActive(f.id)}
-              onEdit={() => setEditingId(editingId === f.id ? null : f.id)}
-              onDelete={() => { if (window.confirm(`Filter "${f.name}" löschen?`)) removeFilter(f.id); }}
-              isEditing={editingId === f.id}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Editor für aktiv editierten Filter */}
-      {editingFilter && (
-        <FilterEditor
-          filter={editingFilter}
-          onChange={(patch) => updateFilter(editingFilter.id, patch)}
-          onBeginDrag={beginDrag}
-          doc={doc}
-        />
       )}
 
-      {/* Hintergrund ausschneiden */}
-      {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
+      {showFilters && (
+      <div className="space-y-2">
+        <SettingsToggleButton
+          label="Erweiterte Bildbearbeitung"
+          active={editOpen}
+          onClick={() => setEditOpen((v) => !v)}
+          onLabel="Offen"
+          offLabel="Zu"
+        />
+
+        {editOpen && (
+          <>
+            {/* Hintergrund entfernen — erster Bereich der erweiterten Bearbeitung */}
+            {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
+
+            {/* Filter-Liste */}
+            <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">Filter</div>
+
+              {addOpen && (
+                <div className="mb-2 grid grid-cols-2 gap-1">
+                  {MODE_OPTIONS.map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => addFilter(m)}
+                      className="cad-toolbar-btn h-9 px-2 text-[11px] justify-center"
+                      title={`Filter "${filterModeLabel(m)}" hinzufügen`}
+                    >
+                      {filterModeLabel(m)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                {/* Original */}
+                <FilterButton
+                  active={activeId === null}
+                  name="Original"
+                  swatches={["#ffffff", "#808080", "#000000"]}
+                  onSelect={() => setActive(null)}
+                />
+                {filters.map(f => (
+                  <FilterButton
+                    key={f.id}
+                    active={activeId === f.id}
+                    name={f.name}
+                    swatches={swatchesFor(f)}
+                    renaming={renamingId === f.id}
+                    renameValue={renameValue}
+                    onRenameChange={setRenameValue}
+                    onRenameStart={() => { setRenamingId(f.id); setRenameValue(f.name); }}
+                    onRenameCommit={() => { renameFilter(f.id, renameValue.trim() || f.name); setRenamingId(null); }}
+                    onSelect={() => setActive(f.id)}
+                    onEdit={() => setEditingId(editingId === f.id ? null : f.id)}
+                    onDelete={() => { if (window.confirm(`Filter "${f.name}" löschen?`)) removeFilter(f.id); }}
+                    isEditing={editingId === f.id}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-md border text-[12px] font-semibold"
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+              onClick={() => setAddOpen(v => !v)}
+              title="Neuen Filter erstellen"
+            >
+              <Plus className="h-4 w-4" /> Neuer Filter
+            </button>
+
+            {/* Editor für aktiv editierten Filter */}
+            {editingFilter && (
+              <FilterEditor
+                filter={editingFilter}
+                onChange={(patch) => updateFilter(editingFilter.id, patch)}
+                onBeginDrag={beginDrag}
+                doc={doc}
+              />
+            )}
+          </>
+        )}
+      </div>
+      )}
     </div>
   );
 }
@@ -312,29 +335,21 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
   const brushActive = isThisDoc && inter?.tool === "brush";
 
   return (
-    <div className="space-y-2" style={{ borderTop: "1px solid hsl(var(--border))", paddingTop: 10 }}>
-      <div className="flex items-center justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-          Hintergrund entfernen
-        </div>
-        <label className="flex items-center gap-1 text-[11px] cursor-pointer" title="Aktiviert das Ausschneiden. Beim ersten Einschalten wird der Hintergrund automatisch anhand der Bild-Ecken erkannt.">
-          <input type="checkbox" checked={!!bg?.enabled} onChange={enable} />
-          <span>Aktiv</span>
-        </label>
-      </div>
+    <div className="space-y-2">
+      <SettingsToggleButton
+        label="Hintergrund entfernen"
+        active={!!bg?.enabled}
+        onClick={enable}
+        title="Aktiviert das Ausschneiden. Beim ersten Einschalten wird der Hintergrund automatisch anhand der Bild-Ecken erkannt."
+      />
 
       {bg?.enabled && (
         <>
-          <p className="text-[10.5px] leading-snug" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-            Klicke im Canvas auf einen Hintergrund­bereich, um ihn zu entfernen.
-            Mit dem Pinsel kannst du feine Kanten nachjustieren.
-          </p>
-
           {/* Auto-Button */}
           <button
             type="button"
             onClick={() => runAuto()}
-            className="cad-toolbar-btn h-8 w-full text-[11px] justify-center"
+            className="cad-toolbar-btn h-10 w-full text-[12px] font-semibold justify-center"
             style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }}
             title="Erkennt den Hintergrund automatisch anhand der 4 Bild-Ecken. Bei zu wenig/zu viel Wegschnitt die Genauigkeit unten anpassen und erneut klicken."
           >
@@ -351,7 +366,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
             </div>
             <input type="range" min={1} max={128} step={1} value={bg.tolerance}
               onChange={(e) => patchBg({ tolerance: parseInt(e.target.value, 10) })}
-              className="w-full" />
+              className="pixuna-range w-full" />
           </div>
 
           {/* Klick-Werkzeuge */}
@@ -381,7 +396,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
                 <button
                   type="button"
                   onClick={() => setBrushMode("bg")}
-                  className="cad-toolbar-btn h-5 px-1.5 text-[10px]"
+                  className="cad-toolbar-btn h-7 px-2 text-[11px]"
                   style={{
                     borderColor: brushMode === "bg" ? "hsl(var(--primary))" : undefined,
                     background: brushMode === "bg" ? "hsl(var(--primary) / 0.15)" : undefined,
@@ -391,7 +406,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
                 <button
                   type="button"
                   onClick={() => setBrushMode("fg")}
-                  className="cad-toolbar-btn h-5 px-1.5 text-[10px]"
+                  className="cad-toolbar-btn h-7 px-2 text-[11px]"
                   style={{
                     borderColor: brushMode === "fg" ? "hsl(var(--primary))" : undefined,
                     background: brushMode === "fg" ? "hsl(var(--primary) / 0.15)" : undefined,
@@ -413,7 +428,7 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
               </div>
               <input type="range" min={1} max={200} step={1} value={Math.round(bg.brushRadiusM * 100)}
                 onChange={(e) => patchBg({ brushRadiusM: parseInt(e.target.value, 10) / 100 })}
-                className="w-full" />
+                className="pixuna-range w-full" />
             </div>
           </div>
 
@@ -427,10 +442,11 @@ function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
           <button
             type="button"
             onClick={() => setAdvancedOpen(v => !v)}
-            className="text-[11px] w-full text-left"
-            style={{ color: "hsl(var(--cad-toolbar-muted))" }}
+            className="flex h-9 w-full items-center justify-between gap-2 rounded-md border px-2 text-[11px] font-medium hover:bg-muted"
+            style={{ borderColor: "hsl(var(--hairline))" }}
           >
-            {advancedOpen ? "▾" : "▸"} Erweitert (Einfärben & Deckkraft)
+            <span>Erweitert (Einfärben &amp; Deckkraft)</span>
+            {advancedOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </button>
 
           {advancedOpen && (
@@ -472,7 +488,7 @@ function ToolBtn({ active, onClick, label, title }: { active: boolean; onClick: 
       type="button"
       onClick={onClick}
       title={title}
-      className="cad-toolbar-btn h-7 px-2 text-[11px] justify-center"
+      className="cad-toolbar-btn h-9 px-2 text-[11px] font-medium justify-center"
       style={{
         borderColor: active ? "hsl(var(--primary))" : undefined,
         background: active ? "hsl(var(--primary) / 0.15)" : undefined,
@@ -510,7 +526,7 @@ function ColorAlphaRow({ label, color, alpha, onChange, hint }: {
       </div>
       <input type="range" min={0} max={1} step={0.01} value={alpha}
         onChange={(e) => onChange(color, parseFloat(e.target.value))}
-        className="w-full" />
+        className="pixuna-range w-full" />
     </div>
   );
 }
@@ -650,29 +666,38 @@ function AdjustEditor({ filter, onChange, onBeginDrag }: {
     onChange((cur) => ({ adjust: { ...DEFAULT_ADJUST, ...(cur.adjust || {}), ...patch } }));
   const applyPreset = (params: Partial<AdjustParams>) => onChange({ adjust: { ...DEFAULT_ADJUST, ...params } });
 
+  // Die vier alten Mustervorlagen werden in der Oberfläche nicht mehr angeboten.
+  const HIDDEN_PRESETS = new Set(["master", "trees", "architecture", "competition"]);
+  const presets = ADJUST_PRESETS.filter(p => !HIDDEN_PRESETS.has(p.key));
+
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1">
-        {ADJUST_PRESETS.map(p => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => applyPreset(p.values)}
-            className="cad-toolbar-btn h-6 px-2 text-[10px]"
-            title={`Preset "${p.name}" anwenden`}
-          >
-            {p.name}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => applyPreset({})}
-          className="cad-toolbar-btn h-6 px-2 text-[10px] ml-auto"
-          title="Alle Regler zurücksetzen"
+      {presets.length > 0 && (
+        <select
+          value=""
+          onChange={(e) => {
+            const p = presets.find(x => x.key === e.target.value);
+            if (p) applyPreset(p.values);
+          }}
+          className="cad-settings-select w-full"
+          title="Filter bearbeiten"
         >
-          Reset
-        </button>
-      </div>
+          <option value="">Filter bearbeiten …</option>
+          {presets.map(p => (
+            <option key={p.key} value={p.key}>{p.name}</option>
+          ))}
+        </select>
+      )}
+      <button
+        type="button"
+        onClick={() => applyPreset({})}
+        className="cad-toolbar-btn h-9 w-full justify-center text-[12px] font-semibold"
+        style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }}
+        title="Alle Regler zurücksetzen"
+      >
+        Reset
+      </button>
+
 
       {ADJUST_GROUPS.map(group => (
         <div key={group.title} className="space-y-1 pt-1" style={{ borderTop: "1px dashed hsl(var(--border))" }}>

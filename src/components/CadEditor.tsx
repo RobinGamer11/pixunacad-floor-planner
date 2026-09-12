@@ -33,6 +33,7 @@ import { LineModeSelect } from "@/components/cad/LineModeSelect";
 import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
+import { StepHints } from "@/components/cad/StepHints";
 import {
   CadEbeneSelect,
   CadThicknessMmInput,
@@ -2611,7 +2612,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
 
                 <div className={measureIsAngle ? "hidden" : ""}>
-                <CadCheckboxProxy target={measureExtRef} label="Verlängerungslinien" />
+                <CadBigToggleProxy target={measureExtRef} label="Verlängerungslinien" />
                 </div>
                 <div ref={measureExtGroupRef} className={`hidden space-y-2 ${measureIsAngle ? "!hidden" : ""}`}>
                   <div>
@@ -2624,7 +2625,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <CadColorProxy label="Farbe Verlängerung" target={measureExtColorRef} />
                 </div>
 
-                <CadCheckboxProxy target={measureFreeTextToggleRef} label="Freier Text" />
+                <CadBigToggleProxy target={measureFreeTextToggleRef} label="Freier Text" />
                 <div ref={measureFreeTextGroupRef} className="hidden space-y-2">
                   <input
                     ref={measureFreeTextInputRef}
@@ -2640,7 +2641,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   <CadColorProxy label="Farbe freier Text" target={measureFreeTextColorRef} />
                 </div>
 
-                <CadCheckboxProxy target={measureTextBgToggleRef} label="Text-Hintergrund" />
+                <CadBigToggleProxy target={measureTextBgToggleRef} label="Text-Hintergrund" />
                 <div ref={measureTextBgGroupRef} className="hidden space-y-2">
                   <CadColorProxy label="Hintergrundfarbe" target={measureTextBgColorRef} />
                 </div>
@@ -2656,6 +2657,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <CadEbeneSelect target={textIdSelectRef} />
+              <RasterModeToggle app={appRef.current} projectId={projectId} />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
                 <div className="hidden">
@@ -2673,7 +2675,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   </CadToggleProxy>
                 </div>
               </div>
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
             </div>
             <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
             <div className="text-[10px] font-semibold tracking-wider mb-2" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>TEXT</div>
@@ -2741,23 +2742,21 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 </div>
               </div>
               <div>
-                <div className="mb-1.5 flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>Transparenz</span>
-                  <span className="flex overflow-hidden rounded border" style={{ borderColor: "hsl(var(--hairline))" }}>
-                    {(["text", "bg"] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setTextAlphaTarget(t)}
-                        className="px-1.5 py-[1px] text-[9px]"
-                        style={textAlphaTarget === t
-                          ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
-                          : { background: "transparent" }}
-                      >
-                        {t === "text" ? "Text" : "Feld"}
-                      </button>
-                    ))}
-                  </span>
+                <div className="mb-1.5 text-[10px] text-muted-foreground">Transparenz</div>
+                <div className="mb-2 grid grid-cols-2 gap-1">
+                  {(["text", "bg"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTextAlphaTarget(t)}
+                      className="flex h-9 items-center justify-center rounded-md border text-[12px] font-medium transition-colors"
+                      style={textAlphaTarget === t
+                        ? { borderColor: "hsl(var(--primary))", background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
+                        : { borderColor: "hsl(var(--hairline))", background: "transparent" }}
+                    >
+                      {t === "text" ? "Text" : "Feld"}
+                    </button>
+                  ))}
                 </div>
                 <div className="hidden">
                   <input ref={textBgAlphaRangeRef} type="range" min={0} max={100} step={1} defaultValue={0} />
@@ -2776,11 +2775,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <label className="!mb-0 cursor-pointer">Zeilenumbruch</label>
               </div>
               <div>
-                <div className="mb-1.5 text-[10px] text-muted-foreground">Rahmen</div>
                 <div className="hidden">
                   <input ref={textBorderToggleRef} type="checkbox" />
                 </div>
-                <CadCheckboxProxy target={textBorderToggleRef} label="Rahmen anzeigen" />
+                <CadBigToggleProxy target={textBorderToggleRef} label="Rahmen" />
               </div>
               <div ref={textBorderGroupRef} className="hidden space-y-2 pt-2" style={{ borderTop: "1px solid hsl(var(--border))" }}>
                 <div>
@@ -2812,10 +2810,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     if (stickerPhase === "selecting") appRef.current!.stickerTool.cancel();
                     else appRef.current!.stickerTool.beginSelectionMode();
                   }}
-                  className={`cad-toolbar-btn w-full justify-center h-9 ${stickerPhase === "selecting" ? "active" : ""}`}
+                  className={`cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold ${stickerPhase === "selecting" ? "active" : ""}`}
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
                   title="Objekte für einen neuen Stempel auswählen"
                 >
-                  <Plus className="h-4 w-4" /> <span className="text-xs">Stempel</span>
+                  <Plus className="h-4 w-4" /> <span>Neuer Stempel</span>
                 </button>
 
                 {stickerPhase === "selecting" && (
@@ -2956,11 +2955,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   type="button"
                   disabled={docImporting}
                   onClick={() => docFileInputRef.current?.click()}
-                  className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50 disabled:cursor-wait"
+                  className="cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold disabled:opacity-50 disabled:cursor-wait"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
                   title="PDF, JPG oder PNG importieren"
                 >
                   <Upload className="h-4 w-4" />
-                  <span className="text-xs">{docImporting ? "Importiere…" : "Datei importieren"}</span>
+                  <span>{docImporting ? "Importiere…" : "Datei importieren"}</span>
                 </button>
                 <input
                   ref={docFileInputRef}
@@ -2974,44 +2974,42 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   type="button"
                   disabled={docImporting}
                   onClick={() => setDocLibraryOpen(true)}
-                  className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50"
+                  className="cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold disabled:opacity-50"
                   title="Dokumente aus der Projekt-Ablage (Startseite) einfügen"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  <span className="text-xs">Aus Projekt-Ablage</span>
+                  <span>Aus Projekt-Ablage</span>
                 </button>
 
-                <label
-                  className="flex items-center gap-2 text-[11px] cursor-pointer select-none px-0.5"
-                  title="Ohne Häkchen wird das Dokument frei platziert (Originalgröße)."
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 accent-primary"
-                    style={{ width: "1rem", minWidth: "1rem" }}
-                    checked={!docFreePlace}
-                    onChange={(e) => setDocFreePlace(!e.target.checked)}
-                  />
-                  <span>Maßstab anwenden</span>
-                </label>
+                <SettingsToggleButton
+                  label="Maßstab anwenden"
+                  active={!docFreePlace}
+                  onClick={() => setDocFreePlace(!docFreePlace)}
+                  title="Ohne Maßstab wird das Dokument frei platziert (Originalgröße)."
+                />
 
-                <div className={docFreePlace ? "opacity-50 pointer-events-none" : ""}>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] w-14" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Maßstab</span>
+                {!docFreePlace && (
+                  <div
+                    className="rounded-md border p-2"
+                    style={{ borderColor: "hsl(var(--primary) / 0.5)", background: "hsl(var(--primary) / 0.08)" }}
+                  >
+                    <div className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground">MASSSTAB</div>
                     <input
                       value={docImportScale}
                       onChange={(e) => setDocImportScale(e.target.value)}
                       placeholder="1:100"
-                      className="flex-1 h-8 px-2 rounded border bg-transparent text-xs"
-                      style={{ borderColor: "hsl(var(--border))" }}
+                      className="h-9 w-full rounded border px-2 text-sm font-medium tabular-nums"
+                      style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "hsl(var(--card))" }}
                     />
                   </div>
-                </div>
+                )}
 
                 {docToolPhase === "placing" && (
-                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    Linksklick: Position setzen · Enter: final platzieren · Esc: abbrechen
-                  </div>
+                  <StepHints
+                    steps={["Position setzen – L-Klick", "Objekt setzen – Enter"]}
+                    current={0}
+                    footer="ESC: abbrechen"
+                  />
                 )}
 
               </div>
@@ -3310,113 +3308,98 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </label>
               <div className="space-y-3">
 
-                <div className="text-xs">
-                  <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
-                  <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                    {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
-                  </div>
-                </div>
-
-                {(docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input") && (
-                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
-                    {docToolPhase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
-                    {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
-                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
-                  title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                  <span className="text-xs">Skalieren (2 Punkte)</span>
-                </button>
-
-
-                {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl), ohne Rahmen. */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] px-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                    <span>Freie Skalierung</span>
-                    <button
-                      type="button"
-                      className="hover:underline"
-                      title="Zurück auf 100%"
-                      onClick={() => {
-                        const base = docFreeScaleBaseRef.current;
-                        if (!base) return;
-                        setDocFreeScalePct(100);
-                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, 1, base.w, base.h);
-                      }}
-                    >
-                      Reset
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="range"
-                      min={1}
-                      max={2000}
-                      step={1}
-                      value={Math.round(docFreeScalePct)}
-                      onChange={(e) => {
-                        const pct = Number(e.target.value);
-                        const base = docFreeScaleBaseRef.current;
-                        if (!base) return;
-                        setDocFreeScalePct(pct);
-                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
-                      }}
-                      className="flex-1 accent-foreground"
-                    />
-                    <input
-                      type="number"
-                      min={1}
-                      max={2000}
-                      step={1}
-                      value={Math.round(docFreeScalePct)}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (!Number.isFinite(v)) return;
-                        const pct = Math.max(1, Math.min(2000, v));
-                        const base = docFreeScaleBaseRef.current;
-                        if (!base) return;
-                        setDocFreeScalePct(pct);
-                        (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
-                      }}
-                      className="w-14 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
-                      style={{ borderColor: "hsl(var(--border))" }}
-                    />
-                    <span className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>%</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    const app = appRef.current; if (!app) return;
-                    const doc = app.scene.getDocumentById(docSelected.id);
-                    if (doc && window.confirm(`Dokument "${doc.name}" löschen?`)) {
-                      app.scene.removeDocument(doc); app.clearSelection(); app.refreshLabelUI();
-                    }
-                  }}
-                  className="cad-toolbar-btn w-full justify-start px-2 h-9"
-                  title="Dokument löschen"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span className="text-xs">Löschen</span>
-                </button>
-
                 {!!docSelected.pdfSourceB64 && (
                   <DocumentPixelModeToggle app={appRef.current} docId={docSelected.id} />
                 )}
 
-                <WarpSection engine={appRef.current} docId={docSelected.id} />
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">SKALIERUNG</div>
 
-                <FlipSection engine={appRef.current} docId={docSelected.id} />
+                  <div className="text-xs">
+                    <div className="font-medium truncate" title={docSelected.name}>{docSelected.name}</div>
+                    <div style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                      {docSelected.widthM.toFixed(3)} × {docSelected.heightM.toFixed(3)} m
+                    </div>
+                  </div>
 
-                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
+                  {(docToolPhase === "scale-pick-1" || docToolPhase === "scale-pick-2" || docToolPhase === "scale-await-input") && (
+                    <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
+                      {docToolPhase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+                      {docToolPhase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
+                      {docToolPhase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => appRef.current?.documentTool.beginScaleTwoPoints(docSelected.id)}
+                    className="cad-toolbar-btn w-full justify-center h-10 text-[12px] font-semibold"
+                    style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                    title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                    <span>Skalieren (2 Punkte)</span>
+                  </button>
+
+                  {/* Freie Skalierung — Slider (relativ zur Größe bei Auswahl), ohne Rahmen. */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[11px] px-0.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                      <span>Freie Skalierung</span>
+                      <button
+                        type="button"
+                        className="hover:underline"
+                        title="Zurück auf 100%"
+                        onClick={() => {
+                          const base = docFreeScaleBaseRef.current;
+                          if (!base) return;
+                          setDocFreeScalePct(100);
+                          (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, 1, base.w, base.h);
+                        }}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="range"
+                        min={1}
+                        max={2000}
+                        step={1}
+                        value={Math.round(docFreeScalePct)}
+                        onChange={(e) => {
+                          const pct = Number(e.target.value);
+                          const base = docFreeScaleBaseRef.current;
+                          if (!base) return;
+                          setDocFreeScalePct(pct);
+                          (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
+                        }}
+                        className="pixuna-range flex-1"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        max={2000}
+                        step={1}
+                        value={Math.round(docFreeScalePct)}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          if (!Number.isFinite(v)) return;
+                          const pct = Math.max(1, Math.min(2000, v));
+                          const base = docFreeScaleBaseRef.current;
+                          if (!base) return;
+                          setDocFreeScalePct(pct);
+                          (appRef.current?.documentTool as any)?.scaleUniformAbsolute?.(docSelected.id, pct / 100, base.w, base.h);
+                        }}
+                        className="w-14 h-6 px-1 text-[11px] rounded border tabular-nums text-right"
+                        style={{ borderColor: "hsl(var(--border))" }}
+                      />
+                      <span className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Transparenz */}
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="opacity" />
 
                 {!!docSelected.pdfSourceB64 && (
                   <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -3441,6 +3424,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     </button>
                   </div>
                 )}
+
+                <WarpSection engine={appRef.current} docId={docSelected.id} />
+
+                <FlipSection engine={appRef.current} docId={docSelected.id} />
+
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="filters" />
 
               </div>
             </div>

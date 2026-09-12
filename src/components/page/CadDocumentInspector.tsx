@@ -13,6 +13,7 @@ import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
+import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 interface Props {
   engine: MiniCad | null;
@@ -125,77 +126,88 @@ export function CadDocumentInspector({ engine }: Props) {
         Dokument-Eigenschaften
       </div>
 
-      <div className="text-[11px]">
-        <div className="font-medium truncate" title={sel.name}>
-          {sel.name}
-        </div>
-        <div className="text-muted-foreground">
-          {sel.widthM.toFixed(3)} × {sel.heightM.toFixed(3)} m
-        </div>
-      </div>
-
-
-      {scaling && (
-        <div
-          className="rounded-md p-2 text-[11px]"
-          style={{
-            background: "hsl(var(--primary) / 0.12)",
-            border: "1px solid hsl(var(--primary) / 0.4)",
-          }}
-        >
-          {phase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
-          {phase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
-          {phase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => (engine as any).documentTool?.beginScaleTwoPoints?.(sel.id)}
-        className="w-full h-9 rounded-md border text-xs flex items-center justify-start gap-2 px-2 hover:bg-muted"
-        style={{ borderColor: "hsl(var(--hairline))" }}
-        title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
-      >
-        <Maximize2 className="h-4 w-4" />
-        <span>Skalieren (2 Punkte)</span>
-      </button>
-
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-[10px] px-0.5 text-muted-foreground">
-          <span>Freie Skalierung</span>
-          <button
-            type="button"
-            className="hover:underline"
-            title="Zurück auf 100%"
-            onClick={() => applyScale(100)}
-          >
-            Reset
-          </button>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <input
-            type="range"
-            min={1}
-            max={2000}
-            step={1}
-            value={Math.round(scalePct)}
-            onChange={(e) => applyScale(parseFloat(e.target.value))}
-            className="flex-1"
-          />
-          <span className="text-[10px] tabular-nums w-10 text-right text-muted-foreground">
-            {Math.round(scalePct)}%
-          </span>
-        </div>
-      </div>
-
+      {/* Objektart */}
       <DocumentPixelModeToggle app={engine as any} docId={sel.id} />
+
+      {/* Skalierung */}
+      <div className="space-y-2 pt-1">
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">SKALIERUNG</div>
+
+        <div className="text-[11px]">
+          <div className="font-medium truncate" title={sel.name}>
+            {sel.name}
+          </div>
+          <div className="text-muted-foreground">
+            {sel.widthM.toFixed(3)} × {sel.heightM.toFixed(3)} m
+          </div>
+        </div>
+
+        {scaling && (
+          <div
+            className="rounded-md p-2 text-[11px]"
+            style={{
+              background: "hsl(var(--primary) / 0.12)",
+              border: "1px solid hsl(var(--primary) / 0.4)",
+            }}
+          >
+            {phase === "scale-pick-1" && <span>1. Skalier-Punkt anklicken (Snap aktiv)</span>}
+            {phase === "scale-pick-2" && <span>2. Punkt setzen · Shift: Ortho · Klick auf m-Anzeige: Distanz tippen</span>}
+            {phase === "scale-await-input" && <span>Soll-Länge im Hub eingeben + Enter</span>}
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => (engine as any).documentTool?.beginScaleTwoPoints?.(sel.id)}
+          className="w-full h-10 rounded-md border text-[12px] font-semibold flex items-center justify-center gap-2"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: "hsl(var(--primary))",
+            color: "hsl(var(--primary-foreground))",
+          }}
+          title="Über zwei Snap-Punkte und eine Soll-Länge skalieren"
+        >
+          <Maximize2 className="h-4 w-4" />
+          <span>Skalieren (2 Punkte)</span>
+        </button>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-[10px] px-0.5 text-muted-foreground">
+            <span>Freie Skalierung</span>
+            <button
+              type="button"
+              className="hover:underline"
+              title="Zurück auf 100%"
+              onClick={() => applyScale(100)}
+            >
+              Reset
+            </button>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="range"
+              min={1}
+              max={2000}
+              step={1}
+              value={Math.round(scalePct)}
+              onChange={(e) => applyScale(parseFloat(e.target.value))}
+              className="pixuna-range flex-1"
+            />
+            <span className="text-[10px] tabular-nums w-10 text-right text-muted-foreground">
+              {Math.round(scalePct)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Transparenz */}
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} part="opacity" />
 
       <WarpSection engine={engine} docId={sel.id} />
 
       <FlipSection engine={engine} docId={sel.id} />
 
-      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} showBgRemove={false} />
-
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} part="filters" showBgRemove={false} />
 
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"
@@ -244,54 +256,41 @@ export function WarpSection({ engine, docId }: { engine: MiniCad | any; docId: s
   };
 
   return (
-    <div
-      className="rounded-md border p-2 space-y-1.5"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Bild verzerren
-      </div>
-
-      <button
-        type="button"
+    <div className="space-y-1.5">
+      <SettingsToggleButton
+        label="Bild verzerren"
+        active={active}
         onClick={toggle}
-        className="w-full h-8 rounded-md text-[11px] border flex items-center justify-center gap-2"
-        style={{
-          borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-          background: active ? "hsl(var(--accent-gold-soft))" : "transparent",
-        }}
         title="Vier Eckpunkte frei ziehen (perspektivische Verzerrung)"
-      >
-        {active ? "Verzerren beenden" : "Verzerren"}
-      </button>
-
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground w-14">Achse</span>
-        <select
-          value={axis}
-          onChange={(e) => setAxis(e.target.value as any)}
-          className="flex-1 h-8 px-2 rounded bg-transparent border text-[11px]"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-          title="Beschränkt die Ziehrichtung der Verzerr-Handles"
-        >
-          <option value="free">Frei (X + Y)</option>
-          <option value="x">Nur X (horizontal)</option>
-          <option value="y">Nur Y (vertikal)</option>
-        </select>
-      </div>
-
+      />
 
       {active && (
-        <div className="text-[10px] text-muted-foreground leading-relaxed">
-          Eckpunkte am Dokument ziehen · Snap aktiv · Fertig über „Verzerren beenden“.
-        </div>
+        <>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground w-14">Achse</span>
+            <select
+              value={axis}
+              onChange={(e) => setAxis(e.target.value as any)}
+              className="cad-settings-select flex-1"
+              title="Beschränkt die Ziehrichtung der Verzerr-Handles"
+            >
+              <option value="free">Frei (X + Y)</option>
+              <option value="x">Nur X (horizontal)</option>
+              <option value="y">Nur Y (vertikal)</option>
+            </select>
+          </div>
+
+          <div className="text-[10px] text-muted-foreground leading-relaxed">
+            Eckpunkte am Dokument ziehen · Snap aktiv · Fertig über „Bild verzerren“.
+          </div>
+        </>
       )}
 
       {hasWarp && (
         <button
           type="button"
           onClick={reset}
-          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+          className="w-full h-8 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >
           Verzerrung zurücksetzen
@@ -309,6 +308,7 @@ export function FlipSection({ engine, docId }: { engine: MiniCad | any; docId: s
   const tool: any = app.documentTool;
   const flipX = !!doc?.flipX;
   const flipY = !!doc?.flipY;
+  const [open, setOpen] = useState(flipX || flipY);
 
   const setFlip = (x: boolean, y: boolean) => {
     tool?.setDocFlip?.(docId, x, y);
@@ -316,40 +316,44 @@ export function FlipSection({ engine, docId }: { engine: MiniCad | any; docId: s
   };
 
   return (
-    <div
-      className="rounded-md border p-2 space-y-1.5"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-        Spiegeln
-      </div>
-      <div className="flex gap-1">
-        <button
-          type="button"
-          onClick={() => setFlip(!flipX, flipY)}
-          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${flipX ? "active" : ""}`}
-          title="Links ↔ Rechts spiegeln"
-        >
-          Links ↔ Rechts
-        </button>
-        <button
-          type="button"
-          onClick={() => setFlip(flipX, !flipY)}
-          className={`cad-toolbar-btn flex-1 justify-center h-8 text-[11px] ${flipY ? "active" : ""}`}
-          title="Oben ↔ Unten spiegeln"
-        >
-          Oben ↔ Unten
-        </button>
-      </div>
-      {(flipX || flipY) && (
-        <button
-          type="button"
-          onClick={() => setFlip(false, false)}
-          className="w-full h-7 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
-          style={{ borderColor: "hsl(var(--hairline))" }}
-        >
-          Spiegelung zurücksetzen
-        </button>
+    <div className="space-y-1.5">
+      <SettingsToggleButton
+        label="Bild spiegeln"
+        active={open}
+        onClick={() => setOpen((v) => !v)}
+        title="Spiegel-Einstellungen anzeigen"
+      />
+      {open && (
+        <>
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={() => setFlip(!flipX, flipY)}
+              className={`cad-toolbar-btn flex-1 justify-center h-9 text-[11px] ${flipX ? "active" : ""}`}
+              title="Links ↔ Rechts spiegeln"
+            >
+              Links ↔ Rechts
+            </button>
+            <button
+              type="button"
+              onClick={() => setFlip(flipX, !flipY)}
+              className={`cad-toolbar-btn flex-1 justify-center h-9 text-[11px] ${flipY ? "active" : ""}`}
+              title="Oben ↔ Unten spiegeln"
+            >
+              Oben ↔ Unten
+            </button>
+          </div>
+          {(flipX || flipY) && (
+            <button
+              type="button"
+              onClick={() => setFlip(false, false)}
+              className="w-full h-8 rounded-md text-[11px] border text-muted-foreground hover:text-foreground"
+              style={{ borderColor: "hsl(var(--hairline))" }}
+            >
+              Spiegelung zurücksetzen
+            </button>
+          )}
+        </>
       )}
     </div>
   );

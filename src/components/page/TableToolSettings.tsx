@@ -4,7 +4,7 @@ import {
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ArrowUpToLine, ArrowDownToLine, Combine, Split,
   Rows3, Columns3, Trash2, Filter, Equal,
-  SquareDashed, Square,
+  SquareDashed, Square, Info,
 } from "lucide-react";
 import { projectStore } from "@/lib/projectStore";
 import type { PageElement } from "@/lib/projectStore";
@@ -48,6 +48,7 @@ export function TableToolSettings({
   onPatch?: (patch: Partial<PageElement>) => void;
 }) {
   const ctx = React.useContext(TableEditContext);
+  const [infoOpen, setInfoOpen] = React.useState(false);
   const editMode = !!tableElement && ctx?.editId === tableElement.id;
   const setEditMode = (v: boolean) => ctx?.setEditId(v && tableElement ? tableElement.id : null);
   const newCols = ctx?.newCols ?? 3;
@@ -58,10 +59,20 @@ export function TableToolSettings({
   if (!tableElement || tableElement.kind !== "table") {
     return (
       <div className="space-y-3">
-        <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="text-[11px] font-semibold text-muted-foreground">Neue Tabelle</div>
-          <Stepper label="Spalten" value={newCols} min={1} max={24} onChange={setNewCols} />
-          <Stepper label="Zeilen" value={newRows} min={1} max={200} onChange={setNewRows} />
+        <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">GRUNDEINSTELLUNGEN</div>
+          <div
+            className="flex h-10 w-full items-center justify-center gap-2 rounded-md border text-[12px] font-semibold"
+            style={{
+              borderColor: "hsl(var(--hairline))",
+              background: "hsl(var(--accent-gold-soft))",
+              color: "hsl(var(--accent-gold))",
+            }}
+          >
+            <Plus size={14} /> Neue Tabelle
+          </div>
+          <Stepper label="Spalten" value={newCols} min={1} max={24} onChange={setNewCols} big />
+          <Stepper label="Zeilen" value={newRows} min={1} max={200} onChange={setNewRows} big />
           <div className="text-[10px] text-muted-foreground leading-snug">
             Auf der Seite aufziehen oder einmal klicken, um die Tabelle in Standardgröße zu setzen.
           </div>
@@ -133,29 +144,72 @@ export function TableToolSettings({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[11px] font-semibold text-muted-foreground">Tabelle</div>
+      <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">TABELLE</div>
 
-        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} />
-        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} />
+        <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
+        <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} big />
 
         <button
           onClick={() => setEditMode(!editMode)}
-          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
+          className="w-full h-11 rounded-md border text-[12px] font-semibold flex items-center justify-center gap-2"
           style={{
-            borderColor: "hsl(var(--hairline))",
-            background: editMode ? "hsl(var(--accent-gold-soft))" : undefined,
+            borderColor: editMode ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+            background: editMode ? "hsl(var(--accent-gold-soft))" : "hsl(var(--surface-strong))",
             color: editMode ? "hsl(var(--accent-gold))" : undefined,
           }}
           title="Doppelklick auf die Tabelle aktiviert den Tabellenmodus ebenfalls"
         >
-          <Pencil size={11} /> {editMode ? "Tabellenmodus aktiv" : "Tabelle bearbeiten"}
+          <Pencil size={13} /> {editMode ? "Tabellenmodus aktiv" : "Tabelle bearbeiten"}
         </button>
-        <div className="text-[10px] text-muted-foreground leading-snug">
-          Objektmodus: verschieben, drehen, skalieren. Tabellenmodus: Zellen bearbeiten,
-          Spalten-/Zeilengrenzen ziehen. ESC verlässt den Tabellenmodus.
-        </div>
+
+        <button
+          onClick={() => setInfoOpen((v) => !v)}
+          className="w-full h-8 rounded-md border text-[11px] flex items-center justify-between px-2 hover:bg-muted"
+          style={{ borderColor: "hsl(var(--hairline))" }}
+        >
+          <span className="flex items-center gap-1.5"><Info size={12} /> Info</span>
+          <span className="text-muted-foreground">{infoOpen ? "▾" : "▸"}</span>
+        </button>
+        {infoOpen && (
+          <div className="text-[10px] text-muted-foreground leading-snug">
+            Objektmodus: verschieben, drehen, skalieren. Tabellenmodus: Zellen bearbeiten,
+            Spalten-/Zeilengrenzen ziehen. ESC verlässt den Tabellenmodus.
+          </div>
+        )}
       </div>
+
+      {/* Rahmen & Hintergrund */}
+      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+        <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">RAHMEN &amp; HINTERGRUND</div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[11px] text-muted-foreground">Rahmenbreite</span>
+          <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <button onClick={() => patchTable({ borderWidthPx: Math.max(0, borderWidthPx - 1) })} className="h-8 w-8 flex items-center justify-center hover:bg-muted"><Minus size={12} /></button>
+            <div className="w-9 text-center text-[11px] tabular-nums">{borderWidthPx}px</div>
+            <button onClick={() => patchTable({ borderWidthPx: Math.min(6, borderWidthPx + 1) })} className="h-8 w-8 flex items-center justify-center hover:bg-muted"><Plus size={12} /></button>
+          </div>
+        </div>
+        <ColorRow label="Rahmenfarbe" value={borderColor} onChange={(v) => patchTable({ borderColor: v })} big />
+        <ColorRow label="Hintergrund" value={background} onChange={setTableBackground} big />
+        <div className="text-[10px] text-muted-foreground leading-snug">
+          „Hintergrund" gilt für die ganze Tabelle und überschreibt beim erneuten
+          Anwenden alle einzeln gesetzten Zellhintergründe.
+        </div>
+
+        <button
+          onClick={() => patchTable({ filtersEnabled: !filtersEnabled, filters: {} })}
+          className="w-full h-9 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
+          style={{
+            borderColor: "hsl(var(--hairline))",
+            background: filtersEnabled ? "hsl(var(--accent-gold-soft))" : undefined,
+            color: filtersEnabled ? "hsl(var(--accent-gold))" : undefined,
+          }}
+        >
+          <Filter size={12} /> Filterfunktion {filtersEnabled ? "an" : "aus"}
+        </button>
+      </div>
+
 
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -212,32 +266,6 @@ export function TableToolSettings({
           <ColorRow label="Zellhintergrund" value={fmt.background ?? "#ffffff"} onChange={(v) => format({ background: v })} />
 
           <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
-            <div className="text-[10px] font-semibold text-muted-foreground">
-              Zahlenformat{numFormatSel === null ? " (gemischt)" : ""}
-            </div>
-            <div className="flex items-center gap-1">
-              {NUM_FORMATS.map((nf) => (
-                <button
-                  key={nf.key}
-                  onClick={() => format({ numFormat: nf.key })}
-                  className="h-7 flex-1 rounded-md border text-[10px]"
-                  style={{
-                    borderColor: "hsl(var(--hairline))",
-                    background: numFormatSel === nf.key ? "hsl(var(--accent-gold-soft))" : undefined,
-                    color: numFormatSel === nf.key ? "hsl(var(--accent-gold))" : undefined,
-                  }}
-                  title={nf.title}
-                >{nf.label}</button>
-              ))}
-            </div>
-            <div className="text-[10px] text-muted-foreground leading-snug">
-              Nur Anzeige — Formeln rechnen weiterhin mit dem Rohwert
-              (z. B. 0,19 mit „%“ = 19,00 %).
-            </div>
-          </div>
-
-
-          <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
             <div className="text-[10px] font-semibold text-muted-foreground">Zellrahmen</div>
             <div className="flex items-center gap-1">
               {(["top", "right", "bottom", "left"] as const).map((side) => (
@@ -264,7 +292,7 @@ export function TableToolSettings({
                 <button
                   key={st}
                   onClick={() => format({ borderStyle: st })}
-                  className="h-7 flex-1 rounded-md border text-[10px]"
+                  className="h-8 flex-1 rounded-md border text-[11px]"
                   style={{
                     borderColor: "hsl(var(--hairline))",
                     background: cellBorders.style === st ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -275,7 +303,7 @@ export function TableToolSettings({
             </div>
             <button
               onClick={() => format({ bottomDouble: !cellBorders.bottomDouble, borders: { ...(fmtRaw.borders ?? {}), bottom: true } })}
-              className="w-full h-7 rounded-md border text-[10px] flex items-center justify-center gap-1.5"
+              className="w-full h-8 rounded-md border text-[10px] flex items-center justify-center gap-1.5"
               style={{
                 borderColor: "hsl(var(--hairline))",
                 background: cellBorders.bottomDouble ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -285,57 +313,47 @@ export function TableToolSettings({
             >
               <Equal size={11} /> Summenlinie (untere Doppellinie)
             </button>
-            <UnitField
-              label="Rahmenstärke (Zelle)"
-              value={cellBorders.widthPx}
-              unit="px" min={0} max={8}
-              onChange={(v) => format({ borderWidthPx: Math.round(v) })}
-            />
+          </div>
+
+          <div className="pt-1 space-y-1.5" style={{ borderTop: "1px solid hsl(var(--hairline))" }}>
+            <div className="text-[10px] font-semibold text-muted-foreground">
+              Zahlenformat{numFormatSel === null ? " (gemischt)" : ""}
+            </div>
+            <div className="flex items-center gap-1">
+              {NUM_FORMATS.map((nf) => (
+                <button
+                  key={nf.key}
+                  onClick={() => format({ numFormat: nf.key })}
+                  className="h-8 flex-1 rounded-md border text-[11px]"
+                  style={{
+                    borderColor: "hsl(var(--hairline))",
+                    background: numFormatSel === nf.key ? "hsl(var(--accent-gold-soft))" : undefined,
+                    color: numFormatSel === nf.key ? "hsl(var(--accent-gold))" : undefined,
+                  }}
+                  title={nf.title}
+                >{nf.label}</button>
+              ))}
+            </div>
+            <div className="text-[10px] text-muted-foreground leading-snug">
+              Nur Anzeige — Formeln rechnen weiterhin mit dem Rohwert
+              (z. B. 0,19 mit „%“ = 19,00 %).
+            </div>
           </div>
         </div>
       )}
 
-      <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[11px] font-semibold text-muted-foreground">Rahmen &amp; Hintergrund</div>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted-foreground">Rahmenbreite</span>
-          <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
-            <button onClick={() => patchTable({ borderWidthPx: Math.max(0, borderWidthPx - 1) })} className="h-7 w-7 flex items-center justify-center hover:bg-muted"><Minus size={11} /></button>
-            <div className="w-8 text-center text-[11px]">{borderWidthPx}px</div>
-            <button onClick={() => patchTable({ borderWidthPx: Math.min(6, borderWidthPx + 1) })} className="h-7 w-7 flex items-center justify-center hover:bg-muted"><Plus size={11} /></button>
-          </div>
-        </div>
-        <ColorRow label="Rahmenfarbe" value={borderColor} onChange={(v) => patchTable({ borderColor: v })} />
-        <ColorRow label="Hintergrund" value={background} onChange={setTableBackground} />
-        <div className="text-[10px] text-muted-foreground leading-snug">
-          „Hintergrund" gilt für die ganze Tabelle und überschreibt beim erneuten
-          Anwenden alle einzeln gesetzten Zellhintergründe.
-        </div>
-
-        <button
-          onClick={() => patchTable({ filtersEnabled: !filtersEnabled, filters: {} })}
-          className="w-full h-7 rounded-md border text-[11px] flex items-center justify-center gap-1.5"
-          style={{
-            borderColor: "hsl(var(--hairline))",
-            background: filtersEnabled ? "hsl(var(--accent-gold-soft))" : undefined,
-            color: filtersEnabled ? "hsl(var(--accent-gold))" : undefined,
-          }}
-        >
-          <Filter size={11} /> Filterfunktion {filtersEnabled ? "an" : "aus"}
-        </button>
-      </div>
 
       {setFormulaFn && editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
             <Sigma size={11} /> Formel per Klick
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="grid grid-cols-3 gap-1.5">
             {fns.map((f) => (
               <button
                 key={f}
                 onClick={() => setFormulaFn(formulaFn === f ? null : f)}
-                className="h-6 px-2 text-[10px] rounded border"
+                className="h-9 px-2 text-[12px] font-semibold rounded-md border"
                 style={{
                   borderColor: "hsl(var(--hairline))",
                   background: formulaFn === f ? "hsl(var(--accent-gold-soft))" : undefined,
@@ -427,8 +445,28 @@ function UnitField({ label, value, unit, min, max, onChange }: {
   );
 }
 
-function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ColorRow({ label, value, onChange, big }: { label: string; value: string; onChange: (v: string) => void; big?: boolean }) {
   const hex = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#ffffff";
+  if (big) {
+    return (
+      <div
+        className="flex items-center justify-between gap-2 rounded-md border px-2 h-11"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <span className="text-[12px] font-medium">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] tabular-nums text-muted-foreground">{hex.toUpperCase()}</span>
+          <input
+            type="color"
+            value={hex}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-8 w-12 rounded border cursor-pointer"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px] text-muted-foreground">{label}</span>
@@ -443,18 +481,19 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
   );
 }
 
-function Stepper({ label, value, min, max, onChange }: {
-  label: string; value: number; min: number; max: number; onChange: (v: number) => void;
+function Stepper({ label, value, min, max, onChange, big }: {
+  label: string; value: number; min: number; max: number; onChange: (v: number) => void; big?: boolean;
 }) {
+  const h = big ? "h-9" : "h-7";
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <span className={`${big ? "text-[12px] font-medium" : "text-[11px]"} text-muted-foreground`}>{label}</span>
       <div className="flex items-center rounded-md border" style={{ borderColor: "hsl(var(--hairline))" }}>
         <button
           onClick={() => onChange(Math.max(min, value - 1))}
           disabled={value <= min}
-          className="h-7 w-7 flex items-center justify-center hover:bg-muted disabled:opacity-30"
-        ><Minus size={11} /></button>
+          className={`${h} ${big ? "w-9" : "w-7"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
+        ><Minus size={big ? 13 : 11} /></button>
         <input
           type="number"
           min={min}
@@ -464,13 +503,13 @@ function Stepper({ label, value, min, max, onChange }: {
             const n = Number(e.target.value);
             if (Number.isFinite(n)) onChange(Math.max(min, Math.min(max, n)));
           }}
-          className="w-10 h-7 text-center text-[11px] bg-transparent outline-none"
+          className={`${big ? "w-12 h-9 text-[13px]" : "w-10 h-7 text-[11px]"} text-center bg-transparent outline-none tabular-nums`}
         />
         <button
           onClick={() => onChange(Math.min(max, value + 1))}
           disabled={value >= max}
-          className="h-7 w-7 flex items-center justify-center hover:bg-muted disabled:opacity-30"
-        ><Plus size={11} /></button>
+          className={`${h} ${big ? "w-9" : "w-7"} flex items-center justify-center hover:bg-muted disabled:opacity-30`}
+        ><Plus size={big ? 13 : 11} /></button>
       </div>
     </div>
   );
