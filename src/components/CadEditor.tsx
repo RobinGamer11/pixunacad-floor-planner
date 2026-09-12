@@ -2954,11 +2954,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   type="button"
                   disabled={docImporting}
                   onClick={() => docFileInputRef.current?.click()}
-                  className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50 disabled:cursor-wait"
+                  className="cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold disabled:opacity-50 disabled:cursor-wait"
+                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
                   title="PDF, JPG oder PNG importieren"
                 >
                   <Upload className="h-4 w-4" />
-                  <span className="text-xs">{docImporting ? "Importiere…" : "Datei importieren"}</span>
+                  <span>{docImporting ? "Importiere…" : "Datei importieren"}</span>
                 </button>
                 <input
                   ref={docFileInputRef}
@@ -2972,44 +2973,42 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   type="button"
                   disabled={docImporting}
                   onClick={() => setDocLibraryOpen(true)}
-                  className="cad-toolbar-btn w-full justify-center h-9 disabled:opacity-50"
+                  className="cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold disabled:opacity-50"
                   title="Dokumente aus der Projekt-Ablage (Startseite) einfügen"
                 >
                   <FolderOpen className="h-4 w-4" />
-                  <span className="text-xs">Aus Projekt-Ablage</span>
+                  <span>Aus Projekt-Ablage</span>
                 </button>
 
-                <label
-                  className="flex items-center gap-2 text-[11px] cursor-pointer select-none px-0.5"
-                  title="Ohne Häkchen wird das Dokument frei platziert (Originalgröße)."
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 accent-primary"
-                    style={{ width: "1rem", minWidth: "1rem" }}
-                    checked={!docFreePlace}
-                    onChange={(e) => setDocFreePlace(!e.target.checked)}
-                  />
-                  <span>Maßstab anwenden</span>
-                </label>
+                <SettingsToggleButton
+                  label="Maßstab anwenden"
+                  active={!docFreePlace}
+                  onClick={() => setDocFreePlace(!docFreePlace)}
+                  title="Ohne Maßstab wird das Dokument frei platziert (Originalgröße)."
+                />
 
-                <div className={docFreePlace ? "opacity-50 pointer-events-none" : ""}>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] w-14" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Maßstab</span>
+                {!docFreePlace && (
+                  <div
+                    className="rounded-md border p-2"
+                    style={{ borderColor: "hsl(var(--primary) / 0.5)", background: "hsl(var(--primary) / 0.08)" }}
+                  >
+                    <div className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground">MASSSTAB</div>
                     <input
                       value={docImportScale}
                       onChange={(e) => setDocImportScale(e.target.value)}
                       placeholder="1:100"
-                      className="flex-1 h-8 px-2 rounded border bg-transparent text-xs"
-                      style={{ borderColor: "hsl(var(--border))" }}
+                      className="h-9 w-full rounded border px-2 text-sm font-medium tabular-nums"
+                      style={{ borderColor: "hsl(var(--hairline))", backgroundColor: "hsl(var(--card))" }}
                     />
                   </div>
-                </div>
+                )}
 
                 {docToolPhase === "placing" && (
-                  <div className="rounded-md p-2 text-xs" style={{ background: "hsl(var(--primary) / 0.12)", border: "1px solid hsl(var(--primary) / 0.4)" }}>
-                    Linksklick: Position setzen · Enter: final platzieren · Esc: abbrechen
-                  </div>
+                  <StepHints
+                    steps={["Position setzen – L-Klick", "Objekt setzen – Enter"]}
+                    current={0}
+                    footer="ESC: abbrechen"
+                  />
                 )}
 
               </div>
