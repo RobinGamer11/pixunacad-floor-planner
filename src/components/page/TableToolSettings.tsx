@@ -48,6 +48,7 @@ export function TableToolSettings({
   onPatch?: (patch: Partial<PageElement>) => void;
 }) {
   const ctx = React.useContext(TableEditContext);
+  const [infoOpen, setInfoOpen] = React.useState(false);
   const editMode = !!tableElement && ctx?.editId === tableElement.id;
   const setEditMode = (v: boolean) => ctx?.setEditId(v && tableElement ? tableElement.id : null);
   const newCols = ctx?.newCols ?? 3;
