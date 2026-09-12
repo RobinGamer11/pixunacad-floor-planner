@@ -437,8 +437,28 @@ function UnitField({ label, value, unit, min, max, onChange }: {
   );
 }
 
-function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ColorRow({ label, value, onChange, big }: { label: string; value: string; onChange: (v: string) => void; big?: boolean }) {
   const hex = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#ffffff";
+  if (big) {
+    return (
+      <div
+        className="flex items-center justify-between gap-2 rounded-md border px-2 h-11"
+        style={{ borderColor: "hsl(var(--hairline))" }}
+      >
+        <span className="text-[12px] font-medium">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] tabular-nums text-muted-foreground">{hex.toUpperCase()}</span>
+          <input
+            type="color"
+            value={hex}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-8 w-12 rounded border cursor-pointer"
+            style={{ borderColor: "hsl(var(--hairline))" }}
+          />
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-[11px] text-muted-foreground">{label}</span>
