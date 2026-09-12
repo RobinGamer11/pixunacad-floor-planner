@@ -144,8 +144,24 @@ export function TableToolSettings({
 
   return (
     <div className="space-y-3">
+      {onNewTable && (
+        <button
+          type="button"
+          onClick={() => onNewTable()}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-md border text-[13px] font-semibold"
+          style={{
+            borderColor: "hsl(var(--accent-gold))",
+            background: "hsl(var(--accent-gold-soft))",
+            color: "hsl(var(--accent-gold))",
+          }}
+          title="Weitere Tabelle auf dieser Seite platzieren"
+        >
+          <Plus size={15} /> Tabelle
+        </button>
+      )}
       <div className="rounded-md border p-2 space-y-2.5" style={{ borderColor: "hsl(var(--hairline))" }}>
         <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">TABELLE</div>
+
 
         <Stepper label="Spalten" value={cols} min={1} max={24} onChange={(v) => commit(resizeGrid(model, rows, v))} big />
         <Stepper label="Zeilen" value={rows} min={1} max={200} onChange={(v) => commit(resizeGrid(model, v, cols))} big />
