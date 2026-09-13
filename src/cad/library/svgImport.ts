@@ -16,9 +16,22 @@ type Pt = { x: number; y: number };
 type Mat = [number, number, number, number, number, number];
 
 export interface SvgImportOptions {
-  /** SVG-Benutzereinheiten pro Meter (Standard 100 → 1 Einheit = 1 cm). */
+  /**
+   * SVG-Benutzereinheiten pro Meter.
+   *
+   * Verbindlicher PixunaCAD-Umrechnungsweg: **1 SVG-Benutzereinheit = 1 mm**,
+   * also 1000 Einheiten pro Meter. Genau diesen Maßstab schreibt auch
+   * `svgExport.ts` (viewBox in Millimetern, `width`/`height` mit „mm“).
+   * Wird hier nichts angegeben, versucht der Import den Maßstab aus
+   * `width`/`height` + `viewBox` der Datei zu ermitteln und fällt sonst auf
+   * 1000 zurück.
+   */
   unitsPerMeter?: number;
 }
+
+/** Verbindlicher Standardmaßstab: 1 SVG-Benutzereinheit = 1 mm. */
+export const SVG_UNITS_PER_METER = 1000;
+
 
 export interface SvgImportResult {
   snapshots: LibraryGeometrySnapshot[];
@@ -285,8 +298,21 @@ function parsePointList(raw: string | null): Pt[] {
   return out;
 }
 
+/** Physische Länge eines `width`/`height`-Attributs in Millimetern. */
+function lengthToMm(raw: string | null): number | null {
+  if (!raw) return null;
+  const m = /^\s*(-?[\d.]+)\s*(mm|cm|m|in|pt|pc|px)?\s*$/i.exec(raw);
+  if (!m) return null;
+  const value = parseFloat(m[1]);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const unit = (m[2] || "px").toLowerCase();
+  const perUnit: Record<string, number> = {
+    mm: 1, cm: 10, m: 1000, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96,
+  };
+  return value * (perUnit[unit] ?? 25.4 / 96);
+}
+
 export function importSvgToSnapshots(svgText: string, opts: SvgImportOptions = {}): SvgImportResult {
-  const upm = opts.unitsPerMeter && opts.unitsPerMeter > 0 ? opts.unitsPerMeter : 100;
   const warnSet = new Set<string>();
   const warn = (s: string) => warnSet.add(s);
   const snapshots: LibraryGeometrySnapshot[] = [];
@@ -305,9 +331,22 @@ export function importSvgToSnapshots(svgText: string, opts: SvgImportOptions = {
   // viewBox: Ursprung normalisieren.
   let base: Mat = IDENT;
   const vb = (root.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
-  if (vb.length === 4 && vb.every((n) => Number.isFinite(n))) {
+  const hasViewBox = vb.length === 4 && vb.every((n) => Number.isFinite(n));
+  if (hasViewBox) {
     base = [1, 0, 0, 1, -vb[0], -vb[1]];
   }
+
+  // Maßstab: ausdrückliche Vorgabe > physische Größe der Datei > 1 mm je Einheit.
+  let upm = SVG_UNITS_PER_METER;
+  if (opts.unitsPerMeter && opts.unitsPerMeter > 0) {
+    upm = opts.unitsPerMeter;
+  } else if (hasViewBox && vb[2] > 0) {
+    const mm = lengthToMm(root.getAttribute("width"));
+    if (mm) upm = (vb[2] / mm) * 1000;
+  }
+
+
+
 
   const byId = new Map<string, Element>();
   doc.querySelectorAll("[id]").forEach((el) => byId.set(el.getAttribute("id")!, el));

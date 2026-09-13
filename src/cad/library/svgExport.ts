@@ -10,8 +10,14 @@
 import { snapshotsBounds } from "./libraryGeometry";
 import type { LibraryDefinition, LibraryGeometrySnapshot } from "./types";
 
-/** SVG-Benutzereinheiten pro Meter (1 Einheit = 1 cm). */
-const UPM = 100;
+/**
+ * Verbindlicher PixunaCAD-Umrechnungsweg für SVG:
+ * **1 SVG-Benutzereinheit = 1 mm**, also 1000 Einheiten je Meter.
+ * `viewBox`, `width` und `height` sind dadurch identisch (Zahl = Millimeter),
+ * und `svgImport.ts` liest denselben Maßstab wieder ein.
+ */
+const UPM = 1000;
+
 
 const esc = (s: string) =>
   String(s).replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c] as string));
