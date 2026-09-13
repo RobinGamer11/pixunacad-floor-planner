@@ -2999,6 +2999,14 @@ export class CadApp {
   removeLibraryDefinition(id: string) { return Library.removeDefinition(this, id); }
   exportLibraryDefinition(id: string) { return Library.exportDefinition(this, id); }
   importLibraryDefinition(json: string) { return Library.importDefinition(this, json); }
+  getLibraryDefinition(id: string) { return Library.getDefinition(this, id); }
+  updateLibraryDefinitionMeta(id: string, meta: any) { return Library.updateDefinitionMeta(this, id, meta); }
+  exportLibraryDefinitionSvg(id: string) { return Library.exportDefinitionSvg(this, id); }
+  importLibraryDefinitionFromSvg(svg: string, meta: any, unitsPerMeter?: number) {
+    return Library.importDefinitionFromSvg(this, svg, meta, unitsPerMeter);
+  }
+  /** Bricht eine laufende Platzierung ab (Auswahl ist danach wieder möglich). */
+  cancelLibraryPlacement() { this.libraryTool.cancel(); }
 
   /** Aktuell ausgewählte Bibliotheksinstanz (oder null). */
   getSelectedLibraryInstance() {
