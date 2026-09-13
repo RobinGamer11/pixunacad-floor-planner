@@ -1338,6 +1338,48 @@ export class Scene {
     for (const s of this.stickerInstances) if (set.has(s.id)) s.labelId = newId;
   }
 
+  // ---- Library Instances (Bibliotheksobjekte) ----
+  _rebuildLibraryIdMap() {
+    this._libraryIdMap.clear();
+    for (const s of this.libraryInstances) this._libraryIdMap.set(s.id, s);
+  }
+
+  createLibraryInstance(opts: {
+    definitionId: string; definitionVersion?: number;
+    position: Vec2; rotationRad?: number; scaleX?: number; scaleY?: number; labelId?: string;
+  }): LibraryInstance {
+    const inst = new LibraryInstance({ id: this._makeId(), ...opts });
+    this.libraryInstances.push(inst);
+    this._rebuildLibraryIdMap();
+    return inst;
+  }
+
+  getLibraryInstanceById(id: string): LibraryInstance | null { return this._libraryIdMap.get(id) || null; }
+
+  getLibraryInstancesByLabelId(labelId: string): LibraryInstance[] {
+    return this.libraryInstances.filter(s => s.labelId === labelId);
+  }
+
+  removeLibraryInstance(inst: LibraryInstance) {
+    this.libraryInstances = this.libraryInstances.filter(s => s !== inst);
+    this._rebuildLibraryIdMap();
+  }
+
+  removeLibraryInstancesByLabelId(labelId: string) {
+    this.libraryInstances = this.libraryInstances.filter(s => s.labelId !== labelId);
+    this._rebuildLibraryIdMap();
+  }
+
+  reassignLibraryInstancesLabel(oldId: string, newId: string) {
+    for (const s of this.libraryInstances) if (s.labelId === oldId) s.labelId = newId;
+  }
+
+  assignLibraryInstancesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const s of this.libraryInstances) if (set.has(s.id)) s.labelId = newId;
+  }
+
+
   // ---- TextBoxes ----
   createTextBox(center: Vec2, widthM: number, heightM: number, style: TextBoxStyle = {}, html: string = "", rotationRad: number = 0) {
     const box = new TextBox({
