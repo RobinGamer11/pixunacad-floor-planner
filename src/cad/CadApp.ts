@@ -2999,6 +2999,14 @@ export class CadApp {
   removeLibraryDefinition(id: string) { return Library.removeDefinition(this, id); }
   exportLibraryDefinition(id: string) { return Library.exportDefinition(this, id); }
   importLibraryDefinition(json: string) { return Library.importDefinition(this, json); }
+  getLibraryDefinition(id: string) { return Library.getDefinition(this, id); }
+  updateLibraryDefinitionMeta(id: string, meta: any) { return Library.updateDefinitionMeta(this, id, meta); }
+  exportLibraryDefinitionSvg(id: string) { return Library.exportDefinitionSvg(this, id); }
+  importLibraryDefinitionFromSvg(svg: string, meta: any, unitsPerMeter?: number) {
+    return Library.importDefinitionFromSvg(this, svg, meta, unitsPerMeter);
+  }
+  /** Bricht eine laufende Platzierung ab (Auswahl ist danach wieder möglich). */
+  cancelLibraryPlacement() { this.libraryTool.cancel(); }
 
   /** Aktuell ausgewählte Bibliotheksinstanz (oder null). */
   getSelectedLibraryInstance() {
@@ -3135,7 +3143,10 @@ export class CadApp {
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
-    else if (id === ToolIds.LIBRARY) { this.activeTool = this.libraryTool; this.libraryTool.activate(); }
+    // Bibliothek: solange nichts platziert wird, arbeitet die normale Auswahl
+    // weiter (Klick, Shift-Klick, Rahmenauswahl). Erst `beginPlacement()`
+    // übernimmt das Bibliothekswerkzeug die Eingabe.
+    else if (id === ToolIds.LIBRARY) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.DOCUMENT) { this.activeTool = this.documentTool; this.documentTool.activate(); }
     else if (id === ToolIds.FREE) { this.activeTool = this.freeDrawTool; this.freeDrawTool.activate(); }
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }

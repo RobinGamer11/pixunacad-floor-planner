@@ -360,6 +360,18 @@
   }
 
 
+  /* Größere Eingabefelder (Bibliothek) – gleiche Farbwelt wie oben. */
+  .cad-settings-input {
+    @apply rounded border w-full min-w-0;
+    background: hsl(var(--cad-settings-bg));
+    border-color: hsl(var(--cad-hub-border));
+    color: hsl(var(--cad-toolbar-foreground));
+  }
+  .cad-settings-input:focus {
+    @apply outline-none ring-1;
+    ring-color: hsl(var(--ring));
+  }
+
   /* Eingabefelder, die bereits in einem gerahmten Feld (mit Einheit) sitzen –
      Look 1:1 wie in der Projektmappe: kein doppelter Rahmen, kein eigener HG. */
   .cad-settings-panel input[type="text"].bg-transparent,

@@ -15,6 +15,8 @@ import {
   transformSnapshots,
   translateSnapshots,
 } from "./libraryGeometry";
+import { importSvgToSnapshots } from "./svgImport";
+import { exportDefinitionToSvg } from "./svgExport";
 import {
   exportDefinitionToPxobj,
   importDefinitionFromPxobj,
@@ -128,7 +130,8 @@ export function getDefinition(app: CadApp, id: string): LibraryDefinition | null
 
 function buildDefinition(sel: LibrarySelection, meta: LibraryDefinitionMeta): LibraryDefinition | null {
   if (sel.snapshots.length === 0) return null;
-  const ip = meta.insertionPointWorld || snapshotsCentroid(sel.snapshots);
+  // Einfügepunkt ist immer der Mittelpunkt der Auswahl (kein Nullpunkt-Modus).
+  const ip = snapshotsCentroid(sel.snapshots);
   const local = translateSnapshots(sel.snapshots, -ip.x, -ip.y);
   const now = Date.now();
   return {
@@ -199,7 +202,7 @@ export function convertSelectionToInstance(
   const def = buildDefinition(sel, meta);
   if (!def) return { definition: null, unsupported: sel.unsupported };
 
-  const ip = meta.insertionPointWorld || snapshotsCentroid(sel.snapshots);
+  const ip = snapshotsCentroid(sel.snapshots);
   app.libraryDefinitions.push(def);
   removeRefs(app.scene, sel.refs);
   const inst = app.scene.createLibraryInstance({
@@ -330,4 +333,69 @@ export function importDefinition(app: CadApp, json: string): LibraryDefinition |
   app.onLibraryChange?.();
   app.commitHistorySnapshot?.();
   return def;
+}
+
+/* -------------------------------------------- Metadaten nachträglich ändern */
+
+/**
+ * Ändert die Metadaten einer bestehenden Definition. Geometrie und alle
+ * platzierten Instanzen (Position, Drehung, Skalierung) bleiben unverändert.
+ */
+export function updateDefinitionMeta(
+  app: CadApp,
+  id: string,
+  meta: LibraryDefinitionMeta,
+): boolean {
+  const def = getDefinition(app, id);
+  if (!def) return false;
+  def.name = (meta.name || "").trim() || def.name;
+  def.category = (meta.category ?? def.category ?? "").trim();
+  def.tags = (meta.tags || []).map((t) => t.trim()).filter(Boolean);
+  def.units = meta.units || def.units;
+  def.metadata = {
+    author: meta.author?.trim() || undefined,
+    license: meta.license?.trim() || undefined,
+    source: meta.source?.trim() || undefined,
+  };
+  def.updatedAt = Date.now();
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return true;
+}
+
+/* ------------------------------------------------------- Adapter-Import */
+
+/**
+ * Erzeugt eine Definition direkt aus Snapshots (Adapter-Pfad: SVG, später
+ * DXF/DWG). Die Geometrie wird auf ihren Mittelpunkt zentriert.
+ */
+export function addDefinitionFromSnapshots(
+  app: CadApp,
+  snapshots: LibraryGeometrySnapshot[],
+  meta: LibraryDefinitionMeta,
+): LibraryDefinition | null {
+  const def = buildDefinition({ snapshots, refs: [], unsupported: [] }, meta);
+  if (!def) return null;
+  app.libraryDefinitions.push(def);
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return def;
+}
+
+/** SVG-Datei → neue Bibliotheksdefinition. */
+export function importDefinitionFromSvg(
+  app: CadApp,
+  svgText: string,
+  meta: LibraryDefinitionMeta,
+  unitsPerMeter?: number,
+): { definition: LibraryDefinition | null; warnings: string[] } {
+  const res = importSvgToSnapshots(svgText, { unitsPerMeter });
+  if (res.snapshots.length === 0) return { definition: null, warnings: res.warnings };
+  return { definition: addDefinitionFromSnapshots(app, res.snapshots, meta), warnings: res.warnings };
+}
+
+/** Bibliotheksdefinition → SVG-Datei. */
+export function exportDefinitionSvg(app: CadApp, id: string): string | null {
+  const def = getDefinition(app, id);
+  return def ? exportDefinitionToSvg(def) : null;
 }
