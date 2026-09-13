@@ -34,6 +34,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   scene.textBoxes = [];
   (scene as any).tables = [];
   scene.stickerInstances = [];
+  (scene as any).libraryInstances = [];
   scene.documents = [];
   scene.freeStrokes = [];
   scene.walls = [];
