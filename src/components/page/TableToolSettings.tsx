@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  Plus, Minus, Check, X, Pencil, Sigma,
+  Plus, Minus, Pencil, Sigma,
   AlignLeft, AlignCenter, AlignRight, Bold, Italic,
   ArrowUpToLine, ArrowDownToLine, Combine, Split,
   Rows3, Columns3, Trash2, Filter, Equal,
@@ -25,13 +25,10 @@ export function TableToolSettings({
   projectId,
   pageId,
   tableElement,
-  isPending,
   pageWmm,
   pageHmm,
   formulaFn,
   setFormulaFn,
-  onConfirm,
-  onCancel,
   onPatch,
   onNewTable,
   placementActive = false,
@@ -39,13 +36,15 @@ export function TableToolSettings({
   projectId: string;
   pageId: string;
   tableElement?: PageElement;
-  isPending: boolean;
+  /** Veraltet: Kein Bestätigungszustand mehr — Tabelle ist sofort bearbeitbar. */
+  isPending?: boolean;
   pageWmm?: number;
   pageHmm?: number;
   formulaFn?: FormulaFn | null;
   setFormulaFn?: (f: FormulaFn | null) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
+  /** Veraltet: Bestätigen/Abbrechen unter den Einstellungen wurde entfernt. */
+  onConfirm?: () => void;
+  onCancel?: () => void;
   /** Alternative Persistenz (CAD-Oberfläche): ersetzt projectStore-Update. */
   onPatch?: (patch: Partial<PageElement>) => void;
   /** Weitere Tabelle platzieren, während bereits eine Tabelle ausgewählt ist. */
@@ -394,24 +393,8 @@ export function TableToolSettings({
         </div>
       )}
 
-      {isPending && (
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={onConfirm}
-            className="flex-1 h-10 rounded-md text-[12px] font-medium flex items-center justify-center gap-1.5"
-            style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          >
-            <Check size={12} /> Bestätigen
-          </button>
-          <button
-            onClick={onCancel}
-            className="h-10 px-3 rounded-md text-[12px] border flex items-center gap-1"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <X size={12} /> Abbrechen
-          </button>
-        </div>
-      )}
+      {/* Kein Bestätigen/Abbrechen: Die Tabelle ist nach dem Setzen sofort
+          ausgewählt und bearbeitbar. Platzierung endet über Werkzeugwechsel/ESC. */}
     </div>
   );
 }
