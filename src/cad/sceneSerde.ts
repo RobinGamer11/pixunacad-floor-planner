@@ -47,6 +47,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   (scene as any)._rebuildTextIdMap?.();
   (scene as any)._rebuildTableIdMap?.();
   (scene as any)._rebuildStickerIdMap?.();
+  (scene as any)._rebuildLibraryIdMap?.();
   (scene as any)._rebuildDocIdMap?.();
   (scene as any)._rebuildFreeIdMap?.();
   if (!data) return;
