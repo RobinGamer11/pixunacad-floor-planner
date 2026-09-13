@@ -2584,6 +2584,7 @@ export class CadApp {
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
       if (e.key === "w" || e.key === "W") this.setTool(ToolIds.WALL);
       if (e.key === "u" || e.key === "U") this.setTool(ToolIds.DOOR);
+      if (e.key === "k" || e.key === "K") this.setTool(ToolIds.LIBRARY);
 
       // 'B' = Bezugslinie einer selektierten Wand an gegenüberliegender Kante koppeln
       // (cycelt outer → center → inner → outer, Wandkörper bleibt sichtbar gleich).
@@ -2688,6 +2689,11 @@ export class CadApp {
         if (this.activeTool === this.doorTool) {
           if (this.doorTool.selectedDoorId) { this.doorTool.selectDoor(null); return; }
           this.doorTool.cancel(); this.setTool(ToolIds.SELECT); return;
+        }
+        if ((this.activeTool as any) === this.libraryTool) {
+          if (this.libraryTool.phase !== "idle") { this.libraryTool.cancel(); return; }
+          this.setTool(ToolIds.SELECT);
+          return;
         }
         if (this.activeTool === this.stickerTool) {
           // Erst aktive Platzierung abbrechen, sonst Tool wechseln

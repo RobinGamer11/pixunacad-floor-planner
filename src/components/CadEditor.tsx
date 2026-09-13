@@ -3,11 +3,12 @@ import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon, Boxes } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
+import LibraryPanel from "@/components/cad/LibraryPanel";
 import type { StickerDefinition } from "@/cad/StickerManager";
 import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
@@ -99,6 +100,7 @@ const CAD_TOOLS = [
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
   { id: ToolIds.STICKER, label: "Stempel", key: "O", icon: StickerIcon },
+  { id: ToolIds.LIBRARY, label: "Bibliothek", key: "K", icon: Boxes },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
 
@@ -2954,6 +2956,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </div>
             </div>
           )}
+
+
+          {/* Bibliotheks-Werkzeug (nur eigenständiger CAD-Editor) */}
+          {activeTool === ToolIds.LIBRARY && <LibraryPanel app={appRef.current} />}
 
 
           {/* Document-Tool-Panel: nur Import */}
