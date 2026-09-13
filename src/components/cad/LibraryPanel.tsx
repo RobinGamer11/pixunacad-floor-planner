@@ -53,13 +53,16 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
   const [meta, setMeta] = useState<Meta>(EMPTY_META);
   const [replaceOriginal, setReplaceOriginal] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
-  const [svgUnits, setSvgUnits] = useState(100);
+  const [svgUnits, setSvgUnits] = useState(1000);
+  const [dxfUnits, setDxfUnits] = useState(1000);
   const [selInfo, setSelInfo] = useState<{ count: number; unsupported: string[] }>({ count: 0, unsupported: [] });
   const [instanceDefId, setInstanceDefId] = useState<string | null>(null);
   const [placingId, setPlacingId] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<HTMLInputElement>(null);
+  const dxfRef = useRef<HTMLInputElement>(null);
   const lastInstanceDef = useRef<string | null>(null);
+
 
   useEffect(() => {
     if (!app) return;
