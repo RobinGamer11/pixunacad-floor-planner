@@ -501,6 +501,38 @@ export class StickerInstance {
   }
 }
 
+/**
+ * Platzierte Bibliotheksinstanz — bewusst EIGENER Objekttyp (kein Sticker).
+ * Sie hält nur die Referenz auf eine projektweite `LibraryDefinition` sowie
+ * die Transformation; die Geometrie wird beim Zeichnen aufgelöst.
+ */
+export class LibraryInstance {
+  id: string;
+  definitionId: string;
+  definitionVersion: number;
+  position: Vec2;
+  rotationRad: number;
+  scaleX: number;
+  scaleY: number;
+  labelId: string;
+
+  constructor({ id, definitionId, definitionVersion, position, rotationRad, scaleX, scaleY, labelId }: {
+    id: string; definitionId: string; definitionVersion?: number;
+    position: Vec2; rotationRad?: number; scaleX?: number; scaleY?: number; labelId?: string;
+  }) {
+    this.id = id;
+    this.definitionId = definitionId;
+    this.definitionVersion = definitionVersion || 1;
+    this.position = v(position.x, position.y);
+    this.rotationRad = rotationRad || 0;
+    this.scaleX = (typeof scaleX === "number" && scaleX !== 0) ? scaleX : 1;
+    this.scaleY = (typeof scaleY === "number" && scaleY !== 0) ? scaleY : 1;
+    this.labelId = labelId || Defaults.defaultLabelId;
+  }
+}
+
+
+
 export class DocumentObject {
   id: string;
   name: string;
@@ -963,6 +995,8 @@ export class Scene {
   textBoxes: TextBox[] = [];
   tables: TableObject[] = [];
   stickerInstances: StickerInstance[] = [];
+  /** Platzierte Bibliotheksinstanzen (eigener Objekttyp, unabhängig von Stickern). */
+  libraryInstances: LibraryInstance[] = [];
   documents: DocumentObject[] = [];
   walls: Wall[] = [];
   doors: Door[] = [];
@@ -977,6 +1011,7 @@ export class Scene {
   private _dimIdMap = new Map<string, Dimension>();
   private _textIdMap = new Map<string, TextBox>();
   private _stickerIdMap = new Map<string, StickerInstance>();
+  private _libraryIdMap = new Map<string, LibraryInstance>();
   private _docIdMap = new Map<string, DocumentObject>();
   private _freeIdMap = new Map<string, FreeStroke>();
 
@@ -1302,6 +1337,48 @@ export class Scene {
     const set = new Set(ids);
     for (const s of this.stickerInstances) if (set.has(s.id)) s.labelId = newId;
   }
+
+  // ---- Library Instances (Bibliotheksobjekte) ----
+  _rebuildLibraryIdMap() {
+    this._libraryIdMap.clear();
+    for (const s of this.libraryInstances) this._libraryIdMap.set(s.id, s);
+  }
+
+  createLibraryInstance(opts: {
+    definitionId: string; definitionVersion?: number;
+    position: Vec2; rotationRad?: number; scaleX?: number; scaleY?: number; labelId?: string;
+  }): LibraryInstance {
+    const inst = new LibraryInstance({ id: this._makeId(), ...opts });
+    this.libraryInstances.push(inst);
+    this._rebuildLibraryIdMap();
+    return inst;
+  }
+
+  getLibraryInstanceById(id: string): LibraryInstance | null { return this._libraryIdMap.get(id) || null; }
+
+  getLibraryInstancesByLabelId(labelId: string): LibraryInstance[] {
+    return this.libraryInstances.filter(s => s.labelId === labelId);
+  }
+
+  removeLibraryInstance(inst: LibraryInstance) {
+    this.libraryInstances = this.libraryInstances.filter(s => s !== inst);
+    this._rebuildLibraryIdMap();
+  }
+
+  removeLibraryInstancesByLabelId(labelId: string) {
+    this.libraryInstances = this.libraryInstances.filter(s => s.labelId !== labelId);
+    this._rebuildLibraryIdMap();
+  }
+
+  reassignLibraryInstancesLabel(oldId: string, newId: string) {
+    for (const s of this.libraryInstances) if (s.labelId === oldId) s.labelId = newId;
+  }
+
+  assignLibraryInstancesToLabel(ids: string[], newId: string) {
+    const set = new Set(ids);
+    for (const s of this.libraryInstances) if (set.has(s.id)) s.labelId = newId;
+  }
+
 
   // ---- TextBoxes ----
   createTextBox(center: Vec2, widthM: number, heightM: number, style: TextBoxStyle = {}, html: string = "", rotationRad: number = 0) {

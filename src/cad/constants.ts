@@ -148,6 +148,8 @@ export const ToolIds = {
   DOOR: "door",
   TABLE: "table",
   RULER: "ruler",
+  /** Bibliothekssystem (nur eigenständige CAD-Oberfläche). */
+  LIBRARY: "library",
 } as const;
 
 export const SelectionType = {
@@ -158,6 +160,8 @@ export const SelectionType = {
   TEXTBOX: "textbox",
   TEXTBOX_HANDLE: "textbox_handle",
   STICKER_INSTANCE: "sticker_instance",
+  /** Platzierte Bibliotheksinstanz (eigener Auswahltyp, kein Sticker). */
+  LIBRARY_INSTANCE: "library_instance",
   DOCUMENT: "document",
   FREE_STROKE: "free_stroke",
   WALL: "wall",

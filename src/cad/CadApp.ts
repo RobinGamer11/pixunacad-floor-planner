@@ -36,6 +36,10 @@ import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
+import type { LibraryDefinition } from "./library/types";
+import { LibraryPlacementTool } from "./library/LibraryPlacementTool";
+import * as Library from "./library/LibraryManager";
+import { serializeDefinitions, restoreDefinitions, serializeLibraryInstance } from "./library/librarySerde";
 import { DocumentTool } from "./DocumentTool";
 import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 import { FreeDrawTool } from "./FreeDrawTool";
@@ -336,6 +340,8 @@ export class CadApp {
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
   stickerTool!: StickerTool;
+  /** Bibliotheks-Platzierungswerkzeug (nur eigenständige CAD-Oberfläche). */
+  libraryTool!: LibraryPlacementTool;
   tableTool!: TableTool;
   documentTool!: DocumentTool;
   freeDrawTool!: FreeDrawTool;
@@ -343,7 +349,7 @@ export class CadApp {
   eraserTool!: EraserTool;
   wallTool!: WallTool;
   doorTool!: DoorTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool | TableTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool | TableTool | LibraryPlacementTool;
 
   /** Hub-Box-State für ausgewähltes Dokument (Verschieben/Drehen/Crop). Geschrieben von SelectTool, gelesen von CadEditor. */
   documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null; cropSide: "top" | "right" | "bottom" | "left" | null } = {
@@ -385,6 +391,10 @@ export class CadApp {
   // Sticker library (per project, included in undo/redo)
   stickers: StickerDefinition[] = [];
   onStickersChange?: () => void;
+
+  // Bibliothek (projektweit, Teil von Undo/Redo und Persistenz)
+  libraryDefinitions: LibraryDefinition[] = [];
+  onLibraryChange?: () => void;
 
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
@@ -581,6 +591,8 @@ export class CadApp {
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
     this.stickerTool = new StickerTool(this);
+    this.libraryTool = new LibraryPlacementTool(this);
+    this.renderer.libraryDefinitionSource = () => this.libraryDefinitions;
     this.tableTool = new TableTool(this);
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
@@ -789,6 +801,7 @@ export class CadApp {
         position: { x: si.position.x, y: si.position.y },
         rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
       })),
+      libraryInstances: (scene.libraryInstances || []).map(serializeLibraryInstance),
       documents: scene.documents
         .filter(d => !(d as any)._snapOnly)
         .map(d => {
@@ -893,6 +906,7 @@ export class CadApp {
       stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
       _stickerEditInstanceId: this._stickerEditInstanceId,
       _stickerEditSnapshot: this._stickerEditSnapshot,
+      libraryDefinitions: serializeDefinitions(this.libraryDefinitions),
       // Multi-Sheet-State
       sheets: this.sheetManager.toJSON(),
       activeSheetId: this.activeSheetId,
@@ -950,6 +964,9 @@ export class CadApp {
       }));
       this.onStickersChange?.();
     }
+    // Bibliotheksdefinitionen (additiv, fehlende Daten => leere Liste)
+    this.libraryDefinitions = restoreDefinitions(data.libraryDefinitions);
+    this.onLibraryChange?.();
     // Restore sheets list (falls vorhanden).
     if (Array.isArray(data.sheets)) {
       this.sheetManager.restore(data.sheets);
@@ -2768,6 +2785,11 @@ export class CadApp {
           if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
+        if (this.selection && this.selection.type === SelectionType.LIBRARY_INSTANCE) {
+          const inst = this.scene.getLibraryInstanceById((this.selection as any).libraryInstanceId);
+          if (inst) { this.scene.removeLibraryInstance(inst); this.clearSelection(); this.refreshLabelUI(); }
+          return;
+        }
         if (this.selection && this.selection.type === SelectionType.STICKER_INSTANCE) {
           const inst = this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
           if (inst) { this.scene.removeStickerInstance(inst); this.clearSelection(); }
@@ -2941,6 +2963,62 @@ export class CadApp {
     return true;
   }
 
+  /* ------------------------------------------------ Bibliothek (CAD-only) */
+
+  /** Vorschau-Info zur aktuellen Auswahl (unterstützt/nicht unterstützt). */
+  getLibrarySelectionInfo() {
+    const sel = Library.collectLibrarySelection(this);
+    return { count: sel.snapshots.length, unsupported: sel.unsupported };
+  }
+
+  /** „Zur Bibliothek hinzufügen“ — Objekte bleiben auf dem Blatt. */
+  addLibraryDefinitionFromSelection(meta: any) {
+    return Library.addDefinitionFromSelection(this, meta);
+  }
+
+  /** „In Bibliotheksobjekt umwandeln“ — ersetzt die Auswahl (ein Undo-Schritt). */
+  convertSelectionToLibraryObject(meta: any) {
+    return Library.convertSelectionToInstance(this, meta);
+  }
+
+  beginLibraryPlacement(definitionId: string, scale = 1) {
+    const def = Library.getDefinition(this, definitionId);
+    if (!def) return;
+    if (this.activeTool !== this.libraryTool) this.setTool(ToolIds.LIBRARY);
+    this.libraryTool.beginPlacement(def, scale);
+    this.onLibraryChange?.();
+  }
+
+  renameLibraryDefinition(id: string, name: string) { return Library.renameDefinition(this, id, name); }
+  removeLibraryDefinition(id: string) { return Library.removeDefinition(this, id); }
+  exportLibraryDefinition(id: string) { return Library.exportDefinition(this, id); }
+  importLibraryDefinition(json: string) { return Library.importDefinition(this, json); }
+
+  /** Aktuell ausgewählte Bibliotheksinstanz (oder null). */
+  getSelectedLibraryInstance() {
+    if (!this.selection || this.selection.type !== SelectionType.LIBRARY_INSTANCE) return null;
+    return this.scene.getLibraryInstanceById((this.selection as any).libraryInstanceId);
+  }
+
+  /** „Auflösen“ — dauerhaft in normale CAD-Objekte (ein Undo-Schritt). */
+  explodeSelectedLibraryInstance(): boolean {
+    const inst = this.getSelectedLibraryInstance();
+    if (!inst) return false;
+    this.setTool(ToolIds.SELECT);
+    return Library.explodeLibraryInstance(this, inst.id);
+  }
+
+  /** Transformation der ausgewählten Instanz (Drehen/Skalieren aus dem Panel). */
+  setSelectedLibraryInstanceTransform(patch: { rotationRad?: number; scale?: number }): boolean {
+    const inst = this.getSelectedLibraryInstance();
+    if (!inst) return false;
+    if (typeof patch.rotationRad === "number") inst.rotationRad = patch.rotationRad;
+    if (typeof patch.scale === "number" && patch.scale > 0) { inst.scaleX = patch.scale; inst.scaleY = patch.scale; }
+    this.commitHistorySnapshot?.();
+    return true;
+  }
+
+
 
   exportStickers(): string {
     return exportStickersToJson(this.stickers);
@@ -3051,6 +3129,7 @@ export class CadApp {
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
+    else if (id === ToolIds.LIBRARY) { this.activeTool = this.libraryTool; this.libraryTool.activate(); }
     else if (id === ToolIds.DOCUMENT) { this.activeTool = this.documentTool; this.documentTool.activate(); }
     else if (id === ToolIds.FREE) { this.activeTool = this.freeDrawTool; this.freeDrawTool.activate(); }
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }

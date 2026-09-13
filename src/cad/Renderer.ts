@@ -22,6 +22,8 @@ import { strokeHatchSeal } from "./hatchSeal";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, patternAlwaysFollowsWall, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
+import type { LibraryDefinition, LibraryGeometrySnapshot } from "./library/types";
+import { createObjectsFromSnapshots, snapshotsBounds, transformSnapshots } from "./library/libraryGeometry";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { applyFilterToCanvas, filterSignature } from "./documentFilters";
@@ -41,6 +43,8 @@ export interface Selection {
   dimensionId?: string;
   textBoxId?: string;
   stickerInstanceId?: string;
+  /** Ausgewählte Bibliotheksinstanz (eigener Auswahltyp, kein Sticker). */
+  libraryInstanceId?: string;
   documentId?: string;
   freeStrokeId?: string;
   handleIndex?: number | null;
@@ -305,6 +309,7 @@ export class Renderer {
       this._drawTextBoxesForLabel(labelId);
       this._drawTablesForLabel(labelId);
       this._drawStickerInstancesForLabel(labelId);
+      this._drawLibraryInstancesForLabel(labelId);
     }
     if (!isExportMode()) {
       // Fangpunkte der selektierten Wand IMMER ganz oben (über allen Wänden/Hatches),
@@ -434,6 +439,7 @@ export class Renderer {
     this._drawDimensionSelection();
     this._drawTextBoxSelection();
     this._drawStickerInstanceSelection();
+    this._drawLibraryInstanceSelection();
     this._drawDocumentSnapAffordances();
     this._drawDocumentGuides();
     this._drawDocumentSelection();
@@ -453,6 +459,7 @@ export class Renderer {
         this._drawDimensionSelection();
         this._drawTextBoxSelection();
         this._drawStickerInstanceSelection();
+    this._drawLibraryInstanceSelection();
         this._drawDocumentSelection();
         this._drawFreeStrokeSelection();
       }
@@ -1280,6 +1287,102 @@ export class Renderer {
         });
       }
     }
+  }
+
+  /* ------------------------------------------------- Bibliotheksobjekte */
+
+  /** Quelle der projektweiten Bibliotheksdefinitionen (von CadApp gesetzt). */
+  libraryDefinitionSource: (() => LibraryDefinition[]) | null = null;
+  /** Cache: aufgelöste Welt-Geometrie je Instanz (Signatur-basiert invalidiert). */
+  private _libCache = new Map<string, { sig: string; snaps: LibraryGeometrySnapshot[]; scene: Scene }>();
+
+  private _libraryDefinition(id: string): LibraryDefinition | null {
+    return (this.libraryDefinitionSource?.() || []).find(d => d.id === id) || null;
+  }
+
+  /** Löst eine Instanz auf Welt-Geometrie + transiente Render-Szene auf. */
+  private _resolveLibraryInstance(inst: any): { snaps: LibraryGeometrySnapshot[]; scene: Scene } | null {
+    const def = this._libraryDefinition(inst.definitionId);
+    if (!def) return null;
+    const sig = [
+      def.id, def.version, def.updatedAt, inst.position.x, inst.position.y,
+      inst.rotationRad, inst.scaleX, inst.scaleY, inst.labelId,
+    ].join("|");
+    const hit = this._libCache.get(inst.id);
+    if (hit && hit.sig === sig) return hit;
+    const snaps = transformSnapshots(def.geometry, {
+      position: { x: inst.position.x, y: inst.position.y },
+      rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY,
+    });
+    const scene = new Scene();
+    createObjectsFromSnapshots(scene, snaps, inst.labelId);
+    const entry = { sig, snaps, scene };
+    this._libCache.set(inst.id, entry);
+    if (this._libCache.size > 400) {
+      const live = new Set(this.scene.libraryInstances.map(i => i.id));
+      for (const k of [...this._libCache.keys()]) if (!live.has(k)) this._libCache.delete(k);
+    }
+    return entry;
+  }
+
+  private _drawLibraryInstancesForLabel(labelId: string) {
+    const list = this.scene.libraryInstances || [];
+    if (list.length === 0) return;
+    if (!this.labels.isVisible(labelId)) return;
+    for (const inst of list) {
+      if (inst.labelId !== labelId) continue;
+      const res = this._resolveLibraryInstance(inst);
+      if (!res) continue;
+      // Die aufgelöste Geometrie wird mit den NORMALEN Zeichenpfaden gerendert:
+      // dazu wird kurzzeitig auf die transiente Szene umgeschaltet.
+      const realScene = this.scene;
+      const realSelection = this.selection;
+      (this as any).scene = res.scene;
+      (this as any).selection = null;
+      try {
+        this._drawHatchesForLabel(labelId);
+        this._drawWallsForLabel(labelId);
+        this._drawSegmentsForLabel(labelId);
+        this._drawFreeStrokesForLabel(labelId);
+        this._drawDimensionsForLabel(labelId);
+        this._drawTextBoxesForLabel(labelId);
+        this._drawTablesForLabel(labelId);
+      } finally {
+        (this as any).scene = realScene;
+        (this as any).selection = realSelection;
+      }
+    }
+  }
+
+  private _drawLibraryInstanceSelection() {
+    if (!this.selection || this.selection.type !== SelectionType.LIBRARY_INSTANCE) return;
+    const inst = this.scene.getLibraryInstanceById(this.selection.libraryInstanceId!);
+    if (!inst || !this.labels.isVisible(inst.labelId)) return;
+    const res = this._resolveLibraryInstance(inst);
+    if (!res) return;
+    const b = snapshotsBounds(res.snaps);
+    const ctx = this.ctx, cam = this.camera;
+    const p0 = cam.worldToScreen(b.minX, b.minY);
+    const p1 = cam.worldToScreen(b.maxX, b.maxY);
+    ctx.save();
+    ctx.strokeStyle = "rgba(120,110,255,0.95)";
+    ctx.fillStyle = "rgba(120,110,255,0.08)";
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.rect(Math.min(p0.x, p1.x), Math.min(p0.y, p1.y), Math.abs(p1.x - p0.x), Math.abs(p1.y - p0.y));
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+    const center = cam.worldToScreen(inst.position.x, inst.position.y);
+    ctx.fillStyle = "rgba(120,110,255,0.95)";
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(center.x, center.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    for (const p of [p0, { x: p1.x, y: p0.y }, p1, { x: p0.x, y: p1.y }]) {
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(p.x - 4, p.y - 4, 8, 8); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   private _drawStickerInstanceSelection() {

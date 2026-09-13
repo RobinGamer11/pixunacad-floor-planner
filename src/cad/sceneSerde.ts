@@ -16,6 +16,8 @@ export interface SerializedScene {
   textBoxes?: any[];
   tables?: any[];
   stickerInstances?: any[];
+  /** Platzierte Bibliotheksinstanzen (nur Referenz + Transformation). */
+  libraryInstances?: any[];
   documents?: any[];
   freeStrokes?: any[];
   rulerGuide?: any;
@@ -32,6 +34,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   scene.textBoxes = [];
   (scene as any).tables = [];
   scene.stickerInstances = [];
+  (scene as any).libraryInstances = [];
   scene.documents = [];
   scene.freeStrokes = [];
   scene.walls = [];
@@ -44,8 +47,20 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   (scene as any)._rebuildTextIdMap?.();
   (scene as any)._rebuildTableIdMap?.();
   (scene as any)._rebuildStickerIdMap?.();
+  (scene as any)._rebuildLibraryIdMap?.();
   (scene as any)._rebuildDocIdMap?.();
   (scene as any)._rebuildFreeIdMap?.();
+  if (!data) return;
+  appendSceneObjects(scene, data);
+}
+
+/**
+ * Fügt die Objekte eines Szenen-JSON zu einer BESTEHENDEN Szene hinzu, ohne sie
+ * vorher zu leeren. `restoreOneScene()` nutzt exakt diese Logik — es gibt damit
+ * weiterhin nur einen einzigen, vollständigen Wiederherstellungspfad.
+ */
+export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | undefined): void {
+  const data = raw ? (migrateSceneData(raw) as SerializedScene) : raw;
   if (!data) return;
 
   for (const s of data.freeStrokes || []) {
@@ -174,6 +189,22 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
       if (si.id) (inst as any).id = si.id;
     }
     (scene as any)._rebuildStickerIdMap?.();
+  }
+  if (Array.isArray(data.libraryInstances)) {
+    for (const li of data.libraryInstances) {
+      if (!li || typeof li.definitionId !== "string") continue;
+      const inst = (scene as any).createLibraryInstance({
+        definitionId: li.definitionId,
+        definitionVersion: li.definitionVersion || 1,
+        position: li.position || { x: 0, y: 0 },
+        rotationRad: li.rotationRad || 0,
+        scaleX: li.scaleX || 1,
+        scaleY: li.scaleY || 1,
+        labelId: li.labelId,
+      });
+      if (li.id) inst.id = li.id;
+    }
+    (scene as any)._rebuildLibraryIdMap?.();
   }
   for (const d of data.documents || []) {
     const doc = scene.createDocument({
