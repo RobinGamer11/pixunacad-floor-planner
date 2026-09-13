@@ -47,6 +47,17 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   (scene as any)._rebuildDocIdMap?.();
   (scene as any)._rebuildFreeIdMap?.();
   if (!data) return;
+  appendSceneObjects(scene, data);
+}
+
+/**
+ * Fügt die Objekte eines Szenen-JSON zu einer BESTEHENDEN Szene hinzu, ohne sie
+ * vorher zu leeren. `restoreOneScene()` nutzt exakt diese Logik — es gibt damit
+ * weiterhin nur einen einzigen, vollständigen Wiederherstellungspfad.
+ */
+export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | undefined): void {
+  const data = raw ? (migrateSceneData(raw) as SerializedScene) : raw;
+  if (!data) return;
 
   for (const s of data.freeStrokes || []) {
     const stroke = scene.createFreeStroke(s.points || [], {
