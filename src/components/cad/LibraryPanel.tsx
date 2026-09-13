@@ -353,7 +353,7 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
           <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
             <div className="text-[13px] font-semibold">SVG als Bibliotheksobjekt importieren</div>
             <div className="space-y-1">
-              <label className="text-[12px]">Importgröße: SVG-Einheiten pro Meter</label>
+              <label className="text-[12px]">Importgröße: SVG-Einheiten pro Meter (1000 = 1 Einheit entspricht 1 mm)</label>
               <input type="text" inputMode="numeric" className={inputCls} value={String(svgUnits)}
                 onChange={(e) => setSvgUnits(Math.max(1, parseFloat(e.target.value) || 1))} />
             </div>
@@ -375,6 +375,37 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             </div>
           </div>
         )}
+
+        {/* ------------------------------------------------------ DXF-Dialog */}
+        {mode.kind === "dxf" && (
+          <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
+            <div className="text-[13px] font-semibold">DXF als Bibliotheksobjekt importieren</div>
+            <div className="text-[12px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Erkannte Einheit in der Datei: {mode.detected}
+            </div>
+            <div className="space-y-1">
+              <label className="text-[12px]">Einheit der Zeichnung (bei Bedarf korrigieren)</label>
+              <select className={selectCls} value={String(dxfUnits)}
+                onChange={(e) => setDxfUnits(parseFloat(e.target.value) || 1000)}>
+                {listDxfUnitOptions().map((o) => (
+                  <option key={o.code} value={String(o.unitsPerMeter)}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            {metaFields}
+            <div className="space-y-2">
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={() => saveDxf(mode.dxf)}>
+                <Save className="h-5 w-5" /> Als Bibliotheksobjekt anlegen
+              </button>
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={closeDialog}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
 
         {/* -------------------------------------------------- Bearbeiten */}
         {mode.kind === "edit" && (
