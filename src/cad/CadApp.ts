@@ -2963,6 +2963,62 @@ export class CadApp {
     return true;
   }
 
+  /* ------------------------------------------------ Bibliothek (CAD-only) */
+
+  /** Vorschau-Info zur aktuellen Auswahl (unterstützt/nicht unterstützt). */
+  getLibrarySelectionInfo() {
+    const sel = Library.collectLibrarySelection(this);
+    return { count: sel.snapshots.length, unsupported: sel.unsupported };
+  }
+
+  /** „Zur Bibliothek hinzufügen“ — Objekte bleiben auf dem Blatt. */
+  addLibraryDefinitionFromSelection(meta: any) {
+    return Library.addDefinitionFromSelection(this, meta);
+  }
+
+  /** „In Bibliotheksobjekt umwandeln“ — ersetzt die Auswahl (ein Undo-Schritt). */
+  convertSelectionToLibraryObject(meta: any) {
+    return Library.convertSelectionToInstance(this, meta);
+  }
+
+  beginLibraryPlacement(definitionId: string, scale = 1) {
+    const def = Library.getDefinition(this, definitionId);
+    if (!def) return;
+    if (this.activeTool !== this.libraryTool) this.setTool(ToolIds.LIBRARY);
+    this.libraryTool.beginPlacement(def, scale);
+    this.onLibraryChange?.();
+  }
+
+  renameLibraryDefinition(id: string, name: string) { return Library.renameDefinition(this, id, name); }
+  removeLibraryDefinition(id: string) { return Library.removeDefinition(this, id); }
+  exportLibraryDefinition(id: string) { return Library.exportDefinition(this, id); }
+  importLibraryDefinition(json: string) { return Library.importDefinition(this, json); }
+
+  /** Aktuell ausgewählte Bibliotheksinstanz (oder null). */
+  getSelectedLibraryInstance() {
+    if (!this.selection || this.selection.type !== SelectionType.LIBRARY_INSTANCE) return null;
+    return this.scene.getLibraryInstanceById((this.selection as any).libraryInstanceId);
+  }
+
+  /** „Auflösen“ — dauerhaft in normale CAD-Objekte (ein Undo-Schritt). */
+  explodeSelectedLibraryInstance(): boolean {
+    const inst = this.getSelectedLibraryInstance();
+    if (!inst) return false;
+    this.setTool(ToolIds.SELECT);
+    return Library.explodeLibraryInstance(this, inst.id);
+  }
+
+  /** Transformation der ausgewählten Instanz (Drehen/Skalieren aus dem Panel). */
+  setSelectedLibraryInstanceTransform(patch: { rotationRad?: number; scale?: number }): boolean {
+    const inst = this.getSelectedLibraryInstance();
+    if (!inst) return false;
+    if (typeof patch.rotationRad === "number") inst.rotationRad = patch.rotationRad;
+    if (typeof patch.scale === "number" && patch.scale > 0) { inst.scaleX = patch.scale; inst.scaleY = patch.scale; }
+    this.commitHistorySnapshot?.();
+    return true;
+  }
+
+
 
   exportStickers(): string {
     return exportStickersToJson(this.stickers);
