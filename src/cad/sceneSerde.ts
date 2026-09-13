@@ -16,6 +16,8 @@ export interface SerializedScene {
   textBoxes?: any[];
   tables?: any[];
   stickerInstances?: any[];
+  /** Platzierte Bibliotheksinstanzen (nur Referenz + Transformation). */
+  libraryInstances?: any[];
   documents?: any[];
   freeStrokes?: any[];
   rulerGuide?: any;
