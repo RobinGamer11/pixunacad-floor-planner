@@ -842,9 +842,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setStickerPhase(app.stickerTool.phase);
       setStickerSelCount(app.stickerTool.getSelectionCount());
     };
-    app.onTablePlaced = () => {
+    app.onTablePlaced = (id: string) => {
+      // Nach genau einer Platzierung: neue Tabelle unmittelbar auswählen und
+      // den Tabellenkontext samt Einstellungen geöffnet lassen (kein Seitenreiter).
       setTablePlacementActive(false);
       setTableTool(true);
+      setTableEditId(null);
+      setTableSelectedId(id);
       setRightTab("settings");
     };
     // CAD-State pro Projekt aus localStorage wiederherstellen
@@ -1460,15 +1464,19 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             onClick={() => {
               const app = appRef.current;
               if (tableTool) {
-                if (app?.activeTool === app.tableTool) app.setTool(ToolIds.SELECT);
+                // Erneuter Klick beendet das Tabellenwerkzeug sauber und
+                // wechselt wie bei jedem anderen Werkzeug zur normalen Auswahl.
+                app?.setTool(ToolIds.SELECT);
                 setTableTool(false);
                 setTablePlacementActive(false);
+                setTableEditId(null);
                 return;
               }
-              // Das Symbol öffnet nur die gemeinsamen Einstellungen. Erst die
-              // Hauptaktion „Neue Tabelle“ startet die eigentliche Platzierung.
+              // Das Symbol aktiviert das echte Tabellenwerkzeug in der Engine —
+              // das zuvor aktive Werkzeug wird vollständig beendet.
+              app?.setTool(ToolIds.TABLE);
               setTableTool(true);
-              setTablePlacementActive(false);
+              setTablePlacementActive(true);
               setTableEditId(null);
               setRightTab("settings");
             }}
