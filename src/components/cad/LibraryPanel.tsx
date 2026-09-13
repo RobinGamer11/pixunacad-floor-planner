@@ -28,10 +28,12 @@ type Mode =
   | { kind: "none" }
   | { kind: "save" }
   | { kind: "edit"; id: string }
-  | { kind: "svg"; svg: string; warnings: string[] };
+  | { kind: "svg"; svg: string; warnings: string[] }
+  | { kind: "dxf"; dxf: string; detected: string };
 
 const inputCls = "cad-settings-input w-full h-10 text-[12px] px-3";
 const selectCls = "cad-settings-select w-full h-10 text-[12px] px-3";
+
 
 function fileSafe(name: string) {
   return (name || "bibliotheksobjekt").replace(/[^\w\-]+/g, "_");
