@@ -100,7 +100,7 @@ const CAD_TOOLS = [
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
   { id: ToolIds.STICKER, label: "Stempel", key: "O", icon: StickerIcon },
-  { id: ToolIds.LIBRARY, label: "Bibliothek", key: "B", icon: Boxes },
+  { id: ToolIds.LIBRARY, label: "Bibliothek", key: "K", icon: Boxes },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
 

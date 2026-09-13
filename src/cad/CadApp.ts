@@ -2584,6 +2584,7 @@ export class CadApp {
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
       if (e.key === "w" || e.key === "W") this.setTool(ToolIds.WALL);
       if (e.key === "u" || e.key === "U") this.setTool(ToolIds.DOOR);
+      if (e.key === "k" || e.key === "K") this.setTool(ToolIds.LIBRARY);
 
       // 'B' = Bezugslinie einer selektierten Wand an gegenüberliegender Kante koppeln
       // (cycelt outer → center → inner → outer, Wandkörper bleibt sichtbar gleich).
