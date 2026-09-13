@@ -37,6 +37,8 @@ import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedIt
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import type { LibraryDefinition } from "./library/types";
+import { LibraryPlacementTool } from "./library/LibraryPlacementTool";
+import * as Library from "./library/LibraryManager";
 import { serializeDefinitions, restoreDefinitions, serializeLibraryInstance } from "./library/librarySerde";
 import { DocumentTool } from "./DocumentTool";
 import { rulerSideOf, rulerUnitOf } from "./rulerModel";
@@ -338,6 +340,8 @@ export class CadApp {
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
   stickerTool!: StickerTool;
+  /** Bibliotheks-Platzierungswerkzeug (nur eigenständige CAD-Oberfläche). */
+  libraryTool!: LibraryPlacementTool;
   tableTool!: TableTool;
   documentTool!: DocumentTool;
   freeDrawTool!: FreeDrawTool;
@@ -587,6 +591,8 @@ export class CadApp {
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
     this.stickerTool = new StickerTool(this);
+    this.libraryTool = new LibraryPlacementTool(this);
+    this.renderer.libraryDefinitionSource = () => this.libraryDefinitions;
     this.tableTool = new TableTool(this);
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
@@ -2779,6 +2785,11 @@ export class CadApp {
           if (dim) { this.scene.removeDimension(dim); this.clearSelection(); this.refreshLabelUI(); }
           return;
         }
+        if (this.selection && this.selection.type === SelectionType.LIBRARY_INSTANCE) {
+          const inst = this.scene.getLibraryInstanceById((this.selection as any).libraryInstanceId);
+          if (inst) { this.scene.removeLibraryInstance(inst); this.clearSelection(); this.refreshLabelUI(); }
+          return;
+        }
         if (this.selection && this.selection.type === SelectionType.STICKER_INSTANCE) {
           const inst = this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
           if (inst) { this.scene.removeStickerInstance(inst); this.clearSelection(); }
@@ -3062,6 +3073,7 @@ export class CadApp {
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
+    else if (id === ToolIds.LIBRARY) { this.activeTool = this.libraryTool; this.libraryTool.activate(); }
     else if (id === ToolIds.DOCUMENT) { this.activeTool = this.documentTool; this.documentTool.activate(); }
     else if (id === ToolIds.FREE) { this.activeTool = this.freeDrawTool; this.freeDrawTool.activate(); }
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
