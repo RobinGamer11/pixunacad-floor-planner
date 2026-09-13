@@ -995,6 +995,8 @@ export class Scene {
   textBoxes: TextBox[] = [];
   tables: TableObject[] = [];
   stickerInstances: StickerInstance[] = [];
+  /** Platzierte Bibliotheksinstanzen (eigener Objekttyp, unabhängig von Stickern). */
+  libraryInstances: LibraryInstance[] = [];
   documents: DocumentObject[] = [];
   walls: Wall[] = [];
   doors: Door[] = [];
