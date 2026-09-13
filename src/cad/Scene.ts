@@ -1011,6 +1011,7 @@ export class Scene {
   private _dimIdMap = new Map<string, Dimension>();
   private _textIdMap = new Map<string, TextBox>();
   private _stickerIdMap = new Map<string, StickerInstance>();
+  private _libraryIdMap = new Map<string, LibraryInstance>();
   private _docIdMap = new Map<string, DocumentObject>();
   private _freeIdMap = new Map<string, FreeStroke>();
 
