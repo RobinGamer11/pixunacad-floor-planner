@@ -34,6 +34,7 @@ export class LibraryPlacementTool {
 
   get activeDefinitionId(): string | null { return this.activeDef?.id || null; }
 
+  /** Nur relevant, wenn tatsächlich platziert wird (siehe `beginPlacement`). */
   activate() {
     this.app.hub.hide();
     this.app.pointEditMenu.hide();
@@ -41,11 +42,18 @@ export class LibraryPlacementTool {
   }
 
   cancel() {
+    const wasActive = this.phase !== "idle";
     this.phase = "idle";
     this.activeDef = null;
     this.anchor = null;
     this.rotationRad = 0;
     this.app.hub.hide();
+    // Zurück zur normalen Auswahl, damit das Bibliothekswerkzeug die
+    // CAD-Auswahl nie blockiert.
+    if (wasActive && (this.app as any).activeTool === this) {
+      (this.app as any).activeTool = this.app.selectTool;
+      this.app.selectTool.activate();
+    }
     this.onStateChange?.();
   }
 
@@ -60,6 +68,8 @@ export class LibraryPlacementTool {
     this.anchor = null;
     this.rotationRad = 0;
     this.scale = scale > 0 ? scale : 1;
+    (this.app as any).activeTool = this;
+    this.activate();
     this.app.clearSelection();
     this.app.pointEditMenu.hide();
     this.onStateChange?.();

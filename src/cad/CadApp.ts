@@ -3135,7 +3135,10 @@ export class CadApp {
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
     else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
-    else if (id === ToolIds.LIBRARY) { this.activeTool = this.libraryTool; this.libraryTool.activate(); }
+    // Bibliothek: solange nichts platziert wird, arbeitet die normale Auswahl
+    // weiter (Klick, Shift-Klick, Rahmenauswahl). Erst `beginPlacement()`
+    // übernimmt das Bibliothekswerkzeug die Eingabe.
+    else if (id === ToolIds.LIBRARY) { this.activeTool = this.selectTool; this.selectTool.activate(); }
     else if (id === ToolIds.DOCUMENT) { this.activeTool = this.documentTool; this.documentTool.activate(); }
     else if (id === ToolIds.FREE) { this.activeTool = this.freeDrawTool; this.freeDrawTool.activate(); }
     else if (id === ToolIds.ERASER) { this.activeTool = this.eraserTool; this.eraserTool.activate(); }
