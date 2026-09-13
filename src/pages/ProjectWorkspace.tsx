@@ -1784,7 +1784,8 @@ export default function ProjectWorkspace() {
             setTableEditId(null);
             setTableSelection(null);
             setActiveToolAndTab("table");
-            setTablePlacementActive(false);
+            // Wie in der CAD-Oberfläche: Platzierung ist direkt aktiv.
+            setTablePlacementActive(true);
           }}
         />
         <input
