@@ -572,6 +572,17 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
                 }}>
                 <FileCode2 className="h-3.5 w-3.5" /> Als SVG exportieren
               </button>
+
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]"
+                onClick={() => {
+                  const res = app.exportLibraryDefinitionDxf(d.id);
+                  if (!res) return;
+                  download(`${fileSafe(d.name)}.dxf`, res.dxf, "image/vnd.dxf");
+                  if (res.warnings.length) window.alert("DXF exportiert. Hinweise:\n• " + res.warnings.join("\n• "));
+                }}>
+                <FileCode2 className="h-3.5 w-3.5" /> Als DXF exportieren
+              </button>
+
             </div>
           ))}
         </div>
