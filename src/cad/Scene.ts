@@ -501,6 +501,38 @@ export class StickerInstance {
   }
 }
 
+/**
+ * Platzierte Bibliotheksinstanz — bewusst EIGENER Objekttyp (kein Sticker).
+ * Sie hält nur die Referenz auf eine projektweite `LibraryDefinition` sowie
+ * die Transformation; die Geometrie wird beim Zeichnen aufgelöst.
+ */
+export class LibraryInstance {
+  id: string;
+  definitionId: string;
+  definitionVersion: number;
+  position: Vec2;
+  rotationRad: number;
+  scaleX: number;
+  scaleY: number;
+  labelId: string;
+
+  constructor({ id, definitionId, definitionVersion, position, rotationRad, scaleX, scaleY, labelId }: {
+    id: string; definitionId: string; definitionVersion?: number;
+    position: Vec2; rotationRad?: number; scaleX?: number; scaleY?: number; labelId?: string;
+  }) {
+    this.id = id;
+    this.definitionId = definitionId;
+    this.definitionVersion = definitionVersion || 1;
+    this.position = v(position.x, position.y);
+    this.rotationRad = rotationRad || 0;
+    this.scaleX = (typeof scaleX === "number" && scaleX !== 0) ? scaleX : 1;
+    this.scaleY = (typeof scaleY === "number" && scaleY !== 0) ? scaleY : 1;
+    this.labelId = labelId || Defaults.defaultLabelId;
+  }
+}
+
+
+
 export class DocumentObject {
   id: string;
   name: string;
