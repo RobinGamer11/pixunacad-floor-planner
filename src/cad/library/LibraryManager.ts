@@ -17,6 +17,9 @@ import {
 } from "./libraryGeometry";
 import { importSvgToSnapshots } from "./svgImport";
 import { exportDefinitionToSvg } from "./svgExport";
+import { importDxfToSnapshots } from "./dxfImport";
+import { exportDefinitionToDxf } from "./dxfExport";
+
 import {
   exportDefinitionToPxobj,
   importDefinitionFromPxobj,
