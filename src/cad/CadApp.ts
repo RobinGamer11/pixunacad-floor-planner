@@ -3005,6 +3005,11 @@ export class CadApp {
   importLibraryDefinitionFromSvg(svg: string, meta: any, unitsPerMeter?: number) {
     return Library.importDefinitionFromSvg(this, svg, meta, unitsPerMeter);
   }
+  exportLibraryDefinitionDxf(id: string) { return Library.exportDefinitionDxf(this, id); }
+  importLibraryDefinitionFromDxf(dxf: string, meta: any, unitsPerMeter?: number) {
+    return Library.importDefinitionFromDxf(this, dxf, meta, unitsPerMeter);
+  }
+
   /** Bricht eine laufende Platzierung ab (Auswahl ist danach wieder möglich). */
   cancelLibraryPlacement() { this.libraryTool.cancel(); }
 

@@ -17,6 +17,9 @@ import {
 } from "./libraryGeometry";
 import { importSvgToSnapshots } from "./svgImport";
 import { exportDefinitionToSvg } from "./svgExport";
+import { importDxfToSnapshots } from "./dxfImport";
+import { exportDefinitionToDxf } from "./dxfExport";
+
 import {
   exportDefinitionToPxobj,
   importDefinitionFromPxobj,
@@ -399,3 +402,27 @@ export function exportDefinitionSvg(app: CadApp, id: string): string | null {
   const def = getDefinition(app, id);
   return def ? exportDefinitionToSvg(def) : null;
 }
+
+/* --------------------------------------------------------------- DXF */
+
+/** DXF-Datei → neue Bibliotheksdefinition (kein direktes Ablegen auf dem Blatt). */
+export function importDefinitionFromDxf(
+  app: CadApp,
+  dxfText: string,
+  meta: LibraryDefinitionMeta,
+  unitsPerMeter?: number,
+): { definition: LibraryDefinition | null; warnings: string[]; failed?: string } {
+  const res = importDxfToSnapshots(dxfText, { unitsPerMeter });
+  if (res.failed) return { definition: null, warnings: res.warnings, failed: res.failed };
+  if (res.snapshots.length === 0) {
+    return { definition: null, warnings: [...res.warnings, "Die DXF-Datei enthält keine übernehmbare Geometrie."] };
+  }
+  return { definition: addDefinitionFromSnapshots(app, res.snapshots, meta), warnings: res.warnings };
+}
+
+/** Bibliotheksdefinition → DXF-Datei. */
+export function exportDefinitionDxf(app: CadApp, id: string): { dxf: string; warnings: string[] } | null {
+  const def = getDefinition(app, id);
+  return def ? exportDefinitionToDxf(def) : null;
+}
+

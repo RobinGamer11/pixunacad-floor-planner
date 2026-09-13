@@ -3,6 +3,8 @@ import { Boxes, Download, FileCode2, Pencil, Plus, Save, Trash2, Upload, Ungroup
 import type { CadApp } from "@/cad/CadApp";
 import type { LibraryDefinition, LibraryUnits } from "@/cad/library/types";
 import { PXOBJ_EXTENSION } from "@/cad/library/types";
+import { detectDxfUnits, listDxfUnitOptions } from "@/cad/library/dxfImport";
+
 
 interface Props {
   app: CadApp | null;
@@ -28,10 +30,12 @@ type Mode =
   | { kind: "none" }
   | { kind: "save" }
   | { kind: "edit"; id: string }
-  | { kind: "svg"; svg: string; warnings: string[] };
+  | { kind: "svg"; svg: string; warnings: string[] }
+  | { kind: "dxf"; dxf: string; detected: string };
 
 const inputCls = "cad-settings-input w-full h-10 text-[12px] px-3";
 const selectCls = "cad-settings-select w-full h-10 text-[12px] px-3";
+
 
 function fileSafe(name: string) {
   return (name || "bibliotheksobjekt").replace(/[^\w\-]+/g, "_");
@@ -51,13 +55,16 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
   const [meta, setMeta] = useState<Meta>(EMPTY_META);
   const [replaceOriginal, setReplaceOriginal] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
-  const [svgUnits, setSvgUnits] = useState(100);
+  const [svgUnits, setSvgUnits] = useState(1000);
+  const [dxfUnits, setDxfUnits] = useState(1000);
   const [selInfo, setSelInfo] = useState<{ count: number; unsupported: string[] }>({ count: 0, unsupported: [] });
   const [instanceDefId, setInstanceDefId] = useState<string | null>(null);
   const [placingId, setPlacingId] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<HTMLInputElement>(null);
+  const dxfRef = useRef<HTMLInputElement>(null);
   const lastInstanceDef = useRef<string | null>(null);
+
 
   useEffect(() => {
     if (!app) return;
@@ -181,6 +188,19 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
     }
     closeDialog();
   };
+
+  const saveDxf = (dxf: string) => {
+    const res = app.importLibraryDefinitionFromDxf(dxf, buildMeta(), dxfUnits);
+    if (!res.definition) {
+      window.alert("DXF konnte nicht importiert werden:\n• " + (res.failed || res.warnings.join("\n• ") || "Unbekannter Fehler"));
+      return;
+    }
+    if (res.warnings.length) {
+      window.alert("DXF importiert. Hinweise:\n• " + res.warnings.join("\n• "));
+    }
+    closeDialog();
+  };
+
 
   /* --------------------------------------------------------- Teilansichten */
 
@@ -333,7 +353,7 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
           <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
             <div className="text-[13px] font-semibold">SVG als Bibliotheksobjekt importieren</div>
             <div className="space-y-1">
-              <label className="text-[12px]">Importgröße: SVG-Einheiten pro Meter</label>
+              <label className="text-[12px]">Importgröße: SVG-Einheiten pro Meter (1000 = 1 Einheit entspricht 1 mm)</label>
               <input type="text" inputMode="numeric" className={inputCls} value={String(svgUnits)}
                 onChange={(e) => setSvgUnits(Math.max(1, parseFloat(e.target.value) || 1))} />
             </div>
@@ -355,6 +375,37 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             </div>
           </div>
         )}
+
+        {/* ------------------------------------------------------ DXF-Dialog */}
+        {mode.kind === "dxf" && (
+          <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
+            <div className="text-[13px] font-semibold">DXF als Bibliotheksobjekt importieren</div>
+            <div className="text-[12px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Erkannte Einheit in der Datei: {mode.detected}
+            </div>
+            <div className="space-y-1">
+              <label className="text-[12px]">Einheit der Zeichnung (bei Bedarf korrigieren)</label>
+              <select className={selectCls} value={String(dxfUnits)}
+                onChange={(e) => setDxfUnits(parseFloat(e.target.value) || 1000)}>
+                {listDxfUnitOptions().map((o) => (
+                  <option key={o.code} value={String(o.unitsPerMeter)}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            {metaFields}
+            <div className="space-y-2">
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={() => saveDxf(mode.dxf)}>
+                <Save className="h-5 w-5" /> Als Bibliotheksobjekt anlegen
+              </button>
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={closeDialog}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
 
         {/* -------------------------------------------------- Bearbeiten */}
         {mode.kind === "edit" && (
@@ -422,6 +473,9 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
           <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={() => svgRef.current?.click()}>
             <FileCode2 className="h-4 w-4" /> SVG importieren
           </button>
+          <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[13px] font-semibold" onClick={() => dxfRef.current?.click()}>
+            <FileCode2 className="h-4 w-4" /> DXF importieren
+          </button>
           <input ref={importRef} type="file" accept=".pxobj,application/json" className="hidden" multiple onChange={async (e) => {
             const files = Array.from(e.target.files || []);
             let ok = 0;
@@ -439,6 +493,17 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             setMeta({ ...EMPTY_META, name: f.name.replace(/\.svg$/i, "") });
             setMode({ kind: "svg", svg: text, warnings: [] });
           }} />
+          <input ref={dxfRef} type="file" accept=".dxf,image/vnd.dxf,application/dxf" className="hidden" onChange={async (e) => {
+            const f = (e.target.files || [])[0];
+            e.target.value = "";
+            if (!f) return;
+            const text = await f.text();
+            const info = detectDxfUnits(text);
+            setDxfUnits(info.unitsPerMeter);
+            setMeta({ ...EMPTY_META, name: f.name.replace(/\.dxf$/i, "") });
+            setMode({ kind: "dxf", dxf: text, detected: info.label });
+          }} />
+
         </div>
 
         {/* ----------------------------------------------------- Liste */}
@@ -507,6 +572,17 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
                 }}>
                 <FileCode2 className="h-3.5 w-3.5" /> Als SVG exportieren
               </button>
+
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]"
+                onClick={() => {
+                  const res = app.exportLibraryDefinitionDxf(d.id);
+                  if (!res) return;
+                  download(`${fileSafe(d.name)}.dxf`, res.dxf, "image/vnd.dxf");
+                  if (res.warnings.length) window.alert("DXF exportiert. Hinweise:\n• " + res.warnings.join("\n• "));
+                }}>
+                <FileCode2 className="h-3.5 w-3.5" /> Als DXF exportieren
+              </button>
+
             </div>
           ))}
         </div>
