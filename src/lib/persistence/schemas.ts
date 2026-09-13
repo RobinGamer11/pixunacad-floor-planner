@@ -97,6 +97,15 @@ export function migrateSceneData<T>(scene: T): T {
     fill(s, "scale", 1);
   });
 
+  // Bibliotheksinstanzen (additiv; alte Szenen haben das Feld nicht).
+  fill(scene, "libraryInstances", []);
+  mapArray(scene, "libraryInstances", (s) => {
+    fill(s, "rotationRad", 0);
+    fill(s, "scaleX", 1);
+    fill(s, "scaleY", 1);
+    fill(s, "definitionVersion", 1);
+  });
+
   mapArray(scene, "tables", (t) => {
     fill(t, "rotationRad", 0);
     fill(t, "scale", 1);
@@ -124,6 +133,7 @@ defineSchema({
         if (!isObj(data)) return data;
         fill(data, "labels", []);
         fill(data, "stickers", []);
+        fill(data, "libraryDefinitions", []);
         fill(data, "sheets", []);
         fill(data, "scenesById", {});
         fill(data, "plans", []);
