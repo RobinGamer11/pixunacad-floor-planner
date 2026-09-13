@@ -36,6 +36,8 @@ import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
+import type { LibraryDefinition } from "./library/types";
+import { serializeDefinitions, restoreDefinitions, serializeLibraryInstance } from "./library/librarySerde";
 import { DocumentTool } from "./DocumentTool";
 import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 import { FreeDrawTool } from "./FreeDrawTool";
