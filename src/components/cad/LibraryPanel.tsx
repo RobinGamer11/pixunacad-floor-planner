@@ -473,6 +473,9 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
           <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={() => svgRef.current?.click()}>
             <FileCode2 className="h-4 w-4" /> SVG importieren
           </button>
+          <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[13px] font-semibold" onClick={() => dxfRef.current?.click()}>
+            <FileCode2 className="h-4 w-4" /> DXF importieren
+          </button>
           <input ref={importRef} type="file" accept=".pxobj,application/json" className="hidden" multiple onChange={async (e) => {
             const files = Array.from(e.target.files || []);
             let ok = 0;
@@ -490,6 +493,17 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             setMeta({ ...EMPTY_META, name: f.name.replace(/\.svg$/i, "") });
             setMode({ kind: "svg", svg: text, warnings: [] });
           }} />
+          <input ref={dxfRef} type="file" accept=".dxf,image/vnd.dxf,application/dxf" className="hidden" onChange={async (e) => {
+            const f = (e.target.files || [])[0];
+            e.target.value = "";
+            if (!f) return;
+            const text = await f.text();
+            const info = detectDxfUnits(text);
+            setDxfUnits(info.unitsPerMeter);
+            setMeta({ ...EMPTY_META, name: f.name.replace(/\.dxf$/i, "") });
+            setMode({ kind: "dxf", dxf: text, detected: info.label });
+          }} />
+
         </div>
 
         {/* ----------------------------------------------------- Liste */}
