@@ -10,6 +10,7 @@ import { getEffectiveContourGeometry } from "./effectiveGeometry";
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
 import type { TextBox } from "./Scene";
 import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
+import { instanceCornersWorld, pointInInstanceBounds } from "./library/libraryGeometry";
 import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld, documentEdgeMidpointsWorld, documentAnchorsWorld } from "./documentGeometry";
 import { pointInDocumentVisible } from "./documentBgRemove";
 import { computeWallLines } from "./wallGeom";
@@ -134,6 +135,11 @@ export class SelectTool {
   dragDimGrabDx = 0;
   dragDimGrabDy = 0;
   private dimensionHubGuideOrigin: Vec2 | null = null;
+
+  // Bibliotheksinstanz Drag-State (Translate) — unabhängig vom Sticker-State
+  dragLibraryId: string | null = null;
+  dragLibraryGrabOffset: Vec2 | null = null;
+  dragLibraryMouseStart: Vec2 | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
   dragStickerId: string | null = null;
@@ -291,6 +297,7 @@ export class SelectTool {
       case "table":      return { type: SelectionType.TEXTBOX, textBoxId: ref.id, handleIndex: null };
       case "document":   return { type: SelectionType.DOCUMENT, documentId: ref.id, handleIndex: null };
       case "sticker":    return { type: SelectionType.STICKER_INSTANCE, stickerInstanceId: ref.id, handleIndex: null };
+      case "library":    return { type: SelectionType.LIBRARY_INSTANCE, libraryInstanceId: ref.id, handleIndex: null } as any;
       default:           return null;
     }
   }
@@ -764,6 +771,33 @@ export class SelectTool {
       const box = boxes[i];
       if (!this.app.labelManager.isEditable(box.labelId)) continue;
       if (pointInOrientedBox(mouseW, box)) return box;
+    }
+    return null;
+  }
+
+  /** Lokale Geometrie einer Bibliotheksinstanz (über die Definition aufgelöst). */
+  private _libraryGeometryOf(inst: any): any[] | null {
+    const def = ((this.app as any).libraryDefinitions || []).find((d: any) => d.id === inst?.definitionId);
+    return def ? def.geometry : null;
+  }
+
+  private _libraryTransformOf(inst: any) {
+    return {
+      position: { x: inst.position.x, y: inst.position.y },
+      rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY,
+    };
+  }
+
+  /** Oberste Bibliotheksinstanz unter der Maus oder null. */
+  private _hitLibraryInstance(input: Input): any | null {
+    const mouseW = { x: input.mouse.wx, y: input.mouse.wy };
+    const list = (this.app.scene as any).libraryInstances || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const inst = list[i];
+      if (!this.app.labelManager.isEditable(inst.labelId)) continue;
+      const geom = this._libraryGeometryOf(inst);
+      if (!geom) continue;
+      if (pointInInstanceBounds(geom, this._libraryTransformOf(inst), mouseW)) return inst;
     }
     return null;
   }
@@ -3202,6 +3236,33 @@ export class SelectTool {
 
 
 
+    // Aktiver Bibliotheksobjekt-Drag (mit Punkt-Snapping)
+    if (this.dragLibraryId) {
+      const inst = (this.app.scene as any).getLibraryInstanceById(this.dragLibraryId);
+      if (!inst || !this.dragLibraryGrabOffset) {
+        this.dragLibraryId = null;
+        this.dragLibraryGrabOffset = null;
+        this.dragLibraryMouseStart = null;
+        this._clearTransformGuides();
+      } else {
+        const mouseW = v(input.mouse.wx, input.mouse.wy);
+        if (this._tryToggleTransformGuide(input, {}, this.dragLibraryMouseStart || mouseW)) return;
+        const snap = this._findTransformSnap(input);
+        const target = (snap && snap.world) ? snap.world : mouseW;
+        inst.position = {
+          x: target.x - this.dragLibraryGrabOffset.x,
+          y: target.y - this.dragLibraryGrabOffset.y,
+        };
+        if (!input.mouse.left) {
+          this.dragLibraryId = null;
+          this.dragLibraryGrabOffset = null;
+          this.dragLibraryMouseStart = null;
+          this._clearTransformGuides();
+        }
+        return;
+      }
+    }
+
     // Active sticker drag with point snapping
     if (this.dragStickerId) {
       const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
@@ -3879,6 +3940,18 @@ export class SelectTool {
             return;
           }
         }
+        // Bibliotheksinstanzen (eigener Objekttyp) vor den normalen Objekten prüfen.
+        const libHit = this._hitLibraryInstance(input);
+        if (libHit) {
+          this._clearTransformGuides();
+          this.app.setSelection({ type: SelectionType.LIBRARY_INSTANCE, libraryInstanceId: libHit.id } as any);
+          const mouseL = v(input.mouse.wx, input.mouse.wy);
+          this.dragLibraryId = libHit.id;
+          this.dragLibraryMouseStart = mouseL;
+          this.dragLibraryGrabOffset = { x: mouseL.x - libHit.position.x, y: mouseL.y - libHit.position.y };
+          return;
+        }
+
         // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
         const stickerHit = this._hitStickerInstance(input);
         if (stickerHit) {
@@ -4591,6 +4664,10 @@ export class SelectTool {
         case "table":    return boxCornersWorld(obj);
         case "document": return documentCornersWorld(obj);
         case "sticker":  return instanceBoundingCornersWorld(obj.items, obj.position, obj.rotationRad, obj.scale);
+        case "library": {
+          const geom = this._libraryGeometryOf(obj);
+          return geom ? instanceCornersWorld(geom, this._libraryTransformOf(obj)) as any : [];
+        }
         default: return [];
       }
     } catch { return []; }
@@ -4630,6 +4707,7 @@ export class SelectTool {
     for (const o of s.tables || [])           if (selectable(o)) yield { kind: "table",      id: o.id, obj: o };
     for (const o of s.documents || [])        if (selectable(o)) yield { kind: "document",   id: o.id, obj: o };
     for (const o of s.stickerInstances || []) if (selectable(o)) yield { kind: "sticker",    id: o.id, obj: o };
+    for (const o of s.libraryInstances || []) if (selectable(o)) yield { kind: "library",    id: o.id, obj: o };
   }
 
   private _commitMarquee() {
@@ -4738,6 +4816,7 @@ export class SelectTool {
           case "table":      { const o = (scene as any).getTableById(id);   if (o) (scene as any).removeTable(o); break; }
           case "document":   { const o = scene.getDocumentById(id);        if (o) scene.removeDocument(o); break; }
           case "sticker":    { const o = scene.getStickerInstanceById(id); if (o) scene.removeStickerInstance(o); break; }
+          case "library":    { const o = (scene as any).getLibraryInstanceById(id); if (o) (scene as any).removeLibraryInstance(o); break; }
         }
       } catch { /* ignore individual failures */ }
     }
