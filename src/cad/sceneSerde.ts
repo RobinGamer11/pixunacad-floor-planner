@@ -190,6 +190,22 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
     }
     (scene as any)._rebuildStickerIdMap?.();
   }
+  if (Array.isArray(data.libraryInstances)) {
+    for (const li of data.libraryInstances) {
+      if (!li || typeof li.definitionId !== "string") continue;
+      const inst = (scene as any).createLibraryInstance({
+        definitionId: li.definitionId,
+        definitionVersion: li.definitionVersion || 1,
+        position: li.position || { x: 0, y: 0 },
+        rotationRad: li.rotationRad || 0,
+        scaleX: li.scaleX || 1,
+        scaleY: li.scaleY || 1,
+        labelId: li.labelId,
+      });
+      if (li.id) inst.id = li.id;
+    }
+    (scene as any)._rebuildLibraryIdMap?.();
+  }
   for (const d of data.documents || []) {
     const doc = scene.createDocument({
       name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
