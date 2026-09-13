@@ -2689,6 +2689,11 @@ export class CadApp {
           if (this.doorTool.selectedDoorId) { this.doorTool.selectDoor(null); return; }
           this.doorTool.cancel(); this.setTool(ToolIds.SELECT); return;
         }
+        if ((this.activeTool as any) === this.libraryTool) {
+          if (this.libraryTool.phase !== "idle") { this.libraryTool.cancel(); return; }
+          this.setTool(ToolIds.SELECT);
+          return;
+        }
         if (this.activeTool === this.stickerTool) {
           // Erst aktive Platzierung abbrechen, sonst Tool wechseln
           if (this.stickerTool.phase !== "idle") { this.stickerTool.cancel(); return; }
