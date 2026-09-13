@@ -89,8 +89,10 @@ export interface LibraryDefinitionMeta {
   author?: string;
   license?: string;
   source?: string;
-  /** Einfügepunkt in Weltkoordinaten; ohne Angabe = Schwerpunkt der Auswahl. */
-  insertionPointWorld?: { x: number; y: number } | null;
+  /**
+   * Der Einfügepunkt ist immer der Mittelpunkt der gespeicherten Geometrie.
+   * Ein wählbarer Nullpunkt existiert bewusst nicht mehr.
+   */
 }
 
 /** Dateiformat für den verlustfreien Einzelobjekt-Austausch. */

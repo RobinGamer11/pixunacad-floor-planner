@@ -128,7 +128,8 @@ export function getDefinition(app: CadApp, id: string): LibraryDefinition | null
 
 function buildDefinition(sel: LibrarySelection, meta: LibraryDefinitionMeta): LibraryDefinition | null {
   if (sel.snapshots.length === 0) return null;
-  const ip = meta.insertionPointWorld || snapshotsCentroid(sel.snapshots);
+  // Einfügepunkt ist immer der Mittelpunkt der Auswahl (kein Nullpunkt-Modus).
+  const ip = snapshotsCentroid(sel.snapshots);
   const local = translateSnapshots(sel.snapshots, -ip.x, -ip.y);
   const now = Date.now();
   return {
@@ -199,7 +200,7 @@ export function convertSelectionToInstance(
   const def = buildDefinition(sel, meta);
   if (!def) return { definition: null, unsupported: sel.unsupported };
 
-  const ip = meta.insertionPointWorld || snapshotsCentroid(sel.snapshots);
+  const ip = snapshotsCentroid(sel.snapshots);
   app.libraryDefinitions.push(def);
   removeRefs(app.scene, sel.refs);
   const inst = app.scene.createLibraryInstance({
