@@ -795,6 +795,7 @@ export class CadApp {
         position: { x: si.position.x, y: si.position.y },
         rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
       })),
+      libraryInstances: (scene.libraryInstances || []).map(serializeLibraryInstance),
       documents: scene.documents
         .filter(d => !(d as any)._snapOnly)
         .map(d => {
@@ -957,6 +958,9 @@ export class CadApp {
       }));
       this.onStickersChange?.();
     }
+    // Bibliotheksdefinitionen (additiv, fehlende Daten => leere Liste)
+    this.libraryDefinitions = restoreDefinitions(data.libraryDefinitions);
+    this.onLibraryChange?.();
     // Restore sheets list (falls vorhanden).
     if (Array.isArray(data.sheets)) {
       this.sheetManager.restore(data.sheets);
