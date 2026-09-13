@@ -3,6 +3,8 @@ import { Boxes, Download, FileCode2, Pencil, Plus, Save, Trash2, Upload, Ungroup
 import type { CadApp } from "@/cad/CadApp";
 import type { LibraryDefinition, LibraryUnits } from "@/cad/library/types";
 import { PXOBJ_EXTENSION } from "@/cad/library/types";
+import { detectDxfUnits, listDxfUnitOptions } from "@/cad/library/dxfImport";
+
 
 interface Props {
   app: CadApp | null;
