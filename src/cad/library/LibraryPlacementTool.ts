@@ -81,7 +81,7 @@ export class LibraryPlacementTool {
 
     if (this.phase === "rotating" && this.anchor) {
       let a = Math.atan2(mouseW.y - this.anchor.y, mouseW.x - this.anchor.x);
-      if (input.shift) a = Math.round(a / (Math.PI / 4)) * (Math.PI / 4);
+      if (input.keys.shift) a = Math.round(a / (Math.PI / 4)) * (Math.PI / 4);
       this.rotationRad = a;
       if (input.clicked) this.commit();
     }
