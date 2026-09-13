@@ -187,6 +187,19 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
     closeDialog();
   };
 
+  const saveDxf = (dxf: string) => {
+    const res = app.importLibraryDefinitionFromDxf(dxf, buildMeta(), dxfUnits);
+    if (!res.definition) {
+      window.alert("DXF konnte nicht importiert werden:\n• " + (res.failed || res.warnings.join("\n• ") || "Unbekannter Fehler"));
+      return;
+    }
+    if (res.warnings.length) {
+      window.alert("DXF importiert. Hinweise:\n• " + res.warnings.join("\n• "));
+    }
+    closeDialog();
+  };
+
+
   /* --------------------------------------------------------- Teilansichten */
 
   const tagEditor = (
