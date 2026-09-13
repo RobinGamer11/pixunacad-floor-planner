@@ -346,7 +346,7 @@ export function createObjectsFromSnapshots(
     walls: new Set(scene.walls.map((o) => o.id)),
     dimensions: new Set(scene.dimensions.map((o) => o.id)),
     textBoxes: new Set(scene.textBoxes.map((o) => o.id)),
-    tables: new Set(((scene as any).tables || []).map((o: any) => o.id)),
+    tables: new Set<string>(((scene as any).tables || []).map((o: any) => String(o.id))),
     freeStrokes: new Set(scene.freeStrokes.map((o) => o.id)),
   };
   const data = snapshotsToSerializedScene(
