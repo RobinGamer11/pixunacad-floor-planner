@@ -1464,7 +1464,8 @@ export default function ProjectWorkspace() {
       labelId: (cadEngineApiRef.current?.engine as any)?.activeDrawLabelId,
       tableData: data as any,
     } as any);
-    setPendingTableId(id);
+    // Kein Bestätigungszustand: Die Tabelle ist nach dem Setzen sofort
+    // ausgewählt und direkt bearbeitbar, die Einstellungen bleiben geöffnet.
     setSelectedElementId(id);
     setTablePlacementActive(false);
     setRightTabState("tools");
@@ -6793,7 +6794,7 @@ function ToolsTab({
           projectId={projectId}
           pageId={pageId}
           tableElement={element?.kind === "table" ? element : undefined}
-          isPending={!!pendingTableId && element?.id === pendingTableId}
+          isPending={false}
           placementActive={!!tablePlacementActive}
           pageWmm={settingsPage ? getPageSizeMm(settingsPage).wMm : undefined}
           pageHmm={settingsPage ? getPageSizeMm(settingsPage).hMm : undefined}

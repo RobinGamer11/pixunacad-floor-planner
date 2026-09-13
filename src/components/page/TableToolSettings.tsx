@@ -25,13 +25,10 @@ export function TableToolSettings({
   projectId,
   pageId,
   tableElement,
-  isPending,
   pageWmm,
   pageHmm,
   formulaFn,
   setFormulaFn,
-  onConfirm,
-  onCancel,
   onPatch,
   onNewTable,
   placementActive = false,
@@ -39,13 +36,15 @@ export function TableToolSettings({
   projectId: string;
   pageId: string;
   tableElement?: PageElement;
-  isPending: boolean;
+  /** Veraltet: Kein Bestätigungszustand mehr — Tabelle ist sofort bearbeitbar. */
+  isPending?: boolean;
   pageWmm?: number;
   pageHmm?: number;
   formulaFn?: FormulaFn | null;
   setFormulaFn?: (f: FormulaFn | null) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
+  /** Veraltet: Bestätigen/Abbrechen unter den Einstellungen wurde entfernt. */
+  onConfirm?: () => void;
+  onCancel?: () => void;
   /** Alternative Persistenz (CAD-Oberfläche): ersetzt projectStore-Update. */
   onPatch?: (patch: Partial<PageElement>) => void;
   /** Weitere Tabelle platzieren, während bereits eine Tabelle ausgewählt ist. */
