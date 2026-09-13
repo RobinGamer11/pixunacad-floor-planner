@@ -2960,6 +2960,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Bibliotheks-Werkzeug (nur eigenständiger CAD-Editor) */}
           {activeTool === ToolIds.LIBRARY && <LibraryPanel app={appRef.current} />}
+          {activeTool !== ToolIds.LIBRARY && <LibraryPanel app={appRef.current} onlyWhenInstance />}
 
 
           {/* Document-Tool-Panel: nur Import */}

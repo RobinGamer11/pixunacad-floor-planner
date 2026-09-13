@@ -6,6 +6,8 @@ import { PXOBJ_EXTENSION } from "@/cad/library/types";
 
 interface Props {
   app: CadApp | null;
+  /** Nur anzeigen, wenn gerade ein Bibliotheksobjekt ausgewählt ist. */
+  onlyWhenInstance?: boolean;
 }
 
 type Meta = {
@@ -40,7 +42,7 @@ function fileSafe(name: string) {
  * Speichern aus Auswahl (Kopie/Original), Suche, Kategorien, Tags,
  * Platzieren, Bearbeiten, Auflösen sowie .pxobj- und SVG-Austausch.
  */
-export default function LibraryPanel({ app }: Props) {
+export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
   const [defs, setDefs] = useState<LibraryDefinition[]>([]);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
@@ -126,6 +128,7 @@ export default function LibraryPanel({ app }: Props) {
   }, [defs, query, category, tag]);
 
   if (!app) return null;
+  if (onlyWhenInstance && !instanceDefId) return null;
 
   const buildMeta = () => ({
     name: meta.name,
