@@ -386,6 +386,10 @@ export class CadApp {
   stickers: StickerDefinition[] = [];
   onStickersChange?: () => void;
 
+  // Bibliothek (projektweit, Teil von Undo/Redo und Persistenz)
+  libraryDefinitions: LibraryDefinition[] = [];
+  onLibraryChange?: () => void;
+
   measureSettings: MeasureSettings = {
     orientation: Defaults.measureOrientation,
     pointCount: Defaults.measurePointCount,
@@ -893,6 +897,7 @@ export class CadApp {
       stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
       _stickerEditInstanceId: this._stickerEditInstanceId,
       _stickerEditSnapshot: this._stickerEditSnapshot,
+      libraryDefinitions: serializeDefinitions(this.libraryDefinitions),
       // Multi-Sheet-State
       sheets: this.sheetManager.toJSON(),
       activeSheetId: this.activeSheetId,
