@@ -42,27 +42,51 @@ export function isCollabSchemaMissing(error: unknown): boolean {
   return isMissingSchemaError(error);
 }
 
-/** Speichert die Objektänderungen als einzelne Datensätze. */
-export async function insertOps(
+/** Ergebnis eines serverseitig abgesicherten Schreibvorgangs. */
+export interface WriteResult {
+  /** false = ein anderer Stand war neuer; nur dieses Objekt ist betroffen. */
+  accepted: boolean;
+  /** Serverseitig vergebene, eindeutige Revision dieses Objekts. */
+  revision: number;
+  /** Bei Ablehnung: der gültige Stand genau dieses Objekts. */
+  payload: Record<string, unknown> | null;
+  deleted: boolean;
+}
+
+/**
+ * Schreibt eine einzelne Objektänderung atomar.
+ *
+ * Die Revision vergibt die Datenbank – nicht der Browser. Dadurch entsteht bei
+ * gleichzeitiger Bearbeitung desselben Objekts in allen Browsern derselbe
+ * Endstand; abgewiesen wird höchstens dieses eine Objekt.
+ */
+export async function writeObject(
   projectId: string,
-  ops: LocalCadOp[],
-  actorId: string,
-  versionOf: (op: LocalCadOp) => number,
-): Promise<void> {
+  op: LocalCadOp,
+  baseRevision: number,
+): Promise<WriteResult> {
   const client = getNetworkClient();
-  if (!client || ops.length === 0) return;
-  const rows = ops.map((op) => ({
-    project_id: projectId,
-    sheet_id: op.sheetId,
-    object_id: op.objectId,
-    object_kind: op.objectKind,
-    change_type: op.changeType,
-    payload: op.payload,
-    object_version: versionOf(op),
-    actor_id: actorId,
-  }));
-  const { error } = await client.from("cad_object_ops").insert(rows);
+  if (!client) return { accepted: false, revision: baseRevision, payload: op.payload, deleted: false };
+  const { data, error } = await client.rpc("cad_write_object", {
+    _project_id: projectId,
+    _sheet_id: op.sheetId,
+    _object_id: op.objectId,
+    _object_kind: op.objectKind,
+    _change_type: op.changeType,
+    _payload: op.payload,
+    _base_revision: baseRevision,
+  });
   if (error) throw error;
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { accepted: boolean; revision: number | string; payload: Record<string, unknown> | null; deleted: boolean }
+    | undefined;
+  if (!row) return { accepted: true, revision: baseRevision + 1, payload: op.payload, deleted: false };
+  return {
+    accepted: Boolean(row.accepted),
+    revision: Number(row.revision ?? 0),
+    payload: row.payload ?? null,
+    deleted: Boolean(row.deleted),
+  };
 }
 
 /** Lädt alle Änderungen nach einer bekannten Reihenfolge-Nummer. */
