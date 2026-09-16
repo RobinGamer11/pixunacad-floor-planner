@@ -17,7 +17,7 @@ import {
   claimObjectLock,
   fetchLatestSeq,
   fetchObjectLocks,
-  fetchObjectRevisions,
+  fetchObjectState,
   fetchOpsSince,
   isCollabSchemaMissing,
   releaseObjectLock,
@@ -48,6 +48,8 @@ export interface MappeLockInfo {
 
 export interface MappeCollabStatus {
   connected: boolean;
+  /** Betriebsmodus: allein, Bereitschaft oder echte Zusammenarbeit. */
+  mode: CollabMode;
   /** Migration fehlt oder kein Zugriff – die Projektmappe arbeitet lokal weiter. */
   unavailable: boolean;
   peers: MappePresenceUser[];
@@ -73,7 +75,11 @@ function currentProject(projectId: string): Project | null {
 
 export class MappeCollabSession {
   private opts: MappeSessionOptions;
+  private presence: RealtimeChannel | null = null;
   private channel: RealtimeChannel | null = null;
+  private mode: CollabMode = "off";
+  private activating = false;
+  private graceTimer = 0;
   private lastIndex: MappeIndex = new Map();
   private revisions = new Map<string, number>();
   private unsubscribe: (() => void) | null = null;
@@ -91,6 +97,7 @@ export class MappeCollabSession {
   private currentPageId: string | null = null;
   private status: MappeCollabStatus = {
     connected: false,
+    mode: "off",
     unavailable: false,
     peers: [],
     locksByObject: new Map(),
@@ -101,27 +108,91 @@ export class MappeCollabSession {
     this.opts = opts;
   }
 
+  /**
+   * Startet die Mappen-Zusammenarbeit gestuft: ohne weitere Mitglieder gar
+   * nicht, allein nur mit einer minimalen Anwesenheitsmeldung, und erst bei
+   * einer zweiten aktiven Person mit Einzeloperationen.
+   */
   async start(): Promise<void> {
-    const { projectId } = this.opts;
+    const { projectId, userId, displayName } = this.opts;
     const access = projectAccessStore.accessFor(projectId);
     if (!access.shared || access.role === null) return; // rein persönliche Mappe
+    if (projectAccessStore.otherMemberCount(projectId) === 0) return; // allein
     this.lastIndex = indexProject(currentProject(projectId));
+    this.mode = "standby";
+    this.setStatus({ mode: "standby" });
+
+    const client = getNetworkClient();
+    if (!client) return;
+    this.presence = client
+      .channel(`mappe-presence:${projectId}`, { config: { presence: { key: userId } } })
+      .on("presence", { event: "sync" }, () => this.readPresence())
+      .subscribe(async (state) => {
+        if (state !== "SUBSCRIBED") return;
+        this.setStatus({ connected: true, unavailable: false });
+        await this.presence?.track({
+          userId,
+          displayName,
+          color: presenceColor(userId),
+          pageId: this.currentPageId,
+          editingObjectId: null,
+        } satisfies MappePresenceUser);
+      });
+  }
+
+  /** Umschalten in die echte Zusammenarbeit (gemeinsamer Stand zuerst). */
+  private async goLive(): Promise<void> {
+    if (this.destroyed || this.mode === "live" || this.activating) return;
+    window.clearTimeout(this.graceTimer);
+    this.graceTimer = 0;
+    this.activating = true;
+    const { projectId } = this.opts;
     try {
+      const state = await fetchObjectState(projectId);
+      this.revisions = new Map(state.map((op) => [`${op.pageId}|${op.objectId}`, op.objectVersion]));
+      this.applyRemoteOps(state);
       this.lastSeq = await fetchLatestSeq(projectId);
-      this.revisions = await fetchObjectRevisions(projectId);
-      const missed = await fetchOpsSince(projectId, 0);
-      this.applyRemoteOps(missed);
-      if (missed.length) this.lastSeq = missed[missed.length - 1].seq;
       this.lastIndex = indexProject(currentProject(projectId));
       this.setLocks(await fetchObjectLocks(projectId));
     } catch (error) {
+      this.activating = false;
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
       return;
     }
+    this.mode = "live";
+    this.activating = false;
+    this.setStatus({ mode: "live" });
     this.unsubscribe = projectStore.subscribe(() => this.notifyLocalChange());
     this.connect();
     this.heartbeatTimer = window.setInterval(() => { void this.renewOwnLocks(); }, LOCK_HEARTBEAT_MS);
     this.sweepTimer = window.setInterval(() => this.sweepExpiredLocks(), LOCK_SWEEP_MS);
+  }
+
+  private scheduleStandby() {
+    if (this.mode !== "live" || this.graceTimer) return;
+    this.graceTimer = window.setTimeout(() => {
+      this.graceTimer = 0;
+      void this.goStandby();
+    }, COLLAB_GRACE_MS);
+  }
+
+  /** Zurück zum normalen Speicherweg der Projektmappe. */
+  private async goStandby(): Promise<void> {
+    if (this.mode !== "live") return;
+    this.mode = "standby";
+    window.clearTimeout(this.sendTimer);
+    window.clearInterval(this.heartbeatTimer);
+    window.clearInterval(this.sweepTimer);
+    this.heartbeatTimer = 0;
+    this.sweepTimer = 0;
+    this.previewed.clear();
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    await this.unlockAll();
+    const client = getNetworkClient();
+    if (client && this.channel) await client.removeChannel(this.channel);
+    this.channel = null;
+    this.setStatus({ mode: "standby", locksByObject: new Map(), previewByObject: new Map() });
   }
 
   private connect() {
@@ -130,7 +201,7 @@ export class MappeCollabSession {
     const { projectId, userId, displayName } = this.opts;
 
     this.channel = client
-      .channel(`mappe-collab:${projectId}`, { config: { presence: { key: userId } } })
+      .channel(`mappe-collab:${projectId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "mappe_object_ops", filter: `project_id=eq.${projectId}` },
@@ -158,17 +229,9 @@ export class MappeCollabSession {
         else map.delete(msg.objectId);
         this.setStatus({ previewByObject: map });
       })
-      .on("presence", { event: "sync" }, () => this.readPresence())
       .subscribe(async (state) => {
         if (state !== "SUBSCRIBED") return;
         this.setStatus({ connected: true, unavailable: false });
-        await this.channel?.track({
-          userId,
-          displayName,
-          color: presenceColor(userId),
-          pageId: this.currentPageId,
-          editingObjectId: null,
-        } satisfies MappePresenceUser);
         try {
           const missed = await fetchOpsSince(projectId, this.lastSeq);
           if (missed.length) {
@@ -191,6 +254,10 @@ export class MappeCollabSession {
 
   private async flush(): Promise<void> {
     if (this.destroyed || this.applyingRemote) return;
+    if (this.mode !== "live") {
+      this.lastIndex = indexProject(currentProject(this.opts.projectId));
+      return;
+    }
     if (this.flushing) { this.flushAgain = true; return; }
     const { projectId } = this.opts;
     if (!projectAccessStore.canEdit(projectId)) return;
@@ -269,7 +336,7 @@ export class MappeCollabSession {
 
   /** Flüchtige Vorschau eines Elements während Verschieben/Größe/Drehen. */
   sendPreview(pageId: string, objectId: string, payload: Record<string, unknown> | null) {
-    if (!this.channel || !this.status.connected) return;
+    if (this.mode !== "live" || !this.channel) return;
     if (!projectAccessStore.canEdit(this.opts.projectId)) return;
     const now = Date.now();
     if (payload && now - this.lastPreviewAt < PREVIEW_THROTTLE_MS) return;
@@ -306,8 +373,9 @@ export class MappeCollabSession {
   }
 
   updatePresence(partial: Partial<Pick<MappePresenceUser, "pageId" | "editingObjectId">>) {
-    if (!this.channel || !this.status.connected) return;
-    void this.channel.track({
+    if (!this.presence || !this.status.connected) return;
+    const quiet = this.mode !== "live";
+    void this.presence.track({
       userId: this.opts.userId,
       displayName: this.opts.displayName,
       color: presenceColor(this.opts.userId),
@@ -342,7 +410,7 @@ export class MappeCollabSession {
   }
 
   private async renewOwnLocks(): Promise<void> {
-    if (this.destroyed || this.ownLocks.size === 0) return;
+    if (this.destroyed || this.mode !== "live" || this.ownLocks.size === 0) return;
     for (const lock of this.ownLocks.values()) {
       try {
         await claimObjectLock(
@@ -382,7 +450,7 @@ export class MappeCollabSession {
   }
 
   private readPresence() {
-    const raw = this.channel?.presenceState() ?? {};
+    const raw = this.presence?.presenceState() ?? {};
     const peers: MappePresenceUser[] = [];
     for (const key of Object.keys(raw)) {
       const entry = (raw as Record<string, unknown[]>)[key]?.[0] as MappePresenceUser | undefined;
@@ -408,7 +476,10 @@ export class MappeCollabSession {
     this.unsubscribe = null;
     void this.unlockAll();
     const client = getNetworkClient();
+    window.clearTimeout(this.graceTimer);
     if (client && this.channel) void client.removeChannel(this.channel);
+    if (client && this.presence) void client.removeChannel(this.presence);
     this.channel = null;
+    this.presence = null;
   }
 }
