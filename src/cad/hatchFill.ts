@@ -28,8 +28,12 @@ function quantKey(p: Vec2): string {
 /**
  * Sammelt alle Vektorkanten der Szene, die als Füllbegrenzung gelten.
  * Wird auch von der hybriden Vektor/Raster-Analyse (`hybridFill.ts`) genutzt.
+ *
+ * `extraScenes` sind zusätzliche, schreibgeschützte Weltszenen — z. B. die
+ * aufgelöste Geometrie platzierter Bibliotheksobjekte. Deren Konturen
+ * begrenzen die Füllung, bleiben selbst aber unverändert.
  */
-export function collectBoundaryEdges(scene: Scene): RawEdge[] {
+export function collectBoundaryEdges(scene: Scene, extraScenes: Scene[] = []): RawEdge[] {
   const out: RawEdge[] = [];
   /** Offene Punktfolge als Kanten übernehmen. */
   const pushPath = (pts: Vec2[], closed = false) => {
@@ -40,44 +44,46 @@ export function collectBoundaryEdges(scene: Scene): RawEdge[] {
       if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
     }
   };
-  for (const seg of scene.segments) {
-    // Sichtbare Kontur: Wölbung tesselliert, danach identisches Aufrauen wie im Renderer.
-    const bulge = (seg as any).bulge || 0;
-    const base = bulge ? tessellateWithBulges([seg.a, seg.b], [bulge], false, 32) : [seg.a, seg.b];
-    const cacheKey = seg.id ? `seg:${seg.id}:${seg.a.x},${seg.a.y},${seg.b.x},${seg.b.y},${bulge}` : "seg:anon";
-    pushPath(getEffectiveOpenGeometry(base, (seg as any).roughen, cacheKey));
-  }
-  // Wände: beide Wandseiten (Außen- + Innenkontur) als Begrenzung. Dadurch
-  // schnappt die Flood-Fill an die innere Wandkante und überspringt den
-  // Wandkörper nicht — Räume zwischen Wänden werden korrekt umrandet.
-  const wallGraph = scene.getWallTopology?.();
-  for (let wi = 0; wi < scene.walls.length; wi++) {
-    const w = scene.walls[wi];
-    if (w.corners.length < 2) continue;
-    const others = scene.walls.filter((_, i) => i !== wi);
-    const ring = buildHealedWallSolidRing(w, others, wallGraph);
-    for (let i = 0; i < ring.length; i++) {
-      const a = ring[i];
-      const b = ring[(i + 1) % ring.length];
-      if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
+  for (const src of [scene, ...extraScenes]) {
+    for (const seg of src.segments) {
+      // Sichtbare Kontur: Wölbung tesselliert, danach identisches Aufrauen wie im Renderer.
+      const bulge = (seg as any).bulge || 0;
+      const base = bulge ? tessellateWithBulges([seg.a, seg.b], [bulge], false, 32) : [seg.a, seg.b];
+      const cacheKey = seg.id ? `seg:${seg.id}:${seg.a.x},${seg.a.y},${seg.b.x},${seg.b.y},${bulge}` : "seg:anon";
+      pushPath(getEffectiveOpenGeometry(base, (seg as any).roughen, cacheKey));
     }
-  }
-  // Schraffuren UND Polygone: exakt die sichtbare effektive Kontur (Bulges,
-  // Aufrauen, Löcher) — dieselbe Pipeline wie Renderer und Auswahl.
-  for (const h of scene.hatches) {
-    if (!h.points || h.points.length < 2) continue;
-    const geom = getEffectiveContourGeometry(h as any);
-    if (geom.closed) {
-      for (const ring of geom.rings) pushPath(ring, true);
-    } else {
-      pushPath(geom.outer, false);
+    // Wände: beide Wandseiten (Außen- + Innenkontur) als Begrenzung. Dadurch
+    // schnappt die Flood-Fill an die innere Wandkante und überspringt den
+    // Wandkörper nicht — Räume zwischen Wänden werden korrekt umrandet.
+    const wallGraph = src.getWallTopology?.();
+    for (let wi = 0; wi < src.walls.length; wi++) {
+      const w = src.walls[wi];
+      if (w.corners.length < 2) continue;
+      const others = src.walls.filter((_, i) => i !== wi);
+      const ring = buildHealedWallSolidRing(w, others, wallGraph);
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i];
+        const b = ring[(i + 1) % ring.length];
+        if (dist(a, b) > 1e-7) out.push({ a: v(a.x, a.y), b: v(b.x, b.y) });
+      }
     }
-  }
-  for (const s of scene.freeStrokes) {
-    const pts = getEffectiveOpenGeometry(
-      s.points, (s as any).roughen, `free:${s.id}:${s.points.length}`, (s as any).sourceStartDistanceM || 0,
-    );
-    pushPath(pts, false);
+    // Schraffuren UND Polygone: exakt die sichtbare effektive Kontur (Bulges,
+    // Aufrauen, Löcher) — dieselbe Pipeline wie Renderer und Auswahl.
+    for (const h of src.hatches) {
+      if (!h.points || h.points.length < 2) continue;
+      const geom = getEffectiveContourGeometry(h as any);
+      if (geom.closed) {
+        for (const ring of geom.rings) pushPath(ring, true);
+      } else {
+        pushPath(geom.outer, false);
+      }
+    }
+    for (const s of src.freeStrokes) {
+      const pts = getEffectiveOpenGeometry(
+        s.points, (s as any).roughen, `free:${s.id}:${s.points.length}`, (s as any).sourceStartDistanceM || 0,
+      );
+      pushPath(pts, false);
+    }
   }
   return out;
 }
