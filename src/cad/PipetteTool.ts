@@ -21,8 +21,10 @@ const EFFECT_KEYS = ["strokePattern", "roughen"];
 
 const STYLE_KEYS: Record<PickKind, string[]> = {
   segment: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "dashLengthM", ...EFFECT_KEYS],
-  hatch: ["fillColor", "strokeColor", "fillAlphaPct", "strokeWidthPx", "pattern", "patternScale",
-          "patternAngleDeg", "patternStretch", "patternSkewDeg", "patternColor", ...EFFECT_KEYS],
+  hatch: ["fillColor", "strokeColor", "fillAlphaPct", "strokeWidthPx",
+          "patternEnabled", "patternId", "patternScale", "patternAngleDeg", "patternStretch",
+          "patternSkewDeg", "patternOffsetX", "patternOffsetY", "patternOrigin",
+          "patternRotateWithShape", "patternColor", ...EFFECT_KEYS],
   dimension: ["textColor", "textSizePx", "lineColor", "decimals", "tickLengthM", "showExtensions",
               "textBgEnabled", "textBgColor", "textBgAlpha"],
   textbox: ["style"],
