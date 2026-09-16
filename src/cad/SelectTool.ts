@@ -549,6 +549,8 @@ export class SelectTool {
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
+    // ESC während eines Bibliotheks-Drags: Ausgangsposition wiederherstellen.
+    this._endLibraryDrag(true);
     if (this.rotateTextBoxId) {
       // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
       const rb = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
