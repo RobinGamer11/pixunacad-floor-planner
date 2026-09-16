@@ -595,6 +595,10 @@ export class CadApp {
     this.stickerTool = new StickerTool(this);
     this.libraryTool = new LibraryPlacementTool(this);
     this.renderer.libraryDefinitionSource = () => this.libraryDefinitions;
+    // Bibliotheksinstanzen als schreibgeschützte Fangquelle für alle Werkzeuge.
+    this.librarySnapSource = new LibrarySnapSource();
+    this.librarySnapSource.definitions = () => this.libraryDefinitions;
+    this.topology.librarySnaps = this.librarySnapSource;
     this.tableTool = new TableTool(this);
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
