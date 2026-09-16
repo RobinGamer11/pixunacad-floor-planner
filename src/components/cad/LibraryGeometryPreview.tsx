@@ -61,21 +61,28 @@ export default function LibraryGeometryPreview({ geometry, size = 40, className,
     };
 
     for (const snap of geometry) {
-      const d = snap.data as Record<string, { x: number; y: number }[] & any>;
-      if (snap.kind === "segment") poly([d.a, d.b], false);
+      const d = snap.data as Record<string, never> & {
+        a?: { x: number; y: number }; b?: { x: number; y: number };
+        p1?: { x: number; y: number }; p2?: { x: number; y: number };
+        points?: { x: number; y: number }[]; corners?: { x: number; y: number }[];
+        holes?: { x: number; y: number }[][];
+        center?: { x: number; y: number }; widthM?: number; heightM?: number;
+      };
+      if (snap.kind === "segment") poly([d.a!, d.b!], false);
       else if (snap.kind === "hatch") {
         poly(d.points, true, true);
         for (const loop of d.holes || []) poly(loop, true);
       } else if (snap.kind === "wall") poly(d.corners, false);
       else if (snap.kind === "freeStroke") poly(d.points, false);
-      else if (snap.kind === "dimension") poly([d.p1, d.p2], false);
+      else if (snap.kind === "dimension") poly([d.p1!, d.p2!], false);
       else if (snap.kind === "textBox" || snap.kind === "table") {
+        const c = d.center || { x: 0, y: 0 };
         const w2 = (d.widthM || 0.2) / 2, h2 = (d.heightM || 0.2) / 2;
         poly([
-          { x: d.center.x - w2, y: d.center.y - h2 },
-          { x: d.center.x + w2, y: d.center.y - h2 },
-          { x: d.center.x + w2, y: d.center.y + h2 },
-          { x: d.center.x - w2, y: d.center.y + h2 },
+          { x: c.x - w2, y: c.y - h2 },
+          { x: c.x + w2, y: c.y - h2 },
+          { x: c.x + w2, y: c.y + h2 },
+          { x: c.x - w2, y: c.y + h2 },
         ], true);
       }
     }
