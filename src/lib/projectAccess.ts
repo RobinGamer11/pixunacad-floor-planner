@@ -118,6 +118,8 @@ interface AccessState {
   schemaMissing: boolean;
   myId: string | null;
   byProject: Map<string, ProjectAccess>;
+  /** projectId → Anzahl weiterer berechtigter Personen (ohne einen selbst). */
+  otherMembersByProject: Map<string, number>;
 }
 
 let state: AccessState = {
@@ -126,6 +128,7 @@ let state: AccessState = {
   schemaMissing: false,
   myId: null,
   byProject: new Map(),
+  otherMembersByProject: new Map(),
 };
 
 const listeners = new Set<() => void>();
