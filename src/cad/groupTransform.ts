@@ -40,6 +40,8 @@ function movablePoints(kind: string, o: any): Vec2[] {
     case "textbox": out.push(o.center); break;
     case "document": out.push(o.position); break;
     case "sticker": out.push(o.position); break;
+    // Bibliotheksinstanz: nur der Einfügepunkt wandert; die Definition bleibt unberührt.
+    case "library": out.push(o.position); break;
   }
   return out.filter(Boolean);
 }
