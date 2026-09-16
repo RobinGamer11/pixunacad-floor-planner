@@ -144,6 +144,7 @@ export class CadCollabSession {
   private cloudHashes: BaselineHashes = new Map();
   private baseKey = "";
   private revisionsLoaded = false;
+  private policyTimer = 0;
   private saving = false;
   private unregisterSync: (() => void) | null = null;
   private status: CollabStatus = {
