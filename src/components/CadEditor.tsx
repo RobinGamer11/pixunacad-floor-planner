@@ -3,14 +3,12 @@ import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Sticker as StickerIcon, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon, Boxes } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon, Boxes } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import LibraryPanel from "@/components/cad/LibraryPanel";
-import type { StickerDefinition } from "@/cad/StickerManager";
-import { instanceBoundingCornersWorld } from "@/cad/StickerManager";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
@@ -98,7 +96,6 @@ const CAD_TOOLS = [
   { id: ToolIds.HATCH, label: "Schraffur", key: "H", icon: Square },
   { id: ToolIds.MEASURE, label: "Maßkette", key: "M", icon: Ruler },
   { id: ToolIds.TEXT, label: "Text", key: "T", icon: Type },
-  { id: ToolIds.STICKER, label: "Stempel", key: "O", icon: StickerIcon },
   { id: ToolIds.LIBRARY, label: "Bibliothek", key: "K", icon: Boxes },
   { id: ToolIds.DOCUMENT, label: "Dokument", key: "D", icon: FileImage },
 ];
@@ -458,12 +455,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [selectedHatchId, setSelectedHatchId] = useState<string | null>(null);
   const [selectedPolygonId, setSelectedPolygonId] = useState<string | null>(null);
-  const [stickers, setStickers] = useState<StickerDefinition[]>([]);
-  const [stickerSelCount, setStickerSelCount] = useState(0);
-  const [stickerPhase, setStickerPhase] = useState<"idle" | "selecting" | "placing" | "rotating">("idle");
-  const stickerImportRef = useRef<HTMLInputElement>(null);
-  // Floating edit-pencil overlay near selected sticker instance
-  const [stickerEditOverlay, setStickerEditOverlay] = useState<{ id: string; x: number; y: number } | null>(null);
 
   // Document import state
   const [docLabelTick, setDocLabelTick] = useState(0);
@@ -846,8 +837,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // Auswahl-Werkzeug → Seiteneinstellungen automatisch öffnen.
       // Der Ebenen-Reiter bleibt dabei offen, wenn dort gerade gearbeitet wird.
       setRightTab((prev) => (prev === "layers" ? prev : (id === ToolIds.SELECT ? "sheets" : "settings")));
-      setStickerPhase(app.stickerTool.phase);
-      setStickerSelCount(app.stickerTool.getSelectionCount());
     };
     app.onTablePlaced = (id: string) => {
       // Nach genau einer Platzierung: neue Tabelle unmittelbar auswählen und
@@ -912,7 +901,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   sceneObj = {
                     segments: data.segments, hatches: data.hatches, walls: data.walls,
                     dimensions: data.dimensions, textBoxes: data.textBoxes,
-                    stickerInstances: data.stickerInstances, documents: data.documents,
+                    documents: data.documents,
                     freeStrokes: data.freeStrokes, rulerGuide: data.rulerGuide, doors: data.doors,
                   };
                 }
@@ -941,11 +930,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); onHistoryChange?.(u, r); persist(); };
     // Periodischer Fallback (Sheet-Renames etc. pushen keine History).
     const persistTimer = window.setInterval(persist, 4000);
-    app.onStickersChange = () => setStickers([...app.stickers]);
-    app.stickerTool.onSelectionChange = () => {
-      setStickerSelCount(app.stickerTool.getSelectionCount());
-      setStickerPhase(app.stickerTool.phase);
-    };
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.documentTool.onPhaseChange = () => {
@@ -2842,7 +2826,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
 
 
-          {/* Stempel-Werkzeug */}
           {activeTool === ToolIds.STICKER && (
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stempel</div>
