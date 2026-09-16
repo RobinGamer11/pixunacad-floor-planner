@@ -239,7 +239,9 @@ export class CadCollabSession {
     if (client && this.channel) await client.removeChannel(this.channel);
     this.channel = null;
     this.setStatus({ mode: "standby", locksByObject: new Map() });
+    this.trackPresence();
   }
+
 
   private connect() {
     const client = getNetworkClient();
