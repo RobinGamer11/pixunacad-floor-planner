@@ -1438,10 +1438,9 @@
 
   .cad-desktop-density .workspace-header button {
     min-height: 0;
-  }
-
-  .cad-desktop-density .workspace-header button {
     height: 28px;
+    font-size: 10px;
+    line-height: 14px;
   }
 
   .cad-desktop-density .workspace-header {
@@ -1456,6 +1455,11 @@
   .cad-desktop-density .workspace-header button[title^="Rückgängig"],
   .cad-desktop-density .workspace-header button[title^="Wiederherstellen"] {
     width: 28px;
+  }
+
+  .cad-desktop-density .workspace-header > div:first-child > div[title] {
+    font-size: 12px;
+    line-height: 16px;
   }
 
   .cad-desktop-density .cad-tool-rail {
