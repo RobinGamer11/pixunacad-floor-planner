@@ -119,6 +119,52 @@ export async function fetchLatestSeq(projectId: string): Promise<number> {
   return data ? Number((data as { seq: number }).seq ?? 0) : 0;
 }
 
+/** Bekannte Revisionen aller Objekte eines Projekts (Startpunkt nach dem Laden). */
+export async function fetchObjectRevisions(projectId: string): Promise<Map<string, number>> {
+  const client = getNetworkClient();
+  const out = new Map<string, number>();
+  if (!client) return out;
+  const { data, error } = await client
+    .from("cad_object_state")
+    .select("sheet_id,object_id,revision")
+    .eq("project_id", projectId)
+    .limit(20000);
+  if (error) throw error;
+  for (const row of (data ?? []) as { sheet_id: string; object_id: string; revision: number | string }[]) {
+    out.set(`${row.sheet_id}|${row.object_id}`, Number(row.revision ?? 0));
+  }
+  return out;
+}
+
+/** Aktive Bearbeitungsmarkierungen anderer Personen. */
+export interface RemoteLock {
+  sheetId: string;
+  objectId: string;
+  userId: string;
+  displayName: string;
+  expiresAt: string;
+}
+
+export async function fetchObjectLocks(projectId: string): Promise<RemoteLock[]> {
+  const client = getNetworkClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from("cad_object_locks")
+    .select("sheet_id,object_id,user_id,display_name,expires_at")
+    .eq("project_id", projectId)
+    .gt("expires_at", new Date().toISOString());
+  if (error) throw error;
+  return ((data ?? []) as {
+    sheet_id: string; object_id: string; user_id: string; display_name: string | null; expires_at: string;
+  }[]).map((r) => ({
+    sheetId: r.sheet_id,
+    objectId: r.object_id,
+    userId: r.user_id,
+    displayName: r.display_name ?? "Unbekannt",
+    expiresAt: r.expires_at,
+  }));
+}
+
 /** Setzt/verlängert die Bearbeitungsmarkierung für ein Objekt. */
 export async function claimObjectLock(
   projectId: string,
