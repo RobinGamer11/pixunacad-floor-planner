@@ -93,7 +93,8 @@ export class Renderer {
     enabled: true,
     sizeM: 1,
     color: "#000000",
-    opacity: 0.06,
+    // Standard: 85 % Transparenz → 15 % Deckkraft.
+    opacity: 0.15,
   };
 
   /** Hintergrundfarbe der CAD-Oberfläche (außerhalb des Kartenkreises). */

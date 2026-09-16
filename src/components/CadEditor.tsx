@@ -519,7 +519,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [gridPanelOpen, setGridPanelOpen] = useState(false);
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
-  const [gridOpacity, setGridOpacity] = useState<number>(0.06);
+  // Standard: 85 % Transparenz → 15 % Deckkraft.
+  const [gridOpacity, setGridOpacity] = useState<number>(0.15);
   // Hintergrundfarbe der Oberfläche
   const [bgColor, setBgColor] = useState<string>("#ffffff");
 
