@@ -54,6 +54,8 @@ export interface SnapExclusions {
   freeStrokeIds?: ReadonlySet<string>;
   wallIds?: ReadonlySet<string>;
   doorIds?: ReadonlySet<string>;
+  /** Bibliotheksinstanzen, die keine Fangpunkte liefern (z. B. die gerade transformierte). */
+  libraryInstanceIds?: ReadonlySet<string>;
   /** true = das Lineal selbst liefert keine Fangpunkte (beim Ziehen des Lineals). */
   ruler?: boolean;
 }
@@ -65,6 +67,8 @@ export class TopologyEngine {
   labels: LabelManager;
   /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
   overlayScenes: Scene[] = [];
+  /** Schreibgeschützte Fangquelle platzierter Bibliotheksinstanzen. */
+  librarySnaps: import("./library/librarySnapSource").LibrarySnapSource | null = null;
   /** Papierrahmen im Plan-(Druck-)Modus in Metern. Ecken, Kantenmitten,
    * Mittelpunkt und Kanten des Blattrands werden zusätzlich gefangen. */
   planFrame: { widthM: number; heightM: number } | null = null;
@@ -271,9 +275,84 @@ export class TopologyEngine {
       push(rg.a); push(rg.b);
       push(v((rg.a.x + rg.b.x) / 2, (rg.a.y + rg.b.y) / 2));
     }
+    for (const ls of this._libraryScenes()) {
+      for (const seg of ls.scene.segments) { push(seg.a); push(seg.b); }
+      for (const hatch of ls.scene.hatches) for (const p of hatch.points) push(p);
+      for (const w of ls.scene.walls) for (const c of w.corners) push(c);
+    }
     this._nearbyCache = { key, pts };
     return pts;
   }
+
+  /** Aufgelöste Weltszenen der sichtbaren Bibliotheksinstanzen. */
+  private _libraryScenes(excluded?: ReadonlySet<string>) {
+    if (!this.librarySnaps) return [];
+    return this.librarySnaps.scenesFor(this.scene, (id) => this.labels.isVisible(id), excluded);
+  }
+
+  /**
+   * Fangkandidaten einer schreibgeschützten Szene (Bibliotheksinstanz).
+   * Alle Kandidaten sind „freie" Snaps (segment/hatch = null), damit kein
+   * Werkzeug die enthaltene Geometrie auswählt, teilt oder bearbeitet.
+   */
+  private _addLibrarySceneSnaps(
+    scn: Scene,
+    considerPoint: (world: Vec2, segment: Segment | null, hatch: Hatch | null, pointIndex: number) => void,
+    considerLine: (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number | null, bulge?: number) => void,
+  ): void {
+    const mid = (a: Vec2, b: Vec2) => v((a.x + b.x) / 2, (a.y + b.y) / 2);
+    for (const seg of scn.segments) {
+      considerPoint(seg.a, null, null, -1);
+      considerPoint(seg.b, null, null, -1);
+      considerPoint(mid(seg.a, seg.b), null, null, -1);
+      considerLine(seg.a, seg.b, null, null, null, (seg as any).bulge || 0);
+    }
+    for (const hatch of scn.hatches) {
+      const pts = hatch.points || [];
+      for (const p of pts) considerPoint(p, null, null, -1);
+      for (const loop of hatch.holes || []) {
+        if (!loop || loop.length < 2) continue;
+        for (let i = 0; i < loop.length; i++) {
+          considerPoint(loop[i], null, null, -1);
+          considerLine(loop[i], loop[(i + 1) % loop.length], null, null);
+        }
+      }
+    }
+    for (const edge of scn.getHatchEdges()) {
+      considerPoint(mid(edge.a, edge.b), null, null, -1);
+      considerLine(edge.a, edge.b, null, null, null, (edge as any).bulge || 0);
+    }
+    for (const w of scn.walls) {
+      const ref = w.corners || [];
+      for (const c of ref) considerPoint(c, null, null, -1);
+      for (let i = 0; i < ref.length - 1; i++) {
+        considerLine(ref[i], ref[i + 1], null, null, null, (w as any).bulges?.[i] || 0);
+      }
+    }
+    for (const box of [...scn.textBoxes, ...(((scn as any).tables as any[]) || [])] as any[]) {
+      for (const c of boxCornersWorld(box)) considerPoint(c, null, null, -1);
+    }
+    for (const dim of scn.dimensions) {
+      considerPoint(dim.p1, null, null, -1);
+      considerPoint(dim.p2, null, null, -1);
+      try {
+        const g = getDimensionGeometry(dim);
+        considerPoint(g.d1, null, null, -1);
+        considerPoint(g.d2, null, null, -1);
+        considerPoint(g.mid, null, null, -1);
+        considerLine(g.d1, g.d2, null, null);
+      } catch { /* defensiv */ }
+    }
+    for (const s of scn.freeStrokes) {
+      if (!s.points || s.points.length < 2) continue;
+      considerPoint(s.points[0], null, null, -1);
+      considerPoint(s.points[s.points.length - 1], null, null, -1);
+      for (let i = 0; i < s.points.length - 1; i++) considerLine(s.points[i], s.points[i + 1], null, null);
+    }
+  }
+
+
+
 
 
   findBestSnap(mouseS: Vec2, mouseW: Vec2, exclusions?: SnapExclusions): Snap | null {
@@ -531,6 +610,13 @@ export class TopologyEngine {
         considerLine(edge.a, edge.b, null, null);
       }
     }
+
+    // Bibliotheksinstanzen — schreibgeschützte Weltgeometrie der Container.
+    for (const ls of this._libraryScenes(exclusions?.libraryInstanceIds)) {
+      this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+    }
+
+
 
     // Lineal — Endpunkte, Mitte und Zeichenkante sind für alle Werkzeuge fangbar.
     const rg: any = (this.scene as any).rulerGuide;
