@@ -535,6 +535,17 @@ export class CadCollabSession {
 
   getStatus(): CollabStatus { return this.status; }
 
+  /** Bekannter Stand eines Objekts (für die Darstellung fremder Markierungen). */
+  getObjectJson(sheetId: string, objectId: string): string | null {
+    const kinds = this.lastIndex.get(sheetId);
+    if (!kinds) return null;
+    for (const byId of kinds.values()) {
+      const json = byId.get(objectId);
+      if (json) return json;
+    }
+    return null;
+  }
+
   private setStatus(partial: Partial<CollabStatus>) {
     this.status = { ...this.status, ...partial };
     this.opts.onStatus?.(this.status);
