@@ -253,6 +253,81 @@ export function WorkspaceHeader({
   );
 }
 
+/**
+ * Einziger Speicherweg für Projektinhalte: allein arbeiten und per Klick
+ * objektweise sichern – oder, sobald jemand anderes im Projekt ist,
+ * automatische Live-Synchronisierung.
+ */
+function CloudSaveControl({ projectId }: { projectId?: string }) {
+  const sync = useProjectSyncState(projectId);
+  if (!projectId || sync.mode === "off") return null;
+
+  if (sync.mode === "live") {
+    return (
+      <span
+        className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium"
+        style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
+        title="Alle Änderungen werden direkt mit dem Team synchronisiert."
+      >
+        <Users size={14} /> Live synchronisiert
+      </span>
+    );
+  }
+
+  if (sync.saving) {
+    return (
+      <span
+        className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium"
+        style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}
+      >
+        <Loader2 size={14} className="animate-spin" /> Synchronisiere Änderungen …
+      </span>
+    );
+  }
+
+  if (sync.error) {
+    return (
+      <button
+        onClick={() => { void saveProjectToCloud(projectId); }}
+        className="h-8 px-2.5 rounded-md flex items-center gap-1.5 border text-[11px] font-medium"
+        style={{ borderColor: "hsl(var(--destructive))", color: "hsl(var(--destructive))" }}
+        title={`${sync.error} Erneut versuchen?`}
+      >
+        <CloudUpload size={14} /> Sicherung fehlgeschlagen
+      </button>
+    );
+  }
+
+  if (!sync.dirty) {
+    return (
+      <span
+        className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium"
+        style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" }}
+        title="Alle Änderungen sind in der Cloud gesichert."
+      >
+        <Check size={14} /> In Cloud gesichert
+      </span>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => { void saveProjectToCloud(projectId); }}
+      className="h-8 px-2.5 rounded-md flex items-center gap-1.5 border text-[11px] font-medium"
+      style={{
+        background: "hsl(var(--surface-muted))",
+        color: "hsl(var(--ink))",
+        borderColor: "hsl(var(--hairline))",
+      }}
+      title="Lokal gespeichert – noch nicht in Cloud gesichert"
+    >
+      <CloudUpload size={14} /> In Cloud sichern
+    </button>
+  );
+}
+
+
+
 function HeaderAidToggle({
   active,
   icon,
