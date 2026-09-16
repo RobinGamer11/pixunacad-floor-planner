@@ -1,5 +1,10 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Bibliothek – Bedienungsdetails
+- [x] Primär- und Sekundäraktionen klar hervorheben
+- [x] Drei-Punkte-Menüs ohne Abschneiden und mit automatischer Öffnungsrichtung anzeigen
+- [x] Automatische Sektion „Hilfe & Kurzbefehle“ aus CAD und Projektmappe entfernen
+
 ## Aktuelle Oberflächenanpassung
 - [x] Mehr Abstand zwischen Reiterkopf und Inhalt
 - [x] Organisations-Ansichtsauswahl direkt über der gewählten Ansicht

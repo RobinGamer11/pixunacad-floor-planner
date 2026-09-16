@@ -31,7 +31,6 @@ import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSetti
 import { LineModeSelect } from "@/components/cad/LineModeSelect";
 
 
-import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 import { StepHints } from "@/components/cad/StepHints";
@@ -3519,23 +3518,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               />
             </div>
           )}
-          {!tableTool && (activeTool !== ToolIds.ERASER
-            && activeTool !== ToolIds.PIPETTE
-            && activeTool !== ToolIds.SELECT
-            && activeTool !== ToolIds.STICKER
-            && activeTool !== ToolIds.LINE
-            && activeTool !== ToolIds.FREE
-            && activeTool !== ToolIds.RULER
-            && activeTool !== ToolIds.HATCH
-            && activeTool !== ToolIds.POLYGON
-            && activeTool !== ToolIds.DOCUMENT
-            && activeTool !== ToolIds.WALL
-            && activeTool !== ToolIds.DOOR
-            && activeTool !== ToolIds.MEASURE
-            && activeTool !== ToolIds.TEXT) ? (
-            <ToolHelpNotes toolId={activeTool} />
-          ) : null}
-
         </div>
         </DragScrollDiv>
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
