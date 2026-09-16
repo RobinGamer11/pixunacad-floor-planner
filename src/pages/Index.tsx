@@ -2,7 +2,7 @@ import CadEditor from "@/components/CadEditor";
 
 const Index = () => {
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden">
+    <div className="cad-desktop-density flex flex-col h-screen w-screen overflow-hidden">
       {/* Header */}
       <header
         className="flex items-center justify-between h-12 px-5 border-b shrink-0 relative"
