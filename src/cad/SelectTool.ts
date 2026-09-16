@@ -4537,6 +4537,54 @@ export class SelectTool {
     ctx.restore();
   }
 
+  /**
+   * Kleine kontextbezogene Anzeige der 2-Punkt-Skalierung direkt an der
+   * Zeichnung: markierter Fixpunkt, bewegter Referenzpunkt, Länge und Faktor.
+   */
+  private _drawScale2PtOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    if (this.activeEditAction !== PointEditAction.SCALE_2PT) return;
+    const fix = this.fixedPoint;
+    const tgt = this.scale2ptTargetWorld;
+    if (!fix || !tgt) return;
+    const a = cam.worldToScreen(fix.x, fix.y);
+    const b = cam.worldToScreen(tgt.x, tgt.y);
+    const base = this.hatchScaleBaseDist || 0;
+    const len = dist(fix, tgt);
+    const factor = base > 1e-9 ? len / base : 1;
+
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "#f4d47c";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Fixpunkt: gefüllter Kreis mit Ring. Referenzpunkt: offener Kreis.
+    ctx.fillStyle = "#f4d47c";
+    ctx.beginPath(); ctx.arc(a.x, a.y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#f4d47c";
+    ctx.beginPath(); ctx.arc(a.x, a.y, 9, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "#9ecbff";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(b.x, b.y, 5.5, 0, Math.PI * 2); ctx.stroke();
+
+    const label = `2-Punkt skalieren · ${len.toFixed(3)} m · ×${factor.toFixed(3)}`;
+    ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+    const tw = ctx.measureText(label).width;
+    const lx = b.x + 12, ly = b.y - 12;
+    ctx.fillStyle = "rgba(18,18,20,0.85)";
+    ctx.fillRect(lx - 5, ly - 13, tw + 10, 19);
+    ctx.strokeStyle = "#f4d47c";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx - 5, ly - 13, tw + 10, 19);
+    ctx.fillStyle = "#f4d47c";
+    ctx.fillText(label, lx, ly + 1);
+    ctx.restore();
+  }
+
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     // ── Marquee-Rechteck + hervorgehobene Auswahl ──────────────────────
     this._drawMarqueeOverlay(ctx, cam);
