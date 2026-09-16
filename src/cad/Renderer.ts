@@ -1358,29 +1358,40 @@ export class Renderer {
     if (!this.selection || this.selection.type !== SelectionType.LIBRARY_INSTANCE) return;
     const inst = this.scene.getLibraryInstanceById(this.selection.libraryInstanceId!);
     if (!inst || !this.labels.isVisible(inst.labelId)) return;
-    const res = this._resolveLibraryInstance(inst);
-    if (!res) return;
-    const b = snapshotsBounds(res.snaps);
+    const def = this._libraryDefinition(inst.definitionId);
+    if (!def) return;
+    // Auswahlkontur folgt der tatsächlichen Instanz-Transformation (Drehung inkl.).
+    const cornersW = instanceCornersWorld(def.geometry, {
+      position: { x: inst.position.x, y: inst.position.y },
+      rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY,
+    });
     const ctx = this.ctx, cam = this.camera;
-    const p0 = cam.worldToScreen(b.minX, b.minY);
-    const p1 = cam.worldToScreen(b.maxX, b.maxY);
+    const sc = cornersW.map(c => cam.worldToScreen(c.x, c.y));
     ctx.save();
     ctx.strokeStyle = "rgba(120,110,255,0.95)";
     ctx.fillStyle = "rgba(120,110,255,0.08)";
     ctx.lineWidth = 1.8;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
-    ctx.rect(Math.min(p0.x, p1.x), Math.min(p0.y, p1.y), Math.abs(p1.x - p0.x), Math.abs(p1.y - p0.y));
+    ctx.moveTo(sc[0].x, sc[0].y);
+    for (let i = 1; i < sc.length; i++) ctx.lineTo(sc[i].x, sc[i].y);
+    ctx.closePath();
     ctx.fill(); ctx.stroke();
     ctx.setLineDash([]);
+    // Fangpunkte: vier Ecken + Mittelpunkt (Index 4).
     const center = cam.worldToScreen(inst.position.x, inst.position.y);
-    ctx.fillStyle = "rgba(120,110,255,0.95)";
-    ctx.strokeStyle = "#fff";
+    const activeIdx = (this.selection as any).handleIndex;
+    const paint = (i: number) => {
+      ctx.fillStyle = activeIdx === i ? "#ffd166" : "rgba(120,110,255,0.95)";
+      ctx.strokeStyle = "#fff";
+    };
+    paint(4);
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(center.x, center.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    for (const p of [p0, { x: p1.x, y: p0.y }, p1, { x: p0.x, y: p1.y }]) {
+    for (let i = 0; i < sc.length; i++) {
+      paint(i);
       ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.rect(p.x - 4, p.y - 4, 8, 8); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.rect(sc[i].x - 4, sc[i].y - 4, 8, 8); ctx.fill(); ctx.stroke();
     }
     ctx.restore();
   }
