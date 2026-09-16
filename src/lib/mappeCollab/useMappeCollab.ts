@@ -79,6 +79,7 @@ export function useMappeCollab({
       window.removeEventListener("pointercancel", onPointerUp);
       window.removeEventListener("keydown", onKeyDown);
       collab.destroy();
+      setMappeSession(null);
       sessionRef.current = null;
       setStatus(EMPTY);
     };
