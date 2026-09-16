@@ -12,6 +12,16 @@ import { getNetworkClient } from "@/lib/networkClient";
 import { projectAccessStore } from "@/lib/projectAccess";
 import { COLLAB_GRACE_MS, type CollabMode } from "@/lib/cadCollab/session";
 import { projectStore, type Project } from "@/lib/projectStore";
+import {
+  baselineKey,
+  hasBaseline,
+  hashText,
+  loadBaseline,
+  saveBaseline,
+  BASELINE_SEP,
+  type BaselineHashes,
+} from "@/lib/cloudBaseline";
+import { registerProjectSyncSource, reportProjectSyncSource } from "@/lib/projectSync";
 import { applyMappeOp } from "./apply";
 import { diffMappeIndexes, indexProject, type MappeIndex } from "./diff";
 import {
