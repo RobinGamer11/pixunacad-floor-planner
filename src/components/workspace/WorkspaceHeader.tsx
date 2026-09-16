@@ -1,11 +1,15 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
+import { saveProjectToCloud, useProjectSyncState } from "@/lib/projectSync";
 import {
   ChevronLeft,
   Undo2,
   Redo2,
-  
+  Check,
+  CloudUpload,
+  Loader2,
+  Users,
   Play,
   FolderKanban,
   Compass,
