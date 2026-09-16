@@ -291,6 +291,8 @@ const CadPage = () => {
         onDelete={() => editorRef.current?.deleteSelection()}
         canCopy={canDelete}
         onCopy={doCopy}
+        onCenterView={() => editorRef.current?.centerOnOrigin()}
+
         canPaste={canPaste}
         onPaste={doPaste}
         zoomPercent={zoom}

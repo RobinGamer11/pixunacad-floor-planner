@@ -641,7 +641,19 @@ export class TopologyEngine {
       }
     }
 
-    return this._withGuides(best, mouseS, mouseW);
+    return this._withGuides(this._withWorldOrigin(best, mouseS), mouseS, mouseW);
+  }
+
+  /**
+   * Weltursprung (0, 0) als freier Fangpunkt — ohne Segment-, Objekt- oder
+   * Ebenenzuordnung. Nähere Objektpunkte behalten Vorrang.
+   */
+  _withWorldOrigin(best: Snap | null, mouseS: Vec2): Snap | null {
+    const px = this._worldToMousePx(v(0, 0), mouseS);
+    if (px > Defaults.snapPx) return best;
+    const b: any = best;
+    if (b && b.type === SnapType.POINT && (b.px ?? Infinity) <= px) return best;
+    return { type: SnapType.POINT, world: v(0, 0), segment: null, hatch: null, pointIndex: -1, edgeIndex: null, t: null, px } as any;
   }
 
   /** Globale Hilfslinien (Rechtsklick-Anker) in das Snap-Ergebnis einmischen. */
@@ -655,6 +667,7 @@ export class TopologyEngine {
     if (rb < rg) return best;
     return (((best as any).px ?? Infinity) <= (g.px ?? Infinity)) ? best : (g as Snap);
   }
+
 
   findBestSnapExcludingSegment(mouseS: Vec2, mouseW: Vec2, excludedSegmentId: string): Snap | null {
     let best: Snap | null = null;
@@ -708,7 +721,8 @@ export class TopologyEngine {
 
 
 
-    return best;
+    return this._withWorldOrigin(best, mouseS);
+
   }
 
   findBestSnapExcludingHatch(mouseS: Vec2, mouseW: Vec2, excludedHatchId: string, excludedPointIndex?: number, excludeAllPoints?: boolean): Snap | null {
@@ -772,7 +786,8 @@ export class TopologyEngine {
 
 
 
-    return best;
+    return this._withWorldOrigin(best, mouseS);
+
   }
 
   findNearestLineSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {

@@ -11,6 +11,7 @@ import {
   Compass,
   Trash2,
   Copy,
+  Crosshair,
   ClipboardPaste,
   HelpCircle,
   TabletSmartphone,
@@ -32,6 +33,8 @@ interface Props {
   onDelete?: () => void;
   canCopy?: boolean;
   onCopy?: () => void;
+  /** Ansicht zentrieren (CAD: Weltursprung, Mappe: Blatt/100 %). */
+  onCenterView?: () => void;
   canPaste?: boolean;
   onPaste?: () => void;
   zoomPercent?: number;          // display-only; may be undefined
@@ -63,6 +66,7 @@ export function WorkspaceHeader({
   onDelete,
   canCopy = false,
   onCopy,
+  onCenterView,
   canPaste = false,
   onPaste,
   zoomPercent,
@@ -166,6 +170,14 @@ export function WorkspaceHeader({
       {/* Right: Undo/Redo · Zoom · Präsentieren · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
 
+        <button
+          onClick={onCenterView}
+          disabled={!onCenterView}
+          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Ansicht zentrieren"
+        >
+          <Crosshair size={16} />
+        </button>
         <button
           onClick={onCopy}
           disabled={!canCopy || !onCopy}

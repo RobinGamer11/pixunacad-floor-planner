@@ -151,6 +151,8 @@ export interface CadEditorHandle {
   getCameraScale: () => number;
   /** Welt-Koordinaten (Meter) an einer Bildschirm-CSS-Position im Canvas. */
   screenToWorldM: (cssX: number, cssY: number) => { x: number; y: number };
+  /** Ansicht auf den Weltursprung (0, 0) zentrieren — Zoom bleibt erhalten. */
+  centerOnOrigin: () => void;
 }
 
 interface CadEditorProps {
@@ -349,6 +351,18 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const cam = appRef.current?.camera;
       if (!cam) return { x: 0, y: 0 };
       return cam.screenToWorld(cssX, cssY);
+    },
+    centerOnOrigin: () => {
+      const app = appRef.current;
+      const cvs = canvasRef.current;
+      if (!app || !cvs) return;
+      const r = cvs.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return;
+      // Nur die Kamera-Position ändern — Maßstab, Raster, Objekte, Werkzeug bleiben.
+      app.camera.offsetX = r.width / 2;
+      app.camera.offsetY = r.height / 2;
+      (app as any).requestRender?.();
+      app.renderer?.render?.();
     },
   }), []);
 

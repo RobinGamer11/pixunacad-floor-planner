@@ -1525,6 +1525,8 @@ export default function ProjectWorkspace() {
         onDelete={runDeleteSelection}
         canCopy={selectedElementIds.length > 0 || cadSelectionCount > 0}
         onCopy={runCopySelection}
+        onCenterView={resetZoomAndCenter}
+
         canPaste={canPasteElements}
         onPaste={runPasteClipboard}
         onPresent={() => setPresenting(true)}
