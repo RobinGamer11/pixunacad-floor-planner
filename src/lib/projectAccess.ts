@@ -222,6 +222,7 @@ async function loadAccess(): Promise<void> {
       schemaMissing: isMissingSchemaError(error),
       myId,
       byProject: new Map(),
+      otherMembersByProject: new Map(),
     };
     emit();
   }
