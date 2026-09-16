@@ -3809,6 +3809,28 @@ export class SelectTool {
         return;
       }
 
+      // 2-Punkt-Skalierung: Fixpunkt bleibt liegen, der Referenzpunkt folgt
+      // dem (gefangenen) Zielpunkt; daraus entsteht der proportionale Faktor.
+      if (this.activeEditAction === PointEditAction.SCALE_2PT) {
+        const base = this.hatchScaleBaseDist;
+        if (base && !this.hatchScaleLocked && document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
+          const snap = this._findPreviewSnapForEdit(input);
+          const targetW = snap?.world ? v(snap.world.x, snap.world.y) : v(input.mouse.wx, input.mouse.wy);
+          this.scale2ptTargetWorld = targetW;
+          const len = Math.max(0.0001, dist(this.fixedPoint!, targetW));
+          this._applyLibraryScale(len / base);
+          this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+          this.app.hub.updateDisplay(len, angleDeg(this.fixedPoint!, targetW));
+        }
+        if (editCommit) {
+          this._clearEditState();
+          this.app.hub.hide();
+          (this.app as any).commitHistorySnapshot?.();
+        }
+        return;
+      }
+
+
       if (this.activeEditAction === PointEditAction.SPLIT) {
         this.splitPreview = this._computeSplitPoint(input);
         if (editCommit) {
@@ -4116,6 +4138,7 @@ export class SelectTool {
               PointEditAction.MOVE,
               PointEditAction.ROTATE,
               PointEditAction.SCALE,
+              PointEditAction.SCALE_2PT,
             ]);
             return;
           }
