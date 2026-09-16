@@ -4556,6 +4556,10 @@ function ElementView({
       window.removeEventListener("pointercancel", handleUp);
       window.removeEventListener("keydown", handleKey, true);
       unregisterAbort?.(); unregisterAbort = null;
+      // Vorschau beenden: Beim Bestätigen folgt genau eine dauerhafte
+      // Änderung, beim Abbruch sieht die Gegenseite wieder den alten Stand.
+      const livePageId = (node?.parentElement as HTMLElement | null)?.dataset.pageId;
+      if (livePageId) previewMappeElement(livePageId, el.id, null);
       if (commit && (tdx !== 0 || tdy !== 0)) onDrag?.(tdx, tdy, ev?.altKey);
     };
     const handleUp = (ev: PointerEvent) => finish(true, ev);
