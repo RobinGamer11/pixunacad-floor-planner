@@ -190,6 +190,7 @@ export class CadCollabSession {
     }
     this.refreshDirty();
     if (this.mode === "standby") this.connectPresence();
+    else this.policyTimer = window.setInterval(() => this.syncPolicy(), 10_000);
   }
 
   /** Nur Anwesenheit – keine Objektdaten, keine Cursor, keine Sperren. */
