@@ -140,6 +140,10 @@ export class SelectTool {
   dragLibraryId: string | null = null;
   dragLibraryGrabOffset: Vec2 | null = null;
   dragLibraryMouseStart: Vec2 | null = null;
+  /** Ausgangsposition der Instanz beim Drag-Start (für ESC-Wiederherstellung). */
+  dragLibraryOrigin: Vec2 | null = null;
+  /** Drag wird erst nach echter Mausbewegung aus diesem Zustand heraus gestartet. */
+  pendingLibraryDrag: { id: string; screen: Vec2; world: Vec2; grab: Vec2 } | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
   dragStickerId: string | null = null;
@@ -182,6 +186,20 @@ export class SelectTool {
   editGuideAnchors: { key: string; point: Vec2 }[] = [];
   /** Parallele Transform-Hilfslinien (R-Klick auf eine bestehende Kante). */
   editParallelGuides: { key: string; point: Vec2; dir: Vec2 }[] = [];
+
+  /** Beendet einen Bibliotheks-Drag; `revert` stellt die Ausgangsposition wieder her. */
+  private _endLibraryDrag(revert: boolean) {
+    if (revert && this.dragLibraryId && this.dragLibraryOrigin) {
+      const inst = (this.app.scene as any).getLibraryInstanceById?.(this.dragLibraryId);
+      if (inst) inst.position = { x: this.dragLibraryOrigin.x, y: this.dragLibraryOrigin.y };
+    }
+    this.dragLibraryId = null;
+    this.dragLibraryGrabOffset = null;
+    this.dragLibraryMouseStart = null;
+    this.dragLibraryOrigin = null;
+    this.pendingLibraryDrag = null;
+    this._clearTransformGuides();
+  }
 
   private _clearTransformGuides() {
     this.editGuideAnchors = [];
@@ -531,6 +549,8 @@ export class SelectTool {
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
+    // ESC während eines Bibliotheks-Drags: Ausgangsposition wiederherstellen.
+    this._endLibraryDrag(true);
     if (this.rotateTextBoxId) {
       // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
       const rb = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
@@ -3236,14 +3256,33 @@ export class SelectTool {
 
 
 
+    // Bibliotheksobjekt: Klick wählt nur aus — der Drag startet erst nach
+    // einer echten Mausbewegung aus dem Vormerk-Zustand heraus.
+    if (this.pendingLibraryDrag && !this.dragLibraryId) {
+      const p = this.pendingLibraryDrag;
+      if (!input.mouse.left) {
+        this.pendingLibraryDrag = null;
+      } else {
+        const dsx = input.mouse.sx - p.screen.x;
+        const dsy = input.mouse.sy - p.screen.y;
+        if (Math.hypot(dsx, dsy) > 3) {
+          const inst = (this.app.scene as any).getLibraryInstanceById(p.id);
+          if (inst) {
+            this.dragLibraryId = p.id;
+            this.dragLibraryMouseStart = v(p.world.x, p.world.y);
+            this.dragLibraryGrabOffset = v(p.grab.x, p.grab.y);
+            this.dragLibraryOrigin = v(inst.position.x, inst.position.y);
+          }
+          this.pendingLibraryDrag = null;
+        }
+      }
+    }
+
     // Aktiver Bibliotheksobjekt-Drag (mit Punkt-Snapping)
     if (this.dragLibraryId) {
       const inst = (this.app.scene as any).getLibraryInstanceById(this.dragLibraryId);
       if (!inst || !this.dragLibraryGrabOffset) {
-        this.dragLibraryId = null;
-        this.dragLibraryGrabOffset = null;
-        this.dragLibraryMouseStart = null;
-        this._clearTransformGuides();
+        this._endLibraryDrag(false);
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
         if (this._tryToggleTransformGuide(input, {}, this.dragLibraryMouseStart || mouseW)) return;
@@ -3254,10 +3293,12 @@ export class SelectTool {
           y: target.y - this.dragLibraryGrabOffset.y,
         };
         if (!input.mouse.left) {
-          this.dragLibraryId = null;
-          this.dragLibraryGrabOffset = null;
-          this.dragLibraryMouseStart = null;
-          this._clearTransformGuides();
+          const moved = !this.dragLibraryOrigin
+            || Math.abs(inst.position.x - this.dragLibraryOrigin.x) > 1e-9
+            || Math.abs(inst.position.y - this.dragLibraryOrigin.y) > 1e-9;
+          this._endLibraryDrag(false);
+          // Genau ein Undo-Schritt pro abgeschlossener Verschiebung.
+          if (moved) this.app.commitHistorySnapshot();
         }
         return;
       }
@@ -3941,14 +3982,22 @@ export class SelectTool {
           }
         }
         // Bibliotheksinstanzen (eigener Objekttyp) vor den normalen Objekten prüfen.
-        const libHit = this._hitLibraryInstance(input);
+        const libHit = input.keys?.shift ? null : this._hitLibraryInstance(input);
         if (libHit) {
           this._clearTransformGuides();
+          // Einfacher Linksklick wählt nur aus. Der Drag wird lediglich
+          // vorgemerkt und startet erst nach echter Mausbewegung.
           this.app.setSelection({ type: SelectionType.LIBRARY_INSTANCE, libraryInstanceId: libHit.id } as any);
+          // Auch als Mehrfachauswahl-Eintrag führen, damit Drehen/Ankerpunkt
+          // über dieselbe Transformationsbedienung wie bei anderen Objekten geht.
+          this.marqueeSelectedIds = [{ kind: "library", id: libHit.id }];
           const mouseL = v(input.mouse.wx, input.mouse.wy);
-          this.dragLibraryId = libHit.id;
-          this.dragLibraryMouseStart = mouseL;
-          this.dragLibraryGrabOffset = { x: mouseL.x - libHit.position.x, y: mouseL.y - libHit.position.y };
+          this.pendingLibraryDrag = {
+            id: libHit.id,
+            screen: v(input.mouse.sx, input.mouse.sy),
+            world: mouseL,
+            grab: v(mouseL.x - libHit.position.x, mouseL.y - libHit.position.y),
+          };
           return;
         }
 

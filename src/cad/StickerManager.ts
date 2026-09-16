@@ -73,6 +73,8 @@ function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "dimension") return { x: (it.p1.x + it.p2.x) / 2, y: (it.p1.y + it.p2.y) / 2 };
   if (it.kind === "wall") return polygonCentroid(it.corners);
   if (it.kind === "free") return polygonCentroid(it.points);
+  // Bibliotheksinstanzen kommen im Stempel-System nicht vor.
+  if (it.kind === "library") return v(it.position.x, it.position.y);
   return v(it.center.x, it.center.y);
 }
 
@@ -94,6 +96,7 @@ function translateItem(it: ClipboardItem, dx: number, dy: number): ClipboardItem
     placementPoint: { x: it.placementPoint.x + dx, y: it.placementPoint.y + dy },
   };
   if (it.kind === "free") return { ...it, points: it.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+  if (it.kind === "library") return { ...it, position: { x: it.position.x + dx, y: it.position.y + dy } };
   return { ...it, center: { x: it.center.x + dx, y: it.center.y + dy } };
 }
 
@@ -118,6 +121,7 @@ function rotateItem(it: ClipboardItem, angleRad: number): ClipboardItem {
     };
   }
   if (it.kind === "free") return { ...it, points: it.points.map(p => rotPt(p, cs, sn)) };
+  if (it.kind === "library") return { ...it, position: rotPt(it.position, cs, sn), rotationRad: (it.rotationRad || 0) + angleRad };
   // textbox
   return {
     ...it,
@@ -225,6 +229,7 @@ function scaleItem(it: ClipboardItem, s: number): ClipboardItem {
   // Wand: Bezugslinie skalieren, Dicke bleibt maßstabsgetreu mitskaliert.
   if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x * s, y: p.y * s })), thicknessM: it.thicknessM * s };
   if (it.kind === "free") return { ...it, points: it.points.map(p => ({ x: p.x * s, y: p.y * s })), thicknessM: it.thicknessM * s };
+  if (it.kind === "library") return { ...it, position: { x: it.position.x * s, y: it.position.y * s }, scaleX: it.scaleX * s, scaleY: it.scaleY * s };
   // textbox: skaliere center + Box-Dimensionen (Textgröße bleibt fix)
   return { ...it, center: { x: it.center.x * s, y: it.center.y * s }, widthM: it.widthM * s, heightM: it.heightM * s };
 

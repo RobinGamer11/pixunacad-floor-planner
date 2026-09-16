@@ -20,6 +20,7 @@ export function getGroupObject(app: any, kind: string, id: string): any {
     case "textbox":    return s.getTextBoxById?.(id);
     case "document":   return s.getDocumentById?.(id);
     case "sticker":    return s.getStickerInstanceById?.(id);
+    case "library":    return s.getLibraryInstanceById?.(id);
     default: return null;
   }
 }
@@ -39,6 +40,8 @@ function movablePoints(kind: string, o: any): Vec2[] {
     case "textbox": out.push(o.center); break;
     case "document": out.push(o.position); break;
     case "sticker": out.push(o.position); break;
+    // Bibliotheksinstanz: nur der Einfügepunkt wandert; die Definition bleibt unberührt.
+    case "library": out.push(o.position); break;
   }
   return out.filter(Boolean);
 }
@@ -115,7 +118,7 @@ export function rotateGroup(app: any, refs: GroupRef[], angle: number, center: V
 
     for (const p of movablePoints(r.kind, o)) rot(p, center, cos, sin);
 
-    if (r.kind === "textbox" || r.kind === "sticker") {
+    if (r.kind === "textbox" || r.kind === "sticker" || r.kind === "library") {
       o.rotationRad = (o.rotationRad || 0) + angle;
     } else if (r.kind === "hatch") {
       if (o.areaLabel) o.areaLabel.rotationRad = (o.areaLabel.rotationRad || 0) + angle;
