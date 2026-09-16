@@ -510,7 +510,11 @@ export class CadCollabSession {
     const base = this.revisions.get(key) ?? 0;
     const result = await writeObject(this.opts.projectId, op, base);
     this.revisions.set(key, result.revision);
-    if (result.accepted) return;
+    if (result.accepted) {
+      this.noteCloudObject(op, op.changeType === "delete" ? null : op.payload);
+      return;
+    }
+    this.noteCloudObject(op, result.deleted ? null : result.payload);
     // Konflikt: ausschließlich dieses eine Objekt wird auf den gültigen
     // Serverstand zurückgesetzt – die übrige Zeichnung bleibt unberührt.
     this.applyRemoteOps([
