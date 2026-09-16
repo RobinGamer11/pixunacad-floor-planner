@@ -51,3 +51,9 @@
 - [x] Board-Kalender mit Ebenen „Abwesenheiten“ und „Geräte“
 - [x] Projektübergreifender Kalender im Netzwerk
 - [x] Zeit-Auswertung je Projekt/Person in der Team-Ansicht
+
+## Bibliothek: 2-Punkt-Skalierung
+- Fangpunkt-Menü kennt zusätzlich "2-Punkt skalieren" (SCALE_2PT).
+- Angeklickter Fangpunkt ist Fixpunkt, gegenüberliegender Punkt wird bewegt/gefangen.
+- Kontextanzeige an der Zeichnung (Länge + Faktor), Hub-Eingabe möglich.
+- Escape stellt Position und Skalierung wieder her, Bestätigen = ein Undo-Schritt.

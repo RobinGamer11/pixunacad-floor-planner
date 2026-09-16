@@ -130,4 +130,25 @@ describe("Bibliotheksobjekt-Platzierung und -Transformation", () => {
     expect(instance.scaleX).toBe(1);
     expect(instance.scaleY).toBe(1);
   });
+
+  it("skaliert per 2-Punkt-Aktion um den festen Fangpunkt", () => {
+    const { selectTool, instance, hubCommit } = makeTransformHarness();
+    selectTool.beginLibraryHandleEdit(instance.id, 0, PointEditAction.SCALE_2PT);
+    const fixed = selectTool.fixedPoint!;
+    const commit = hubCommit.current;
+    expect(commit).not.toBeNull();
+
+    commit?.({ lengthM: 4 * Math.SQRT2, angleDeg: null });
+
+    expect(instance.scaleX).toBeCloseTo(2, 8);
+    expect(instance.scaleY).toBeCloseTo(2, 8);
+    // Der angeklickte Fangpunkt bleibt exakt liegen.
+    expect(selectTool.fixedPoint).toEqual(fixed);
+    expect(instance.position.x).toBeCloseTo(fixed.x + (5 - fixed.x) * 2, 8);
+    expect(definition.geometry[0].data.points[0]).toEqual(v(-1, -1));
+
+    selectTool.cancel();
+    expect(instance.scaleX).toBe(1);
+    expect(instance.position).toEqual(v(5, 5));
+  });
 });

@@ -49,6 +49,8 @@ export interface HybridFillOptions {
   activeLabelId?: string | null;
   /** Sichtbarkeitsfilter für Ebenen (Vektor wie Raster). */
   isVisible?: (labelId: string) => boolean;
+  /** Zusätzliche schreibgeschützte Weltszenen (z. B. Bibliotheksobjekte). */
+  extraScenes?: Scene[];
 }
 
 interface Rect { x: number; y: number; w: number; h: number }
@@ -159,7 +161,7 @@ export function findHybridEnclosingFace(
   click: Vec2,
   options: HybridFillOptions = {},
 ): Vec2[] | null {
-  const vectorEdges = collectBoundaryEdges(scene);
+  const vectorEdges = collectBoundaryEdges(scene, options.extraScenes || []);
 
   for (const half of WINDOW_STEPS_M) {
     const rect: Rect = { x: click.x - half, y: click.y - half, w: half * 2, h: half * 2 };

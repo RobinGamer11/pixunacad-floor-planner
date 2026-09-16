@@ -38,6 +38,7 @@ import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import type { LibraryDefinition, LibraryFolder } from "./library/types";
 import { LibraryPlacementTool } from "./library/LibraryPlacementTool";
+import { LibrarySnapSource } from "./library/librarySnapSource";
 import * as Library from "./library/LibraryManager";
 import { serializeDefinitions, restoreDefinitions, serializeFolders, restoreFolders, serializeLibraryInstance } from "./library/librarySerde";
 import { DocumentTool } from "./DocumentTool";
@@ -394,6 +395,8 @@ export class CadApp {
 
   // Bibliothek (projektweit, Teil von Undo/Redo und Persistenz)
   libraryDefinitions: LibraryDefinition[] = [];
+  /** Schreibgeschützte Fangquelle für platzierte Bibliotheksinstanzen. */
+  librarySnapSource!: LibrarySnapSource;
   /** Ordnerstruktur der Bibliotheksverwaltung (rein organisatorisch). */
   libraryFolders: LibraryFolder[] = [];
   onLibraryChange?: () => void;
@@ -595,6 +598,10 @@ export class CadApp {
     this.stickerTool = new StickerTool(this);
     this.libraryTool = new LibraryPlacementTool(this);
     this.renderer.libraryDefinitionSource = () => this.libraryDefinitions;
+    // Bibliotheksinstanzen als schreibgeschützte Fangquelle für alle Werkzeuge.
+    this.librarySnapSource = new LibrarySnapSource();
+    this.librarySnapSource.definitions = () => this.libraryDefinitions;
+    this.topology.librarySnaps = this.librarySnapSource;
     this.tableTool = new TableTool(this);
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);

@@ -185,6 +185,8 @@ export const PointEditAction = {
   RESIZE: "resize",
   /** Objekt am gewählten Fangpunkt gleichmäßig skalieren */
   SCALE: "scale",
+  /** Zwei-Punkt-Skalierung: Fixpunkt + Referenzpunkt auf Zielpunkt ziehen */
+  SCALE_2PT: "scale2pt",
   DUPLICATE: "duplicate",
   /** Kante wölben (rein-/rauswölben) */
   BULGE: "bulge",

@@ -148,6 +148,10 @@ export class SelectTool {
   libraryScaleYOriginal = 1;
   /** Weltposition des angeklickten Fangpunkts bei Editierbeginn. */
   libraryHandleOriginal: Vec2 | null = null;
+  /** 2-Punkt-Skalierung: ursprünglicher Referenzpunkt (Startlage). */
+  scale2ptRefOriginal: Vec2 | null = null;
+  /** 2-Punkt-Skalierung: aktueller Zielpunkt des Referenzpunkts. */
+  scale2ptTargetWorld: Vec2 | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
   dragStickerId: string | null = null;
@@ -234,7 +238,8 @@ export class SelectTool {
   beginLibraryHandleEdit(libraryInstanceId: string, handleIndex: number, action: string) {
     const inst = (this.app.scene as any).getLibraryInstanceById?.(libraryInstanceId);
     if (!inst) return;
-    if (action !== PointEditAction.MOVE && action !== PointEditAction.ROTATE && action !== PointEditAction.SCALE) return;
+    if (action !== PointEditAction.MOVE && action !== PointEditAction.ROTATE
+      && action !== PointEditAction.SCALE && action !== PointEditAction.SCALE_2PT) return;
 
     this._clearTransformGuides();
     this.activeEditAction = action;
@@ -259,6 +264,15 @@ export class SelectTool {
       // Proportionale Skalierung um die Instanzmitte (Schraffurverhalten).
       this.fixedPoint = v(center.x, center.y);
       this.otherPointOriginal = v(handle.x, handle.y);
+    } else if (action === PointEditAction.SCALE_2PT) {
+      // Fixpunkt = angeklickter Fangpunkt; Referenzpunkt = gegenüberliegender
+      // Fangpunkt (bei der Mitte die erste Ecke).
+      this.fixedPoint = v(handle.x, handle.y);
+      const oppIdx = handleIndex < 4 ? (handleIndex + 2) % 4 : 0;
+      const ref = pts[oppIdx] || center;
+      this.scale2ptRefOriginal = v(ref.x, ref.y);
+      this.scale2ptTargetWorld = v(ref.x, ref.y);
+      this.otherPointOriginal = v(ref.x, ref.y);
     } else {
       this.fixedPoint = v(center.x, center.y);
       this.otherPointOriginal = v(handle.x, handle.y);
@@ -277,6 +291,10 @@ export class SelectTool {
       this.hatchScaleBaseDist = radius > 1e-9 ? radius : null;
       this.hatchScaleLocked = false;
       this.app.hub.bindCommit((vals) => this._applyScaleHubValues(vals));
+    } else if (action === PointEditAction.SCALE_2PT) {
+      this.hatchScaleBaseDist = radius > 1e-9 ? radius : null;
+      this.hatchScaleLocked = false;
+      this.app.hub.bindCommit((vals) => this._applyScale2PtHubValues(vals));
     } else if (action === PointEditAction.ROTATE) {
       this.app.hub.bindCommit((vals) => this._applyRotateHubValues(vals));
     } else {
@@ -2203,6 +2221,21 @@ export class SelectTool {
     this.app.hub.updateDisplay(len, ang);
   }
 
+  /** Hub-Eingabe der 2-Punkt-Skalierung: Länge = Zielabstand ab Fixpunkt. */
+  private _applyScale2PtHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.activeEditAction !== PointEditAction.SCALE_2PT) return;
+    const base = this.hatchScaleBaseDist;
+    if (!base) return;
+    const len = vals.lengthM != null ? Math.max(0.0001, vals.lengthM) : base;
+    this.hatchScaleLocked = true;
+    this._applyLibraryScale(len / base);
+    const ang = vals.angleDeg != null ? vals.angleDeg : angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+    const rad = (ang * Math.PI) / 180;
+    this.scale2ptTargetWorld = v(this.fixedPoint!.x + Math.cos(rad) * len, this.fixedPoint!.y + Math.sin(rad) * len);
+    this.app.hub.setValues(len, ang);
+    this.app.hub.updateDisplay(len, ang);
+  }
+
   /** Rotate the WHOLE hatch polygon (inkl. Löcher) around `fixedPoint`
    *  (= Polygon-Schwerpunkt) auf den absoluten Winkel `newAngleDeg`.
    *  Ohne diese Sonderbehandlung würde beim Drehen nur der angefasste
@@ -2427,6 +2460,8 @@ export class SelectTool {
     this.wallPointsOriginal = null;
     this.libraryPositionOriginal = null;
     this.libraryHandleOriginal = null;
+    this.scale2ptRefOriginal = null;
+    this.scale2ptTargetWorld = null;
     this.libraryRotationOriginal = 0;
     this.libraryScaleXOriginal = 1;
     this.libraryScaleYOriginal = 1;
@@ -2815,6 +2850,9 @@ export class SelectTool {
       exclusions.hatchIds = new Set([target.hatchId]);
     } else if (target.kind === "wall" || (target.kind === "wallPoint" && wholeObject)) {
       exclusions.wallIds = new Set([target.wallId]);
+    } else if (target.kind === "libraryHandle") {
+      // Die transformierte Instanz darf nicht an ihre eigenen Punkte zurückschnappen.
+      exclusions.libraryInstanceIds = new Set([target.libraryInstanceId]);
     }
     const topoSnap = this.app.topology.findBestSnap(
       v(input.mouse.sx, input.mouse.sy),
@@ -3806,6 +3844,28 @@ export class SelectTool {
         return;
       }
 
+      // 2-Punkt-Skalierung: Fixpunkt bleibt liegen, der Referenzpunkt folgt
+      // dem (gefangenen) Zielpunkt; daraus entsteht der proportionale Faktor.
+      if (this.activeEditAction === PointEditAction.SCALE_2PT) {
+        const base = this.hatchScaleBaseDist;
+        if (base && !this.hatchScaleLocked && document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
+          const snap = this._findPreviewSnapForEdit(input);
+          const targetW = snap?.world ? v(snap.world.x, snap.world.y) : v(input.mouse.wx, input.mouse.wy);
+          this.scale2ptTargetWorld = targetW;
+          const len = Math.max(0.0001, dist(this.fixedPoint!, targetW));
+          this._applyLibraryScale(len / base);
+          this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
+          this.app.hub.updateDisplay(len, angleDeg(this.fixedPoint!, targetW));
+        }
+        if (editCommit) {
+          this._clearEditState();
+          this.app.hub.hide();
+          (this.app as any).commitHistorySnapshot?.();
+        }
+        return;
+      }
+
+
       if (this.activeEditAction === PointEditAction.SPLIT) {
         this.splitPreview = this._computeSplitPoint(input);
         if (editCommit) {
@@ -4113,6 +4173,7 @@ export class SelectTool {
               PointEditAction.MOVE,
               PointEditAction.ROTATE,
               PointEditAction.SCALE,
+              PointEditAction.SCALE_2PT,
             ]);
             return;
           }
@@ -4476,12 +4537,63 @@ export class SelectTool {
     ctx.restore();
   }
 
+  /**
+   * Kleine kontextbezogene Anzeige der 2-Punkt-Skalierung direkt an der
+   * Zeichnung: markierter Fixpunkt, bewegter Referenzpunkt, Länge und Faktor.
+   */
+  private _drawScale2PtOverlay(ctx: CanvasRenderingContext2D, cam: any) {
+    if (this.activeEditAction !== PointEditAction.SCALE_2PT) return;
+    const fix = this.fixedPoint;
+    const tgt = this.scale2ptTargetWorld;
+    if (!fix || !tgt) return;
+    const a = cam.worldToScreen(fix.x, fix.y);
+    const b = cam.worldToScreen(tgt.x, tgt.y);
+    const base = this.hatchScaleBaseDist || 0;
+    const len = dist(fix, tgt);
+    const factor = base > 1e-9 ? len / base : 1;
+
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = "#f4d47c";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Fixpunkt: gefüllter Kreis mit Ring. Referenzpunkt: offener Kreis.
+    ctx.fillStyle = "#f4d47c";
+    ctx.beginPath(); ctx.arc(a.x, a.y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#f4d47c";
+    ctx.beginPath(); ctx.arc(a.x, a.y, 9, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "#9ecbff";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(b.x, b.y, 5.5, 0, Math.PI * 2); ctx.stroke();
+
+    const label = `2-Punkt skalieren · ${len.toFixed(3)} m · ×${factor.toFixed(3)}`;
+    ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+    const tw = ctx.measureText(label).width;
+    const lx = b.x + 12, ly = b.y - 12;
+    ctx.fillStyle = "rgba(18,18,20,0.85)";
+    ctx.fillRect(lx - 5, ly - 13, tw + 10, 19);
+    ctx.strokeStyle = "#f4d47c";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(lx - 5, ly - 13, tw + 10, 19);
+    ctx.fillStyle = "#f4d47c";
+    ctx.fillText(label, lx, ly + 1);
+    ctx.restore();
+  }
+
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
     // ── Marquee-Rechteck + hervorgehobene Auswahl ──────────────────────
     this._drawMarqueeOverlay(ctx, cam);
 
     // ── Winkel-Hilfslinie / Grad-Anzeige beim Drehen ───────────────────
     this._drawRotateGuide(ctx, cam);
+
+    // ── 2-Punkt-Skalierung: Fixpunkt, Referenzpunkt und Maßangabe ──────
+    this._drawScale2PtOverlay(ctx, cam);
 
 
     // PDF/Bild-Hub: Live-Vorschau (Ghost) während aktivem Move/Rotate/Scale.

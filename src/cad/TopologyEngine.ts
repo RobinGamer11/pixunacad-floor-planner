@@ -700,9 +700,13 @@ export class TopologyEngine {
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex, (edge as any).bulge || 0);
     }
 
+    for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
       if (score < bestScore) { bestScore = score; best = cand; }
     });
+
+
 
     return best;
   }
@@ -760,9 +764,13 @@ export class TopologyEngine {
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex, (edge as any).bulge || 0);
     }
 
+    for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
       if (score < bestScore) { bestScore = score; best = cand; }
     });
+
+
 
     return best;
   }
