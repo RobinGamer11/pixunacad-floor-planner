@@ -278,7 +278,7 @@ const CadPage = () => {
   }, [sheetPdfMode, sheetPdfId]);
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden">
+    <div className="cad-desktop-density flex flex-col h-screen w-screen overflow-hidden">
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}

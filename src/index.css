@@ -1422,6 +1422,180 @@
   *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
 }
 
+/* Kompakte CAD-Dichte auf Laptop und Desktop.
+   Nur die Bedienoberfläche wird verdichtet; Canvas und Koordinatensystem
+   bleiben unskaliert. Tablet und Handy behalten ihre Touch-Größen. */
+@media (min-width: 1024px) {
+  .cad-desktop-density .workspace-header {
+    height: 48px;
+    gap: 4px;
+    padding-inline: 8px;
+  }
+
+  .cad-desktop-density .workspace-header > div:first-child {
+    gap: 5px;
+  }
+
+  .cad-desktop-density .workspace-header button {
+    min-height: 0;
+  }
+
+  .cad-desktop-density .workspace-header button.h-8 {
+    height: 28px;
+  }
+
+  .cad-desktop-density .workspace-header button.w-8 {
+    width: 28px;
+  }
+
+  .cad-desktop-density .workspace-header .text-sm {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .cad-desktop-density .workspace-header .text-xs,
+  .cad-desktop-density .workspace-header .text-\[11px\] {
+    font-size: 10px;
+    line-height: 14px;
+  }
+
+  .cad-desktop-density .cad-tool-rail {
+    width: 44px !important;
+  }
+
+  .cad-desktop-density .cad-tool-rail > div.flex.flex-col {
+    gap: 1px;
+    padding: 3px;
+  }
+
+  .cad-desktop-density .cad-tool-rail .cad-rail-btn {
+    width: 38px;
+    height: 38px;
+    gap: 1px;
+    border-radius: 6px;
+    font-size: 8px;
+  }
+
+  .cad-desktop-density .cad-tool-rail .cad-rail-btn > svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .cad-desktop-density .cad-tool-rail > .border-t {
+    margin-inline: 7px;
+  }
+
+  .cad-desktop-density .cad-settings-sidebar {
+    width: 240px;
+  }
+
+  .cad-desktop-density .cad-settings-sidebar > div:first-child button {
+    padding: 6px 5px;
+    font-size: 10px;
+  }
+
+  .cad-desktop-density .cad-settings-sidebar > div:first-child button:last-child {
+    width: 28px;
+  }
+
+  .cad-desktop-density .cad-settings-sidebar > .overflow-y-auto,
+  .cad-desktop-density .cad-settings-sidebar > .overflow-auto {
+    padding: 5px;
+    gap: 5px;
+  }
+
+  .cad-desktop-density .cad-settings-panel {
+    padding: 5px;
+    row-gap: 5px;
+  }
+
+  .cad-desktop-density .cad-settings-panel .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 8px;
+  }
+
+  .cad-desktop-density .cad-settings-panel .mb-3 {
+    margin-bottom: 8px;
+  }
+
+  .cad-desktop-density .cad-settings-panel .mt-3 {
+    margin-top: 8px;
+  }
+
+  .cad-desktop-density .cad-settings-panel label,
+  .cad-desktop-density .cad-settings-panel .text-xs,
+  .cad-desktop-density .cad-settings-panel .text-\[11px\] {
+    font-size: 10px;
+    line-height: 14px;
+  }
+
+  .cad-desktop-density .cad-settings-panel input[type="text"],
+  .cad-desktop-density .cad-settings-panel input[type="number"],
+  .cad-desktop-density .cad-settings-select {
+    min-height: 26px;
+    padding-block: 3px;
+    font-size: 10px;
+  }
+
+  .cad-desktop-density .cad-settings-panel .h-10 {
+    height: 32px;
+  }
+
+  .cad-desktop-density .cad-settings-panel .h-9 {
+    height: 30px;
+  }
+
+  .cad-desktop-density .cad-settings-panel .h-8 {
+    height: 28px;
+  }
+
+  .cad-desktop-density .cad-sheet-tab-head {
+    padding: 8px 8px 6px;
+  }
+
+  .cad-desktop-density .cad-sheet-tab-title,
+  .cad-desktop-density .id-title-lg {
+    font-size: 12px;
+  }
+
+  .cad-desktop-density .cad-sheet-tab-subtitle,
+  .cad-desktop-density .id-sub {
+    font-size: 9px;
+  }
+
+  .cad-desktop-density .id-body {
+    padding: 5px;
+  }
+
+  .cad-desktop-density .id-primary-action,
+  .cad-desktop-density .id-add-gold {
+    min-height: 32px;
+    height: 32px;
+    font-size: 10.5px;
+  }
+
+  .cad-desktop-density .id-row {
+    gap: 5px;
+    padding: 5px 6px;
+    border-radius: 7px;
+  }
+
+  .cad-desktop-density .id-name,
+  .cad-desktop-density .sheet-name {
+    font-size: 11px;
+  }
+
+  .cad-desktop-density .sheet-row {
+    gap: 5px;
+    padding: 5px 6px;
+  }
+
+  .cad-desktop-density .sheet-glyph,
+  .cad-desktop-density .sheet-icon-btn {
+    width: 24px;
+    height: 24px;
+  }
+}
+
 
 
 /* Beim Drucken: Papier ohne grauen Rand/Schatten */

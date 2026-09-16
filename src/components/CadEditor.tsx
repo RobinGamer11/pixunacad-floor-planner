@@ -1289,11 +1289,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setNewRows: setTableNewRows,
     }}>
     <TableFormulaPickContext.Provider value={{ fn: tableFormulaFn, setFn: setTableFormulaFn }}>
-    <div className="flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
+    <div className="cad-editor-shell flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
       {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
         ref={(el) => { (leftSidebarRef as any).current = el; leftRailScroll(el); }}
-        className="relative shrink-0 flex flex-col border-r overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain"
+        className="cad-tool-rail relative shrink-0 flex flex-col border-r overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain"
         style={{
           width: 56,
           background: "hsl(var(--surface-card))",
@@ -2067,7 +2067,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       </div>
       {/* Right Tab Panel */}
       {rightOpen && !presenting ? (
-      <aside className="shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+      <aside className="cad-settings-sidebar shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
             { id: "sheets" as const, label: "Seiten", Icon: SettingsIcon },
