@@ -79,3 +79,10 @@
 - [x] Kompakte Kopfzeile sowie kompakte Werkzeug- und Einstellungsleisten ab 1024 px.
 - [x] Keine globale Skalierung; CAD-Canvas, Weltmaßstab und Eingabekoordinaten bleiben unverändert.
 - [x] Tablet- und Handy-Dichte unterhalb 1024 px bleibt unverändert.
+
+## Ein Speicherweg pro Projekt (zentrale Synchronisierungsrichtlinie)
+- `src/lib/projectSync.ts` entscheidet allein: lokal / manuell sichern / Bereitschaft / live.
+- `src/lib/cloudBaseline.ts` merkt den zuletzt bestätigten Cloud-Stand (nur Prüfsummen).
+- CAD und Projektmappe melden sich als Quellen an und sichern objektweise.
+- Entfernt: automatischer Projekt-Upload (`scheduleSharedSave`) und `saveProjectDocument`.
+- Persönliche Einstellungen bleiben getrennt (`workspaceSync.tsx`).

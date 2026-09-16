@@ -17,7 +17,6 @@ import {
   hydrateSharedProject,
   onSharedSync,
   resetSharedSyncState,
-  scheduleSharedSave,
   sharedProjectIds,
 } from "@/lib/sharedProjectSync";
 import { setSharedProjectIdsProvider } from "@/lib/workspaceStorage";
@@ -77,15 +76,10 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
     const offAccess = projectAccessStore.subscribe(hydrateAll);
     hydrateAll();
 
-    // Lokale Änderungen an geteilten Projekten hochladen.
-    let known = new Map(projectStore.getState().projects.map((p) => [p.id, p] as const));
-    const offProjects = projectStore.subscribe(() => {
-      const next = new Map(projectStore.getState().projects.map((p) => [p.id, p] as const));
-      next.forEach((project, id) => {
-        if (known.get(id) !== project) scheduleSharedSave(id);
-      });
-      known = next;
-    });
+    // Bewusst kein automatischer Projekt-Upload mehr: Projektinhalte gehen
+    // ausschließlich über die zentrale Synchronisierungsrichtlinie
+    // (manuelles Sichern bzw. objektweise Live-Zusammenarbeit).
+
 
     // Rollen-/Mitgliedschaftsänderungen sofort übernehmen.
     const client = getNetworkClient();
@@ -107,7 +101,6 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
       offBlocked();
       offSync();
       offAccess();
-      offProjects();
       projectStore.setWriteGuard(null);
       setSharedProjectIdsProvider(null);
       if (client && channel) void client.removeChannel(channel);
