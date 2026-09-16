@@ -105,6 +105,8 @@ export class CadCollabSession {
   private flushing = false;
   private flushAgain = false;
   private ownLocks = new Map<string, { sheetId: string; objectId: string }>();
+  /** Objekte, für die gerade eine flüchtige Vorschau läuft. */
+  private previewed = new Map<string, LocalCadOp>();
   private heartbeatTimer = 0;
   private sweepTimer = 0;
   private status: CollabStatus = {
