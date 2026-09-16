@@ -262,6 +262,15 @@ export const projectAccessStore = {
   canComment(projectId: string | undefined): boolean {
     return projectAccessStore.accessFor(projectId).permissions.canComment;
   },
+
+  /**
+   * Anzahl weiterer berechtigter Personen (ohne einen selbst).
+   * 0 = persönliches Projekt: die Zusammenarbeit bleibt komplett aus.
+   */
+  otherMemberCount(projectId: string | undefined): number {
+    if (!projectId) return 0;
+    return state.otherMembersByProject.get(projectId) ?? 0;
+  },
 };
 
 /* ------------------------------------------------------------------ Hooks */
