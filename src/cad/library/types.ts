@@ -36,6 +36,15 @@ export interface LibraryGeometrySnapshot {
   data: Record<string, any>;
 }
 
+/** Ordner der Bibliotheksverwaltung (reine Organisation, unabhängig von Kategorie/Tags). */
+export interface LibraryFolder {
+  id: string;
+  name: string;
+  /** Übergeordneter Ordner oder null für die oberste Ebene. */
+  parentId: string | null;
+  createdAt: number;
+}
+
 export interface LibraryDefinition {
   schemaVersion: 1;
   id: string;
@@ -44,6 +53,8 @@ export interface LibraryDefinition {
   category: string;
   tags: string[];
   units: LibraryUnits;
+  /** Ordnerzuordnung; null/undefiniert = „Nicht zugeordnet“. */
+  folderId?: string | null;
   /** Einfügepunkt in lokalen Koordinaten (Meter). */
   insertionPoint: { x: number; y: number };
   metadata: {
@@ -89,6 +100,7 @@ export interface LibraryDefinitionMeta {
   author?: string;
   license?: string;
   source?: string;
+  folderId?: string | null;
   /**
    * Der Einfügepunkt ist immer der Mittelpunkt der gespeicherten Geometrie.
    * Ein wählbarer Nullpunkt existiert bewusst nicht mehr.

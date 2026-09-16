@@ -134,6 +134,7 @@ defineSchema({
         fill(data, "labels", []);
         fill(data, "stickers", []);
         fill(data, "libraryDefinitions", []);
+        fill(data, "libraryFolders", []);
         fill(data, "sheets", []);
         fill(data, "scenesById", {});
         fill(data, "plans", []);

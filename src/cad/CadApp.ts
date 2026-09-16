@@ -36,10 +36,10 @@ import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import { StickerTool } from "./StickerTool";
 import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
-import type { LibraryDefinition } from "./library/types";
+import type { LibraryDefinition, LibraryFolder } from "./library/types";
 import { LibraryPlacementTool } from "./library/LibraryPlacementTool";
 import * as Library from "./library/LibraryManager";
-import { serializeDefinitions, restoreDefinitions, serializeLibraryInstance } from "./library/librarySerde";
+import { serializeDefinitions, restoreDefinitions, serializeFolders, restoreFolders, serializeLibraryInstance } from "./library/librarySerde";
 import { DocumentTool } from "./DocumentTool";
 import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 import { FreeDrawTool } from "./FreeDrawTool";
@@ -394,6 +394,8 @@ export class CadApp {
 
   // Bibliothek (projektweit, Teil von Undo/Redo und Persistenz)
   libraryDefinitions: LibraryDefinition[] = [];
+  /** Ordnerstruktur der Bibliotheksverwaltung (rein organisatorisch). */
+  libraryFolders: LibraryFolder[] = [];
   onLibraryChange?: () => void;
 
   measureSettings: MeasureSettings = {
@@ -911,6 +913,7 @@ export class CadApp {
       _stickerEditInstanceId: this._stickerEditInstanceId,
       _stickerEditSnapshot: this._stickerEditSnapshot,
       libraryDefinitions: serializeDefinitions(this.libraryDefinitions),
+      libraryFolders: serializeFolders(this.libraryFolders),
       // Multi-Sheet-State
       sheets: this.sheetManager.toJSON(),
       activeSheetId: this.activeSheetId,
@@ -970,6 +973,7 @@ export class CadApp {
     }
     // Bibliotheksdefinitionen (additiv, fehlende Daten => leere Liste)
     this.libraryDefinitions = restoreDefinitions(data.libraryDefinitions);
+    this.libraryFolders = restoreFolders(data.libraryFolders);
     this.onLibraryChange?.();
     // Restore sheets list (falls vorhanden).
     if (Array.isArray(data.sheets)) {
@@ -3005,6 +3009,12 @@ export class CadApp {
   importLibraryDefinition(json: string) { return Library.importDefinition(this, json); }
   getLibraryDefinition(id: string) { return Library.getDefinition(this, id); }
   updateLibraryDefinitionMeta(id: string, meta: any) { return Library.updateDefinitionMeta(this, id, meta); }
+  duplicateLibraryDefinition(id: string) { return Library.duplicateDefinition(this, id); }
+  createLibraryFolder(name: string, parentId: string | null = null) { return Library.createFolder(this, name, parentId); }
+  renameLibraryFolder(id: string, name: string) { return Library.renameFolder(this, id, name); }
+  removeLibraryFolder(id: string) { return Library.removeFolder(this, id); }
+  moveLibraryFolder(id: string, parentId: string | null) { return Library.moveFolder(this, id, parentId); }
+  setLibraryDefinitionFolder(defId: string, folderId: string | null) { return Library.setDefinitionFolder(this, defId, folderId); }
   exportLibraryDefinitionSvg(id: string) { return Library.exportDefinitionSvg(this, id); }
   importLibraryDefinitionFromSvg(svg: string, meta: any, unitsPerMeter?: number) {
     return Library.importDefinitionFromSvg(this, svg, meta, unitsPerMeter);

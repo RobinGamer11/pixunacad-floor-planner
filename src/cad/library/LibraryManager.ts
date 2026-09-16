@@ -27,6 +27,7 @@ import {
 } from "./librarySerde";
 import type {
   LibraryDefinition,
+  LibraryFolder,
   LibraryDefinitionMeta,
   LibraryGeometryKind,
   LibraryGeometrySnapshot,
@@ -145,6 +146,7 @@ function buildDefinition(sel: LibrarySelection, meta: LibraryDefinitionMeta): Li
     category: (meta.category || "").trim(),
     tags: (meta.tags || []).map((t) => t.trim()).filter(Boolean),
     units: meta.units || "m",
+    folderId: meta.folderId ?? null,
     insertionPoint: { x: 0, y: 0 },
     metadata: {
       author: meta.author?.trim() || undefined,
@@ -355,6 +357,7 @@ export function updateDefinitionMeta(
   def.category = (meta.category ?? def.category ?? "").trim();
   def.tags = (meta.tags || []).map((t) => t.trim()).filter(Boolean);
   def.units = meta.units || def.units;
+  if (meta.folderId !== undefined) def.folderId = meta.folderId || null;
   def.metadata = {
     author: meta.author?.trim() || undefined,
     license: meta.license?.trim() || undefined,
@@ -426,3 +429,88 @@ export function exportDefinitionDxf(app: CadApp, id: string): { dxf: string; war
   return def ? exportDefinitionToDxf(def) : null;
 }
 
+
+/* ------------------------------------------------------------- Ordner */
+
+/** Neuen Ordner anlegen (optional als Unterordner). */
+export function createFolder(app: CadApp, name: string, parentId: string | null = null): LibraryFolder {
+  const folder: LibraryFolder = {
+    id: newLibraryId(),
+    name: (name || "").trim() || "Neuer Ordner",
+    parentId: parentId || null,
+    createdAt: Date.now(),
+  };
+  app.libraryFolders.push(folder);
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return folder;
+}
+
+export function renameFolder(app: CadApp, id: string, name: string): boolean {
+  const f = app.libraryFolders.find((x) => x.id === id);
+  if (!f) return false;
+  f.name = (name || "").trim() || f.name;
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return true;
+}
+
+/**
+ * Löscht einen Ordner samt Unterordnern. Die enthaltenen Bibliotheksobjekte
+ * bleiben erhalten und rutschen nach „Nicht zugeordnet“.
+ */
+export function removeFolder(app: CadApp, id: string): boolean {
+  const ids = new Set<string>();
+  const collect = (fid: string) => {
+    ids.add(fid);
+    for (const f of app.libraryFolders) if (f.parentId === fid) collect(f.id);
+  };
+  if (!app.libraryFolders.some((f) => f.id === id)) return false;
+  collect(id);
+  app.libraryFolders = app.libraryFolders.filter((f) => !ids.has(f.id));
+  for (const d of app.libraryDefinitions) if (d.folderId && ids.has(d.folderId)) d.folderId = null;
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return true;
+}
+
+/** Verschiebt einen Ordner unter einen anderen (Zyklen werden verhindert). */
+export function moveFolder(app: CadApp, id: string, parentId: string | null): boolean {
+  const f = app.libraryFolders.find((x) => x.id === id);
+  if (!f || id === parentId) return false;
+  let cur = parentId;
+  while (cur) {
+    if (cur === id) return false;
+    cur = app.libraryFolders.find((x) => x.id === cur)?.parentId || null;
+  }
+  f.parentId = parentId || null;
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return true;
+}
+
+/** Ordnet ein Bibliotheksobjekt einem Ordner zu (null = „Nicht zugeordnet“). */
+export function setDefinitionFolder(app: CadApp, defId: string, folderId: string | null): boolean {
+  const def = getDefinition(app, defId);
+  if (!def) return false;
+  def.folderId = folderId || null;
+  def.updatedAt = Date.now();
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return true;
+}
+
+/** Dupliziert eine Definition (neue ID, gleiche Geometrie und Metadaten). */
+export function duplicateDefinition(app: CadApp, id: string): LibraryDefinition | null {
+  const def = getDefinition(app, id);
+  if (!def) return null;
+  const copy: LibraryDefinition = JSON.parse(JSON.stringify(def));
+  copy.id = newLibraryId();
+  copy.name = `${def.name} (Kopie)`;
+  copy.createdAt = Date.now();
+  copy.updatedAt = Date.now();
+  app.libraryDefinitions.push(copy);
+  app.onLibraryChange?.();
+  app.commitHistorySnapshot?.();
+  return copy;
+}

@@ -12,6 +12,7 @@ import {
   PXOBJ_SCHEMA_VERSION,
   type LibraryDefinition,
   type LibraryGeometryKind,
+  type LibraryFolder,
   type LibraryGeometrySnapshot,
   type LibraryObjectInstance,
   type LibraryUnits,
@@ -51,6 +52,7 @@ export function normalizeDefinition(raw: any, opts: { newId?: boolean } = {}): L
     category: typeof raw.category === "string" ? raw.category : "",
     tags: Array.isArray(raw.tags) ? raw.tags.filter((t: any) => typeof t === "string") : [],
     units: UNITS.includes(raw.units) ? raw.units : "m",
+    folderId: typeof raw.folderId === "string" && raw.folderId ? raw.folderId : null,
     insertionPoint: {
       x: Number.isFinite(raw?.insertionPoint?.x) ? raw.insertionPoint.x : 0,
       y: Number.isFinite(raw?.insertionPoint?.y) ? raw.insertionPoint.y : 0,
@@ -83,6 +85,28 @@ export function restoreDefinitions(raw: any): LibraryDefinition[] {
     if (def) out.push(def);
   }
   return out;
+}
+
+/* --------------------------------------------------------------- Ordner */
+
+export function restoreFolders(raw: any): LibraryFolder[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LibraryFolder[] = [];
+  for (const f of raw) {
+    if (!f || typeof f !== "object") continue;
+    const id = typeof f.id === "string" && f.id ? f.id : newLibraryId();
+    const name = typeof f.name === "string" && f.name.trim() ? f.name.trim() : "Ordner";
+    out.push({
+      id, name,
+      parentId: typeof f.parentId === "string" && f.parentId ? f.parentId : null,
+      createdAt: Number.isFinite(f.createdAt) ? f.createdAt : Date.now(),
+    });
+  }
+  return out;
+}
+
+export function serializeFolders(folders: LibraryFolder[]): LibraryFolder[] {
+  return (folders || []).map((f) => ({ ...f }));
 }
 
 /* --------------------------------------------------------------- .pxobj */
