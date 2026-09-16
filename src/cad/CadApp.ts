@@ -2276,10 +2276,6 @@ export class CadApp {
       }
 
 
-      if (e.key === "Enter" && this.activeTool === this.stickerTool && !isHubInput) {
-        if (this.stickerTool.handleEnterKey()) { e.preventDefault(); return; }
-      }
-
       if (e.key === "Enter" && this.activeTool === this.measureTool && !isHubInput) {
         if (this.measureTool.finishCollect()) { e.preventDefault(); return; }
       }
@@ -2298,7 +2294,6 @@ export class CadApp {
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
-      if (e.key === "o" || e.key === "O") this.setTool(ToolIds.STICKER);
       if (e.key === "d" || e.key === "D") this.setTool(ToolIds.DOCUMENT);
       if (e.key === "f" || e.key === "F") this.setTool(ToolIds.FREE);
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
@@ -2371,7 +2366,6 @@ export class CadApp {
         // ESC im Tabellen-Zellmodus: nur den Zellmodus beenden, Tabelle bleibt
         // als normales CAD-Objekt ausgewählt.
         if (this.tableEditId) { e.preventDefault(); this.endTableEdit(); return; }
-        if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
 
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         // Stufe 1: Läuft gerade eine Zeichen-Aktion? Dann NUR diese abbrechen —
@@ -2383,7 +2377,6 @@ export class CadApp {
             t.cancel();
             return;
           }
-          if (t === this.stickerTool && this.stickerTool.phase !== "idle") { e.preventDefault(); this.stickerTool.cancel(); return; }
           if (t === this.documentTool && this.documentTool.phase !== "idle") { e.preventDefault(); this.documentTool.cancel(); return; }
         }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
@@ -2412,12 +2405,6 @@ export class CadApp {
         }
         if ((this.activeTool as any) === this.libraryTool) {
           if (this.libraryTool.phase !== "idle") { this.libraryTool.cancel(); return; }
-          this.setTool(ToolIds.SELECT);
-          return;
-        }
-        if (this.activeTool === this.stickerTool) {
-          // Erst aktive Platzierung abbrechen, sonst Tool wechseln
-          if (this.stickerTool.phase !== "idle") { this.stickerTool.cancel(); return; }
           this.setTool(ToolIds.SELECT);
           return;
         }
@@ -2514,11 +2501,6 @@ export class CadApp {
         if (this.selection && this.selection.type === SelectionType.LIBRARY_INSTANCE) {
           const inst = this.scene.getLibraryInstanceById((this.selection as any).libraryInstanceId);
           if (inst) { this.scene.removeLibraryInstance(inst); this.clearSelection(); this.refreshLabelUI(); }
-          return;
-        }
-        if (this.selection && this.selection.type === SelectionType.STICKER_INSTANCE) {
-          const inst = this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
-          if (inst) { this.scene.removeStickerInstance(inst); this.clearSelection(); }
           return;
         }
         if (this.selection && this.selection.type === SelectionType.DOCUMENT) {
@@ -2627,68 +2609,6 @@ export class CadApp {
     this.canvas.style.cursor = "";
   }
 
-  /* ---- Sticker library ---- */
-  createStickerFromSelection(name: string): StickerDefinition | null {
-    const def = buildStickerFromSelection(this, name);
-    if (!def) return null;
-    this.stickers.push(def);
-    this.onStickersChange?.();
-    return def;
-  }
-
-  createStickerFromIds(ids: StickerIdSet, name: string): StickerDefinition | null {
-    const def = buildStickerFromIds(this, ids, name);
-    if (!def) return null;
-    this.stickers.push(def);
-    this.onStickersChange?.();
-    return def;
-  }
-
-  renameSticker(id: string, name: string): boolean {
-    const s = this.stickers.find(x => x.id === id);
-    if (!s) return false;
-    s.name = name.trim() || s.name;
-    this.onStickersChange?.();
-    return true;
-  }
-
-  removeSticker(id: string): boolean {
-    const before = this.stickers.length;
-    this.stickers = this.stickers.filter(s => s.id !== id);
-    if (this.stickers.length === before) return false;
-    if (this.stickerTool.activeDef?.id === id) this.stickerTool.cancel();
-    this.onStickersChange?.();
-    return true;
-  }
-
-  beginStickerPlacement(id: string) {
-    const def = this.stickers.find(s => s.id === id);
-    if (!def) return;
-    if (this.activeTool !== this.stickerTool) this.setTool(ToolIds.STICKER);
-    this.stickerTool.beginPlacement(def);
-    this.onStickersChange?.();
-  }
-
-  /** Öffnet Edit-Mode für die erste platzierte Instanz dieses Stickers (oder gibt false zurück). */
-  openStickerEditByDefId(defId: string): boolean {
-    if (this.isStickerEditing()) return false;
-    const inst = this.scene.stickerInstances.find(si => si.defId === defId);
-    if (!inst) return false;
-    this.setTool(ToolIds.SELECT);
-    this.enterStickerEdit(inst as any);
-    return true;
-  }
-
-  /** Öffnet Edit-Mode für eine konkrete Instanz-ID. */
-  openStickerEditByInstanceId(instanceId: string): boolean {
-    if (this.isStickerEditing()) return false;
-    const inst = this.scene.getStickerInstanceById(instanceId);
-    if (!inst) return false;
-    this.setTool(ToolIds.SELECT);
-    this.enterStickerEdit(inst as any);
-    return true;
-  }
-
   /* ------------------------------------------------ Bibliothek (CAD-only) */
 
   /** Vorschau-Info zur aktuellen Auswahl (unterstützt/nicht unterstützt). */
@@ -2764,18 +2684,6 @@ export class CadApp {
   }
 
 
-
-  exportStickers(): string {
-    return exportStickersToJson(this.stickers);
-  }
-
-  importStickers(json: string): number {
-    const incoming = importStickersFromJson(json);
-    if (incoming.length === 0) return 0;
-    this.stickers.push(...incoming);
-    this.onStickersChange?.();
-    return incoming.length;
-  }
 
   private _commitPasteAtMouse() {
     if (!this.clipboard) { this.cancelPastePreview(); return; }
@@ -2873,7 +2781,6 @@ export class CadApp {
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
-    else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
     // Bibliothek: solange nichts platziert wird, arbeitet die normale Auswahl
     // weiter (Klick, Shift-Klick, Rahmenauswahl). Erst `beginPlacement()`
     // übernimmt das Bibliothekswerkzeug die Eingabe.
