@@ -138,9 +138,6 @@ export class SelectTool {
   private dimensionHubGuideOrigin: Vec2 | null = null;
 
   // Bibliotheksinstanz Drag-State (Translate) — unabhängig vom Sticker-State
-  dragLibraryId: string | null = null;
-  dragLibraryGrabOffset: Vec2 | null = null;
-  dragLibraryMouseStart: Vec2 | null = null;
   /* Bibliotheksobjekte werden NICHT mehr direkt per Linksklick gezogen. Die
      Transformation läuft ausschließlich über das Fangpunkt-Menü (wie Schraffur). */
   libraryPositionOriginal: Vec2 | null = null;
