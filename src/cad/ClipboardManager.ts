@@ -51,7 +51,13 @@ interface FreeSnap {
   labelId: string;
 }
 
-export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap;
+/** Platzierte Bibliotheksinstanz (nur Verweis + Transformation, Definition bleibt unberührt). */
+interface LibrarySnap {
+  kind: "library"; definitionId: string; definitionVersion: number;
+  position: Vec2; rotationRad: number; scaleX: number; scaleY: number; labelId: string;
+}
+
+export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap | LibrarySnap;
 
 
 export interface Clipboard {
@@ -109,12 +115,19 @@ function snapTextBox(t: TextBox): TextBoxSnap {
 }
 
 /* ---- Bounding center for an item, used as anchor candidate ---- */
+function snapLibrary(i: any): LibrarySnap {
+  return { kind: "library", definitionId: i.definitionId, definitionVersion: i.definitionVersion,
+    position: v(i.position.x, i.position.y), rotationRad: i.rotationRad,
+    scaleX: i.scaleX, scaleY: i.scaleY, labelId: i.labelId };
+}
+
 function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
   if (it.kind === "hatch") return polygonCentroid(it.points);
   if (it.kind === "dimension") return { x: (it.p1.x + it.p2.x) / 2, y: (it.p1.y + it.p2.y) / 2 };
   if (it.kind === "wall") return polygonCentroid(it.corners);
   if (it.kind === "free") return polygonCentroid(it.points);
+  if (it.kind === "library") return v(it.position.x, it.position.y);
   return v(it.center.x, it.center.y);
 }
 
@@ -149,6 +162,7 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       else if (kind === "dimension") { const o = s.getDimensionById?.(id); if (o) items.push(snapDimension(o)); }
       else if (kind === "textbox") { const o = s.getTextBoxById?.(id); if (o) items.push(snapTextBox(o)); }
       else if (kind === "freeStroke" || kind === "free") { const o = s.getFreeStrokeById?.(id); if (o) items.push(snapFree(o)); }
+      else if (kind === "library") { const o = s.getLibraryInstanceById?.(id); if (o) items.push(snapLibrary(o)); }
       else if (kind === "wall") {
         const o = s.getWallById?.(id);
         if (o) items.push({ kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
@@ -165,6 +179,9 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
     else if (hatch) items.push(snapHatch(hatch));
     else if (dim) items.push(snapDimension(dim));
     else if (tb) items.push(snapTextBox(tb));
+    else if ((app as any).getSelectedLibraryInstance?.()) {
+      items.push(snapLibrary((app as any).getSelectedLibraryInstance()));
+    }
     else if ((app as any).getSelectedFreeStroke?.()) {
       items.push(snapFree((app as any).getSelectedFreeStroke()));
     }
@@ -206,6 +223,7 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
     if (it.kind === "dimension") return translatedDim(it, dx, dy);
     if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (it.kind === "free") return { ...it, points: it.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
+    if (it.kind === "library") return { ...it, position: { x: it.position.x + dx, y: it.position.y + dy } };
     return translatedText(it, dx, dy);
   });
 }
@@ -276,6 +294,16 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         ...copyStrokeEffects(it),
       });
       if (o) created.push({ kind: "freeStroke", id: o.id });
+    } else if (it.kind === "library") {
+      // Neue Instanz mit neuer ID, aber identischer definitionId — die
+      // Bibliotheksdefinition selbst bleibt unverändert.
+      const o = (app.scene as any).createLibraryInstance({
+        definitionId: it.definitionId, definitionVersion: it.definitionVersion,
+        position: { x: it.position.x + dx, y: it.position.y + dy },
+        rotationRad: it.rotationRad, scaleX: it.scaleX, scaleY: it.scaleY,
+        labelId: it.labelId,
+      });
+      if (o) created.push({ kind: "library", id: o.id });
     } else {
       const o = app.scene.createTextBox(
         { x: it.center.x + dx, y: it.center.y + dy },
