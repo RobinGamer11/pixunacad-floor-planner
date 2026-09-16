@@ -148,6 +148,10 @@ export class SelectTool {
   libraryScaleYOriginal = 1;
   /** Weltposition des angeklickten Fangpunkts bei Editierbeginn. */
   libraryHandleOriginal: Vec2 | null = null;
+  /** 2-Punkt-Skalierung: ursprünglicher Referenzpunkt (Startlage). */
+  scale2ptRefOriginal: Vec2 | null = null;
+  /** 2-Punkt-Skalierung: aktueller Zielpunkt des Referenzpunkts. */
+  scale2ptTargetWorld: Vec2 | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
   dragStickerId: string | null = null;
