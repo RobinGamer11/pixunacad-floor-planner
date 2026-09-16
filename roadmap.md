@@ -74,3 +74,8 @@
   Text-/Tabelleneingaben werden bei Konflikt nicht still überschrieben.
 - Gesamtstand (`project_documents`) bleibt nur Erststand und Sicherheitskopie.
 - Offen: Abnahme mit zwei Browser-Sitzungen, Übertragung nach GitHub main.
+
+## CAD-Oberfläche: einheitliche Desktop-Dichte
+- [x] Kompakte Kopfzeile sowie kompakte Werkzeug- und Einstellungsleisten ab 1024 px.
+- [x] Keine globale Skalierung; CAD-Canvas, Weltmaßstab und Eingabekoordinaten bleiben unverändert.
+- [x] Tablet- und Handy-Dichte unterhalb 1024 px bleibt unverändert.
