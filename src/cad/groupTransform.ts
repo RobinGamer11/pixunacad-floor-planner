@@ -20,6 +20,7 @@ export function getGroupObject(app: any, kind: string, id: string): any {
     case "textbox":    return s.getTextBoxById?.(id);
     case "document":   return s.getDocumentById?.(id);
     case "sticker":    return s.getStickerInstanceById?.(id);
+    case "library":    return s.getLibraryInstanceById?.(id);
     default: return null;
   }
 }
