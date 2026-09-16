@@ -195,6 +195,7 @@ async function loadAccess(): Promise<void> {
     }
     // Ownership hat immer Vorrang und wird nie von Overrides berührt.
     for (const row of (owned ?? []) as { id: string; owner_id: string }[]) {
+      addPerson(row.id, row.owner_id);
       if (row.owner_id === myId) byProject.set(row.id, buildAccess(row.id, "owner", {}));
       else if (!byProject.has(row.id)) {
         // Sichtbar, aber ohne Mitgliedschaft → kein Zugriff.
