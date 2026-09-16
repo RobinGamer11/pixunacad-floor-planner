@@ -46,6 +46,16 @@ const SEND_DEBOUNCE_MS = 400;
 const PREVIEW_THROTTLE_MS = 80;
 const LOCK_HEARTBEAT_MS = 12_000;
 const LOCK_SWEEP_MS = 5_000;
+/** Nachlaufzeit, bevor nach dem Weggang der letzten Person abgeschaltet wird. */
+export const COLLAB_GRACE_MS = 45_000;
+
+/**
+ * Betriebsmodus der Zusammenarbeit:
+ *  - "off":     persönliches Projekt – keinerlei Verbindung.
+ *  - "standby": geteilt, aber allein – nur eine minimale Anwesenheitsmeldung.
+ *  - "live":    mindestens zwei Personen – volle Objektsynchronisierung.
+ */
+export type CollabMode = "off" | "standby" | "live";
 
 /** Minimale Sicht auf die CAD-Anwendung – kein Zugriff auf Interna der Werkzeuge. */
 export interface CollabCadApp {
