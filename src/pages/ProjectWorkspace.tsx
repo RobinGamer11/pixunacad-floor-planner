@@ -2,6 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "re
 import { CommentLayer } from "@/components/comments/CommentLayer";
 import { useMappeCollab } from "@/lib/mappeCollab/useMappeCollab";
 import { MappeCollabPageLayer } from "@/components/mappe/MappeCollabLayer";
+import { previewMappeElement } from "@/lib/mappeCollab/store";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
