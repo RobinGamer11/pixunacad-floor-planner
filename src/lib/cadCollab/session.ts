@@ -16,6 +16,16 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getNetworkClient } from "@/lib/networkClient";
 import { projectAccessStore } from "@/lib/projectAccess";
+import {
+  baselineKey,
+  hasBaseline,
+  hashText,
+  loadBaseline,
+  saveBaseline,
+  BASELINE_SEP,
+  type BaselineHashes,
+} from "@/lib/cloudBaseline";
+import { registerProjectSyncSource, reportProjectSyncSource } from "@/lib/projectSync";
 import { applyLibraryOp } from "./applyLibraryOps";
 import { applyOpToScene } from "./applyOps";
 import { diffSceneIndexes, indexSnapshot, type SceneIndex } from "./sceneDiff";
@@ -23,6 +33,7 @@ import {
   claimObjectLock,
   fetchLatestSeq,
   fetchObjectLocks,
+  fetchObjectRevisions,
   fetchObjectState,
   fetchOpsSince,
   isCollabSchemaMissing,
@@ -51,11 +62,13 @@ export const COLLAB_GRACE_MS = 45_000;
 
 /**
  * Betriebsmodus der Zusammenarbeit:
- *  - "off":     persönliches Projekt – keinerlei Verbindung.
- *  - "standby": geteilt, aber allein – nur eine minimale Anwesenheitsmeldung.
+ *  - "off":     persönliches Projekt ohne Cloud-Eintrag – keinerlei Verbindung.
+ *  - "local":   in der Cloud geführt, keine weiteren Mitglieder – keine
+ *               Verbindung; Sicherung ausschließlich per Klick.
+ *  - "standby": geteilt, aber allein online – nur eine minimale Anwesenheitsmeldung.
  *  - "live":    mindestens zwei Personen – volle Objektsynchronisierung.
  */
-export type CollabMode = "off" | "standby" | "live";
+export type CollabMode = "off" | "local" | "standby" | "live";
 
 /** Minimale Sicht auf die CAD-Anwendung – kein Zugriff auf Interna der Werkzeuge. */
 export interface CollabCadApp {
