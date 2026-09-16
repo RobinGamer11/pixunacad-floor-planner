@@ -23,7 +23,7 @@ import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, pattern
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
 import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import type { LibraryDefinition, LibraryGeometrySnapshot } from "./library/types";
-import { createObjectsFromSnapshots, instanceCornersWorld, snapshotsBounds, transformSnapshots } from "./library/libraryGeometry";
+import { createObjectsFromSnapshots, instanceCornersWorld, transformSnapshots } from "./library/libraryGeometry";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { applyFilterToCanvas, filterSignature } from "./documentFilters";
