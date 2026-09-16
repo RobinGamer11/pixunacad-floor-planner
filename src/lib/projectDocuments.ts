@@ -67,37 +67,8 @@ export async function loadProjectDocument(projectId: string): Promise<ProjectDoc
   };
 }
 
-/** Nur die Version lesen – für die günstige Konfliktprüfung vor dem Speichern. */
-export async function loadProjectDocumentVersion(projectId: string): Promise<number | null> {
-  const client = getNetworkClient();
-  if (!client) return null;
-  const { data, error } = await client
-    .from("project_documents")
-    .select("version")
-    .eq("project_id", projectId)
-    .maybeSingle();
-  if (error) throw classify(error);
-  return data ? Number(data.version ?? 0) : null;
-}
-
-/**
- * Speichert den gemeinsamen Stand.
- * `expectedVersion` ist die zuletzt geladene Version; weicht sie serverseitig
- * ab, wird mit `ProjectDocumentConflictError` abgebrochen, statt zu
- * überschreiben. Schreibrechte prüft zusätzlich die Datenbank.
+/*
+ * Bewusst ohne Schreibfunktion: Ein vollständiger Projekt-Schnappschuss wird
+ * nicht mehr in die Cloud geschrieben. Projektinhalte laufen ausschließlich
+ * objektweise über die zentrale Synchronisierungsrichtlinie.
  */
-export async function saveProjectDocument(
-  projectId: string,
-  payload: Record<string, unknown>,
-  expectedVersion: number | null,
-): Promise<number> {
-  const client = getNetworkClient();
-  if (!client) throw new Error("Keine Verbindung zur gemeinsamen Datenbasis.");
-  const { data, error } = await client.rpc("save_project_document", {
-    _project_id: projectId,
-    _payload: payload,
-    _expected_version: expectedVersion,
-  });
-  if (error) throw classify(error);
-  return Number(data ?? 0);
-}
