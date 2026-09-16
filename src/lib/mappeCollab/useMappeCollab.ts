@@ -13,6 +13,7 @@ import { setMappeSession, setMappeStatus } from "./store";
 
 const EMPTY: MappeCollabStatus = {
   connected: false,
+  mode: "off",
   unavailable: false,
   peers: [],
   locksByObject: new Map(),

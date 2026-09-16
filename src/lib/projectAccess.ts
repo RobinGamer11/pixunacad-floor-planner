@@ -118,6 +118,8 @@ interface AccessState {
   schemaMissing: boolean;
   myId: string | null;
   byProject: Map<string, ProjectAccess>;
+  /** projectId → Anzahl weiterer berechtigter Personen (ohne einen selbst). */
+  otherMembersByProject: Map<string, number>;
 }
 
 let state: AccessState = {
@@ -126,6 +128,7 @@ let state: AccessState = {
   schemaMissing: false,
   myId: null,
   byProject: new Map(),
+  otherMembersByProject: new Map(),
 };
 
 const listeners = new Set<() => void>();
@@ -174,7 +177,17 @@ async function loadAccess(): Promise<void> {
     if (memberErr) throw memberErr;
 
     const byProject = new Map<string, ProjectAccess>();
+    // Wer außer mir gehört zu welchem Projekt? Daraus ergibt sich, ob
+    // Zusammenarbeit überhaupt möglich ist.
+    const peopleByProject = new Map<string, Set<string>>();
+    const addPerson = (projectId: string, personId: string) => {
+      if (personId === myId) return;
+      const set = peopleByProject.get(projectId) ?? new Set<string>();
+      set.add(personId);
+      peopleByProject.set(projectId, set);
+    };
     for (const row of (memberships ?? []) as { project_id: string; user_id: string; role: string; permissions?: unknown }[]) {
+      addPerson(row.project_id, row.user_id);
       if (row.user_id !== myId) continue;
       const role: ProjectRole =
         row.role === "admin" || row.role === "viewer" ? row.role : "member";
@@ -182,6 +195,7 @@ async function loadAccess(): Promise<void> {
     }
     // Ownership hat immer Vorrang und wird nie von Overrides berührt.
     for (const row of (owned ?? []) as { id: string; owner_id: string }[]) {
+      addPerson(row.id, row.owner_id);
       if (row.owner_id === myId) byProject.set(row.id, buildAccess(row.id, "owner", {}));
       else if (!byProject.has(row.id)) {
         // Sichtbar, aber ohne Mitgliedschaft → kein Zugriff.
@@ -196,7 +210,10 @@ async function loadAccess(): Promise<void> {
       }
     }
 
-    state = { loading: false, ready: true, schemaMissing: false, myId, byProject };
+    const otherMembersByProject = new Map<string, number>();
+    for (const [projectId, people] of peopleByProject) otherMembersByProject.set(projectId, people.size);
+
+    state = { loading: false, ready: true, schemaMissing: false, myId, byProject, otherMembersByProject };
     emit();
   } catch (error) {
     state = {
@@ -205,6 +222,7 @@ async function loadAccess(): Promise<void> {
       schemaMissing: isMissingSchemaError(error),
       myId,
       byProject: new Map(),
+      otherMembersByProject: new Map(),
     };
     emit();
   }
@@ -243,6 +261,15 @@ export const projectAccessStore = {
   },
   canComment(projectId: string | undefined): boolean {
     return projectAccessStore.accessFor(projectId).permissions.canComment;
+  },
+
+  /**
+   * Anzahl weiterer berechtigter Personen (ohne einen selbst).
+   * 0 = persönliches Projekt: die Zusammenarbeit bleibt komplett aus.
+   */
+  otherMemberCount(projectId: string | undefined): number {
+    if (!projectId) return 0;
+    return state.otherMembersByProject.get(projectId) ?? 0;
   },
 };
 
