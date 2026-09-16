@@ -140,6 +140,10 @@ export class SelectTool {
   dragLibraryId: string | null = null;
   dragLibraryGrabOffset: Vec2 | null = null;
   dragLibraryMouseStart: Vec2 | null = null;
+  /** Ausgangsposition der Instanz beim Drag-Start (für ESC-Wiederherstellung). */
+  dragLibraryOrigin: Vec2 | null = null;
+  /** Drag wird erst nach echter Mausbewegung aus diesem Zustand heraus gestartet. */
+  pendingLibraryDrag: { id: string; screen: Vec2; world: Vec2; grab: Vec2 } | null = null;
 
   // Sticker-Instanz Drag-State (Translate)
   dragStickerId: string | null = null;
