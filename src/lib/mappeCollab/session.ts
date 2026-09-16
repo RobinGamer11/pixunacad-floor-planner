@@ -373,7 +373,17 @@ export class MappeCollabSession {
     this.updatePresence({ pageId });
   }
 
+  /**
+   * Im Standby (nur eine aktive Person) wird bewusst nichts gesendet – die
+   * einmalige Startmeldung beim Verbinden genügt, um einen Beitritt zu erkennen.
+   */
   updatePresence(partial: Partial<Pick<MappePresenceUser, "pageId" | "editingObjectId">>) {
+    if (this.mode !== "live") return;
+    this.trackPresence(partial);
+  }
+
+  /** Einmalige Presence-Meldung (Verbindungsaufbau, Moduswechsel). */
+  private trackPresence(partial?: Partial<Pick<MappePresenceUser, "pageId" | "editingObjectId">>) {
     if (!this.presence || !this.status.connected) return;
     const quiet = this.mode !== "live";
     void this.presence.track({
@@ -386,6 +396,7 @@ export class MappeCollabSession {
       ...(quiet ? { editingObjectId: null } : {}),
     } satisfies MappePresenceUser);
   }
+
 
   async lockObject(pageId: string, objectId: string): Promise<void> {
     this.updatePresence({ pageId, editingObjectId: objectId });
