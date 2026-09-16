@@ -3240,14 +3240,33 @@ export class SelectTool {
 
 
 
+    // Bibliotheksobjekt: Klick wählt nur aus — der Drag startet erst nach
+    // einer echten Mausbewegung aus dem Vormerk-Zustand heraus.
+    if (this.pendingLibraryDrag && !this.dragLibraryId) {
+      const p = this.pendingLibraryDrag;
+      if (!input.mouse.left) {
+        this.pendingLibraryDrag = null;
+      } else {
+        const dsx = input.mouse.sx - p.screen.x;
+        const dsy = input.mouse.sy - p.screen.y;
+        if (Math.hypot(dsx, dsy) > 3) {
+          const inst = (this.app.scene as any).getLibraryInstanceById(p.id);
+          if (inst) {
+            this.dragLibraryId = p.id;
+            this.dragLibraryMouseStart = v(p.world.x, p.world.y);
+            this.dragLibraryGrabOffset = v(p.grab.x, p.grab.y);
+            this.dragLibraryOrigin = v(inst.position.x, inst.position.y);
+          }
+          this.pendingLibraryDrag = null;
+        }
+      }
+    }
+
     // Aktiver Bibliotheksobjekt-Drag (mit Punkt-Snapping)
     if (this.dragLibraryId) {
       const inst = (this.app.scene as any).getLibraryInstanceById(this.dragLibraryId);
       if (!inst || !this.dragLibraryGrabOffset) {
-        this.dragLibraryId = null;
-        this.dragLibraryGrabOffset = null;
-        this.dragLibraryMouseStart = null;
-        this._clearTransformGuides();
+        this._endLibraryDrag(false);
       } else {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
         if (this._tryToggleTransformGuide(input, {}, this.dragLibraryMouseStart || mouseW)) return;
@@ -3258,10 +3277,12 @@ export class SelectTool {
           y: target.y - this.dragLibraryGrabOffset.y,
         };
         if (!input.mouse.left) {
-          this.dragLibraryId = null;
-          this.dragLibraryGrabOffset = null;
-          this.dragLibraryMouseStart = null;
-          this._clearTransformGuides();
+          const moved = !this.dragLibraryOrigin
+            || Math.abs(inst.position.x - this.dragLibraryOrigin.x) > 1e-9
+            || Math.abs(inst.position.y - this.dragLibraryOrigin.y) > 1e-9;
+          this._endLibraryDrag(false);
+          // Genau ein Undo-Schritt pro abgeschlossener Verschiebung.
+          if (moved) this.app.commitHistorySnapshot();
         }
         return;
       }
