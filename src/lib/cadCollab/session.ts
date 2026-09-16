@@ -140,6 +140,12 @@ export class CadCollabSession {
   private previewed = new Map<string, LocalCadOp>();
   private heartbeatTimer = 0;
   private sweepTimer = 0;
+  /** Zuletzt in der Cloud bestätigter Objektstand (nur Prüfsummen). */
+  private cloudHashes: BaselineHashes = new Map();
+  private baseKey = "";
+  private revisionsLoaded = false;
+  private saving = false;
+  private unregisterSync: (() => void) | null = null;
   private status: CollabStatus = {
     connected: false,
     mode: "off",
@@ -154,22 +160,35 @@ export class CadCollabSession {
   }
 
   /**
-   * Startet die Sitzung.
+   * Startet die Sitzung gemäß der zentralen Richtlinie.
    *
-   * Ohne weitere Teammitglieder passiert gar nichts: kein Kanal, keine
-   * Operationen, keine Präsenz. Sonst wird zunächst nur eine minimale
-   * Anwesenheitsverbindung geöffnet; die volle Synchronisierung schaltet sich
-   * erst zu, sobald wirklich jemand anderes im Projekt arbeitet.
+   * Ohne Cloud-Eintrag passiert gar nichts. Ohne weitere Teammitglieder wird
+   * lokal gearbeitet und nur auf Klick gesichert. Sind Mitglieder vorhanden,
+   * läuft eine minimale Anwesenheitsverbindung; die volle Synchronisierung
+   * schaltet sich erst zu, sobald wirklich jemand anderes im Projekt arbeitet.
    */
   async start(): Promise<void> {
     const { projectId } = this.opts;
     const access = projectAccessStore.accessFor(projectId);
     if (!access.shared || access.role === null) return; // rein lokales Projekt
-    if (projectAccessStore.otherMemberCount(projectId) === 0) return; // allein
+    this.baseKey = baselineKey("cad", projectId);
+    this.cloudHashes = loadBaseline(this.baseKey);
     this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
-    this.mode = "standby";
-    this.setStatus({ mode: "standby" });
-    this.connectPresence();
+    this.unregisterSync = registerProjectSyncSource(projectId, "cad", {
+      save: () => this.saveToCloud(),
+    });
+
+    this.mode = projectAccessStore.otherMemberCount(projectId) === 0 ? "local" : "standby";
+    this.setStatus({ mode: this.mode });
+
+    // Beim Öffnen den gemeinsamen Objektstand holen – aber nur, wenn lokal
+    // nichts Ungesichertes wartet. Eigene Arbeit wird nie überschrieben.
+    const firstOpen = !hasBaseline(this.baseKey);
+    if (firstOpen || this.pendingOps().length === 0) {
+      await this.pullRemoteState();
+    }
+    this.refreshDirty();
+    if (this.mode === "standby") this.connectPresence();
   }
 
   /** Nur Anwesenheit – keine Objektdaten, keine Cursor, keine Sperren. */
@@ -195,10 +214,131 @@ export class CadCollabSession {
       });
   }
 
+  /* ------------------------------------------- Cloud-Sicherung (ein Weg) */
+
+  /** Flacher Objektindex: Schlüssel → JSON-Text des Objekts. */
+  private flatten(index: SceneIndex): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const [sheetId, kinds] of index) {
+      for (const [kind, byId] of kinds) {
+        for (const [objectId, json] of byId) {
+          out.set(`${sheetId}${BASELINE_SEP}${kind}${BASELINE_SEP}${objectId}`, json);
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Objekte, die sich seit dem letzten bestätigten Cloud-Stand geändert haben. */
+  private pendingOps(): LocalCadOp[] {
+    const current = this.flatten(indexSnapshot(this.opts.app.serializeForCollab()));
+    const ops: LocalCadOp[] = [];
+    for (const [key, json] of current) {
+      if (this.cloudHashes.get(key) === hashText(json)) continue;
+      const [sheetId, kind, objectId] = key.split(BASELINE_SEP);
+      ops.push({
+        sheetId,
+        objectId,
+        objectKind: kind as CadObjectKind,
+        changeType: this.cloudHashes.has(key) ? "update" : "create",
+        payload: JSON.parse(json) as Record<string, unknown>,
+      });
+    }
+    for (const key of this.cloudHashes.keys()) {
+      if (current.has(key)) continue;
+      const [sheetId, kind, objectId] = key.split(BASELINE_SEP);
+      ops.push({ sheetId, objectId, objectKind: kind as CadObjectKind, changeType: "delete", payload: null });
+    }
+    // Bibliotheksdefinitionen zuerst: eine Instanz darf nie ohne Geometrie ankommen.
+    ops.sort((a, b) => Number(isLibraryKind(b.objectKind)) - Number(isLibraryKind(a.objectKind)));
+    return ops;
+  }
+
+  /** Merkt einen Objektstand als „in der Cloud bestätigt“. */
+  private noteCloudObject(op: LocalCadOp, payload: Record<string, unknown> | null) {
+    const key = `${op.sheetId}${BASELINE_SEP}${op.objectKind}${BASELINE_SEP}${op.objectId}`;
+    if (payload) this.cloudHashes.set(key, hashText(JSON.stringify(payload)));
+    else this.cloudHashes.delete(key);
+  }
+
+  /** Im Live-Betrieb gilt der laufende Stand als bestätigt. */
+  private baselineFromCurrent() {
+    const current = this.flatten(indexSnapshot(this.opts.app.serializeForCollab()));
+    this.cloudHashes = new Map();
+    for (const [key, json] of current) this.cloudHashes.set(key, hashText(json));
+    if (this.baseKey) saveBaseline(this.baseKey, this.cloudHashes);
+  }
+
+  private refreshDirty() {
+    if (this.mode === "off") return;
+    const dirty = this.mode === "live" ? false : this.pendingOps().length > 0;
+    this.report({ dirty });
+  }
+
+  private report(partial: Parameters<typeof reportProjectSyncSource>[2]) {
+    if (!this.baseKey) return;
+    reportProjectSyncSource(this.opts.projectId, "cad", partial);
+  }
+
+  /** Holt den gemeinsamen Objektstand (reines Lesen). */
+  private async pullRemoteState(): Promise<void> {
+    try {
+      const state = await fetchObjectState(this.opts.projectId);
+      this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
+      this.revisionsLoaded = true;
+      if (state.length) this.applyRemoteOps(state);
+      this.lastSeq = await fetchLatestSeq(this.opts.projectId);
+      this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
+      this.baselineFromCurrent();
+    } catch (error) {
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+    }
+  }
+
+  /**
+   * Manuelle Sicherung: überträgt ausschließlich die geänderten Objekte.
+   * Ein vollständiger Projekt-Schnappschuss wird nie geschrieben.
+   */
+  async saveToCloud(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live" || this.saving) return;
+    const { projectId } = this.opts;
+    if (!projectAccessStore.canEdit(projectId)) return;
+    const ops = this.pendingOps();
+    if (ops.length === 0) { this.report({ dirty: false, error: null }); return; }
+    this.saving = true;
+    this.report({ saving: true, error: null });
+    try {
+      if (!this.revisionsLoaded) {
+        this.revisions = await fetchObjectRevisions(projectId);
+        this.revisionsLoaded = true;
+      }
+      for (const op of ops) {
+        await this.writeOne(op);
+        if (this.destroyed) return;
+      }
+      saveBaseline(this.baseKey, this.cloudHashes);
+      this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
+      this.report({ saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null });
+    } catch (error) {
+      saveBaseline(this.baseKey, this.cloudHashes);
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({
+        saving: false,
+        dirty: true,
+        error: isCollabSchemaMissing(error)
+          ? "Die Cloud-Sicherung ist für dieses Projekt noch nicht eingerichtet."
+          : "Die Cloud-Sicherung ist fehlgeschlagen. Deine Arbeit ist lokal gespeichert.",
+      });
+    } finally {
+      this.saving = false;
+    }
+  }
+
   /**
    * Schaltet die objektbasierte Zusammenarbeit ein, sobald eine zweite Person
-   * im Projekt arbeitet: erst den gemeinsamen Stand abgleichen, daraus die
-   * gemeinsame Ausgangsbasis bilden, danach Einzeloperationen und Vorschauen.
+   * im Projekt arbeitet: erst die eigenen offenen Änderungen objektweise
+   * abgleichen, dann den gemeinsamen Stand laden, daraus die gemeinsame
+   * Ausgangsbasis bilden, danach Einzeloperationen und Vorschauen.
    */
   private async goLive(): Promise<void> {
     if (this.destroyed || this.mode === "live" || this.activating) return;
@@ -207,9 +347,13 @@ export class CadCollabSession {
     this.activating = true;
     const { projectId } = this.opts;
     try {
+      // Einmaliger Abgleich der eigenen offenen Änderungen – objektweise und
+      // mit Revisionsschutz, damit fremde Stände nie überschrieben werden.
+      await this.saveToCloud();
       // Gemeinsamen Objektstand laden – nicht die gesamte Änderungshistorie.
       const state = await fetchObjectState(projectId);
       this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
+      this.revisionsLoaded = true;
       this.applyRemoteOps(state);
       this.lastSeq = await fetchLatestSeq(projectId);
       this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
@@ -222,10 +366,11 @@ export class CadCollabSession {
     this.mode = "live";
     this.activating = false;
     this.setStatus({ mode: "live" });
+    this.baselineFromCurrent();
+    this.report({ mode: "live", dirty: false, saving: false, error: null });
     this.trackPresence();
     this.connect();
     this.startTimers();
-
   }
 
   /** Nachlauf starten, wenn die letzte andere Person das Projekt verlässt. */
