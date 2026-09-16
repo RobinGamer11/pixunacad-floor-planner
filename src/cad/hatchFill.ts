@@ -235,8 +235,8 @@ function buildPlanarFaces(rawEdges: RawEdge[]): { faceLoops: Vec2[][]; verts: Ve
  * Findet das kleinste Polygon, das den Klickpunkt enthält.
  * Rückgabe: Polygon-Punkte (CCW) oder null wenn kein geschlossener Bereich umschließt.
  */
-export function findEnclosingFace(scene: Scene, click: Vec2): Vec2[] | null {
-  return findEnclosingFaceFromEdges(collectBoundaryEdges(scene), click);
+export function findEnclosingFace(scene: Scene, click: Vec2, extraScenes: Scene[] = []): Vec2[] | null {
+  return findEnclosingFaceFromEdges(collectBoundaryEdges(scene, extraScenes), click);
 }
 
 /**
