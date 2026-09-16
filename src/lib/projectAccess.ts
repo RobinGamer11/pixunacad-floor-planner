@@ -177,7 +177,17 @@ async function loadAccess(): Promise<void> {
     if (memberErr) throw memberErr;
 
     const byProject = new Map<string, ProjectAccess>();
+    // Wer außer mir gehört zu welchem Projekt? Daraus ergibt sich, ob
+    // Zusammenarbeit überhaupt möglich ist.
+    const peopleByProject = new Map<string, Set<string>>();
+    const addPerson = (projectId: string, personId: string) => {
+      if (personId === myId) return;
+      const set = peopleByProject.get(projectId) ?? new Set<string>();
+      set.add(personId);
+      peopleByProject.set(projectId, set);
+    };
     for (const row of (memberships ?? []) as { project_id: string; user_id: string; role: string; permissions?: unknown }[]) {
+      addPerson(row.project_id, row.user_id);
       if (row.user_id !== myId) continue;
       const role: ProjectRole =
         row.role === "admin" || row.role === "viewer" ? row.role : "member";
