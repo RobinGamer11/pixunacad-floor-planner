@@ -21,7 +21,8 @@ export const CAD_OBJECT_KINDS = [
   "doors",
 ] as const;
 
-export type CadObjectKind = (typeof CAD_OBJECT_KINDS)[number];
+/** Objektarten, die direkt in einer Zeichenszene liegen. */
+export type CadSceneKind = (typeof CAD_OBJECT_KINDS)[number];
 
 /**
  * Bibliotheksdaten gehören zum Projekt, nicht zu einer Zeichenseite. Sie
