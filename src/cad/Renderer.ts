@@ -3,7 +3,7 @@ import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToR
 import { Camera } from "./Camera";
 import { metersToUnit, rulerSideOf, rulerTickStep, rulerUnitOf } from "./rulerModel";
 import type { RasterLayers } from "./RasterLayers";
-import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
+import { Scene, Hatch, Dimension, TextBox, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
 import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx, strokeWithBrushIfActive } from "./strokeEffects";
 import { getEffectiveContourGeometry } from "./effectiveGeometry";
@@ -21,7 +21,6 @@ import { evalCell } from "@/lib/table/tableFormula";
 import { strokeHatchSeal } from "./hatchSeal";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, patternAlwaysFollowsWall, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
-import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import type { LibraryDefinition, LibraryGeometrySnapshot } from "./library/types";
 import { createObjectsFromSnapshots, instanceCornersWorld, transformSnapshots } from "./library/libraryGeometry";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
@@ -42,7 +41,6 @@ export interface Selection {
   hatchId?: string;
   dimensionId?: string;
   textBoxId?: string;
-  stickerInstanceId?: string;
   /** Ausgewählte Bibliotheksinstanz (eigener Auswahltyp, kein Sticker). */
   libraryInstanceId?: string;
   documentId?: string;
@@ -285,7 +283,7 @@ export class Renderer {
    * Zeichnet ALLE Objekte gruppiert nach Label-ID, von Hintergrund zu Vordergrund.
    * Höher in der ID-Panel-Liste (kleinerer Index) = Vordergrund.
    * Innerhalb einer ID-Gruppe gilt die Sub-Reihenfolge:
-   * Documents → Hatches → Segments → Dimensions → TextBoxes → Stickers.
+   * Documents → Hatches → Segments → Dimensions → TextBoxes.
    * Damit liegen z. B. Schraffuren einer höher gerankten ID über Linien einer niedriger gerankten ID.
    */
   private _drawByLabelOrder() {
@@ -309,7 +307,6 @@ export class Renderer {
       this._drawDimensionsForLabel(labelId);
       this._drawTextBoxesForLabel(labelId);
       this._drawTablesForLabel(labelId);
-      this._drawStickerInstancesForLabel(labelId);
       this._drawLibraryInstancesForLabel(labelId);
     }
     if (!isExportMode()) {
@@ -439,7 +436,6 @@ export class Renderer {
     this._drawSegmentSelection();
     this._drawDimensionSelection();
     this._drawTextBoxSelection();
-    this._drawStickerInstanceSelection();
     this._drawLibraryInstanceSelection();
     this._drawDocumentSnapAffordances();
     this._drawDocumentGuides();
@@ -459,7 +455,6 @@ export class Renderer {
         this._drawSegmentSelection();
         this._drawDimensionSelection();
         this._drawTextBoxSelection();
-        this._drawStickerInstanceSelection();
     this._drawLibraryInstanceSelection();
         this._drawDocumentSelection();
         this._drawFreeStrokeSelection();
@@ -467,7 +462,6 @@ export class Renderer {
       this.selection = original;
     }
 
-    this._drawStickerEditFrame();
 
 
     if (this.overlay && this.overlay.draw) {
