@@ -1422,6 +1422,30 @@
   *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
 }
 
+/* Linke Werkzeugleiste auf Handy/Tablet: eigener Scrollbereich mit dezentem
+   Hinweis, dass unten weitere Werkzeuge folgen. Flyouts liegen als Portal
+   über der Zeichenfläche und werden davon nicht beschnitten. */
+@media (max-width: 1023px) {
+  .tool-rail-scroll {
+    max-height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tool-rail-scroll::after {
+    content: "";
+    position: sticky;
+    bottom: 0;
+    flex: none;
+    align-self: stretch;
+    display: block;
+    height: 16px;
+    margin-top: -16px;
+    pointer-events: none;
+    background: linear-gradient(to top, hsl(var(--surface-card)) 10%, hsl(var(--surface-card) / 0) 100%);
+  }
+}
+
 /* Kompakte CAD-Dichte auf Laptop und Desktop.
    Nur die Bedienoberfläche wird verdichtet; Canvas und Koordinatensystem
    bleiben unskaliert. Tablet und Handy behalten ihre Touch-Größen. */

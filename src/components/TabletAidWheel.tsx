@@ -36,19 +36,83 @@ function MouseIcon({ side, size = 29 }: { side: "left" | "right"; size?: number 
  * - Rand des Rades ist ein Griff — an ihm kann das Rad verschoben werden.
  * Position wird in localStorage gespeichert.
  */
+/** Tatsächlich sichtbarer Bereich (berücksichtigt Browser-Leisten auf iOS/Android). */
+function visibleViewport() {
+  if (typeof window === "undefined") return { w: 1024, h: 768 };
+  const vv = window.visualViewport;
+  return {
+    w: Math.round(vv?.width ?? window.innerWidth),
+    h: Math.round(vv?.height ?? window.innerHeight),
+  };
+}
+
+function safeInset(name: string): number {
+  if (typeof window === "undefined") return 0;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const px = Number.parseFloat(raw);
+  return Number.isFinite(px) ? px : 0;
+}
+
 export function TabletAidWheel() {
   const STORAGE_KEY = "pixuna.tabletAid.pos";
   const size = 190;
+
+  /**
+   * Begrenzt eine gespeicherte Position auf den sichtbaren Bereich.
+   * Die Nutzerposition bleibt erhalten und wird nur so weit verschoben,
+   * dass das Rad mit kleinem Randabstand vollständig erreichbar bleibt.
+   */
+  const clamp = React.useCallback((p: { x: number; y: number }) => {
+    const { w, h } = visibleViewport();
+    const margin = 8;
+    const bottomSafe = safeInset("--sab") || 0;
+    const maxX = Math.max(margin, w - size - margin);
+    const maxY = Math.max(margin, h - size - margin - bottomSafe);
+    return {
+      x: Math.min(Math.max(margin, p.x), maxX),
+      y: Math.min(Math.max(margin, p.y), maxY),
+    };
+  }, [size]);
+
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    let stored: { x: number; y: number } | null = null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) stored = JSON.parse(raw);
     } catch {}
-    return { x: 16, y: Math.max(80, (typeof window !== "undefined" ? window.innerHeight : 800) - size - 24) };
+    const { h } = visibleViewport();
+    const base = stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)
+      ? stored
+      : { x: 16, y: Math.max(8, h - size - 24) };
+    const { w: vw, h: vh } = visibleViewport();
+    const margin = 8;
+    return {
+      x: Math.min(Math.max(margin, base.x), Math.max(margin, vw - size - margin)),
+      y: Math.min(Math.max(margin, base.y), Math.max(margin, vh - size - margin)),
+    };
   });
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch {}
   }, [pos]);
+
+  // Beim Einblenden sowie bei Größen-/Orientierungswechsel sofort einpassen.
+  useEffect(() => {
+    const fit = () => setPos((p) => {
+      const c = clamp(p);
+      return c.x === p.x && c.y === p.y ? p : c;
+    });
+    fit();
+    window.addEventListener("resize", fit);
+    window.addEventListener("orientationchange", fit);
+    window.visualViewport?.addEventListener("resize", fit);
+    window.visualViewport?.addEventListener("scroll", fit);
+    return () => {
+      window.removeEventListener("resize", fit);
+      window.removeEventListener("orientationchange", fit);
+      window.visualViewport?.removeEventListener("resize", fit);
+      window.visualViewport?.removeEventListener("scroll", fit);
+    };
+  }, [clamp]);
 
   // Solange das Rad sichtbar ist: Tablet-Commit-Gate aktivieren, damit reale
   // Stift-/Finger-Kontakte in Zeichenwerkzeugen NICHT sofort einen Punkt setzen.
@@ -85,9 +149,7 @@ export function TabletAidWheel() {
   const onDragMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
-    const nx = Math.max(0, Math.min(window.innerWidth - size, d.ox + (e.clientX - d.startX)));
-    const ny = Math.max(0, Math.min(window.innerHeight - size, d.oy + (e.clientY - d.startY)));
-    setPos({ x: nx, y: ny });
+    setPos(clamp({ x: d.ox + (e.clientX - d.startX), y: d.oy + (e.clientY - d.startY) }));
   };
   const onDragEnd = (e: React.PointerEvent) => {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
