@@ -850,6 +850,8 @@ export class CadCollabSession {
   syncPolicy() {
     if (this.destroyed || this.mode !== "local") return;
     if (projectAccessStore.otherMemberCount(this.opts.projectId) === 0) return;
+    window.clearInterval(this.policyTimer);
+    this.policyTimer = 0;
     this.mode = "standby";
     this.setStatus({ mode: "standby" });
     this.report({ mode: "standby" });
