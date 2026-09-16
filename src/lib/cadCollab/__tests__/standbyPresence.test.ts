@@ -45,6 +45,7 @@ describe("CAD-Standby: keine wiederholten Presence-Meldungen", () => {
       requestRender: () => {},
     });
     await session.start();
+    await new Promise((r) => setTimeout(r, 5));
     expect(tracks).toHaveLength(1);
 
     for (let i = 0; i < 20; i++) {
