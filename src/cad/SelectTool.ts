@@ -187,6 +187,20 @@ export class SelectTool {
   /** Parallele Transform-Hilfslinien (R-Klick auf eine bestehende Kante). */
   editParallelGuides: { key: string; point: Vec2; dir: Vec2 }[] = [];
 
+  /** Beendet einen Bibliotheks-Drag; `revert` stellt die Ausgangsposition wieder her. */
+  private _endLibraryDrag(revert: boolean) {
+    if (revert && this.dragLibraryId && this.dragLibraryOrigin) {
+      const inst = (this.app.scene as any).getLibraryInstanceById?.(this.dragLibraryId);
+      if (inst) inst.position = { x: this.dragLibraryOrigin.x, y: this.dragLibraryOrigin.y };
+    }
+    this.dragLibraryId = null;
+    this.dragLibraryGrabOffset = null;
+    this.dragLibraryMouseStart = null;
+    this.dragLibraryOrigin = null;
+    this.pendingLibraryDrag = null;
+    this._clearTransformGuides();
+  }
+
   private _clearTransformGuides() {
     this.editGuideAnchors = [];
     this.editParallelGuides = [];
