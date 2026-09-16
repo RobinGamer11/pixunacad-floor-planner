@@ -1,9 +1,20 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { captureWorkspace, restoreWorkspace, type WorkspacePayload } from "@/lib/workspaceStorage";
+import { captureSettings, mergeWorkspace, type WorkspacePayload } from "@/lib/workspaceStorage";
 
-const SYNC_INTERVAL_MS = 4_000;
+/**
+ * Kontoweite Sicherung persönlicher Einstellungen.
+ *
+ * Wichtig: Hier wird bewusst KEIN vollständiger Abzug des lokalen Speichers
+ * mehr übertragen. Projekt-, CAD-, Dokument- und Bilddaten laufen über die
+ * projektbezogene Speicherung bzw. die objektbasierte Zusammenarbeit. Der
+ * frühere Komplettabzug im Vier-Sekunden-Takt hat das Speicherkontingent
+ * gesprengt („quota has been exceeded“).
+ */
+const CHECK_INTERVAL_MS = 15_000;
+const MIN_RETRY_MS = 30_000;
+const MAX_RETRY_MS = 10 * 60_000;
 
 function LoadingWorkspace() {
   return (
@@ -16,6 +27,15 @@ function LoadingWorkspace() {
   );
 }
 
+function friendlyMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  if (/quota|payload too large|413/i.test(raw)) {
+    return "Deine persönlichen Einstellungen konnten nicht gesichert werden, weil der Cloud-Speicher voll ist. Projekt- und Zeichnungsdaten sind davon nicht betroffen.";
+  }
+  if (/sitzung/i.test(raw)) return raw;
+  return "Deine persönlichen Einstellungen konnten gerade nicht gesichert werden. Es wird später automatisch erneut versucht.";
+}
+
 export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
   const [ready, setReady] = useState(false);
@@ -23,6 +43,9 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
   const [syncError, setSyncError] = useState<string | null>(null);
   const lastSnapshot = useRef<string>("");
   const saving = useRef(false);
+  const retryAt = useRef(0);
+  const retryDelay = useRef(MIN_RETRY_MS);
+  const failures = useRef(0);
 
   useEffect(() => {
     if (!session) {
@@ -39,7 +62,7 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
         setSyncError(null);
         setCanSync(false);
         if (window.sessionStorage.getItem(hydrationKey) === "1") {
-          lastSnapshot.current = JSON.stringify(captureWorkspace());
+          lastSnapshot.current = JSON.stringify(captureSettings());
           if (active) {
             setCanSync(true);
             setReady(true);
@@ -49,23 +72,26 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
 
         const remote = await supabase.getWorkspace();
         if (remote?.payload && typeof remote.payload === "object") {
-          restoreWorkspace(remote.payload as WorkspacePayload);
+          // Vorhandene Stände (auch der frühere Komplettabzug) werden
+          // übernommen, aber niemals lokale Daten gelöscht.
+          const changed = mergeWorkspace(remote.payload as WorkspacePayload);
           window.sessionStorage.setItem(hydrationKey, "1");
-          // Die bestehenden synchronen Stores lesen beim Modulstart aus localStorage.
-          // Ein einmaliger Reload stellt daher sicher, dass sie den Cloud-Stand übernehmen.
-          window.location.reload();
-          return;
+          if (changed) {
+            // Die synchronen Stores lesen beim Modulstart aus dem lokalen
+            // Speicher – ein einmaliger Reload übernimmt den Cloud-Stand.
+            window.location.reload();
+            return;
+          }
+        } else {
+          window.sessionStorage.setItem(hydrationKey, "1");
         }
 
-        const snapshot = captureWorkspace();
-        await supabase.saveWorkspace(snapshot);
-        window.sessionStorage.setItem(hydrationKey, "1");
-        lastSnapshot.current = JSON.stringify(snapshot);
+        lastSnapshot.current = "";
         if (active) setCanSync(true);
       } catch (error) {
         if (active) {
           setCanSync(false);
-          setSyncError(error instanceof Error ? error.message : "Die Cloud-Synchronisierung ist nicht verfügbar.");
+          setSyncError(friendlyMessage(error));
         }
       } finally {
         if (active) setReady(true);
@@ -82,7 +108,8 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
 
     const sync = async () => {
       if (saving.current) return;
-      const snapshot = captureWorkspace();
+      if (Date.now() < retryAt.current) return;
+      const snapshot = captureSettings();
       const serialized = JSON.stringify(snapshot);
       if (serialized === lastSnapshot.current) return;
 
@@ -90,15 +117,23 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
       try {
         await supabase.saveWorkspace(snapshot);
         lastSnapshot.current = serialized;
+        retryDelay.current = MIN_RETRY_MS;
+        retryAt.current = 0;
+        failures.current = 0;
         setSyncError(null);
       } catch (error) {
-        setSyncError(error instanceof Error ? error.message : "Die Cloud-Synchronisierung ist nicht verfügbar.");
+        // Kein Dauerfeuer bei einer echten Störung: wachsende Wartezeit und
+        // Hinweis erst, wenn es wiederholt nicht klappt.
+        failures.current += 1;
+        retryAt.current = Date.now() + retryDelay.current;
+        retryDelay.current = Math.min(MAX_RETRY_MS, retryDelay.current * 2);
+        if (failures.current >= 2) setSyncError(friendlyMessage(error));
       } finally {
         saving.current = false;
       }
     };
 
-    const interval = window.setInterval(() => { void sync(); }, SYNC_INTERVAL_MS);
+    const interval = window.setInterval(() => { void sync(); }, CHECK_INTERVAL_MS);
     return () => window.clearInterval(interval);
   }, [canSync, ready, session]);
 
@@ -109,7 +144,7 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
       {children}
       {syncError && (
         <div role="alert" className="fixed bottom-4 right-4 z-[100] max-w-md rounded-lg border border-destructive/30 bg-background px-4 py-3 text-sm shadow-lg">
-          <strong>Cloud-Synchronisierung pausiert.</strong>
+          <strong>Sicherung der Einstellungen pausiert.</strong>
           <div className="mt-1 text-muted-foreground">{syncError}</div>
         </div>
       )}

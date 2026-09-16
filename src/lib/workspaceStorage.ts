@@ -45,6 +45,63 @@ function isWorkspaceKey(key: string) {
     && !key.startsWith("pixuna.legal.");
 }
 
+/**
+ * Persönliche Kleinigkeiten, die weiterhin kontoweit gesichert werden dürfen
+ * (Darstellung, Werkzeugvorlieben, Position des Tablet-Hilfsrads).
+ *
+ * Bewusst NICHT enthalten: Projekt-, CAD-, Tabellen-, Notiz-, Finanz-,
+ * Board- und Dokumentdaten. Diese laufen ausschließlich über die
+ * projektbezogene Speicherung bzw. die objektbasierte Zusammenarbeit –
+ * ein kompletter LocalStorage-Abzug sprengt sonst das Speicherkontingent.
+ */
+const SETTINGS_KEYS = new Set([
+  "pixuna.theme",
+  "pixuna.canvasDark",
+  "pixuna.penOnly",
+  "pixuna.tabletAid",
+  "pixuna.tabletAid.pos",
+]);
+const SETTINGS_PREFIXES = ["pixuna.finance.tplfav."];
+/** Sicherheitsnetz gegen unerwartet große Einzelwerte. */
+const MAX_SETTING_BYTES = 8 * 1024;
+
+export function isSettingsKey(key: string) {
+  return SETTINGS_KEYS.has(key) || SETTINGS_PREFIXES.some((p) => key.startsWith(p));
+}
+
+/** Kleiner Einstellungs-Schnappschuss (ersetzt den früheren Komplettabzug). */
+export function captureSettings(): WorkspacePayload {
+  const localStorageState: Record<string, string> = {};
+  if (typeof window === "undefined") return { localStorage: localStorageState };
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (!key || !isSettingsKey(key)) continue;
+    const value = window.localStorage.getItem(key);
+    if (value === null || value.length > MAX_SETTING_BYTES) continue;
+    localStorageState[key] = value;
+  }
+  return { localStorage: localStorageState };
+}
+
+/**
+ * Übernimmt einen gespeicherten Stand, ohne lokale Daten zu löschen.
+ * Ältere Konten enthalten serverseitig noch den früheren Komplettabzug;
+ * dessen Inhalte werden weiterhin übernommen, damit auf einem neuen Gerät
+ * nichts fehlt.
+ */
+export function mergeWorkspace(payload: WorkspacePayload): boolean {
+  if (typeof window === "undefined") return false;
+  const incoming = payload?.localStorage ?? {};
+  let changed = false;
+  Object.entries(incoming).forEach(([key, value]) => {
+    if (!isWorkspaceKey(key)) return;
+    if (window.localStorage.getItem(key) === value) return;
+    window.localStorage.setItem(key, value);
+    changed = true;
+  });
+  return changed;
+}
+
 export function captureWorkspace(): WorkspacePayload {
   const localStorageState: Record<string, string> = {};
   if (typeof window === "undefined") return { localStorage: localStorageState };
