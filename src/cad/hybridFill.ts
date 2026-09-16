@@ -49,6 +49,8 @@ export interface HybridFillOptions {
   activeLabelId?: string | null;
   /** Sichtbarkeitsfilter für Ebenen (Vektor wie Raster). */
   isVisible?: (labelId: string) => boolean;
+  /** Zusätzliche schreibgeschützte Weltszenen (z. B. Bibliotheksobjekte). */
+  extraScenes?: Scene[];
 }
 
 interface Rect { x: number; y: number; w: number; h: number }
