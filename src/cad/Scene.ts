@@ -469,38 +469,6 @@ export class TextBox {
   }
 }
 
-export interface StickerInstanceItem {
-  // Lokale Snapshot-Items (relativ zu (0,0)). Strukturell identisch zu ClipboardItem.
-  // Wir lassen das absichtlich "any" um keine Zirkulärimporte zu erzeugen.
-  [key: string]: any;
-}
-
-export class StickerInstance {
-  id: string;
-  defId: string | null; // optional: Referenz auf Bibliotheks-Definition
-  name: string;
-  items: StickerInstanceItem[]; // lokale Geometrie (Kopie)
-  position: Vec2;
-  rotationRad: number;
-  scale: number;
-  labelId: string;
-
-  constructor({ id, defId, name, items, position, rotationRad, scale, labelId }: {
-    id: string; defId?: string | null; name?: string;
-    items: StickerInstanceItem[];
-    position: Vec2; rotationRad?: number; scale?: number; labelId?: string;
-  }) {
-    this.id = id;
-    this.defId = defId || null;
-    this.name = name || "Sticker";
-    this.items = items;
-    this.position = v(position.x, position.y);
-    this.rotationRad = rotationRad || 0;
-    this.scale = (typeof scale === "number" && scale > 0) ? scale : 1;
-    this.labelId = labelId || Defaults.defaultLabelId;
-  }
-}
-
 /**
  * Platzierte Bibliotheksinstanz — bewusst EIGENER Objekttyp (kein Sticker).
  * Sie hält nur die Referenz auf eine projektweite `LibraryDefinition` sowie
@@ -994,23 +962,20 @@ export class Scene {
   dimensions: Dimension[] = [];
   textBoxes: TextBox[] = [];
   tables: TableObject[] = [];
-  stickerInstances: StickerInstance[] = [];
-  /** Platzierte Bibliotheksinstanzen (eigener Objekttyp, unabhängig von Stickern). */
+  /** Platzierte Bibliotheksinstanzen (eigener Objekttyp). */
   libraryInstances: LibraryInstance[] = [];
   documents: DocumentObject[] = [];
   walls: Wall[] = [];
   doors: Door[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
-   * Sticker-Edit-Owner-ID markiert. Wird von CadApp während enterStickerEdit
-   * gesetzt und beim Exit wieder geleert.
+   * Edit-Owner-ID markiert (Alt-Mechanismus, aktuell ungenutzt und immer null).
    */
   _currentEditOwnerId: string | null = null;
   private _segIdMap = new Map<string, Segment>();
   private _hatchIdMap = new Map<string, Hatch>();
   private _dimIdMap = new Map<string, Dimension>();
   private _textIdMap = new Map<string, TextBox>();
-  private _stickerIdMap = new Map<string, StickerInstance>();
   private _libraryIdMap = new Map<string, LibraryInstance>();
   private _docIdMap = new Map<string, DocumentObject>();
   private _freeIdMap = new Map<string, FreeStroke>();
@@ -1120,11 +1085,6 @@ export class Scene {
   assignTablesToLabel(ids: string[], newId: string) {
     const set = new Set(ids);
     for (const t of this.tables) if (set.has(t.id)) t.labelId = newId;
-  }
-
-  private _rebuildStickerIdMap() {
-    this._stickerIdMap.clear();
-    for (const s of this.stickerInstances) this._stickerIdMap.set(s.id, s);
   }
 
   private _rebuildDocIdMap() {
@@ -1299,43 +1259,6 @@ export class Scene {
   assignDocumentsToLabel(ids: string[], newId: string) {
     const set = new Set(ids);
     for (const d of this.documents) if (set.has(d.id)) d.labelId = newId;
-  }
-
-  // ---- Sticker Instances ----
-  createStickerInstance(opts: {
-    defId?: string | null; name?: string;
-    items: StickerInstanceItem[];
-    position: Vec2; rotationRad?: number; scale?: number; labelId?: string;
-  }): StickerInstance {
-    const inst = new StickerInstance({ id: this._makeId(), ...opts });
-    this.stickerInstances.push(inst);
-    this._rebuildStickerIdMap();
-    return inst;
-  }
-
-  getStickerInstanceById(id: string): StickerInstance | null { return this._stickerIdMap.get(id) || null; }
-
-  getStickerInstancesByLabelId(labelId: string): StickerInstance[] {
-    return this.stickerInstances.filter(s => s.labelId === labelId);
-  }
-
-  removeStickerInstance(inst: StickerInstance) {
-    this.stickerInstances = this.stickerInstances.filter(s => s !== inst);
-    this._rebuildStickerIdMap();
-  }
-
-  removeStickerInstancesByLabelId(labelId: string) {
-    this.stickerInstances = this.stickerInstances.filter(s => s.labelId !== labelId);
-    this._rebuildStickerIdMap();
-  }
-
-  reassignStickerInstancesLabel(oldId: string, newId: string) {
-    for (const s of this.stickerInstances) if (s.labelId === oldId) s.labelId = newId;
-  }
-
-  assignStickerInstancesToLabel(ids: string[], newId: string) {
-    const set = new Set(ids);
-    for (const s of this.stickerInstances) if (set.has(s.id)) s.labelId = newId;
   }
 
   // ---- Library Instances (Bibliotheksobjekte) ----
