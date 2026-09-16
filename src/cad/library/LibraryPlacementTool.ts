@@ -12,6 +12,7 @@ import type { Input } from "../Input";
 import type { Camera } from "../Camera";
 import { snapshotPoints, transformSnapshots } from "./libraryGeometry";
 import type { LibraryDefinition } from "./types";
+import { SelectionType, ToolIds } from "../constants";
 
 type Phase = "idle" | "placing" | "rotating";
 
@@ -97,10 +98,10 @@ export class LibraryPlacementTool {
     }
   }
 
-  /** Setzt die Instanz endgültig (ein Undo-Schritt) und bleibt platzierbereit. */
+  /** Setzt genau eine Instanz und übergibt sie direkt an das Auswahlwerkzeug. */
   commit() {
     if (!this.activeDef || !this.anchor) return;
-    this.app.scene.createLibraryInstance({
+    const inst = this.app.scene.createLibraryInstance({
       definitionId: this.activeDef.id,
       definitionVersion: this.activeDef.version,
       position: { x: this.anchor.x, y: this.anchor.y },
@@ -109,11 +110,18 @@ export class LibraryPlacementTool {
       scaleY: this.scale,
       labelId: this.app.activeDrawLabelId,
     });
+    this.phase = "idle";
+    this.activeDef = null;
     this.anchor = null;
     this.rotationRad = 0;
-    this.phase = "placing";
     this.app.refreshLabelUI?.();
     this.app.commitHistorySnapshot?.();
+    this.app.setTool(ToolIds.SELECT);
+    this.app.setSelection({
+      type: SelectionType.LIBRARY_INSTANCE,
+      libraryInstanceId: inst.id,
+      handleIndex: null,
+    } as any);
     this.onStateChange?.();
   }
 
