@@ -411,8 +411,33 @@ export class Renderer {
         ctx.restore();
       }
       if (this.gridSettings.enabled) this._drawGrid();
+      this._drawWorldOriginMarker();
     }
   }
+
+  /**
+   * Feines blaues X am CAD-Weltursprung (0, 0).
+   * Reine Orientierungshilfe: kein Objekt, keine Ebene, nie im Export sichtbar.
+   * Konstante Bildschirmgröße — unabhängig vom Zoom.
+   */
+  private _drawWorldOriginMarker() {
+    if (isExportMode() || this.planMode) return;
+    const ctx = this.ctx;
+    const o = this.camera.worldToScreen(0, 0);
+    if (!isFinite(o.x) || !isFinite(o.y)) return;
+    const r = 7; // konstante Bildschirmgröße
+    if (o.x < -r || o.y < -r || o.x > this.vw + r || o.y > this.vh + r) return;
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(77,163,255,0.75)";
+    ctx.beginPath();
+    ctx.moveTo(o.x - r, o.y - r); ctx.lineTo(o.x + r, o.y + r);
+    ctx.moveTo(o.x + r, o.y - r); ctx.lineTo(o.x - r, o.y + r);
+    ctx.stroke();
+    ctx.restore();
+  }
+
 
   private _renderInner() {
     const ctx = this.ctx;
