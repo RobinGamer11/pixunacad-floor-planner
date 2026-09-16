@@ -60,9 +60,10 @@ export function useMappeCollab({
       displayName,
       getProtectedObjectId: () => editingRef.current,
       onFieldConflict: (id) => conflictRef.current?.(id),
-      onStatus: (next) => setStatus({ ...next }),
+      onStatus: (next) => { setStatus({ ...next }); setMappeStatus({ ...next }); },
     });
     sessionRef.current = collab;
+    setMappeSession(collab);
     void collab.start();
 
     // Nach dem Loslassen: Vorschau beenden, die dauerhafte Änderung folgt.

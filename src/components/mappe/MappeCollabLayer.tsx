@@ -8,10 +8,17 @@
  */
 import type { PageElement, ProjectPage } from "@/lib/projectStore";
 import type { MappeCollabStatus } from "@/lib/mappeCollab/session";
+import { useMappeCollabStatus } from "@/lib/mappeCollab/store";
 
 interface Props {
   page: ProjectPage;
   status: MappeCollabStatus;
+}
+
+/** Bequemer Einstieg: holt den Live-Zustand selbst. */
+export function MappeCollabPageLayer({ page }: { page: ProjectPage }) {
+  const status = useMappeCollabStatus();
+  return <MappeCollabLayer page={page} status={status} />;
 }
 
 function box(el: Partial<PageElement>) {
