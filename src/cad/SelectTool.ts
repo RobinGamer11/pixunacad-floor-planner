@@ -138,7 +138,7 @@ export class SelectTool {
   dragDimGrabDy = 0;
   private dimensionHubGuideOrigin: Vec2 | null = null;
 
-  // Bibliotheksinstanz Drag-State (Translate) — unabhängig vom Sticker-State
+  // Bibliotheksinstanz Drag-State (Translate)
   /* Bibliotheksobjekte werden NICHT mehr direkt per Linksklick gezogen. Die
      Transformation läuft ausschließlich über das Fangpunkt-Menü (wie Schraffur). */
   libraryPositionOriginal: Vec2 | null = null;
@@ -3215,7 +3215,7 @@ export class SelectTool {
 
     // ── Gruppen-Verschieben (Mehrfachauswahl ziehen) ─────────────────────
     {
-      const busy = !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
+      const busy = !!(this.dragDocId || this.dragFreeStrokeId
         || this.dragTextBoxId || this.dragDimId || this.dragAreaLabelHatchId
         || this.rotateTextBoxId || this.isEditing() || input.isPanning || input.keys.space);
       const mouseW = v(input.mouse.wx, input.mouse.wy);
@@ -3312,7 +3312,7 @@ export class SelectTool {
     // Sonder-Modi, kein Pan). Wird beim Aufziehen aus der Leerraum-Situation
     // heraus entstehen — sobald der Cursor sich > 6px vom Klickpunkt bewegt.
     {
-      const anyDrag = !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
+      const anyDrag = !!(this.dragDocId || this.dragFreeStrokeId
         || this.dragTextBoxId || this.dragDimId || this.dragAreaLabelHatchId
         || this.rotateTextBoxId);
       const anyEdit = this.isEditing();
@@ -3364,7 +3364,7 @@ export class SelectTool {
 
     // Shift-Klick → Mehrfachauswahl: Element hinzufügen/entfernen.
     if (input.clicked && input.keys?.shift && !this.isEditing()
-        && !this.dragStickerId && !this.dragDocId && !this.dragTextBoxId
+        && !this.dragDocId && !this.dragTextBoxId
         && !this.dragFreeStrokeId && !this.dragDimId && !this.rotateTextBoxId) {
       // Einzel-Selektion (z. B. TextBox, Tabelle, Hatch) in die
       // Mehrfachauswahl überführen, bevor das zweite Element ergänzt wird.
@@ -3384,7 +3384,7 @@ export class SelectTool {
     // damit keine blau markierten „Geister“ zurückbleiben.
     if (input.clicked && !input.keys?.shift && !this.isEditing() && !this.pasteFloatActive
         && this.marqueeSelectedIds.length && !this.marqueeActive
-        && !this.dragStickerId && !this.dragDocId && !this.dragTextBoxId
+        && !this.dragDocId && !this.dragTextBoxId
         && !this.dragFreeStrokeId && !this.dragDimId && !this.rotateTextBoxId) {
       this.marqueeSelectedIds = [];
     }
@@ -3395,7 +3395,7 @@ export class SelectTool {
 
 
     // Tür-Klick → in Door-Tool (nur Edit-Modus) wechseln & selektieren.
-    if (input.clicked && !this.isEditing() && !this.dragStickerId && !this.dragDocId
+    if (input.clicked && !this.isEditing() && !this.dragDocId
         && !this.dragTextBoxId && !this.dragAreaLabelHatchId && !this.rotateTextBoxId) {
       // doorTool existiert nur in der vollständigen CadApp, nicht in MiniCad (Projektmappen-Seite).
       const doorTool: any = (this.app as any).doorTool;
@@ -4574,7 +4574,7 @@ export class SelectTool {
     const editGuideDefs = this._editGuideDefinitions();
     const directTransformActive = this.app.dimensionHubMode === "move"
       || this.app.documentHubMode !== "none"
-      || !!(this.dragStickerId || this.dragDocId || this.dragFreeStrokeId
+      || !!(this.dragDocId || this.dragFreeStrokeId
         || this.dragAreaLabelHatchId || this.dragTextBoxId || this.rotateTextBoxId || this.dragDimId);
 
     // Dezente Fangpunkt-Vorschau, solange etwas verschoben/gedreht wird.
