@@ -2347,7 +2347,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <HatchSettingsPanel
                   app={appRef.current}
                   projectId={projectId}
-                  patternScaleMax={600}
+                  patternScaleMax={5000}
                   hideChrome
                   afterStroke={<CadBigToggleProxy target={areaShowRef} label="Flächenanzeige" />}
                 />
