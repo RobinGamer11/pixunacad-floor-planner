@@ -7,20 +7,20 @@
  */
 import type { Scene } from "@/cad/Scene";
 import { appendSceneObjects } from "@/cad/sceneSerde";
-import type { CadObjectKind, CadObjectOp } from "./types";
+import type { CadObjectKind, CadObjectOp, CadSceneKind } from "./types";
 
 interface KindOps {
   /** Vorhandenes Objekt mit dieser ID entfernen. */
   remove(scene: Scene, id: string): void;
   /** Feldname der Objektliste in der Szene. */
-  field: CadObjectKind;
+  field: CadSceneKind;
   /** ID-Zuordnung nach dem Einfügen neu aufbauen. */
   rebuild(scene: Scene): void;
 }
 
 const anyScene = (scene: Scene) => scene as unknown as Record<string, any>;
 
-const KIND_OPS: Record<CadObjectKind, KindOps> = {
+const KIND_OPS: Record<CadSceneKind, KindOps> = {
   segments: {
     field: "segments",
     remove: (s, id) => { const o = s.getSegmentById(id); if (o) s.removeSegment(o); },
