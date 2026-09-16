@@ -1,25 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowLeft, ChevronDown, ChevronRight, Copy, Download, FileCode2, Folder,
-  FolderOpen, Info, ListRestart, MapPin, MoreHorizontal, Pencil, Plus, RefreshCw,
-  Save, Search, SlidersHorizontal, Tags, Trash2, Ungroup, Upload, X,
-} from "lucide-react";
+import { Boxes, Download, FileCode2, Pencil, Plus, Save, Trash2, Upload, Ungroup, X } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
-import { collectLibrarySelection } from "@/cad/library/LibraryManager";
-import type { LibraryDefinition, LibraryGeometrySnapshot, LibraryUnits } from "@/cad/library/types";
+import type { LibraryDefinition, LibraryUnits } from "@/cad/library/types";
 import { PXOBJ_EXTENSION } from "@/cad/library/types";
 import { detectDxfUnits, listDxfUnitOptions } from "@/cad/library/dxfImport";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
-  DropdownMenuSeparator, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { LibraryGeometryPreview } from "@/components/cad/LibraryGeometryPreview";
-import { cn } from "@/lib/utils";
+
 
 interface Props {
   app: CadApp | null;
+  /** Nur anzeigen, wenn gerade ein Bibliotheksobjekt ausgewählt ist. */
   onlyWhenInstance?: boolean;
 }
 
@@ -33,6 +22,10 @@ type Meta = {
   units: LibraryUnits;
 };
 
+const EMPTY_META: Meta = {
+  name: "", category: "", tags: [], author: "", license: "", source: "", units: "m",
+};
+
 type Mode =
   | { kind: "none" }
   | { kind: "save" }
@@ -40,19 +33,19 @@ type Mode =
   | { kind: "svg"; svg: string; warnings: string[] }
   | { kind: "dxf"; dxf: string; detected: string };
 
-const EMPTY_META: Meta = { name: "", category: "", tags: [], author: "", license: "", source: "", units: "m" };
-const inputCls = "cad-settings-input h-11 w-full px-3 text-[12px]";
-const selectCls = "cad-settings-select h-11 w-full px-3 text-[12px]";
-const iconButtonCls = "h-9 w-9 shrink-0 border-border/80 text-muted-foreground hover:text-foreground";
+const inputCls = "cad-settings-input w-full h-10 text-[12px] px-3";
+const selectCls = "cad-settings-select w-full h-10 text-[12px] px-3";
+
 
 function fileSafe(name: string) {
-  return (name || "bibliotheksobjekt").replace(/[^\w-]+/g, "_");
+  return (name || "bibliotheksobjekt").replace(/[^\w\-]+/g, "_");
 }
 
-function menuIconClass() {
-  return "mr-2 h-4 w-4";
-}
-
+/**
+ * Bibliothek — nur eigenständige CAD-Oberfläche.
+ * Speichern aus Auswahl (Kopie/Original), Suche, Kategorien, Tags,
+ * Platzieren, Bearbeiten, Auflösen sowie .pxobj- und SVG-Austausch.
+ */
 export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
   const [defs, setDefs] = useState<LibraryDefinition[]>([]);
   const [query, setQuery] = useState("");
@@ -65,431 +58,535 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
   const [svgUnits, setSvgUnits] = useState(1000);
   const [dxfUnits, setDxfUnits] = useState(1000);
   const [selInfo, setSelInfo] = useState<{ count: number; unsupported: string[] }>({ count: 0, unsupported: [] });
-  const [selectionGeometry, setSelectionGeometry] = useState<LibraryGeometrySnapshot[]>([]);
   const [instanceDefId, setInstanceDefId] = useState<string | null>(null);
   const [placingId, setPlacingId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [libraryOpen, setLibraryOpen] = useState(true);
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const importRef = useRef<HTMLInputElement>(null);
   const svgRef = useRef<HTMLInputElement>(null);
   const dxfRef = useRef<HTMLInputElement>(null);
+  const lastInstanceDef = useRef<string | null>(null);
+
 
   useEffect(() => {
     if (!app) return;
     const sync = () => setDefs([...(app.libraryDefinitions || [])]);
     sync();
-    const previous = app.onLibraryChange;
-    app.onLibraryChange = () => { previous?.(); sync(); };
-    return () => { app.onLibraryChange = previous; };
+    const prev = app.onLibraryChange;
+    app.onLibraryChange = () => { prev?.(); sync(); };
+    return () => { app.onLibraryChange = prev; };
   }, [app]);
 
+  // Auswahlstatus laufend auffrischen (die Canvas-Auswahl ist nicht reaktiv).
   useEffect(() => {
     if (!app) return;
-    let lastSelectionKey = "";
-    const timer = window.setInterval(() => {
+    const t = window.setInterval(() => {
       try {
-        const selection = collectLibrarySelection(app);
-        const selectionKey = selection.refs.map((ref) => `${ref.kind}:${ref.id}`).join("|");
-        setSelInfo({ count: selection.snapshots.length, unsupported: selection.unsupported });
-        if (selectionKey !== lastSelectionKey) {
-          lastSelectionKey = selectionKey;
-          setSelectionGeometry(selection.snapshots);
-        }
-        const instance = app.getSelectedLibraryInstance();
-        const definitionId = instance ? String((instance as { definitionId: string }).definitionId) : null;
-        setInstanceDefId(definitionId);
+        setSelInfo(app.getLibrarySelectionInfo());
+        const inst = app.getSelectedLibraryInstance();
+        const defId = inst ? (inst as any).definitionId as string : null;
+        setInstanceDefId(defId);
         setPlacingId(app.libraryTool?.activeDefinitionId || null);
-        if (definitionId) setSelectedId(definitionId);
-      } catch { /* Auswahlabfrage darf die Oberfläche nicht unterbrechen. */ }
+      } catch { /* ignore */ }
     }, 150);
-    return () => window.clearInterval(timer);
+    return () => window.clearInterval(t);
   }, [app]);
 
-  const metaFromDefinition = useCallback((definition: LibraryDefinition): Meta => ({
-    name: definition.name,
-    category: definition.category || "",
-    tags: [...(definition.tags || [])],
-    author: definition.metadata?.author || "",
-    license: definition.metadata?.license || "",
-    source: definition.metadata?.source || "",
-    units: definition.units || "m",
+  const metaFromDefinition = useCallback((d: LibraryDefinition): Meta => ({
+    name: d.name,
+    category: d.category || "",
+    tags: [...(d.tags || [])],
+    author: d.metadata?.author || "",
+    license: d.metadata?.license || "",
+    source: d.metadata?.source || "",
+    units: d.units || "m",
   }), []);
 
+  // Klick auf eine Instanz öffnet automatisch deren Definition zum Bearbeiten.
+  useEffect(() => {
+    if (!app) return;
+    if (instanceDefId && instanceDefId !== lastInstanceDef.current) {
+      const d = app.getLibraryDefinition(instanceDefId);
+      if (d) { setMeta(metaFromDefinition(d)); setMode({ kind: "edit", id: d.id }); }
+    }
+    if (!instanceDefId && lastInstanceDef.current) {
+      setMode((m) => (m.kind === "edit" ? { kind: "none" } : m));
+    }
+    lastInstanceDef.current = instanceDefId;
+  }, [instanceDefId, app, metaFromDefinition]);
+
   const categories = useMemo(
-    () => [...new Set(defs.map((definition) => definition.category || "Ohne Kategorie"))].sort((a, b) => a.localeCompare(b, "de")),
+    () => [...new Set(defs.map((d) => d.category).filter(Boolean))].sort(),
     [defs],
   );
   const allTags = useMemo(
-    () => [...new Set(defs.flatMap((definition) => definition.tags || []))].sort((a, b) => a.localeCompare(b, "de")),
+    () => [...new Set(defs.flatMap((d) => d.tags || []))].sort(),
     [defs],
   );
+
   const visible = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return defs.filter((definition) => {
-      if (category && (definition.category || "Ohne Kategorie") !== category) return false;
-      if (tag && !definition.tags.includes(tag)) return false;
-      if (!normalizedQuery) return true;
-      return definition.name.toLowerCase().includes(normalizedQuery)
-        || (definition.category || "").toLowerCase().includes(normalizedQuery)
-        || (definition.tags || []).some((item) => item.toLowerCase().includes(normalizedQuery));
+    const q = query.trim().toLowerCase();
+    return defs.filter((d) => {
+      if (category && d.category !== category) return false;
+      if (tag && !d.tags.includes(tag)) return false;
+      if (!q) return true;
+      return d.name.toLowerCase().includes(q)
+        || (d.category || "").toLowerCase().includes(q)
+        || (d.tags || []).some((t) => t.toLowerCase().includes(q));
     });
   }, [defs, query, category, tag]);
-  const groupedDefinitions = useMemo(() => categories.map((name) => ({
-    name,
-    definitions: visible.filter((definition) => (definition.category || "Ohne Kategorie") === name),
-    total: defs.filter((definition) => (definition.category || "Ohne Kategorie") === name).length,
-  })).filter((group) => group.definitions.length > 0), [categories, defs, visible]);
-  const selectedDefinition = defs.find((definition) => definition.id === selectedId) ?? null;
-  const editedDefinition = mode.kind === "edit" ? defs.find((definition) => definition.id === mode.id) ?? null : null;
-
-  useEffect(() => {
-    if (openCategories.size > 0 || groupedDefinitions.length === 0) return;
-    setOpenCategories(new Set([groupedDefinitions[0].name]));
-  }, [groupedDefinitions, openCategories.size]);
 
   if (!app) return null;
   if (onlyWhenInstance && !instanceDefId) return null;
 
-  const buildMeta = () => ({ ...meta });
-  const closeEditor = () => { setMode({ kind: "none" }); setMeta(EMPTY_META); setTagDraft(""); };
-  const openSave = () => {
-    setReplaceOriginal(false);
-    setMeta({ ...EMPTY_META, name: `Bibliotheksobjekt ${defs.length + 1}` });
-    setMode({ kind: "save" });
-  };
-  const openEdit = (definition: LibraryDefinition) => {
-    setSelectedId(definition.id);
-    setMeta(metaFromDefinition(definition));
-    setMode({ kind: "edit", id: definition.id });
-  };
+  const buildMeta = () => ({
+    name: meta.name,
+    category: meta.category,
+    tags: meta.tags,
+    units: meta.units,
+    author: meta.author,
+    license: meta.license,
+    source: meta.source,
+  });
+
   const addTag = (raw: string) => {
-    const next = raw.trim();
-    if (!next) return;
-    setMeta((current) => current.tags.includes(next) ? current : { ...current, tags: [...current.tags, next] });
+    const t = raw.trim();
+    if (!t) return;
+    setMeta((m) => (m.tags.includes(t) ? m : { ...m, tags: [...m.tags, t] }));
     setTagDraft("");
   };
+
+  const closeDialog = () => { setMode({ kind: "none" }); setMeta(EMPTY_META); setTagDraft(""); };
+
   const download = (name: string, text: string, type: string) => {
     const blob = new Blob([text], { type });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = name;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
   };
+
   const saveSelection = () => {
-    const result = replaceOriginal
+    const res = replaceOriginal
       ? app.convertSelectionToLibraryObject(buildMeta())
       : app.addLibraryDefinitionFromSelection(buildMeta());
-    if (!result.definition) { window.alert("Keine unterstützten Objekte in der Auswahl."); return; }
-    if (result.unsupported.length) window.alert("Diese Objekte wurden NICHT gespeichert:\n• " + result.unsupported.join("\n• "));
-    setSelectedId(result.definition.id);
-    closeEditor();
-  };
-  const saveSvg = (svg: string) => {
-    const result = app.importLibraryDefinitionFromSvg(svg, buildMeta(), svgUnits);
-    if (!result.definition) { window.alert("SVG konnte nicht importiert werden:\n• " + (result.warnings.join("\n• ") || "Unbekannter Fehler")); return; }
-    if (result.warnings.length) window.alert("SVG importiert. Hinweise:\n• " + result.warnings.join("\n• "));
-    setSelectedId(result.definition.id);
-    closeEditor();
-  };
-  const saveDxf = (dxf: string) => {
-    const result = app.importLibraryDefinitionFromDxf(dxf, buildMeta(), dxfUnits);
-    if (!result.definition) { window.alert("DXF konnte nicht importiert werden:\n• " + (result.failed || result.warnings.join("\n• ") || "Unbekannter Fehler")); return; }
-    if (result.warnings.length) window.alert("DXF importiert. Hinweise:\n• " + result.warnings.join("\n• "));
-    setSelectedId(result.definition.id);
-    closeEditor();
-  };
-  const beginPlacement = (definition: LibraryDefinition) => {
-    setSelectedId(definition.id);
-    app.beginLibraryPlacement(definition.id);
-  };
-  const removeDefinition = (definition: LibraryDefinition) => {
-    if (!window.confirm(`„${definition.name}“ löschen? Platzierte Exemplare werden ebenfalls entfernt.`)) return;
-    app.removeLibraryDefinition(definition.id);
-    if (selectedId === definition.id) setSelectedId(null);
-    if (mode.kind === "edit" && mode.id === definition.id) closeEditor();
-  };
-  const exportPxobj = (definition: LibraryDefinition) => {
-    const json = app.exportLibraryDefinition(definition.id);
-    if (json) download(`${fileSafe(definition.name)}${PXOBJ_EXTENSION}`, json, "application/json");
-  };
-  const exportSvg = (definition: LibraryDefinition) => {
-    const svg = app.exportLibraryDefinitionSvg(definition.id);
-    if (svg) download(`${fileSafe(definition.name)}.svg`, svg, "image/svg+xml");
-  };
-  const exportDxf = (definition: LibraryDefinition) => {
-    const result = app.exportLibraryDefinitionDxf(definition.id);
-    if (!result) return;
-    download(`${fileSafe(definition.name)}.dxf`, result.dxf, "image/vnd.dxf");
-    if (result.warnings.length) window.alert("DXF exportiert. Hinweise:\n• " + result.warnings.join("\n• "));
+    if (!res.definition) { window.alert("Keine unterstützten Objekte in der Auswahl."); return; }
+    if (res.unsupported.length) {
+      window.alert("Diese Objekte wurden NICHT gespeichert:\n• " + res.unsupported.join("\n• "));
+    }
+    closeDialog();
   };
 
-  const DefinitionMenu = ({ definition }: { definition: LibraryDefinition }) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className={iconButtonCls} aria-label={`Weitere Aktionen für ${definition.name}`} title="Weitere Aktionen">
-          <MoreHorizontal />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="library-menu w-52">
-        <DropdownMenuItem onSelect={() => openEdit(definition)}><Pencil className={menuIconClass()} />Bearbeiten</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => exportPxobj(definition)}><Download className={menuIconClass()} />Pixuna-Datei exportieren</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => exportSvg(definition)}><FileCode2 className={menuIconClass()} />Als SVG exportieren</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => exportDxf(definition)}><FileCode2 className={menuIconClass()} />Als DXF exportieren</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => removeDefinition(definition)}><Trash2 className={menuIconClass()} />Löschen</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const saveSvg = (svg: string) => {
+    const res = app.importLibraryDefinitionFromSvg(svg, buildMeta(), svgUnits);
+    if (!res.definition) {
+      window.alert("SVG konnte nicht importiert werden:\n• " + (res.warnings.join("\n• ") || "Unbekannter Fehler"));
+      return;
+    }
+    if (res.warnings.length) {
+      window.alert("SVG importiert. Hinweise:\n• " + res.warnings.join("\n• "));
+    }
+    closeDialog();
+  };
+
+  const saveDxf = (dxf: string) => {
+    const res = app.importLibraryDefinitionFromDxf(dxf, buildMeta(), dxfUnits);
+    if (!res.definition) {
+      window.alert("DXF konnte nicht importiert werden:\n• " + (res.failed || res.warnings.join("\n• ") || "Unbekannter Fehler"));
+      return;
+    }
+    if (res.warnings.length) {
+      window.alert("DXF importiert. Hinweise:\n• " + res.warnings.join("\n• "));
+    }
+    closeDialog();
+  };
+
+
+  /* --------------------------------------------------------- Teilansichten */
 
   const tagEditor = (
     <div className="space-y-2">
-      <label>Tags</label>
-      <div className="flex flex-wrap gap-1.5">
-        {meta.tags.map((item) => (
-          <Button key={item} type="button" variant="outline" size="sm" className="library-tag active" onClick={() => setMeta((current) => ({ ...current, tags: current.tags.filter((tagItem) => tagItem !== item) }))} title="Tag entfernen">
-            {item}<X className="h-3.5 w-3.5" />
-          </Button>
-        ))}
-        <div className="flex min-w-[132px] flex-1">
-          <input type="text" className={`${inputCls} rounded-r-none`} placeholder="Tag hinzufügen" value={tagDraft}
-            onChange={(event) => setTagDraft(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addTag(tagDraft); } }} />
-          <Button type="button" variant="outline" size="icon" className="h-11 w-11 rounded-l-none" onClick={() => addTag(tagDraft)} aria-label="Tag hinzufügen"><Plus /></Button>
-        </div>
-      </div>
-      {allTags.filter((item) => !meta.tags.includes(item)).length > 0 && (
+      <label className="text-[12px]">Tags</label>
+      {meta.tags.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {allTags.filter((item) => !meta.tags.includes(item)).slice(0, 8).map((item) => (
-            <Button key={item} type="button" variant="ghost" size="sm" className="library-tag" onClick={() => addTag(item)}>+ {item}</Button>
+          {meta.tags.map((t) => (
+            <button key={t} type="button" onClick={() => setMeta((m) => ({ ...m, tags: m.tags.filter((x) => x !== t) }))}
+              className="cad-toolbar-btn h-8 px-3 text-[12px] active" title="Tag entfernen">
+              {t} <X className="h-3.5 w-3.5" />
+            </button>
           ))}
         </div>
       )}
-    </div>
-  );
-
-  const coreFields = (
-    <>
-      <div className="grid grid-cols-[minmax(0,1fr)_76px] gap-3 max-[260px]:grid-cols-1">
-        <div className="space-y-1.5">
-          <label>Name</label>
-          <input type="text" className={inputCls} placeholder="Name" value={meta.name} onChange={(event) => setMeta({ ...meta, name: event.target.value })} />
-        </div>
-        <LibraryGeometryPreview geometry={editedDefinition?.geometry ?? selectionGeometry} label={meta.name || "Bibliotheksobjekt"} className="h-[76px] w-[76px] max-[260px]:w-full" />
-      </div>
-      <div className="space-y-1.5">
-        <label>Kategorie</label>
-        <input type="text" className={inputCls} list="library-categories" placeholder="Kategorie wählen oder eingeben" value={meta.category} onChange={(event) => setMeta({ ...meta, category: event.target.value })} />
-        <datalist id="library-categories">{categories.filter((item) => item !== "Ohne Kategorie").map((item) => <option key={item} value={item} />)}</datalist>
-      </div>
-      {tagEditor}
-    </>
-  );
-
-  const additionalFields = (
-    <Accordion type="single" collapsible className="library-details-accordion">
-      <AccordionItem value="details">
-        <AccordionTrigger className="py-3 text-left text-[12px] hover:no-underline">
-          <span className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-muted-foreground" /><span><strong className="block text-foreground">Zusatzinformationen</strong><small className="text-[10px] font-normal text-muted-foreground">Autor, Lizenz, Quelle, Maßeinheit</small></span></span>
-        </AccordionTrigger>
-        <AccordionContent className="space-y-3 pt-2">
-          <div><label>Autor</label><input type="text" className={inputCls} placeholder="Autor" value={meta.author} onChange={(event) => setMeta({ ...meta, author: event.target.value })} /></div>
-          <div><label>Lizenz</label><input type="text" className={inputCls} placeholder="Lizenz" value={meta.license} onChange={(event) => setMeta({ ...meta, license: event.target.value })} /></div>
-          <div><label>Quelle</label><input type="text" className={inputCls} placeholder="Quelle" value={meta.source} onChange={(event) => setMeta({ ...meta, source: event.target.value })} /></div>
-          <div><label>Maßeinheit</label><select className={selectCls} value={meta.units} onChange={(event) => setMeta({ ...meta, units: event.target.value as LibraryUnits })}><option value="mm">Millimeter</option><option value="cm">Zentimeter</option><option value="m">Meter</option></select></div>
-        </AccordionContent>
-      </AccordionItem>
-    </Accordion>
-  );
-
-  const editorHeader = (title: string, subtitle: string) => (
-    <div className="library-editor-header">
-      <Button type="button" variant="outline" size="icon" className={iconButtonCls} onClick={closeEditor} aria-label="Zurück" title="Zurück"><ArrowLeft /></Button>
-      <div className="min-w-0">
-        <h3 className="truncate text-[15px] font-semibold">{title}</h3>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{subtitle}</p>
-      </div>
-    </div>
-  );
-
-  if (mode.kind === "save" || mode.kind === "edit") {
-    const isSave = mode.kind === "save";
-    return (
-      <section className="cad-settings-panel library-panel mb-2" aria-label={isSave ? "Bibliotheksobjekt speichern" : "Bibliotheksobjekt bearbeiten"}>
-        <div className="library-title">Bibliothek</div>
-        {editorHeader(
-          isSave ? "Bibliotheksobjekt speichern" : "Bibliotheksobjekt bearbeiten",
-          isSave ? `Auswahl: ${selInfo.count} ${selInfo.count === 1 ? "Objekt" : "Objekte"} · ${replaceOriginal ? "Original wird ersetzt" : "Original bleibt erhalten"}` : "Angaben gelten für alle platzierten Exemplare",
-        )}
-        {isSave && <Button type="button" variant="ghost" size="sm" className="library-change-selection" onClick={closeEditor}><ListRestart />Auswahl ändern</Button>}
-        <div className="library-editor-body">
-          {isSave && (
-            <>
-              <div className="library-mode-switch" role="group" aria-label="Speichermodus">
-                <Button type="button" variant={replaceOriginal ? "ghost" : "default"} className={cn("h-auto min-h-12 flex-1 whitespace-normal px-3 py-2 text-left", !replaceOriginal && "library-primary")} onClick={() => setReplaceOriginal(false)}><Copy />Kopie als Bibliotheksobjekt</Button>
-                <Button type="button" variant={replaceOriginal ? "default" : "ghost"} className={cn("h-auto min-h-12 flex-1 whitespace-normal px-3 py-2 text-left", replaceOriginal && "library-primary")} onClick={() => setReplaceOriginal(true)}><RefreshCw />Original als Bibliotheksobjekt</Button>
-              </div>
-              <p className="library-help-text">{replaceOriginal ? "Die Auswahl wird durch ein gemeinsames Bibliotheksobjekt ersetzt." : "Es wird eine neue, unabhängige Bibliothekskopie erstellt."}</p>
-            </>
-          )}
-          <div className="library-form-section">{coreFields}</div>
-          {additionalFields}
-          <div className="library-insertion-info">
-            <MapPin className="h-5 w-5 text-primary" />
-            <div><strong>Einfügepunkt</strong><span>Mittelpunkt der Auswahl</span><small>Wird beim Platzieren als Dreh- und Fangpunkt verwendet.</small></div>
-          </div>
-          {isSave && selInfo.unsupported.length > 0 && <p className="text-[11px] leading-relaxed text-destructive">Nicht unterstützt: {selInfo.unsupported.join(", ")}</p>}
-          <Button type="button" className="library-primary h-12 w-full text-[13px] font-semibold" onClick={() => {
-            if (isSave) { saveSelection(); return; }
-            app.updateLibraryDefinitionMeta(mode.id, buildMeta());
-            closeEditor();
-          }}><Save />{isSave ? "Bibliotheksobjekt speichern" : "Änderungen speichern"}</Button>
-          <Button type="button" variant="ghost" className="h-10 w-full" onClick={closeEditor}>Abbrechen</Button>
-        </div>
-        {instanceDefId && (
-          <div className="library-separated-action">
-            <Button type="button" variant="ghost" className="w-full" onClick={() => { if (!app.explodeSelectedLibraryInstance()) window.alert("Das Bibliotheksobjekt konnte nicht aufgelöst werden."); }}><Ungroup />Auflösen</Button>
-          </div>
-        )}
-      </section>
-    );
-  }
-
-  if (mode.kind === "svg" || mode.kind === "dxf") {
-    const isSvg = mode.kind === "svg";
-    return (
-      <section className="cad-settings-panel library-panel mb-2">
-        <div className="library-title">Bibliothek</div>
-        {editorHeader(`${isSvg ? "SVG" : "DXF"} importieren`, "Als neues Bibliotheksobjekt anlegen")}
-        <div className="library-editor-body">
-          <div className="library-form-section space-y-3">
-            {!isSvg && <p className="library-help-text">Erkannte Einheit: {mode.detected}</p>}
-            <div><label>{isSvg ? "SVG-Einheiten pro Meter" : "Einheit der Zeichnung"}</label>{isSvg
-              ? <input type="text" inputMode="numeric" className={inputCls} value={String(svgUnits)} onChange={(event) => setSvgUnits(Math.max(1, parseFloat(event.target.value) || 1))} />
-              : <select className={selectCls} value={String(dxfUnits)} onChange={(event) => setDxfUnits(parseFloat(event.target.value) || 1000)}>{listDxfUnitOptions().map((option) => <option key={option.code} value={String(option.unitsPerMeter)}>{option.label}</option>)}</select>}
-            </div>
-            {coreFields}
-          </div>
-          {additionalFields}
-          {isSvg && mode.warnings.length > 0 && <p className="library-help-text">Hinweise: {mode.warnings.join(" · ")}</p>}
-          <Button type="button" className="library-primary h-12 w-full" onClick={() => isSvg ? saveSvg(mode.svg) : saveDxf(mode.dxf)}><Save />Als Bibliotheksobjekt anlegen</Button>
-          <Button type="button" variant="ghost" className="h-10 w-full" onClick={closeEditor}>Abbrechen</Button>
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section className="cad-settings-panel library-panel mb-2" aria-label="Bibliothek">
-      <div className="library-title">Bibliothek</div>
-      <Button type="button" className="library-primary h-11 w-full text-[12px] font-semibold" disabled={selInfo.count === 0} onClick={openSave}><Plus />Bibliotheksobjekt speichern</Button>
-      {selInfo.count === 0 && <p className="library-help-text px-1">Objekte auf der Zeichenfläche auswählen, um sie zu speichern.</p>}
-
-      <div className="library-toolbar">
-        <label className="library-search">
-          <Search className="h-4 w-4" />
-          <input type="text" placeholder="Suchen …" value={query} onChange={(event) => setQuery(event.target.value)} />
-        </label>
-        <label className="library-filter">
-          <Folder className="h-4 w-4" />
-          <select aria-label="Kategorie filtern" value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Kategorie</option>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <ChevronDown className="h-3.5 w-3.5" />
-        </label>
-        <label className="library-filter">
-          <Tags className="h-4 w-4" />
-          <select aria-label="Tags filtern" value={tag} onChange={(event) => setTag(event.target.value)}><option value="">Tags</option>{allTags.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-          <ChevronDown className="h-3.5 w-3.5" />
-        </label>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button variant="outline" size="icon" className={iconButtonCls} aria-label="Weitere Bibliotheksaktionen"><MoreHorizontal /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="library-menu w-52">
-            <DropdownMenuLabel>{defs.length} Bibliotheksobjekte</DropdownMenuLabel>
-            <DropdownMenuItem onSelect={() => { setQuery(""); setCategory(""); setTag(""); }}><RefreshCw className={menuIconClass()} />Filter zurücksetzen</DropdownMenuItem>
-            {placingId && <><DropdownMenuSeparator /><DropdownMenuItem onSelect={() => app.cancelLibraryPlacement()}><X className={menuIconClass()} />Platzierung beenden</DropdownMenuItem></>}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild><Button type="button" variant="outline" className="h-10 w-full"><Upload />Importieren<ChevronDown className="ml-auto" /></Button></DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="library-menu w-[var(--radix-dropdown-menu-trigger-width)] min-w-56">
-          <DropdownMenuItem onSelect={() => importRef.current?.click()}><Upload className={menuIconClass()} />Pixuna-Datei importieren</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => svgRef.current?.click()}><FileCode2 className={menuIconClass()} />SVG importieren</DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => dxfRef.current?.click()}><FileCode2 className={menuIconClass()} />DXF importieren</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <input ref={importRef} type="file" accept=".pxobj,application/json" className="hidden" multiple onChange={async (event) => {
-        const files = Array.from(event.target.files || []);
-        let imported = 0;
-        for (const file of files) { try { if (app.importLibraryDefinition(await file.text())) imported += 1; } catch { /* ungültige Datei */ } }
-        if (imported === 0 && files.length) window.alert("Keine gültige .pxobj-Datei gefunden.");
-        event.target.value = "";
-      }} />
-      <input ref={svgRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={async (event) => {
-        const file = (event.target.files || [])[0]; event.target.value = ""; if (!file) return;
-        setMeta({ ...EMPTY_META, name: file.name.replace(/\.svg$/i, "") });
-        setMode({ kind: "svg", svg: await file.text(), warnings: [] });
-      }} />
-      <input ref={dxfRef} type="file" accept=".dxf,image/vnd.dxf,application/dxf" className="hidden" onChange={async (event) => {
-        const file = (event.target.files || [])[0]; event.target.value = ""; if (!file) return;
-        const text = await file.text();
-        const info = detectDxfUnits(text);
-        setDxfUnits(info.unitsPerMeter);
-        setMeta({ ...EMPTY_META, name: file.name.replace(/\.dxf$/i, "") });
-        setMode({ kind: "dxf", dxf: text, detected: info.label });
-      }} />
-
-      <div className="library-tree">
-        <button type="button" className="library-folder-row" onClick={() => setLibraryOpen((open) => !open)} aria-expanded={libraryOpen}>
-          {libraryOpen ? <ChevronDown /> : <ChevronRight />} {libraryOpen ? <FolderOpen /> : <Folder />}
-          <strong>Meine Bibliothek</strong><span>({visible.length})</span>
-        </button>
-        {libraryOpen && groupedDefinitions.map((group) => {
-          const open = openCategories.has(group.name);
-          return (
-            <div key={group.name} className="library-category-group">
-              <button type="button" className="library-folder-row library-category-row" onClick={() => setOpenCategories((current) => {
-                const next = new Set(current);
-                if (next.has(group.name)) next.delete(group.name); else next.add(group.name);
-                return next;
-              })} aria-expanded={open}>
-                {open ? <ChevronDown /> : <ChevronRight />} {open ? <FolderOpen /> : <Folder />}
-                <strong>{group.name}</strong><span>({group.total})</span>
-              </button>
-              {open && <div className="library-object-list">{group.definitions.map((definition) => {
-                const selected = selectedId === definition.id;
-                return (
-                  <div key={definition.id} className={cn("library-object-row", selected && "selected")} onClick={() => setSelectedId(definition.id)}>
-                    <LibraryGeometryPreview geometry={definition.geometry} label={definition.name} className="h-11 w-11 shrink-0" />
-                    <div className="min-w-0 flex-1"><strong className="block truncate text-[12px]">{definition.name}</strong><span className="block truncate text-[10px] text-muted-foreground">{[definition.category, ...(definition.tags || [])].filter(Boolean).join(" · ") || "Ohne Kategorie"}</span></div>
-                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-primary" onClick={(event) => { event.stopPropagation(); beginPlacement(definition); }} aria-label={`${definition.name} platzieren`} title="Platzieren"><MapPin /></Button>
-                    <span onClick={(event) => event.stopPropagation()}><DefinitionMenu definition={definition} /></span>
-                  </div>
-                );
-              })}</div>}
-            </div>
-          );
-        })}
-        {visible.length === 0 && <div className="py-8 text-center text-[11px] text-muted-foreground">Keine Bibliotheksobjekte gefunden</div>}
-      </div>
-
-      {instanceDefId && <Button type="button" variant="outline" className="h-10 w-full" onClick={() => { if (!app.explodeSelectedLibraryInstance()) window.alert("Das Bibliotheksobjekt konnte nicht aufgelöst werden."); }}><Ungroup />Ausgewählte Instanz auflösen</Button>}
-
-      {selectedDefinition && (
-        <div className="library-selected-bar">
-          <LibraryGeometryPreview geometry={selectedDefinition.geometry} label={selectedDefinition.name} className="h-11 w-11 shrink-0" />
-          <div className="min-w-0 flex-1"><strong className="block truncate text-[12px]">{selectedDefinition.name}</strong><span className="block truncate text-[10px] text-muted-foreground">{selectedDefinition.category || "Ohne Kategorie"}</span></div>
-          <Button type="button" className="library-primary h-10 px-3 text-[12px]" onClick={() => beginPlacement(selectedDefinition)}><MapPin />Platzieren</Button>
-          <DefinitionMenu definition={selectedDefinition} />
+      {allTags.filter((t) => !meta.tags.includes(t)).length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {allTags.filter((t) => !meta.tags.includes(t)).map((t) => (
+            <button key={t} type="button" onClick={() => addTag(t)} className="cad-toolbar-btn h-8 px-3 text-[12px]" title="Tag hinzufügen">
+              + {t}
+            </button>
+          ))}
         </div>
       )}
-      <div className="library-footer"><Info /><span>Objekte per Auswahl speichern und präzise platzieren.</span><strong>{defs.length}</strong></div>
-    </section>
+      <div className="flex gap-2">
+        <input type="text" className={inputCls} placeholder="Neuer Tag" value={tagDraft}
+          onChange={(e) => setTagDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(tagDraft); } }} />
+        <button type="button" className="cad-toolbar-btn h-10 px-4 text-[12px]" onClick={() => addTag(tagDraft)}>Hinzufügen</button>
+      </div>
+    </div>
+  );
+
+  const metaFields = (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <label className="text-[12px]">Name</label>
+        <input type="text" className={inputCls} placeholder="Name" value={meta.name} onChange={(e) => setMeta({ ...meta, name: e.target.value })} />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[12px]">Kategorie</label>
+        {categories.length > 0 && (
+          <select className={selectCls} value={categories.includes(meta.category) ? meta.category : ""}
+            onChange={(e) => setMeta({ ...meta, category: e.target.value })}>
+            <option value="">Vorhandene Kategorie wählen …</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        <input type="text" className={inputCls} placeholder="Neue Kategorie" value={meta.category}
+          onChange={(e) => setMeta({ ...meta, category: e.target.value })} />
+      </div>
+      {tagEditor}
+      <div className="space-y-1">
+        <label className="text-[12px]">Autor</label>
+        <input type="text" className={inputCls} placeholder="Autor" value={meta.author} onChange={(e) => setMeta({ ...meta, author: e.target.value })} />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[12px]">Lizenz</label>
+        <input type="text" className={inputCls} placeholder="Lizenz" value={meta.license} onChange={(e) => setMeta({ ...meta, license: e.target.value })} />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[12px]">Quelle</label>
+        <input type="text" className={inputCls} placeholder="Quelle" value={meta.source} onChange={(e) => setMeta({ ...meta, source: e.target.value })} />
+      </div>
+      <div className="space-y-1">
+        <label className="text-[12px]">Maßeinheit</label>
+        <select className={selectCls} value={meta.units} onChange={(e) => setMeta({ ...meta, units: e.target.value as LibraryUnits })}>
+          <option value="mm">Millimeter</option>
+          <option value="cm">Zentimeter</option>
+          <option value="m">Meter</option>
+        </select>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="cad-settings-panel mb-2">
+      <div className="text-[12px] font-semibold uppercase tracking-[0.14em] mb-4" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+        Bibliothek
+      </div>
+
+      <div className="space-y-5">
+        {/* ---------------------------------------------------- Speichern */}
+        {mode.kind !== "edit" && mode.kind !== "svg" && (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                setMeta({ ...EMPTY_META, name: `Bibliotheksobjekt ${defs.length + 1}` });
+                setMode({ kind: "save" });
+              }}
+              disabled={selInfo.count === 0}
+              className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold disabled:opacity-50"
+              style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+            >
+              <Plus className="h-5 w-5" />
+              <span>Bibliotheksobjekt speichern{selInfo.count ? ` · ${selInfo.count} ${selInfo.count === 1 ? "Objekt" : "Objekte"}` : ""}</span>
+            </button>
+            {selInfo.count === 0 && (
+              <div className="text-[12px] leading-relaxed" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Wähle Objekte auf der Zeichenfläche aus — Klick, Shift-Klick oder Rahmenauswahl funktionieren hier wie im Auswahlwerkzeug.
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode.kind === "save" && (
+          <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
+            <div className="space-y-2">
+              <button type="button" onClick={() => setReplaceOriginal(false)}
+                className={`cad-toolbar-btn w-full justify-start h-11 text-[13px] font-semibold ${replaceOriginal ? "" : "active"}`}>
+                Kopie als Bibliotheksobjekt
+              </button>
+              <div className="text-[12px] leading-relaxed pl-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Die ausgewählten Originale bleiben auf dem Blatt.
+              </div>
+              <button type="button" onClick={() => setReplaceOriginal(true)}
+                className={`cad-toolbar-btn w-full justify-start h-11 text-[13px] font-semibold ${replaceOriginal ? "active" : ""}`}>
+                Original als Bibliotheksobjekt
+              </button>
+              <div className="text-[12px] leading-relaxed pl-1" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Die ausgewählten Originale werden durch ein gemeinsames Bibliotheksobjekt ersetzt.
+              </div>
+            </div>
+
+            {metaFields}
+
+            {selInfo.unsupported.length > 0 && (
+              <div className="text-[12px] leading-relaxed" style={{ color: "hsl(var(--destructive))" }}>
+                Nicht unterstützt: {selInfo.unsupported.join(", ")}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={saveSelection}>
+                <Save className="h-5 w-5" /> Speichern
+              </button>
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={closeDialog}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------ SVG-Dialog */}
+        {mode.kind === "svg" && (
+          <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
+            <div className="text-[13px] font-semibold">SVG als Bibliotheksobjekt importieren</div>
+            <div className="space-y-1">
+              <label className="text-[12px]">Importgröße: SVG-Einheiten pro Meter (1000 = 1 Einheit entspricht 1 mm)</label>
+              <input type="text" inputMode="numeric" className={inputCls} value={String(svgUnits)}
+                onChange={(e) => setSvgUnits(Math.max(1, parseFloat(e.target.value) || 1))} />
+            </div>
+            {metaFields}
+            {mode.warnings.length > 0 && (
+              <div className="text-[12px] leading-relaxed" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                Hinweise: {mode.warnings.join(" · ")}
+              </div>
+            )}
+            <div className="space-y-2">
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={() => saveSvg(mode.svg)}>
+                <Save className="h-5 w-5" /> Als Bibliotheksobjekt anlegen
+              </button>
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={closeDialog}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ------------------------------------------------------ DXF-Dialog */}
+        {mode.kind === "dxf" && (
+          <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
+            <div className="text-[13px] font-semibold">DXF als Bibliotheksobjekt importieren</div>
+            <div className="text-[12px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Erkannte Einheit in der Datei: {mode.detected}
+            </div>
+            <div className="space-y-1">
+              <label className="text-[12px]">Einheit der Zeichnung (bei Bedarf korrigieren)</label>
+              <select className={selectCls} value={String(dxfUnits)}
+                onChange={(e) => setDxfUnits(parseFloat(e.target.value) || 1000)}>
+                {listDxfUnitOptions().map((o) => (
+                  <option key={o.code} value={String(o.unitsPerMeter)}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            {metaFields}
+            <div className="space-y-2">
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={() => saveDxf(mode.dxf)}>
+                <Save className="h-5 w-5" /> Als Bibliotheksobjekt anlegen
+              </button>
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={closeDialog}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
+
+        {/* -------------------------------------------------- Bearbeiten */}
+        {mode.kind === "edit" && (
+          <div className="rounded-lg border p-3 space-y-4" style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" }}>
+            <div className="text-[13px] font-semibold">Bibliotheksobjekt bearbeiten</div>
+            <div className="text-[12px] leading-relaxed" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Änderungen gelten für alle platzierten Exemplare. Position, Drehung und Größe bleiben unverändert.
+            </div>
+            {metaFields}
+            <div className="space-y-2">
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={() => {
+                  if (mode.kind !== "edit") return;
+                  app.updateLibraryDefinitionMeta(mode.id, buildMeta());
+                  closeDialog();
+                }}>
+                <Save className="h-5 w-5" /> Änderungen speichern
+              </button>
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={closeDialog}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* --------------------------------------------------- Auflösen */}
+        {instanceDefId && (
+          <button
+            type="button"
+            onClick={() => { if (!app.explodeSelectedLibraryInstance()) window.alert("Das Bibliotheksobjekt konnte nicht aufgelöst werden."); }}
+            className="cad-toolbar-btn w-full justify-center h-12 text-[14px] font-semibold"
+          >
+            <Ungroup className="h-5 w-5" /> Auflösen
+          </button>
+        )}
+
+        {placingId && (
+          <button type="button" onClick={() => app.cancelLibraryPlacement()}
+            className="cad-toolbar-btn w-full justify-center h-10 text-[12px]">
+            <X className="h-4 w-4" /> Platzierung beenden
+          </button>
+        )}
+
+        {/* ------------------------------------------------------- Suche */}
+        <div className="rounded-lg border p-3 space-y-3" style={{ borderColor: "hsl(var(--cad-hub-border))" }}>
+          <input type="text" className={inputCls} placeholder="Suchen …" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <div className="space-y-2">
+            <select className={selectCls} value={category} onChange={(e) => setCategory(e.target.value)}>
+              <option value="">Alle Kategorien</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className={selectCls} value={tag} onChange={(e) => setTag(e.target.value)}>
+              <option value="">Alle Tags</option>
+              {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* --------------------------------------------------- Austausch */}
+        <div className="rounded-lg border p-3 space-y-2" style={{ borderColor: "hsl(var(--cad-hub-border))" }}>
+          <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={() => importRef.current?.click()}>
+            <Upload className="h-4 w-4" /> Pixuna-Datei importieren
+          </button>
+          <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]" onClick={() => svgRef.current?.click()}>
+            <FileCode2 className="h-4 w-4" /> SVG importieren
+          </button>
+          <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[13px] font-semibold" onClick={() => dxfRef.current?.click()}>
+            <FileCode2 className="h-4 w-4" /> DXF importieren
+          </button>
+          <input ref={importRef} type="file" accept=".pxobj,application/json" className="hidden" multiple onChange={async (e) => {
+            const files = Array.from(e.target.files || []);
+            let ok = 0;
+            for (const f of files) {
+              try { if (app.importLibraryDefinition(await f.text())) ok++; } catch { /* ignore */ }
+            }
+            if (ok === 0 && files.length) window.alert("Keine gültige .pxobj-Datei gefunden.");
+            e.target.value = "";
+          }} />
+          <input ref={svgRef} type="file" accept=".svg,image/svg+xml" className="hidden" onChange={async (e) => {
+            const f = (e.target.files || [])[0];
+            e.target.value = "";
+            if (!f) return;
+            const text = await f.text();
+            setMeta({ ...EMPTY_META, name: f.name.replace(/\.svg$/i, "") });
+            setMode({ kind: "svg", svg: text, warnings: [] });
+          }} />
+          <input ref={dxfRef} type="file" accept=".dxf,image/vnd.dxf,application/dxf" className="hidden" onChange={async (e) => {
+            const f = (e.target.files || [])[0];
+            e.target.value = "";
+            if (!f) return;
+            const text = await f.text();
+            const info = detectDxfUnits(text);
+            setDxfUnits(info.unitsPerMeter);
+            setMeta({ ...EMPTY_META, name: f.name.replace(/\.dxf$/i, "") });
+            setMode({ kind: "dxf", dxf: text, detected: info.label });
+          }} />
+
+        </div>
+
+        {/* ----------------------------------------------------- Liste */}
+        <div className="space-y-3">
+          {visible.length === 0 && (
+            <div className="text-[12px] text-center py-6" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+              Noch keine Bibliotheksobjekte
+            </div>
+          )}
+          {visible.map((d) => (
+            <div key={d.id} className="rounded-lg border p-3 space-y-3" style={{ borderColor: "hsl(var(--cad-hub-border))", background: "hsl(var(--cad-settings-bg))" }}>
+              <div className="flex items-start gap-3">
+                <div className="h-12 w-12 shrink-0 rounded-md border flex items-center justify-center"
+                  style={{ borderColor: "hsl(var(--cad-hub-border))" }}>
+                  {d.preview?.thumbnail
+                    ? <img src={d.preview.thumbnail} alt={d.name} className="h-full w-full object-contain rounded-md" />
+                    : <Boxes className="h-6 w-6" style={{ color: "hsl(var(--cad-toolbar-muted))" }} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold truncate">{d.name}</div>
+                  <div className="text-[12px] truncate" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
+                    {d.category || "Ohne Kategorie"}
+                  </div>
+                  {d.tags?.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {d.tags.map((t) => (
+                        <span key={t} className="cad-kbd" style={{ minWidth: 0 }}>{t}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button type="button" onClick={() => app.beginLibraryPlacement(d.id)}
+                className={`cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold ${placingId === d.id ? "active" : ""}`}>
+                <Boxes className="h-4 w-4" /> Platzieren
+              </button>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button type="button" className="cad-toolbar-btn justify-center h-10 text-[12px]"
+                  onClick={() => { setMeta(metaFromDefinition(d)); setMode({ kind: "edit", id: d.id }); }}>
+                  <Pencil className="h-3.5 w-3.5" /> Bearbeiten
+                </button>
+                <button type="button" className="cad-toolbar-btn justify-center h-10 text-[12px]"
+                  onClick={() => {
+                    const json = app.exportLibraryDefinition(d.id);
+                    if (json) download(`${fileSafe(d.name)}${PXOBJ_EXTENSION}`, json, "application/json");
+                  }}>
+                  <Download className="h-3.5 w-3.5" /> Export
+                </button>
+                <button type="button" className="cad-toolbar-btn justify-center h-10 text-[12px]"
+                  onClick={() => {
+                    if (window.confirm(`„${d.name}“ löschen? Platzierte Exemplare werden ebenfalls entfernt.`)) {
+                      app.removeLibraryDefinition(d.id);
+                      setMode({ kind: "none" });
+                    }
+                  }}>
+                  <Trash2 className="h-3.5 w-3.5" /> Löschen
+                </button>
+              </div>
+
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]"
+                onClick={() => {
+                  const svg = app.exportLibraryDefinitionSvg(d.id);
+                  if (svg) download(`${fileSafe(d.name)}.svg`, svg, "image/svg+xml");
+                }}>
+                <FileCode2 className="h-3.5 w-3.5" /> Als SVG exportieren
+              </button>
+
+              <button type="button" className="cad-toolbar-btn w-full justify-center h-10 text-[12px]"
+                onClick={() => {
+                  const res = app.exportLibraryDefinitionDxf(d.id);
+                  if (!res) return;
+                  download(`${fileSafe(d.name)}.dxf`, res.dxf, "image/vnd.dxf");
+                  if (res.warnings.length) window.alert("DXF exportiert. Hinweise:\n• " + res.warnings.join("\n• "));
+                }}>
+                <FileCode2 className="h-3.5 w-3.5" /> Als DXF exportieren
+              </button>
+
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
