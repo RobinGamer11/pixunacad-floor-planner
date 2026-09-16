@@ -238,7 +238,8 @@ export class SelectTool {
   beginLibraryHandleEdit(libraryInstanceId: string, handleIndex: number, action: string) {
     const inst = (this.app.scene as any).getLibraryInstanceById?.(libraryInstanceId);
     if (!inst) return;
-    if (action !== PointEditAction.MOVE && action !== PointEditAction.ROTATE && action !== PointEditAction.SCALE) return;
+    if (action !== PointEditAction.MOVE && action !== PointEditAction.ROTATE
+      && action !== PointEditAction.SCALE && action !== PointEditAction.SCALE_2PT) return;
 
     this._clearTransformGuides();
     this.activeEditAction = action;
@@ -263,6 +264,15 @@ export class SelectTool {
       // Proportionale Skalierung um die Instanzmitte (Schraffurverhalten).
       this.fixedPoint = v(center.x, center.y);
       this.otherPointOriginal = v(handle.x, handle.y);
+    } else if (action === PointEditAction.SCALE_2PT) {
+      // Fixpunkt = angeklickter Fangpunkt; Referenzpunkt = gegenüberliegender
+      // Fangpunkt (bei der Mitte die erste Ecke).
+      this.fixedPoint = v(handle.x, handle.y);
+      const oppIdx = handleIndex < 4 ? (handleIndex + 2) % 4 : 0;
+      const ref = pts[oppIdx] || center;
+      this.scale2ptRefOriginal = v(ref.x, ref.y);
+      this.scale2ptTargetWorld = v(ref.x, ref.y);
+      this.otherPointOriginal = v(ref.x, ref.y);
     } else {
       this.fixedPoint = v(center.x, center.y);
       this.otherPointOriginal = v(handle.x, handle.y);
