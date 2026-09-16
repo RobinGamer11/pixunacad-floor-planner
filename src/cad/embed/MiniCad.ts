@@ -2662,7 +2662,6 @@ export class MiniCad {
       if (!b) return null;
       return { x: b.center.x, y: b.center.y };
     }
-    }
     const did = s.documentId;
     if (did) {
       const d = this.scene.documents.find((x) => x.id === did);
