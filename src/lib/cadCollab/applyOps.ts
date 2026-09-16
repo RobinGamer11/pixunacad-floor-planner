@@ -84,7 +84,8 @@ export function applyOpToScene(
   changeType: CadObjectOp["changeType"],
   payload: Record<string, unknown> | null,
 ): boolean {
-  const ops = KIND_OPS[kind];
+  // Bibliotheksarten gehören nicht zur Szene und werden getrennt behandelt.
+  const ops = KIND_OPS[kind as CadSceneKind];
   if (!ops) return false;
 
   ops.remove(scene, objectId);
