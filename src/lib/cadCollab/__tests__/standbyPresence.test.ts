@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const tracks: unknown[] = [];
 const channel = {
   on() { return channel; },
-  subscribe(cb: (state: string) => void) { cb("SUBSCRIBED"); return channel; },
+  subscribe(cb: (state: string) => void) { setTimeout(() => cb("SUBSCRIBED"), 0); return channel; },
   track(payload: unknown) { tracks.push(payload); return Promise.resolve("ok"); },
   presenceState() { return {}; },
   send() { return Promise.resolve("ok"); },
