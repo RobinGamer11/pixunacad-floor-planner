@@ -953,7 +953,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       setSelectedWallId(app.getSelectedWall()?.id || null);
       // Auswahl-Werkzeug: bestehendes Objekt ausgewählt → automatisch in die
       // Werkzeugeinstellungen wechseln; ohne Auswahl zurück zu "Seiten".
-      if (app.activeTool === app.selectTool) {
+      // Im Bibliothekswerkzeug bleibt der Reiter „Werkzeug" stehen: Löschen
+      // oder Abwählen eines Objekts darf die Bibliotheksverwaltung nicht
+      // verlassen (Ordneransicht, Suche und Filter bleiben erhalten).
+      if (app.activeTool === app.selectTool && activeToolRef.current !== ToolIds.LIBRARY) {
         // Der Ebenen-Reiter bleibt offen, wenn dort gerade gearbeitet wird.
         setRightTab((prev) => (prev === "layers" ? prev : (app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets")));
       }

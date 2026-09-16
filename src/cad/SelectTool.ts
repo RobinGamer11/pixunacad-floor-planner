@@ -2815,6 +2815,9 @@ export class SelectTool {
       exclusions.hatchIds = new Set([target.hatchId]);
     } else if (target.kind === "wall" || (target.kind === "wallPoint" && wholeObject)) {
       exclusions.wallIds = new Set([target.wallId]);
+    } else if (target.kind === "libraryHandle") {
+      // Die transformierte Instanz darf nicht an ihre eigenen Punkte zurückschnappen.
+      exclusions.libraryInstanceIds = new Set([target.libraryInstanceId]);
     }
     const topoSnap = this.app.topology.findBestSnap(
       v(input.mouse.sx, input.mouse.sy),
