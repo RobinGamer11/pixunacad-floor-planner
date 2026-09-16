@@ -183,3 +183,32 @@ export async function releaseObjectLock(projectId: string, pageId: string, objec
     .eq("page_id", pageId)
     .eq("object_id", objectId);
 }
+
+/** Aktueller gemeinsamer Stand aller Elemente – ohne Änderungshistorie. */
+export async function fetchObjectState(projectId: string): Promise<MappeObjectOp[]> {
+  const client = getNetworkClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from("mappe_object_state")
+    .select("page_id,object_id,object_kind,payload,deleted,revision,updated_at")
+    .eq("project_id", projectId)
+    .limit(20000);
+  if (error) throw error;
+  return ((data ?? []) as {
+    page_id: string; object_id: string; object_kind: string;
+    payload: Record<string, unknown> | null; deleted: boolean;
+    revision: number | string; updated_at: string;
+  }[]).map((row) => ({
+    id: `state-${row.page_id}-${row.object_id}`,
+    projectId,
+    pageId: row.page_id,
+    objectId: row.object_id,
+    objectKind: row.object_kind as MappeObjectOp["objectKind"],
+    changeType: row.deleted ? "delete" : "update",
+    payload: row.payload ?? null,
+    objectVersion: Number(row.revision ?? 0),
+    actorId: null,
+    createdAt: row.updated_at,
+    seq: 0,
+  }));
+}

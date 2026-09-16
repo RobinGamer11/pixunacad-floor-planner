@@ -201,3 +201,37 @@ export async function releaseObjectLock(projectId: string, sheetId: string, obje
     .eq("sheet_id", sheetId)
     .eq("object_id", objectId);
 }
+
+/**
+ * Aktueller gemeinsamer Stand aller Objekte – ohne Änderungshistorie.
+ *
+ * Wird genau einmal beim Umschalten in die Zusammenarbeit geladen, damit nicht
+ * bei jedem Öffnen sämtliche alten Einzeloperationen gelesen werden müssen.
+ */
+export async function fetchObjectState(projectId: string): Promise<CadObjectOp[]> {
+  const client = getNetworkClient();
+  if (!client) return [];
+  const { data, error } = await client
+    .from("cad_object_state")
+    .select("sheet_id,object_id,object_kind,payload,deleted,revision,updated_at")
+    .eq("project_id", projectId)
+    .limit(20000);
+  if (error) throw error;
+  return ((data ?? []) as {
+    sheet_id: string; object_id: string; object_kind: string;
+    payload: Record<string, unknown> | null; deleted: boolean;
+    revision: number | string; updated_at: string;
+  }[]).map((row) => ({
+    id: `state-${row.sheet_id}-${row.object_id}`,
+    projectId,
+    sheetId: row.sheet_id,
+    objectId: row.object_id,
+    objectKind: row.object_kind as CadObjectKind,
+    changeType: row.deleted ? "delete" : "update",
+    payload: row.payload ?? null,
+    objectVersion: Number(row.revision ?? 0),
+    actorId: null,
+    createdAt: row.updated_at,
+    seq: 0,
+  }));
+}
