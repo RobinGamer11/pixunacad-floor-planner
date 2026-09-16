@@ -9,6 +9,7 @@
 import type { PageElement, ProjectPage } from "@/lib/projectStore";
 import type { MappeCollabStatus } from "@/lib/mappeCollab/session";
 import { useMappeCollabStatus } from "@/lib/mappeCollab/store";
+import { initialsOf } from "@/lib/mappeCollab/types";
 
 interface Props {
   page: ProjectPage;
