@@ -79,8 +79,10 @@ export interface ObjectLockInfo {
 }
 
 export interface CollabStatus {
-  /** Live-Verbindung steht. */
+  /** Verbindung steht (mindestens Anwesenheitsmeldung). */
   connected: boolean;
+  /** Aktueller Betriebsmodus. */
+  mode: CollabMode;
   /** Migration fehlt oder kein Zugriff – CAD arbeitet rein lokal weiter. */
   unavailable: boolean;
   /** Andere Personen auf demselben Projekt. */
@@ -103,7 +105,13 @@ export interface CollabSessionOptions {
 
 export class CadCollabSession {
   private opts: CollabSessionOptions;
+  /** Dauerhafte, minimale Anwesenheitsverbindung (erkennt einen Beitritt). */
+  private presence: RealtimeChannel | null = null;
+  /** Nur im Live-Betrieb: Objektänderungen, Sperren und Vorschauen. */
   private channel: RealtimeChannel | null = null;
+  private mode: CollabMode = "off";
+  private activating = false;
+  private graceTimer = 0;
   private lastIndex: SceneIndex = new Map();
   /** sheetId|objectId → serverseitig bestätigte Revision. */
   private revisions = new Map<string, number>();
@@ -121,6 +129,7 @@ export class CadCollabSession {
   private sweepTimer = 0;
   private status: CollabStatus = {
     connected: false,
+    mode: "off",
     unavailable: false,
     peers: [],
     editingByObject: new Map(),
@@ -131,35 +140,112 @@ export class CadCollabSession {
     this.opts = opts;
   }
 
-  /** Startet die Sitzung: sicherer Stand zuerst, danach fehlende Änderungen. */
+  /**
+   * Startet die Sitzung.
+   *
+   * Ohne weitere Teammitglieder passiert gar nichts: kein Kanal, keine
+   * Operationen, keine Präsenz. Sonst wird zunächst nur eine minimale
+   * Anwesenheitsverbindung geöffnet; die volle Synchronisierung schaltet sich
+   * erst zu, sobald wirklich jemand anderes im Projekt arbeitet.
+   */
   async start(): Promise<void> {
     const { projectId } = this.opts;
     const access = projectAccessStore.accessFor(projectId);
     if (!access.shared || access.role === null) return; // rein lokales Projekt
+    if (projectAccessStore.otherMemberCount(projectId) === 0) return; // allein
     this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
+    this.mode = "standby";
+    this.setStatus({ mode: "standby" });
+    this.connectPresence();
+  }
+
+  /** Nur Anwesenheit – keine Objektdaten, keine Cursor, keine Sperren. */
+  private connectPresence() {
+    const client = getNetworkClient();
+    if (!client || this.destroyed) return;
+    const { projectId, userId, displayName } = this.opts;
+
+    this.presence = client
+      .channel(`cad-presence:${projectId}`, { config: { presence: { key: userId } } })
+      .on("presence", { event: "sync" }, () => this.readPresence())
+      .subscribe(async (state) => {
+        if (state !== "SUBSCRIBED") return;
+        this.setStatus({ connected: true, unavailable: false });
+        await this.presence?.track({
+          userId,
+          displayName,
+          sheetId: this.opts.app.activeSheetId,
+          cursor: null,
+          editingObjectId: null,
+          color: presenceColor(userId),
+        });
+      });
+  }
+
+  /**
+   * Schaltet die objektbasierte Zusammenarbeit ein, sobald eine zweite Person
+   * im Projekt arbeitet: erst den gemeinsamen Stand abgleichen, daraus die
+   * gemeinsame Ausgangsbasis bilden, danach Einzeloperationen und Vorschauen.
+   */
+  private async goLive(): Promise<void> {
+    if (this.destroyed || this.mode === "live" || this.activating) return;
+    window.clearTimeout(this.graceTimer);
+    this.graceTimer = 0;
+    this.activating = true;
+    const { projectId } = this.opts;
     try {
+      // Gemeinsamen Objektstand laden – nicht die gesamte Änderungshistorie.
+      const state = await fetchObjectState(projectId);
+      this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
+      this.applyRemoteOps(state);
       this.lastSeq = await fetchLatestSeq(projectId);
-      this.revisions = await fetchObjectRevisions(projectId);
-      const missed = await fetchOpsSince(projectId, 0);
-      this.applyRemoteOps(missed);
-      this.lastSeq = missed.length ? missed[missed.length - 1].seq : this.lastSeq;
       this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
       this.setLocks(await fetchObjectLocks(projectId));
     } catch (error) {
+      this.activating = false;
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
       return;
     }
+    this.mode = "live";
+    this.activating = false;
+    this.setStatus({ mode: "live" });
     this.connect();
     this.startTimers();
+  }
+
+  /** Nachlauf starten, wenn die letzte andere Person das Projekt verlässt. */
+  private scheduleStandby() {
+    if (this.mode !== "live" || this.graceTimer) return;
+    this.graceTimer = window.setTimeout(() => {
+      this.graceTimer = 0;
+      void this.goStandby();
+    }, COLLAB_GRACE_MS);
+  }
+
+  /** Zurück zum normalen Speicherweg: keine Operationen, keine Sperren. */
+  private async goStandby(): Promise<void> {
+    if (this.mode !== "live") return;
+    this.mode = "standby";
+    window.clearTimeout(this.sendTimer);
+    window.clearInterval(this.heartbeatTimer);
+    window.clearInterval(this.sweepTimer);
+    this.heartbeatTimer = 0;
+    this.sweepTimer = 0;
+    this.previewed.clear();
+    await this.unlockAll();
+    const client = getNetworkClient();
+    if (client && this.channel) await client.removeChannel(this.channel);
+    this.channel = null;
+    this.setStatus({ mode: "standby", locksByObject: new Map() });
   }
 
   private connect() {
     const client = getNetworkClient();
     if (!client || this.destroyed) return;
-    const { projectId, userId, displayName } = this.opts;
+    const { projectId, userId } = this.opts;
 
     this.channel = client
-      .channel(`cad-collab:${projectId}`, { config: { presence: { key: userId } } })
+      .channel(`cad-collab:${projectId}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "cad_object_ops", filter: `project_id=eq.${projectId}` },
@@ -186,19 +272,10 @@ export class CadCollabSession {
         if (!msg || msg.userId === userId) return;
         this.applyPreview(msg);
       })
-      .on("presence", { event: "sync" }, () => this.readPresence())
       .subscribe(async (state) => {
         if (state !== "SUBSCRIBED") return;
         this.setStatus({ connected: true, unavailable: false });
-        await this.channel?.track({
-          userId,
-          displayName,
-          sheetId: this.opts.app.activeSheetId,
-          cursor: null,
-          editingObjectId: null,
-          color: presenceColor(userId),
-        });
-        // Nach (Wieder-)Verbindung fehlende Änderungen nachholen.
+        // Nach (Wieder-)Verbindung nur die kurze Lücke nachholen.
         try {
           const missed = await fetchOpsSince(projectId, this.lastSeq);
           if (missed.length) {
