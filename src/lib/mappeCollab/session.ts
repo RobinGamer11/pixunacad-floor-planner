@@ -107,6 +107,13 @@ export class MappeCollabSession {
   private heartbeatTimer = 0;
   private sweepTimer = 0;
   private currentPageId: string | null = null;
+  /** Zuletzt in der Cloud bestätigter Elementstand (nur Prüfsummen). */
+  private cloudHashes: BaselineHashes = new Map();
+  private baseKey = "";
+  private revisionsLoaded = false;
+  private saving = false;
+  private policyTimer = 0;
+  private unregisterSync: (() => void) | null = null;
   private status: MappeCollabStatus = {
     connected: false,
     mode: "off",
@@ -121,21 +128,40 @@ export class MappeCollabSession {
   }
 
   /**
-   * Startet die Mappen-Zusammenarbeit gestuft: ohne weitere Mitglieder gar
-   * nicht, allein nur mit einer minimalen Anwesenheitsmeldung, und erst bei
-   * einer zweiten aktiven Person mit Einzeloperationen.
+   * Startet die Mappen-Zusammenarbeit gemäß der zentralen Richtlinie: ohne
+   * Cloud-Eintrag gar nicht, ohne weitere Mitglieder rein lokal mit manueller
+   * Sicherung, allein online nur mit einer minimalen Anwesenheitsmeldung und
+   * erst bei einer zweiten aktiven Person mit Einzeloperationen.
    */
   async start(): Promise<void> {
-    const { projectId, userId, displayName } = this.opts;
+    const { projectId } = this.opts;
     const access = projectAccessStore.accessFor(projectId);
     if (!access.shared || access.role === null) return; // rein persönliche Mappe
-    if (projectAccessStore.otherMemberCount(projectId) === 0) return; // allein
+    this.baseKey = baselineKey("mappe", projectId);
+    this.cloudHashes = loadBaseline(this.baseKey);
     this.lastIndex = indexProject(currentProject(projectId));
-    this.mode = "standby";
-    this.setStatus({ mode: "standby" });
+    this.unregisterSync = registerProjectSyncSource(projectId, "mappe", {
+      save: () => this.saveToCloud(),
+    });
+    // Offene Änderungen erkennen, auch ohne Live-Betrieb.
+    this.unsubscribe = projectStore.subscribe(() => this.notifyLocalChange());
 
+    this.mode = projectAccessStore.otherMemberCount(projectId) === 0 ? "local" : "standby";
+    this.setStatus({ mode: this.mode });
+
+    const firstOpen = !hasBaseline(this.baseKey);
+    if (firstOpen || this.pendingOps().length === 0) await this.pullRemoteState();
+    this.refreshDirty();
+
+    if (this.mode === "standby") this.connectPresence();
+    else this.policyTimer = window.setInterval(() => this.syncPolicy(), 10_000);
+  }
+
+  /** Nur Anwesenheit – keine Objektdaten, keine Cursor, keine Sperren. */
+  private connectPresence() {
     const client = getNetworkClient();
-    if (!client) return;
+    if (!client || this.destroyed) return;
+    const { projectId, userId, displayName } = this.opts;
     this.presence = client
       .channel(`mappe-presence:${projectId}`, { config: { presence: { key: userId } } })
       .on("presence", { event: "sync" }, () => this.readPresence())
@@ -150,6 +176,128 @@ export class MappeCollabSession {
           editingObjectId: null,
         } satisfies MappePresenceUser);
       });
+  }
+
+  /** Wechselt in die Bereitschaft, sobald ein Mitglied eingeladen wurde. */
+  syncPolicy() {
+    if (this.destroyed || this.mode !== "local") return;
+    if (projectAccessStore.otherMemberCount(this.opts.projectId) === 0) return;
+    window.clearInterval(this.policyTimer);
+    this.policyTimer = 0;
+    this.mode = "standby";
+    this.setStatus({ mode: "standby" });
+    this.report({ mode: "standby" });
+    this.connectPresence();
+  }
+
+  /* ------------------------------------------- Cloud-Sicherung (ein Weg) */
+
+  private flatten(index: MappeIndex): Map<string, { kind: LocalMappeOp["objectKind"]; json: string }> {
+    const out = new Map<string, { kind: LocalMappeOp["objectKind"]; json: string }>();
+    for (const [pageId, byId] of index) {
+      for (const [objectId, entry] of byId) {
+        out.set(`${pageId}${BASELINE_SEP}${entry.kind}${BASELINE_SEP}${objectId}`, entry);
+      }
+    }
+    return out;
+  }
+
+  /** Elemente und Seiten, die seit dem letzten Cloud-Stand geändert wurden. */
+  private pendingOps(): LocalMappeOp[] {
+    const current = this.flatten(indexProject(currentProject(this.opts.projectId)));
+    const ops: LocalMappeOp[] = [];
+    for (const [key, entry] of current) {
+      if (this.cloudHashes.get(key) === hashText(entry.json)) continue;
+      const [pageId, kind, objectId] = key.split(BASELINE_SEP);
+      ops.push({
+        pageId,
+        objectId,
+        objectKind: kind as LocalMappeOp["objectKind"],
+        changeType: this.cloudHashes.has(key) ? "update" : "create",
+        payload: JSON.parse(entry.json) as Record<string, unknown>,
+      });
+    }
+    for (const key of this.cloudHashes.keys()) {
+      if (current.has(key)) continue;
+      const [pageId, kind, objectId] = key.split(BASELINE_SEP);
+      ops.push({ pageId, objectId, objectKind: kind as LocalMappeOp["objectKind"], changeType: "delete", payload: null });
+    }
+    // Seiten zuerst: ein Element darf nie vor seiner Seite ankommen.
+    ops.sort((a, b) => Number(b.objectKind === "page") - Number(a.objectKind === "page"));
+    return ops;
+  }
+
+  private noteCloudObject(op: LocalMappeOp, payload: Record<string, unknown> | null) {
+    const key = `${op.pageId}${BASELINE_SEP}${op.objectKind}${BASELINE_SEP}${op.objectId}`;
+    if (payload) this.cloudHashes.set(key, hashText(JSON.stringify(payload)));
+    else this.cloudHashes.delete(key);
+  }
+
+  private baselineFromCurrent() {
+    const current = this.flatten(indexProject(currentProject(this.opts.projectId)));
+    this.cloudHashes = new Map();
+    for (const [key, entry] of current) this.cloudHashes.set(key, hashText(entry.json));
+    if (this.baseKey) saveBaseline(this.baseKey, this.cloudHashes);
+  }
+
+  private refreshDirty() {
+    if (this.mode === "off") return;
+    this.report({ dirty: this.mode === "live" ? false : this.pendingOps().length > 0 });
+  }
+
+  private report(partial: Parameters<typeof reportProjectSyncSource>[2]) {
+    if (!this.baseKey) return;
+    reportProjectSyncSource(this.opts.projectId, "mappe", partial);
+  }
+
+  private async pullRemoteState(): Promise<void> {
+    try {
+      const state = await fetchObjectState(this.opts.projectId);
+      this.revisions = new Map(state.map((op) => [`${op.pageId}|${op.objectId}`, op.objectVersion]));
+      this.revisionsLoaded = true;
+      if (state.length) this.applyRemoteOps(state);
+      this.lastSeq = await fetchLatestSeq(this.opts.projectId);
+      this.lastIndex = indexProject(currentProject(this.opts.projectId));
+      this.baselineFromCurrent();
+    } catch (error) {
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+    }
+  }
+
+  /** Manuelle Sicherung: überträgt nur die geänderten Seiten und Elemente. */
+  async saveToCloud(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live" || this.saving) return;
+    const { projectId } = this.opts;
+    if (!projectAccessStore.canEdit(projectId)) return;
+    const ops = this.pendingOps();
+    if (ops.length === 0) { this.report({ dirty: false, error: null }); return; }
+    this.saving = true;
+    this.report({ saving: true, error: null });
+    try {
+      if (!this.revisionsLoaded) {
+        this.revisions = await fetchObjectRevisions(projectId);
+        this.revisionsLoaded = true;
+      }
+      for (const op of ops) {
+        await this.writeOne(op);
+        if (this.destroyed) return;
+      }
+      saveBaseline(this.baseKey, this.cloudHashes);
+      this.lastIndex = indexProject(currentProject(projectId));
+      this.report({ saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null });
+    } catch (error) {
+      saveBaseline(this.baseKey, this.cloudHashes);
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({
+        saving: false,
+        dirty: true,
+        error: isCollabSchemaMissing(error)
+          ? "Die Cloud-Sicherung ist für dieses Projekt noch nicht eingerichtet."
+          : "Die Cloud-Sicherung ist fehlgeschlagen. Deine Arbeit ist lokal gespeichert.",
+      });
+    } finally {
+      this.saving = false;
+    }
   }
 
   /** Umschalten in die echte Zusammenarbeit (gemeinsamer Stand zuerst). */
