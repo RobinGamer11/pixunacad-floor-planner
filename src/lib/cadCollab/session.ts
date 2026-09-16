@@ -209,8 +209,10 @@ export class CadCollabSession {
     this.mode = "live";
     this.activating = false;
     this.setStatus({ mode: "live" });
+    this.trackPresence();
     this.connect();
     this.startTimers();
+
   }
 
   /** Nachlauf starten, wenn die letzte andere Person das Projekt verlässt. */
@@ -237,7 +239,9 @@ export class CadCollabSession {
     if (client && this.channel) await client.removeChannel(this.channel);
     this.channel = null;
     this.setStatus({ mode: "standby", locksByObject: new Map() });
+    this.trackPresence();
   }
+
 
   private connect() {
     const client = getNetworkClient();
@@ -528,10 +532,19 @@ export class CadCollabSession {
 
   /* -------------------------------------------- Präsenz & Bearbeitungshinweis */
 
-  /** Meldet die eigene Position/Seite/Bearbeitung (nicht dauerhaft gespeichert). */
+  /**
+   * Meldet die eigene Position/Seite/Bearbeitung (nicht dauerhaft gespeichert).
+   * Im Standby (nur eine aktive Person) wird bewusst nichts gesendet: die
+   * einmalige Startmeldung beim Verbinden reicht, um einen Beitritt zu erkennen.
+   */
   updatePresence(partial: Partial<Pick<CadPresenceUser, "sheetId" | "cursor" | "editingObjectId">>) {
+    if (this.mode !== "live") return;
+    this.trackPresence(partial);
+  }
+
+  /** Einmalige Presence-Meldung (Verbindungsaufbau, Moduswechsel). */
+  private trackPresence(partial?: Partial<Pick<CadPresenceUser, "sheetId" | "cursor" | "editingObjectId">>) {
     if (!this.presence || !this.status.connected) return;
-    // Im Solo-Betrieb wird keine Cursorbewegung übertragen.
     const quiet = this.mode !== "live";
     void this.presence.track({
       userId: this.opts.userId,
@@ -544,6 +557,7 @@ export class CadCollabSession {
       ...(quiet ? { cursor: null, editingObjectId: null } : {}),
     });
   }
+
 
   /** Weiche Bearbeitungssperre setzen. */
   async lockObject(sheetId: string, objectId: string): Promise<void> {
