@@ -24,6 +24,7 @@ import {
   fetchLatestSeq,
   fetchObjectLocks,
   fetchObjectRevisions,
+  fetchObjectState,
   fetchOpsSince,
   isCollabSchemaMissing,
   releaseObjectLock,

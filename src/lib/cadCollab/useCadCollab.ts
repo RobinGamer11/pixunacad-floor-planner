@@ -14,6 +14,7 @@ import { CadCollabSession, type CollabStatus } from "./session";
 
 const EMPTY: CollabStatus = {
   connected: false,
+  mode: "off",
   unavailable: false,
   peers: [],
   editingByObject: new Map(),
