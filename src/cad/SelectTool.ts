@@ -4544,6 +4544,9 @@ export class SelectTool {
     // ── Winkel-Hilfslinie / Grad-Anzeige beim Drehen ───────────────────
     this._drawRotateGuide(ctx, cam);
 
+    // ── 2-Punkt-Skalierung: Fixpunkt, Referenzpunkt und Maßangabe ──────
+    this._drawScale2PtOverlay(ctx, cam);
+
 
     // PDF/Bild-Hub: Live-Vorschau (Ghost) während aktivem Move/Rotate/Scale.
     {
