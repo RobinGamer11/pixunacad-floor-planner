@@ -57,3 +57,8 @@
 - Angeklickter Fangpunkt ist Fixpunkt, gegenüberliegender Punkt wird bewegt/gefangen.
 - Kontextanzeige an der Zeichnung (Länge + Faktor), Hub-Eingabe möglich.
 - Escape stellt Position und Skalierung wieder her, Bestätigen = ein Undo-Schritt.
+
+## CAD: Stempel entfernt, Raster 85 % Transparenz, objektbasierte Live-Zusammenarbeit
+- Stempel-Werkzeug vollständig entfernt (Werkzeug, Panel, Auswahl, Renderer, Serialisierung); alte Stempel-Daten werden beim Laden ignoriert, das Altfeld `_stickerEditOwnerId` bleibt aus Kompatibilitätsgründen erhalten.
+- Raster startet mit 85 % Transparenz (Deckkraft 0.15).
+- Neue Kollaborationsschicht `src/lib/cadCollab/*`: Änderungserkennung je Objekt aus dem bestehenden Serialisierungsstand, Einzeloperationen in `cad_object_ops`, weiche Sperren in `cad_object_locks` (RLS über bestehende Projektmitgliedschaft), Realtime-Vorschau und Präsenz nur flüchtig. Fremde Änderungen erzeugen keinen eigenen Verlaufsschritt (`markExternalChange`). Der gemeinsame Projektstand bleibt Initialstand und Sicherheitskopie.
