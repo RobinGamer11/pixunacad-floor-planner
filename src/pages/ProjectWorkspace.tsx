@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { CommentLayer } from "@/components/comments/CommentLayer";
 import { useMappeCollab } from "@/lib/mappeCollab/useMappeCollab";
+import { MappeCollabPageLayer } from "@/components/mappe/MappeCollabLayer";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
@@ -3363,7 +3364,7 @@ function PageCanvas({
         <CommentLayer projectId={projectId} pageId={page.id}  />
 
         {/* Live-Zusammenarbeit: fremde Bearbeitung und laufende Bewegungen */}
-        <MappeCollabLayer page={page} status={mappeCollabStatus()} />
+        <MappeCollabPageLayer page={page} />
 
         {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
             touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
