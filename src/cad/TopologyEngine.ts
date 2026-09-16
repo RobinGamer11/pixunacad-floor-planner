@@ -786,7 +786,8 @@ export class TopologyEngine {
 
 
 
-    return best;
+    return this._withWorldOrigin(best, mouseS);
+
   }
 
   findNearestLineSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
