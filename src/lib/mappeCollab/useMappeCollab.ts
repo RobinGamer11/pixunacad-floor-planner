@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { projectAccessStore } from "@/lib/projectAccess";
 import { MappeCollabSession, type MappeCollabStatus } from "./session";
+import { setMappeSession, setMappeStatus } from "./store";
 
 const EMPTY: MappeCollabStatus = {
   connected: false,
