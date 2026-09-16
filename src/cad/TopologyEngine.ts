@@ -721,7 +721,8 @@ export class TopologyEngine {
 
 
 
-    return best;
+    return this._withWorldOrigin(best, mouseS);
+
   }
 
   findBestSnapExcludingHatch(mouseS: Vec2, mouseW: Vec2, excludedHatchId: string, excludedPointIndex?: number, excludeAllPoints?: boolean): Snap | null {
