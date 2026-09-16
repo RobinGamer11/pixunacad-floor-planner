@@ -209,8 +209,10 @@ export class CadCollabSession {
     this.mode = "live";
     this.activating = false;
     this.setStatus({ mode: "live" });
+    this.trackPresence();
     this.connect();
     this.startTimers();
+
   }
 
   /** Nachlauf starten, wenn die letzte andere Person das Projekt verlässt. */
