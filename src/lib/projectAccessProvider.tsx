@@ -17,7 +17,6 @@ import {
   hydrateSharedProject,
   onSharedSync,
   resetSharedSyncState,
-  scheduleSharedSave,
   sharedProjectIds,
 } from "@/lib/sharedProjectSync";
 import { setSharedProjectIdsProvider } from "@/lib/workspaceStorage";
