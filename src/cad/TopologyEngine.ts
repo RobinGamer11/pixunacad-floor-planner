@@ -67,6 +67,8 @@ export class TopologyEngine {
   labels: LabelManager;
   /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
   overlayScenes: Scene[] = [];
+  /** Schreibgeschützte Fangquelle platzierter Bibliotheksinstanzen. */
+  librarySnaps: import("./library/librarySnapSource").LibrarySnapSource | null = null;
   /** Papierrahmen im Plan-(Druck-)Modus in Metern. Ecken, Kantenmitten,
    * Mittelpunkt und Kanten des Blattrands werden zusätzlich gefangen. */
   planFrame: { widthM: number; heightM: number } | null = null;
