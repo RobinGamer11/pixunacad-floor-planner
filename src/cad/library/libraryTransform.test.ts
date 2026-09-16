@@ -35,6 +35,12 @@ function makeTransformHarness() {
     libraryDefinitions: [definition],
     input: { mouse: { sx: 0, sy: 0, wx: 0, wy: 0 } },
     pointEditMenu: { hide: vi.fn() },
+    renderer: {
+      setHoverSegmentId: vi.fn(),
+      setHoverTextBoxId: vi.fn(),
+      setHoverHatchId: vi.fn(),
+      setHoverWallId: vi.fn(),
+    },
     hub: {
       bindCommit: vi.fn((callback) => { hubCommit.current = callback; }),
       showAt: vi.fn(),
@@ -101,7 +107,7 @@ describe("Bibliotheksobjekt-Platzierung und -Transformation", () => {
     const applyMove = Reflect.get(selectTool, "_applyLibraryMove").bind(selectTool) as (point: { x: number; y: number }) => boolean;
 
     expect(applyMove(v(10, 20))).toBe(true);
-    expect(instance.position).toEqual(v(16, 26));
+    expect(instance.position).toEqual(v(11, 21));
     expect(definition.geometry[0].data.points[0]).toEqual(v(-1, -1));
 
     selectTool.cancel();

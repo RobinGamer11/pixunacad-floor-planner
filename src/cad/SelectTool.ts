@@ -110,6 +110,8 @@ export class SelectTool {
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
+  rotateHubLocked = false;
+  rotateHubAngleDeg: number | null = null;
 
   // Wall edit snapshot
   wallPointsOriginal: Vec2[] | null = null;
@@ -265,6 +267,8 @@ export class SelectTool {
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
+    this.rotateHubLocked = false;
+    this.rotateHubAngleDeg = null;
     this.app.pointEditMenu.hide();
 
     const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
@@ -1897,6 +1901,8 @@ export class SelectTool {
     const radiusDefault = dist(this.fixedPoint!, this.otherPointOriginal!);
     const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : radiusDefault;
     const nextAng = ((vals.angleDeg != null ? vals.angleDeg : angleDeg(this.fixedPoint!, this.otherPointOriginal!)) % 360 + 360) % 360;
+    this.rotateHubLocked = true;
+    this.rotateHubAngleDeg = nextAng;
 
     const p = pointFromLengthAngle(this.fixedPoint!, nextLen, nextAng);
     if (!this._applyLibraryRotate(nextAng) && !this._applyHatchRotate(nextAng)) {
@@ -2415,6 +2421,8 @@ export class SelectTool {
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
+    this.rotateHubLocked = false;
+    this.rotateHubAngleDeg = null;
     this._clearTransformGuides();
     this.wallPointsOriginal = null;
     this.libraryPositionOriginal = null;
@@ -2884,6 +2892,7 @@ export class SelectTool {
   }
 
   private _previewRotateAngle(input: Input) {
+    if (this.rotateHubLocked && this.rotateHubAngleDeg != null) return this.rotateHubAngleDeg;
     // Drehen: Fangpunkte anderer Objekte werden nicht nur anvisiert, sondern
     // wirklich gefangen — der Winkel zeigt exakt auf den Fangpunkt.
     // Shift rastet zusätzlich auf exakte 45°-Schritte (0/45/90/135/…).
