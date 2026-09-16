@@ -396,6 +396,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   }, [onCanDeleteChange]);
 
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
+  /** Spiegel des aktiven Werkzeugs für Callbacks außerhalb des Render-Closures. */
+  const activeToolRef = useRef<string>(ToolIds.SELECT);
   // ── Tabellen-Werkzeug (identisch zur Projektmappe, als DOM-Overlay) ──
   const [tableTool, setTableTool] = useState(false);
   const [tablePlacementActive, setTablePlacementActive] = useState(false);
@@ -833,6 +835,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
     app.onToolChange = (id) => {
       setActiveTool(id);
+      activeToolRef.current = id;
       // Engine-Werkzeug gewählt → Tabellen-Overlay-Werkzeug verlassen.
       setTableTool(id === ToolIds.TABLE);
       if (id !== ToolIds.TABLE) setTablePlacementActive(false);
