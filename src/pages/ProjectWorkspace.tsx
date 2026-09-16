@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { CommentLayer } from "@/components/comments/CommentLayer";
+import { useMappeCollab } from "@/lib/mappeCollab/useMappeCollab";
+import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
