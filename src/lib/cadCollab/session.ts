@@ -23,7 +23,6 @@ import {
   claimObjectLock,
   fetchLatestSeq,
   fetchObjectLocks,
-  fetchObjectRevisions,
   fetchObjectState,
   fetchOpsSince,
   isCollabSchemaMissing,
@@ -308,6 +307,11 @@ export class CadCollabSession {
 
   private async flush(): Promise<void> {
     if (this.destroyed || this.applyingRemote) return;
+    // Solo-Betrieb: der bestehende gemeinsame Projektstand ist der Speicherweg.
+    if (this.mode !== "live") {
+      this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
+      return;
+    }
     if (this.flushing) { this.flushAgain = true; return; }
     const { projectId } = this.opts;
     if (!projectAccessStore.canEdit(projectId)) return;
@@ -417,7 +421,7 @@ export class CadCollabSession {
    * Bibliotheks- und Dokumenttransformation). Es wird nichts gespeichert.
    */
   previewLocalChanges(): void {
-    if (!this.channel || !this.status.connected || this.applyingRemote) return;
+    if (this.mode !== "live" || !this.channel || this.applyingRemote) return;
     if (!projectAccessStore.canEdit(this.opts.projectId)) return;
     const now = Date.now();
     if (now - this.lastPreviewAt < PREVIEW_THROTTLE_MS) return;
@@ -448,7 +452,7 @@ export class CadCollabSession {
 
   /** Gedrosselte, flüchtige Vorschau während des Ziehens (nichts gespeichert). */
   sendPreview(sheetId: string, objectId: string, objectKind: CadObjectKind, payload: Record<string, unknown> | null) {
-    if (!this.channel || !this.status.connected) return;
+    if (this.mode !== "live" || !this.channel) return;
     const now = Date.now();
     if (payload && now - this.lastPreviewAt < PREVIEW_THROTTLE_MS) return;
     this.lastPreviewAt = now;
@@ -526,8 +530,10 @@ export class CadCollabSession {
 
   /** Meldet die eigene Position/Seite/Bearbeitung (nicht dauerhaft gespeichert). */
   updatePresence(partial: Partial<Pick<CadPresenceUser, "sheetId" | "cursor" | "editingObjectId">>) {
-    if (!this.channel || !this.status.connected) return;
-    void this.channel.track({
+    if (!this.presence || !this.status.connected) return;
+    // Im Solo-Betrieb wird keine Cursorbewegung übertragen.
+    const quiet = this.mode !== "live";
+    void this.presence.track({
       userId: this.opts.userId,
       displayName: this.opts.displayName,
       color: presenceColor(this.opts.userId),
@@ -535,12 +541,14 @@ export class CadCollabSession {
       cursor: null,
       editingObjectId: null,
       ...partial,
+      ...(quiet ? { cursor: null, editingObjectId: null } : {}),
     });
   }
 
   /** Weiche Bearbeitungssperre setzen. */
   async lockObject(sheetId: string, objectId: string): Promise<void> {
     this.updatePresence({ sheetId, editingObjectId: objectId });
+    if (this.mode !== "live") return; // allein: keine Sperren setzen
     if (!projectAccessStore.canEdit(this.opts.projectId)) return;
     this.ownLocks.set(`${sheetId}|${objectId}`, { sheetId, objectId });
     try {
@@ -550,6 +558,7 @@ export class CadCollabSession {
 
   async unlockObject(sheetId: string, objectId: string): Promise<void> {
     this.updatePresence({ sheetId, editingObjectId: null });
+    if (this.mode !== "live") return;
     this.ownLocks.delete(`${sheetId}|${objectId}`);
     try {
       await releaseObjectLock(this.opts.projectId, sheetId, objectId);
@@ -567,7 +576,7 @@ export class CadCollabSession {
   }
 
   private async renewOwnLocks(): Promise<void> {
-    if (this.destroyed || this.ownLocks.size === 0) return;
+    if (this.destroyed || this.mode !== "live" || this.ownLocks.size === 0) return;
     for (const lock of this.ownLocks.values()) {
       try {
         await claimObjectLock(
@@ -607,7 +616,7 @@ export class CadCollabSession {
   }
 
   private readPresence() {
-    const raw = this.channel?.presenceState() ?? {};
+    const raw = this.presence?.presenceState() ?? {};
     const peers: CadPresenceUser[] = [];
     const editing = new Map<string, CadPresenceUser>();
     for (const key of Object.keys(raw)) {
@@ -617,6 +626,17 @@ export class CadCollabSession {
       if (entry.editingObjectId) editing.set(entry.editingObjectId, entry);
     }
     this.setStatus({ peers, editingByObject: editing });
+
+    // Erst wenn wirklich jemand anderes im Projekt ist, wird die
+    // objektbasierte Synchronisierung eingeschaltet – und beim Weggang der
+    // letzten Person mit Nachlaufzeit wieder beendet.
+    if (peers.length > 0) {
+      window.clearTimeout(this.graceTimer);
+      this.graceTimer = 0;
+      if (this.mode === "standby") void this.goLive();
+    } else if (this.mode === "live") {
+      this.scheduleStandby();
+    }
   }
 
   /* ------------------------------------------------------------- Zustand */
@@ -644,9 +664,12 @@ export class CadCollabSession {
     window.clearTimeout(this.sendTimer);
     window.clearInterval(this.heartbeatTimer);
     window.clearInterval(this.sweepTimer);
+    window.clearTimeout(this.graceTimer);
     void this.unlockAll();
     const client = getNetworkClient();
     if (client && this.channel) void client.removeChannel(this.channel);
+    if (client && this.presence) void client.removeChannel(this.presence);
     this.channel = null;
+    this.presence = null;
   }
 }
