@@ -361,7 +361,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // Nur die Kamera-Position ändern — Maßstab, Raster, Objekte, Werkzeug bleiben.
       app.camera.offsetX = r.width / 2;
       app.camera.offsetY = r.height / 2;
-      app.requestRender?.();
+      (app as any).requestRender?.();
       app.renderer?.render?.();
     },
   }), []);
