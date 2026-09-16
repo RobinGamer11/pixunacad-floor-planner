@@ -10,6 +10,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getNetworkClient } from "@/lib/networkClient";
 import { projectAccessStore } from "@/lib/projectAccess";
+import { COLLAB_GRACE_MS, type CollabMode } from "@/lib/cadCollab/session";
 import { projectStore, type Project } from "@/lib/projectStore";
 import { applyMappeOp } from "./apply";
 import { diffMappeIndexes, indexProject, type MappeIndex } from "./diff";
@@ -382,11 +383,13 @@ export class MappeCollabSession {
       pageId: this.currentPageId,
       editingObjectId: null,
       ...partial,
+      ...(quiet ? { editingObjectId: null } : {}),
     } satisfies MappePresenceUser);
   }
 
   async lockObject(pageId: string, objectId: string): Promise<void> {
     this.updatePresence({ pageId, editingObjectId: objectId });
+    if (this.mode !== "live") return; // allein: keine Sperren setzen
     if (!projectAccessStore.canEdit(this.opts.projectId)) return;
     this.ownLocks.set(`${pageId}|${objectId}`, { pageId, objectId });
     try {
@@ -396,6 +399,7 @@ export class MappeCollabSession {
 
   async unlockObject(pageId: string, objectId: string): Promise<void> {
     this.updatePresence({ pageId, editingObjectId: null });
+    if (this.mode !== "live") return;
     this.ownLocks.delete(`${pageId}|${objectId}`);
     try { await releaseObjectLock(this.opts.projectId, pageId, objectId); } catch { /* weich */ }
   }
@@ -458,6 +462,14 @@ export class MappeCollabSession {
       peers.push(entry);
     }
     this.setStatus({ peers });
+
+    if (peers.length > 0) {
+      window.clearTimeout(this.graceTimer);
+      this.graceTimer = 0;
+      if (this.mode === "standby") void this.goLive();
+    } else if (this.mode === "live") {
+      this.scheduleStandby();
+    }
   }
 
   getStatus(): MappeCollabStatus { return this.status; }
