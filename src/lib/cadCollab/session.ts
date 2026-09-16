@@ -861,7 +861,7 @@ export class CadCollabSession {
     if (this.baseKey) saveBaseline(this.baseKey, this.cloudHashes);
     this.unregisterSync?.();
     this.unregisterSync = null;
-    window.clearTimeout(this.policyTimer);
+    window.clearInterval(this.policyTimer);
     window.clearTimeout(this.sendTimer);
     window.clearInterval(this.heartbeatTimer);
     window.clearInterval(this.sweepTimer);
