@@ -163,7 +163,9 @@ export class MappeCollabSession {
     this.mode = "live";
     this.activating = false;
     this.setStatus({ mode: "live" });
+    this.trackPresence();
     this.unsubscribe = projectStore.subscribe(() => this.notifyLocalChange());
+
     this.connect();
     this.heartbeatTimer = window.setInterval(() => { void this.renewOwnLocks(); }, LOCK_HEARTBEAT_MS);
     this.sweepTimer = window.setInterval(() => this.sweepExpiredLocks(), LOCK_SWEEP_MS);
