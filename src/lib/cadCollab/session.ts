@@ -397,6 +397,10 @@ export class CadCollabSession {
     if (client && this.channel) await client.removeChannel(this.channel);
     this.channel = null;
     this.setStatus({ mode: "standby", locksByObject: new Map() });
+    // Der laufende Stand entspricht jetzt dem Cloud-Stand; ab hier wieder
+    // lokal arbeiten und nur auf Klick sichern.
+    this.baselineFromCurrent();
+    this.report({ mode: "standby", dirty: false, saving: false });
     this.trackPresence();
   }
 
