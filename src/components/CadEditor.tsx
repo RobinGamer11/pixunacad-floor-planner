@@ -1056,30 +1056,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   }, []);
 
 
-  // Floating Edit-Pencil neben ausgewählter Sticker-Instanz (Polling per RAF).
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      const app = appRef.current;
-      if (app) {
-        const inst = app.getSelectedStickerInstance?.();
-        if (inst && !app.isStickerEditing()) {
-          const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-          let maxX = -Infinity, minY = Infinity;
-          for (const c of corners) { if (c.x > maxX) maxX = c.x; if (c.y < minY) minY = c.y; }
-          const sp = app.camera.worldToScreen(maxX, minY);
-          const next = { id: inst.id, x: sp.x, y: sp.y };
-          setStickerEditOverlay(prev => (prev && prev.id === next.id && Math.abs(prev.x - next.x) < 0.5 && Math.abs(prev.y - next.y) < 0.5) ? prev : next);
-        } else {
-          setStickerEditOverlay(prev => prev ? null : prev);
-        }
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
   // Poll selected document for the settings panel + Document Hub state
   useEffect(() => {
     let raf = 0;
@@ -2034,28 +2010,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Text Editor (contenteditable) */}
         <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
 
-        {/* Floating Edit-Pencil bei ausgewählter Sticker-Instanz */}
-        {stickerEditOverlay && (
-          <button
-            type="button"
-            onClick={() => {
-              if (stickerEditOverlay) appRef.current?.openStickerEditByInstanceId(stickerEditOverlay.id);
-            }}
-            className="absolute z-30 flex items-center justify-center rounded-full shadow-lg transition-transform hover:scale-110"
-            style={{
-              left: stickerEditOverlay.x + 6,
-              top: stickerEditOverlay.y - 14,
-              width: 28, height: 28,
-              background: "linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))",
-              color: "#fff",
-              border: "1px solid hsl(var(--primary) / 0.6)",
-            }}
-            title="Sticker-Inhalt bearbeiten"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        )}
-
         {/* Ebenen-Button oben links: runder Button mit Icon + Anzahl. */}
         {!presenting && (
           <CanvasFabBar>
@@ -2826,128 +2780,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
 
 
-          {activeTool === ToolIds.STICKER && (
-            <div className="cad-settings-panel mb-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stempel</div>
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (stickerPhase === "selecting") appRef.current!.stickerTool.cancel();
-                    else appRef.current!.stickerTool.beginSelectionMode();
-                  }}
-                  className={`cad-toolbar-btn w-full justify-center h-11 text-[13px] font-semibold ${stickerPhase === "selecting" ? "active" : ""}`}
-                  style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-                  title="Objekte für einen neuen Stempel auswählen"
-                >
-                  <Plus className="h-4 w-4" /> <span>Neuer Stempel</span>
-                </button>
-
-                {stickerPhase === "selecting" && (
-                  <div className="space-y-1.5">
-                    <div
-                      className="flex items-center gap-2 rounded-md border px-2 py-2 text-xs leading-snug"
-                      style={{
-                        borderColor: "hsl(var(--primary))",
-                        background: "hsl(var(--primary) / 0.12)",
-                      }}
-                    >
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold" style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}>1</span>
-                      <span className="font-medium">Objekte auswählen (L-Klick)</span>
-                      <span className="ml-auto tabular-nums">{stickerSelCount}</span>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={stickerSelCount === 0}
-                      onClick={() => {
-                        const name = window.prompt("Name für neuen Stempel:", `Stempel ${appRef.current!.stickers.length + 1}`);
-                        if (!name) return;
-                        appRef.current!.stickerTool.commitSelectionAsSticker(name);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-md border px-2 py-2 text-xs leading-snug transition-colors disabled:cursor-not-allowed"
-                      style={
-                        stickerSelCount > 0
-                          ? { borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }
-                          : { borderColor: "hsl(var(--hairline))", color: "hsl(var(--muted-foreground))" }
-                      }
-                      title="Auswahl als Stempel speichern"
-                    >
-                      <span
-                        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold"
-                        style={stickerSelCount > 0
-                          ? { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
-                          : { background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}
-                      >2</span>
-                      <span className={stickerSelCount > 0 ? "font-medium" : undefined}>Sticker erstellen</span>
-                    </button>
-                  </div>
-                )}
-
-                <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-                  <div className="flex gap-1">
-                    <button type="button" onClick={() => {
-                      const json = appRef.current!.exportStickers();
-                      const blob = new Blob([json], { type: "application/json" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url; a.download = "stempel-bibliothek.json";
-                      document.body.appendChild(a); a.click(); a.remove();
-                      URL.revokeObjectURL(url);
-                    }} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Exportieren">
-                      <Download className="h-3.5 w-3.5" /> Export
-                    </button>
-                    <button type="button" onClick={() => stickerImportRef.current?.click()} className="cad-toolbar-btn flex-1 justify-center h-8 text-xs" title="Importieren">
-                      <Upload className="h-3.5 w-3.5" /> Import
-                    </button>
-                    <input ref={stickerImportRef} type="file" accept="application/json" className="hidden" onChange={async (e) => {
-                      const f = e.target.files?.[0]; if (!f) return;
-                      const text = await f.text();
-                      try {
-                        const n = appRef.current!.importStickers(text);
-                        if (n === 0) window.alert("Keine gültigen Stempel in der Datei gefunden.");
-                      } catch { window.alert("Datei konnte nicht gelesen werden."); }
-                      e.target.value = "";
-                    }} />
-                  </div>
-                </div>
-
-                <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-                  <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                    {stickers.length === 0 && (
-                      <div className="text-xs text-center py-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Noch keine Stempel</div>
-                    )}
-                    {stickers.map(s => {
-                      const isActive = appRef.current?.stickerTool.activeDef?.id === s.id;
-                      return (
-                        <div key={s.id} className="flex items-center gap-1">
-                          <button type="button" onClick={() => appRef.current!.beginStickerPlacement(s.id)} className={`cad-toolbar-btn flex-1 justify-start h-8 text-xs ${isActive ? "active" : ""}`} title="Platzieren">
-                            <StickerIcon className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{s.name}</span>
-                          </button>
-                          <button type="button" onClick={() => {
-                            const ok = appRef.current!.openStickerEditByDefId(s.id);
-                            if (!ok) window.alert("Keine platzierte Instanz dieses Stempels gefunden. Platziere ihn zuerst auf dem Canvas.");
-                          }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Stempel-Inhalt bearbeiten (Edit-Mode)" style={{ color: "hsl(var(--primary))" }}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button type="button" onClick={() => {
-                            const next = window.prompt("Stempel umbenennen:", s.name);
-                            if (next && next.trim()) appRef.current!.renameSticker(s.id, next);
-                          }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Umbenennen">
-                            <Pencil className="h-3.5 w-3.5" />
-                          </button>
-                          <button type="button" onClick={() => {
-                            if (window.confirm(`Stempel "${s.name}" löschen?`)) appRef.current!.removeSticker(s.id);
-                          }} className="cad-toolbar-btn h-8 w-8 justify-center px-0" title="Löschen">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
 
           {/* Bibliotheks-Werkzeug (nur eigenständiger CAD-Editor) */}
