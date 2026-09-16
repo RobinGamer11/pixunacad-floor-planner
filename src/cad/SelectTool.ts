@@ -2460,6 +2460,8 @@ export class SelectTool {
     this.wallPointsOriginal = null;
     this.libraryPositionOriginal = null;
     this.libraryHandleOriginal = null;
+    this.scale2ptRefOriginal = null;
+    this.scale2ptTargetWorld = null;
     this.libraryRotationOriginal = 0;
     this.libraryScaleXOriginal = 1;
     this.libraryScaleYOriginal = 1;
