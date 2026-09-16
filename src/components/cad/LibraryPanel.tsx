@@ -46,7 +46,7 @@ const selectCls = "cad-settings-select h-11 w-full px-3 text-[12px]";
 const iconButtonCls = "h-9 w-9 shrink-0 border-border/80 text-muted-foreground hover:text-foreground";
 
 function fileSafe(name: string) {
-  return (name || "bibliotheksobjekt").replace(/[^\w\-]+/g, "_");
+  return (name || "bibliotheksobjekt").replace(/[^\w-]+/g, "_");
 }
 
 function menuIconClass() {

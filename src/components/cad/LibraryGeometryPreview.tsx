@@ -22,6 +22,8 @@ const plainText = (html: unknown) => String(html ?? "")
   .replace(/&nbsp;/g, " ")
   .trim();
 
+// Snapshot-Daten sind absichtlich offen typisiert, da sie mehrere bestehende CAD-Objektformen abdecken.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function tableSize(data: Record<string, any>): { width: number; height: number } {
   const table = data.data ?? {};
   const scale = Number(data.scale) || 1;
