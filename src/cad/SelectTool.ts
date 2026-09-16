@@ -110,6 +110,8 @@ export class SelectTool {
   moveHubLocked = false;
   moveHubLengthM: number | null = null;
   moveHubAngleDeg: number | null = null;
+  rotateHubLocked = false;
+  rotateHubAngleDeg: number | null = null;
 
   // Wall edit snapshot
   wallPointsOriginal: Vec2[] | null = null;
@@ -265,6 +267,8 @@ export class SelectTool {
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
+    this.rotateHubLocked = false;
+    this.rotateHubAngleDeg = null;
     this.app.pointEditMenu.hide();
 
     const radius = dist(this.fixedPoint!, this.otherPointOriginal!);
@@ -1897,6 +1901,8 @@ export class SelectTool {
     const radiusDefault = dist(this.fixedPoint!, this.otherPointOriginal!);
     const nextLen = (vals.lengthM != null) ? Math.max(0, vals.lengthM) : radiusDefault;
     const nextAng = ((vals.angleDeg != null ? vals.angleDeg : angleDeg(this.fixedPoint!, this.otherPointOriginal!)) % 360 + 360) % 360;
+    this.rotateHubLocked = true;
+    this.rotateHubAngleDeg = nextAng;
 
     const p = pointFromLengthAngle(this.fixedPoint!, nextLen, nextAng);
     if (!this._applyLibraryRotate(nextAng) && !this._applyHatchRotate(nextAng)) {
@@ -2415,6 +2421,8 @@ export class SelectTool {
     this.moveHubLocked = false;
     this.moveHubLengthM = null;
     this.moveHubAngleDeg = null;
+    this.rotateHubLocked = false;
+    this.rotateHubAngleDeg = null;
     this._clearTransformGuides();
     this.wallPointsOriginal = null;
     this.libraryPositionOriginal = null;
@@ -2884,6 +2892,7 @@ export class SelectTool {
   }
 
   private _previewRotateAngle(input: Input) {
+    if (this.rotateHubLocked && this.rotateHubAngleDeg != null) return this.rotateHubAngleDeg;
     // Drehen: Fangpunkte anderer Objekte werden nicht nur anvisiert, sondern
     // wirklich gefangen — der Winkel zeigt exakt auf den Fangpunkt.
     // Shift rastet zusätzlich auf exakte 45°-Schritte (0/45/90/135/…).
@@ -3682,9 +3691,12 @@ export class SelectTool {
         const metrics = { lengthM: dist(this.fixedPoint!, p), angleDeg: angleDeg(this.fixedPoint!, p) };
 
         const isWallPointEdit = this.editTarget?.kind === "wallPoint";
+        const isLibraryHandleEdit = this.editTarget?.kind === "libraryHandle";
         if (isWallPointEdit) {
           // Vorschau-Only: Scene NICHT mutieren, nur Position merken.
           this.wallPreviewPoint = v(p.x, p.y);
+        } else if (isLibraryHandleEdit) {
+          this._applyLibraryMove(p);
         } else {
           this._applyMovingPoint(p, this.fixedPoint!);
         }
@@ -3698,6 +3710,8 @@ export class SelectTool {
           if (isWallPointEdit) {
             // Jetzt erst einmalig auf die Scene anwenden → genau ein Undo-Schritt.
             this._applyMovingPoint(finalP, this.fixedPoint!);
+          } else if (isLibraryHandleEdit) {
+            this._applyLibraryMove(finalP);
           } else {
             this._applyMovingPoint(finalP, this.fixedPoint!);
           }
@@ -3776,7 +3790,7 @@ export class SelectTool {
 
       if (this.activeEditAction === PointEditAction.SCALE) {
         const base = this.hatchScaleBaseDist;
-        if (base && document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
+        if (base && !this.hatchScaleLocked && document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
           const mouseW = v(input.mouse.wx, input.mouse.wy);
           const len = Math.max(0.0001, dist(this.fixedPoint!, mouseW));
           if (!this._applyLibraryScale(len / base)) this._applyHatchScale(len / base);
@@ -4369,6 +4383,10 @@ export class SelectTool {
       // Wand-Edge-Auswahl: Menü offen halten.
     } else if (!this.isEditing() && (this.app.selection as any)?.type === SelectionType.FREE_STROKE) {
       // Freihand-Stroke ausgewählt: Verschieben/Drehen/Löschen offen halten.
+    } else if (!this.isEditing()
+      && (this.app.selection as any)?.type === SelectionType.LIBRARY_INSTANCE
+      && (this.app.selection as any)?.handleIndex != null) {
+      // Bibliotheks-Fangpunkt ausgewählt: Menü bis zur nächsten Auswahl offen halten.
 
     } else {
       this.app.pointEditMenu.hide();
