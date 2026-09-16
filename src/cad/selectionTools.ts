@@ -19,12 +19,11 @@ export type ObjectToolId =
   | "document"
   | "measure"
   | "wall"
-  | "door"
-  | "sticker";
+  | "door";
 
 export const OBJECT_TOOL_IDS: readonly ObjectToolId[] = [
   "line", "guide", "free", "polygon", "hatch", "text",
-  "table", "document", "measure", "wall", "door", "sticker",
+  "table", "document", "measure", "wall", "door",
 ];
 
 /**
@@ -57,7 +56,6 @@ export function engineToolForObject(kind: string, obj: any): ObjectToolId | null
     case "textBox":     return "text";
     case "table":       return "table";
     case "document":    return "document";
-    case "sticker":     return "sticker";
     default:            return null;
   }
 }

@@ -48,7 +48,6 @@ const KIND_MAP: Record<string, LibraryGeometryKind> = {
 
 const UNSUPPORTED_LABELS: Record<string, string> = {
   document: "Dokument (PDF/Bild)",
-  sticker: "Stempel-Instanz",
   library: "Bibliotheksobjekt",
   door: "Tür/Fenster",
 };
@@ -99,7 +98,6 @@ export function collectLibrarySelection(app: CadApp): LibrarySelection {
           : { kind: "textbox", id: sel.textBoxId });
       }
       else if (sel.documentId) refs.push({ kind: "document", id: sel.documentId });
-      else if (sel.stickerInstanceId) refs.push({ kind: "sticker", id: sel.stickerInstanceId });
       else if (sel.libraryInstanceId) refs.push({ kind: "library", id: sel.libraryInstanceId });
     }
   }

@@ -140,7 +140,6 @@ export const ToolIds = {
   MEASURE: "measure",
   TEXT: "text",
   PIPETTE: "pipette",
-  STICKER: "sticker",
   DOCUMENT: "document",
   FREE: "free",
   ERASER: "eraser",
@@ -159,7 +158,6 @@ export const SelectionType = {
   DIMENSION: "dimension",
   TEXTBOX: "textbox",
   TEXTBOX_HANDLE: "textbox_handle",
-  STICKER_INSTANCE: "sticker_instance",
   /** Platzierte Bibliotheksinstanz (eigener Auswahltyp, kein Sticker). */
   LIBRARY_INSTANCE: "library_instance",
   DOCUMENT: "document",

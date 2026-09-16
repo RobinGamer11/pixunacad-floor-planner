@@ -33,7 +33,7 @@ interface TextBoxSnap {
   labelId: string;
 }
 
-/** Wand-Snapshot (Bezugspolylinie + Körper-Parameter). Wird u. a. von Stickern genutzt. */
+/** Wand-Snapshot (Bezugspolylinie + Körper-Parameter). */
 export interface WallSnap {
   kind: "wall"; corners: Vec2[];
   wallKind: string; thicknessM: number; referenceSide: string;
