@@ -10,6 +10,7 @@ import type { MappeCollabSession, MappeCollabStatus } from "./session";
 
 const EMPTY: MappeCollabStatus = {
   connected: false,
+  mode: "off",
   unavailable: false,
   peers: [],
   locksByObject: new Map(),
