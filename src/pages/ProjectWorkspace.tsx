@@ -911,8 +911,7 @@ export default function ProjectWorkspace() {
       : null,
     onFieldConflict: (id) => {
       const name = mappeCollabRef.current?.getStatus().locksByObject.get(id)?.displayName;
-      toast({
-        title: "Gleichzeitige Bearbeitung",
+      toast("Gleichzeitige Bearbeitung", {
         description: name
           ? `${name} hat dieses Element ebenfalls geändert – der gespeicherte Stand wurde übernommen.`
           : "Dieses Element wurde gleichzeitig geändert – der gespeicherte Stand wurde übernommen.",
