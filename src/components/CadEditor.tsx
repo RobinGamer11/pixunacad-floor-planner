@@ -13,6 +13,8 @@ import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
 import { CadCommentLayer } from "@/components/cad/CadCommentLayer";
+import { CadPresenceBar } from "@/components/cad/CadPresenceBar";
+import { useCadCollab } from "@/lib/cadCollab/useCadCollab";
 import { TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
 
@@ -317,6 +319,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
   const appRef = useRef<CadApp | null>(null);
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
+  // Objektbasierte Live-Zusammenarbeit (nur bei geteilten Projekten aktiv).
+  const collab = useCadCollab(cadApp, projectId);
 
   React.useImperativeHandle(ref, () => ({
     undo: () => appRef.current?.undo(),
@@ -2029,6 +2033,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           selectedId={tableSelectedId}
           setSelectedId={setTableSelectedId}
         />
+
+        {/* Live-Zusammenarbeit: wer ist gerade mit auf dieser Zeichnung */}
+        {!presenting && <CadPresenceBar peers={collab.status.peers} connected={collab.status.connected} />}
 
         {/* Kommentare (DOM-Overlay, kein Zeichenobjekt) */}
         {!presenting && (
