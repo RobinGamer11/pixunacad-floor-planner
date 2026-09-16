@@ -2221,6 +2221,21 @@ export class SelectTool {
     this.app.hub.updateDisplay(len, ang);
   }
 
+  /** Hub-Eingabe der 2-Punkt-Skalierung: Länge = Zielabstand ab Fixpunkt. */
+  private _applyScale2PtHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.activeEditAction !== PointEditAction.SCALE_2PT) return;
+    const base = this.hatchScaleBaseDist;
+    if (!base) return;
+    const len = vals.lengthM != null ? Math.max(0.0001, vals.lengthM) : base;
+    this.hatchScaleLocked = true;
+    this._applyLibraryScale(len / base);
+    const ang = vals.angleDeg != null ? vals.angleDeg : angleDeg(this.fixedPoint!, this.otherPointOriginal!);
+    const rad = (ang * Math.PI) / 180;
+    this.scale2ptTargetWorld = v(this.fixedPoint!.x + Math.cos(rad) * len, this.fixedPoint!.y + Math.sin(rad) * len);
+    this.app.hub.setValues(len, ang);
+    this.app.hub.updateDisplay(len, ang);
+  }
+
   /** Rotate the WHOLE hatch polygon (inkl. Löcher) around `fixedPoint`
    *  (= Polygon-Schwerpunkt) auf den absoluten Winkel `newAngleDeg`.
    *  Ohne diese Sonderbehandlung würde beim Drehen nur der angefasste
