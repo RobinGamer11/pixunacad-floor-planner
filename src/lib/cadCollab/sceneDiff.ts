@@ -53,6 +53,24 @@ export function indexSnapshot(snapshot: string | null | undefined): SceneIndex {
     // Altstand ohne `scenesById`: nur die aktive Seite.
     index.set(data.activeSheetId, indexOneScene(data as Record<string, unknown>));
   }
+  // Bibliotheksdefinitionen und Ordner gehören zum Projekt, nicht zu einem
+  // Blatt – sie laufen über eine eigene, feste „Seite".
+  const lib = new Map<CadObjectKind, Map<string, string>>();
+  let hasLib = false;
+  for (const kind of CAD_LIBRARY_KINDS) {
+    const list = data[kind];
+    const byId = new Map<string, string>();
+    if (Array.isArray(list)) {
+      hasLib = true;
+      for (const obj of list) {
+        const id = (obj as { id?: unknown } | null)?.id;
+        if (typeof id !== "string" || !id) continue;
+        byId.set(id, JSON.stringify(obj));
+      }
+    }
+    lib.set(kind, byId);
+  }
+  if (hasLib) index.set(CAD_LIBRARY_SHEET_ID, lib);
   return index;
 }
 
