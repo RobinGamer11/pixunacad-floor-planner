@@ -35,8 +35,26 @@ export function MappeCollabLayer({ page, status }: Props) {
   if (!status.connected) return null;
   const elements = page.elements ?? [];
 
+  const peersHere = status.peers.filter((p) => p.pageId === page.id);
+
   return (
     <div className="pointer-events-none absolute inset-0 z-30">
+      {/* Wer ist gerade auf dieser Seite */}
+      {peersHere.length > 0 && (
+        <div className="absolute right-2 top-2 flex items-center gap-1">
+          {peersHere.slice(0, 4).map((peer) => (
+            <span
+              key={peer.userId}
+              title={peer.displayName}
+              className="flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-semibold"
+              style={{ background: peer.color, color: "#0b1020" }}
+            >
+              {initialsOf(peer.displayName)}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Fremde Bearbeitungsmarkierungen */}
       {elements.map((el) => {
         const lock = status.locksByObject.get(el.id);
