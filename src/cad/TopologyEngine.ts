@@ -611,6 +611,13 @@ export class TopologyEngine {
       }
     }
 
+    // Bibliotheksinstanzen — schreibgeschützte Weltgeometrie der Container.
+    for (const ls of this._libraryScenes(exclusions?.libraryInstanceIds)) {
+      this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+    }
+
+
+
     // Lineal — Endpunkte, Mitte und Zeichenkante sind für alle Werkzeuge fangbar.
     const rg: any = (this.scene as any).rulerGuide;
     if (rg && !exclusions?.ruler) {
