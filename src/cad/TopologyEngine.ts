@@ -54,6 +54,8 @@ export interface SnapExclusions {
   freeStrokeIds?: ReadonlySet<string>;
   wallIds?: ReadonlySet<string>;
   doorIds?: ReadonlySet<string>;
+  /** Bibliotheksinstanzen, die keine Fangpunkte liefern (z. B. die gerade transformierte). */
+  libraryInstanceIds?: ReadonlySet<string>;
   /** true = das Lineal selbst liefert keine Fangpunkte (beim Ziehen des Lineals). */
   ruler?: boolean;
 }
