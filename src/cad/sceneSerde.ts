@@ -15,6 +15,7 @@ export interface SerializedScene {
   dimensions?: any[];
   textBoxes?: any[];
   tables?: any[];
+  /** Altbestand: Stempel-Instanzen werden beim Laden ignoriert. */
   stickerInstances?: any[];
   /** Platzierte Bibliotheksinstanzen (nur Referenz + Transformation). */
   libraryInstances?: any[];
@@ -33,7 +34,6 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   scene.dimensions = [];
   scene.textBoxes = [];
   (scene as any).tables = [];
-  scene.stickerInstances = [];
   (scene as any).libraryInstances = [];
   scene.documents = [];
   scene.freeStrokes = [];
@@ -46,7 +46,6 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   (scene as any)._rebuildDimIdMap?.();
   (scene as any)._rebuildTextIdMap?.();
   (scene as any)._rebuildTableIdMap?.();
-  (scene as any)._rebuildStickerIdMap?.();
   (scene as any)._rebuildLibraryIdMap?.();
   (scene as any)._rebuildDocIdMap?.();
   (scene as any)._rebuildFreeIdMap?.();
@@ -178,17 +177,6 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
       rotationRad: t.rotationRad || 0, labelId: t.labelId, scale: t.scale || 1,
     });
     if (t.id) { tbl.id = t.id; (scene as any)._rebuildTableIdMap?.(); }
-  }
-  if (Array.isArray(data.stickerInstances)) {
-    for (const si of data.stickerInstances) {
-      const inst = scene.createStickerInstance({
-        defId: si.defId, name: si.name, items: si.items,
-        position: si.position, rotationRad: si.rotationRad || 0,
-        scale: si.scale || 1, labelId: si.labelId,
-      });
-      if (si.id) (inst as any).id = si.id;
-    }
-    (scene as any)._rebuildStickerIdMap?.();
   }
   if (Array.isArray(data.libraryInstances)) {
     for (const li of data.libraryInstances) {

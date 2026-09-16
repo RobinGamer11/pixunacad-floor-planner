@@ -107,7 +107,6 @@ type SelectionGeometrySnapshot =
   | { kind: "segment"; a: { x: number; y: number }; b: { x: number; y: number } }
   | { kind: "hatch"; pts: { x: number; y: number }[]; holes: { x: number; y: number }[][] | null }
   | { kind: "textbox"; center: { x: number; y: number } }
-  | { kind: "sticker"; pos: { x: number; y: number } }
   | { kind: "doc"; pos: { x: number; y: number } }
   | { kind: "freestroke"; pts: { x: number; y: number }[] };
 
@@ -163,10 +162,10 @@ export type MiniCadSelectionInfo =
 export const FRAME_PAD_PX = 96;
 
 /** Zwei Selections referenzieren dasselbe Objekt, wenn eine ihrer ID-Felder
- *  (Segment, Hatch, TextBox, Sticker, FreeStroke, Document, Wall) übereinstimmt. */
+ *  (Segment, Hatch, TextBox, FreeStroke, Document, Wall) übereinstimmt. */
 function _sameObject(a: Selection, b: Selection): boolean {
   const ids: (keyof Selection | string)[] = [
-    "segmentId", "hatchId", "textBoxId", "stickerInstanceId",
+    "segmentId", "hatchId", "textBoxId",
     "documentId", "freeStrokeId", "wallId",
   ];
   for (const k of ids) {
@@ -2333,11 +2332,6 @@ export class MiniCad {
 
   getSelectedDimension() { return null; }
 
-  // Sticker-Edit ist im Embed nicht verfügbar — feste No-Op-Werte.
-  isStickerEditing(): boolean { return false; }
-  enterStickerEdit(_inst: any) {}
-  exitStickerEdit() {}
-  isPointOutsideStickerEdit(_mouseW: any): boolean { return true; }
 
   // Settings-Panels existieren im Embed nicht.
   showLineSettingsPanel(_show: boolean) {}
@@ -2362,7 +2356,6 @@ export class MiniCad {
       try { this._drawHatchSelection?.(); } catch {}
       try { this._drawSegmentSelection?.(); } catch {}
       try { this._drawTextBoxSelection?.(); } catch {}
-      try { this._drawStickerInstanceSelection?.(); } catch {}
       try { this._drawDocumentSelection?.(); } catch {}
       try { this._drawFreeStrokeSelection?.(); } catch {}
       try { this._drawHoverSegmentPoints?.(); } catch {}
@@ -2375,7 +2368,6 @@ export class MiniCad {
           try { this._drawHatchSelection?.(); } catch {}
           try { this._drawSegmentSelection?.(); } catch {}
           try { this._drawTextBoxSelection?.(); } catch {}
-          try { this._drawStickerInstanceSelection?.(); } catch {}
           try { this._drawDocumentSelection?.(); } catch {}
           try { this._drawFreeStrokeSelection?.(); } catch {}
         }
@@ -2606,10 +2598,6 @@ export class MiniCad {
         } else if (sel.hatchId) {
           const h = this.scene.getHatchById(sel.hatchId);
           if (h) { this.scene.removeHatch(h); removed = true; }
-        } else if ((sel as any).stickerInstanceId) {
-          const sid = (sel as any).stickerInstanceId as string;
-          const inst = this.scene.stickerInstances?.find?.((i: any) => i.id === sid);
-          if (inst) { this.scene.removeStickerInstance(inst); removed = true; }
         } else if ((sel as any).freeStrokeId) {
           this.scene.removeFreeStrokesByIds([(sel as any).freeStrokeId]);
           removed = true;
@@ -2674,12 +2662,6 @@ export class MiniCad {
       if (!b) return null;
       return { x: b.center.x, y: b.center.y };
     }
-    const sid = s.stickerInstanceId;
-    if (sid) {
-      const i = this.scene.getStickerInstanceById(sid);
-      if (!i) return null;
-      return { x: i.position.x, y: i.position.y };
-    }
     const did = s.documentId;
     if (did) {
       const d = this.scene.documents.find((x) => x.id === did);
@@ -2714,12 +2696,6 @@ export class MiniCad {
       const b = this.scene.getTextBoxById(s.textBoxId);
       if (!b) return null;
       return { kind: "textbox", center: { x: b.center.x, y: b.center.y } };
-    }
-    const sid = s.stickerInstanceId;
-    if (sid) {
-      const i = this.scene.getStickerInstanceById(sid);
-      if (!i) return null;
-      return { kind: "sticker", pos: { x: i.position.x, y: i.position.y } };
     }
     const did = s.documentId;
     if (did) {
@@ -2765,11 +2741,6 @@ export class MiniCad {
       if (!box) return;
       box.center.x = snapshot.center.x + dx;
       box.center.y = snapshot.center.y + dy;
-    } else if (snapshot.kind === "sticker") {
-      const sticker = this.scene.getStickerInstanceById(s.stickerInstanceId ?? "");
-      if (!sticker) return;
-      sticker.position.x = snapshot.pos.x + dx;
-      sticker.position.y = snapshot.pos.y + dy;
     } else if (snapshot.kind === "doc") {
       const document = this.scene.documents.find((item) => item.id === s.documentId);
       if (!document) return;
@@ -2867,7 +2838,7 @@ export class MiniCad {
    * Wenn der User mit gehaltener Shift-Taste (oder im Mehrfach-Modus) auf eine
    * leere Stelle klickt und zieht, wird ein gestricheltes Auswahlrechteck
    * gezeichnet. Beim Loslassen werden alle Objekte (Linien, Hatches, TextBoxen,
-   * Sticker, Documents, FreeStrokes) deren Anker im Rechteck liegt, gewählt. */
+   * Documents, FreeStrokes) deren Anker im Rechteck liegt, gewählt. */
   private _marqueeActive = false;
   private _marqueeStart: { x: number; y: number } | null = null; // Welt
   private _marqueeEnd: { x: number; y: number } | null = null;   // Welt
@@ -2992,9 +2963,6 @@ export class MiniCad {
     for (const b of this.scene.textBoxes) {
       if (Math.abs(wx - b.center.x) <= b.widthM / 2 && Math.abs(wy - b.center.y) <= b.heightM / 2) return true;
     }
-    for (const i of this.scene.stickerInstances || []) {
-      if (Math.hypot(wx - i.position.x, wy - i.position.y) <= 0.05) return true;
-    }
     for (const d of this.scene.documents) {
       if (wx >= d.position.x && wx <= d.position.x + d.widthM && wy >= d.position.y && wy <= d.position.y + d.heightM) return true;
     }
@@ -3029,12 +2997,6 @@ export class MiniCad {
       const box = { minX: b.center.x - halfW, minY: b.center.y - halfH, maxX: b.center.x + halfW, maxY: b.center.y + halfH };
       if (mode === "enclose" ? (box.minX >= x0 && box.minY >= y0 && box.maxX <= x1 && box.maxY <= y1) : rectsOverlap(box)) {
         picks.push({ type: SelectionType.TEXTBOX, textBoxId: b.id, handleIndex: null });
-      }
-    }
-    for (const i of this.scene.stickerInstances || []) {
-      if (!this._labelEditable((i as any).labelId)) continue;
-      if (inRect(i.position.x, i.position.y)) {
-        picks.push({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: i.id } as any);
       }
     }
     for (const d of this.scene.documents) {

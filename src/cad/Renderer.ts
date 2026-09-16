@@ -3,7 +3,7 @@ import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToR
 import { Camera } from "./Camera";
 import { metersToUnit, rulerSideOf, rulerTickStep, rulerUnitOf } from "./rulerModel";
 import type { RasterLayers } from "./RasterLayers";
-import { Scene, Hatch, Dimension, TextBox, StickerInstance, DocumentObject, FreeStroke } from "./Scene";
+import { Scene, Hatch, Dimension, TextBox, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
 import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx, strokeWithBrushIfActive } from "./strokeEffects";
 import { getEffectiveContourGeometry } from "./effectiveGeometry";
@@ -21,7 +21,6 @@ import { evalCell } from "@/lib/table/tableFormula";
 import { strokeHatchSeal } from "./hatchSeal";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, patternAlwaysFollowsWall, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
-import { transformedInstanceItems, instanceBoundingCornersWorld } from "./StickerManager";
 import type { LibraryDefinition, LibraryGeometrySnapshot } from "./library/types";
 import { createObjectsFromSnapshots, instanceCornersWorld, transformSnapshots } from "./library/libraryGeometry";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
@@ -42,7 +41,6 @@ export interface Selection {
   hatchId?: string;
   dimensionId?: string;
   textBoxId?: string;
-  stickerInstanceId?: string;
   /** Ausgewählte Bibliotheksinstanz (eigener Auswahltyp, kein Sticker). */
   libraryInstanceId?: string;
   documentId?: string;
@@ -93,7 +91,8 @@ export class Renderer {
     enabled: true,
     sizeM: 1,
     color: "#000000",
-    opacity: 0.06,
+    // Standard: 85 % Transparenz → 15 % Deckkraft.
+    opacity: 0.15,
   };
 
   /** Hintergrundfarbe der CAD-Oberfläche (außerhalb des Kartenkreises). */
@@ -284,7 +283,7 @@ export class Renderer {
    * Zeichnet ALLE Objekte gruppiert nach Label-ID, von Hintergrund zu Vordergrund.
    * Höher in der ID-Panel-Liste (kleinerer Index) = Vordergrund.
    * Innerhalb einer ID-Gruppe gilt die Sub-Reihenfolge:
-   * Documents → Hatches → Segments → Dimensions → TextBoxes → Stickers.
+   * Documents → Hatches → Segments → Dimensions → TextBoxes.
    * Damit liegen z. B. Schraffuren einer höher gerankten ID über Linien einer niedriger gerankten ID.
    */
   private _drawByLabelOrder() {
@@ -308,7 +307,6 @@ export class Renderer {
       this._drawDimensionsForLabel(labelId);
       this._drawTextBoxesForLabel(labelId);
       this._drawTablesForLabel(labelId);
-      this._drawStickerInstancesForLabel(labelId);
       this._drawLibraryInstancesForLabel(labelId);
     }
     if (!isExportMode()) {
@@ -438,7 +436,6 @@ export class Renderer {
     this._drawSegmentSelection();
     this._drawDimensionSelection();
     this._drawTextBoxSelection();
-    this._drawStickerInstanceSelection();
     this._drawLibraryInstanceSelection();
     this._drawDocumentSnapAffordances();
     this._drawDocumentGuides();
@@ -458,7 +455,6 @@ export class Renderer {
         this._drawSegmentSelection();
         this._drawDimensionSelection();
         this._drawTextBoxSelection();
-        this._drawStickerInstanceSelection();
     this._drawLibraryInstanceSelection();
         this._drawDocumentSelection();
         this._drawFreeStrokeSelection();
@@ -466,7 +462,6 @@ export class Renderer {
       this.selection = original;
     }
 
-    this._drawStickerEditFrame();
 
 
     if (this.overlay && this.overlay.draw) {
@@ -1131,82 +1126,10 @@ export class Renderer {
   }
 
 
-  /** Dashed Frame um die Owner-Objekte einer aktuell im Edit-Mode befindlichen Sticker-Instanz. */
-  private _drawStickerEditFrame() {
-    const app: any = (this.scene as any);
-    // Wir lesen den Edit-Owner anhand der Tags direkt aus den Scene-Objekten.
-    let editOwnerId: string | null = null;
-    for (const s of this.scene.segments) if (s._stickerEditOwnerId) { editOwnerId = s._stickerEditOwnerId; break; }
-    if (!editOwnerId) for (const h of this.scene.hatches) if (h._stickerEditOwnerId) { editOwnerId = h._stickerEditOwnerId; break; }
-    if (!editOwnerId) for (const d of this.scene.dimensions) if (d._stickerEditOwnerId) { editOwnerId = d._stickerEditOwnerId; break; }
-    if (!editOwnerId) for (const t of this.scene.textBoxes) if (t._stickerEditOwnerId) { editOwnerId = t._stickerEditOwnerId; break; }
-    if (!editOwnerId) return;
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    const acc = (x: number, y: number) => { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; };
-    for (const s of this.scene.segments) if (s._stickerEditOwnerId === editOwnerId) { acc(s.a.x, s.a.y); acc(s.b.x, s.b.y); }
-    for (const h of this.scene.hatches) if (h._stickerEditOwnerId === editOwnerId) for (const p of h.points) acc(p.x, p.y);
-    for (const d of this.scene.dimensions) if (d._stickerEditOwnerId === editOwnerId) { acc(d.p1.x, d.p1.y); acc(d.p2.x, d.p2.y); }
-    for (const t of this.scene.textBoxes) if (t._stickerEditOwnerId === editOwnerId) {
-      const w2 = t.widthM / 2, h2 = t.heightM / 2;
-      acc(t.center.x - w2, t.center.y - h2); acc(t.center.x + w2, t.center.y + h2);
-    }
-    if (!isFinite(minX)) return;
 
-    const padPx = 14;
-    const tl = this.camera.worldToScreen(minX, minY);
-    const br = this.camera.worldToScreen(maxX, maxY);
-    const x = Math.min(tl.x, br.x) - padPx;
-    const y = Math.min(tl.y, br.y) - padPx;
-    const w = Math.abs(br.x - tl.x) + padPx * 2;
-    const h = Math.abs(br.y - tl.y) + padPx * 2;
 
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,140,0,0.95)";
-    ctx.fillStyle = "rgba(255,140,0,0.06)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 6]);
-    ctx.beginPath();
-    ctx.rect(x, y, w, h);
-    ctx.fill();
-    ctx.stroke();
-    ctx.setLineDash([]);
 
-    // Label "Sticker bearbeiten"
-    ctx.fillStyle = "rgba(255,140,0,0.95)";
-    ctx.font = "12px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "bottom";
-    ctx.fillText("Sticker bearbeiten — Esc oder Klick außerhalb", x + 4, y - 4);
-    ctx.restore();
-  }
-
-  /* ---------- Sticker Instances ---------- */
-  private _stickersBackToFront(): StickerInstance[] {
-    const order = this.labels.list();
-    const rank = new Map(order.map((g, i) => [g.id, i]));
-    return [...this.scene.stickerInstances]
-      .filter(s => this.labels.isVisible(s.labelId))
-      .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
-  }
-
-  private _drawStickerInstances() {
-    for (const inst of this._stickersBackToFront()) this._drawSingleStickerInstance(inst);
-  }
-
-  private _drawStickerInstancesForLabel(labelId: string) {
-    for (const inst of this.scene.stickerInstances) {
-      if (inst.labelId !== labelId) continue;
-      if (!this.labels.isVisible(inst.labelId)) continue;
-      this._drawSingleStickerInstance(inst);
-    }
-  }
-
-  private _drawSingleStickerInstance(inst: StickerInstance) {
-    const items = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-    this._drawTransformedItems(this.ctx, this.camera, items);
-  }
 
   private _drawTransformedItems(ctx: CanvasRenderingContext2D, cam: Camera, items: any[]) {
     for (const it of items) {
@@ -1396,47 +1319,6 @@ export class Renderer {
     ctx.restore();
   }
 
-  private _drawStickerInstanceSelection() {
-    if (!this.selection || this.selection.type !== SelectionType.STICKER_INSTANCE) return;
-    const inst = this.scene.getStickerInstanceById(this.selection.stickerInstanceId!);
-    if (!inst) return;
-    if (!this.labels.isVisible(inst.labelId)) return;
-
-    const ctx = this.ctx;
-    const cam = this.camera;
-    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-    const sc = corners.map(c => cam.worldToScreen(c.x, c.y));
-
-    ctx.save();
-    ctx.strokeStyle = "rgba(77,163,255,0.95)";
-    ctx.fillStyle = "rgba(77,163,255,0.08)";
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([6, 4]);
-    ctx.beginPath();
-    ctx.moveTo(sc[0].x, sc[0].y);
-    for (let i = 1; i < sc.length; i++) ctx.lineTo(sc[i].x, sc[i].y);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Center handle (Position)
-    const center = cam.worldToScreen(inst.position.x, inst.position.y);
-    ctx.fillStyle = "rgba(77,163,255,0.95)";
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(center.x, center.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-    // Corner handles (visuell, Skalierung über Hub)
-    for (const p of sc) {
-      ctx.fillStyle = "rgba(77,163,255,0.95)";
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.rect(p.x - 4, p.y - 4, 8, 8);
-      ctx.fill(); ctx.stroke();
-    }
-    ctx.restore();
-  }
 
   private _drawGrid() {
     const ctx = this.ctx;

@@ -34,8 +34,6 @@ import { TextTool } from "./TextTool";
 import { TextEditorOverlay } from "./TextEditorOverlay";
 import { PipetteTool } from "./PipetteTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
-import { StickerTool } from "./StickerTool";
-import { StickerDefinition, buildStickerFromSelection, buildStickerFromIds, StickerIdSet, exportStickersToJson, importStickersFromJson, instanceBoundingCornersWorld, transformedInstanceItems, pointInInstance, localItemsBounds } from "./StickerManager";
 import type { LibraryDefinition, LibraryFolder } from "./library/types";
 import { LibraryPlacementTool } from "./library/LibraryPlacementTool";
 import { LibrarySnapSource } from "./library/librarySnapSource";
@@ -340,7 +338,6 @@ export class CadApp {
   measureTool!: MeasureTool;
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
-  stickerTool!: StickerTool;
   /** Bibliotheks-Platzierungswerkzeug (nur eigenständige CAD-Oberfläche). */
   libraryTool!: LibraryPlacementTool;
   tableTool!: TableTool;
@@ -350,7 +347,7 @@ export class CadApp {
   eraserTool!: EraserTool;
   wallTool!: WallTool;
   doorTool!: DoorTool;
-  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | StickerTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool | TableTool | LibraryPlacementTool;
+  activeTool: SelectTool | LineTool | HatchTool | MeasureTool | TextTool | PipetteTool | DocumentTool | FreeDrawTool | EraserTool | WallTool | DoorTool | TableTool | LibraryPlacementTool;
 
   /** Hub-Box-State für ausgewähltes Dokument (Verschieben/Drehen/Crop). Geschrieben von SelectTool, gelesen von CadEditor. */
   documentHubState: { visible: boolean; screenX: number; screenY: number; docId: string | null; cornerIndex: number; anchorWorld: { x: number; y: number } | null; cropSide: "top" | "right" | "bottom" | "left" | null } = {
@@ -388,10 +385,6 @@ export class CadApp {
   clipboard: Clipboard | null = null;
   pastePreviewActive = false;
   private _toolBeforePaste: string | null = null;
-
-  // Sticker library (per project, included in undo/redo)
-  stickers: StickerDefinition[] = [];
-  onStickersChange?: () => void;
 
   // Bibliothek (projektweit, Teil von Undo/Redo und Persistenz)
   libraryDefinitions: LibraryDefinition[] = [];
@@ -486,17 +479,17 @@ export class CadApp {
   private _snapshotTimer: number | null = null;
   private _isRestoring = false;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  /**
+   * Wird nach jeder bestätigten Änderung der Zeichnung ausgelöst.
+   * Wird von der CAD-Zusammenarbeit genutzt, um einzelne Objektänderungen
+   * zu erkennen. Der Zeichenkern selbst bleibt davon unberührt.
+   */
+  onSceneCommitted?: () => void;
 
   onToolChange?: (toolId: string) => void;
 
   onSelectionChange?: () => void;
   onLabelsChange?: () => void;
-
-  // ---- Sticker Edit Mode ("Ghost Scene") ----
-  /** ID der Sticker-Instanz, die gerade im Edit-Mode ist. null = kein Edit-Mode. */
-  _stickerEditInstanceId: string | null = null;
-  /** Snapshot der Instanz-Daten beim Enter (für inverse Transform beim Exit). */
-  private _stickerEditSnapshot: { name: string; defId: string | null; labelId: string; position: Vec2; rotationRad: number; scale: number } | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -595,7 +588,6 @@ export class CadApp {
     this.measureTool = new MeasureTool(this);
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
-    this.stickerTool = new StickerTool(this);
     this.libraryTool = new LibraryPlacementTool(this);
     this.renderer.libraryDefinitionSource = () => this.libraryDefinitions;
     // Bibliotheksinstanzen als schreibgeschützte Fangquelle für alle Werkzeuge.
@@ -809,11 +801,6 @@ export class CadApp {
         labelId: t.labelId,
         _stickerEditOwnerId: t._stickerEditOwnerId || null,
       })),
-      stickerInstances: scene.stickerInstances.map(si => ({
-        id: si.id, defId: si.defId, name: si.name, items: si.items,
-        position: { x: si.position.x, y: si.position.y },
-        rotationRad: si.rotationRad, scale: si.scale, labelId: si.labelId,
-      })),
       libraryInstances: (scene.libraryInstances || []).map(serializeLibraryInstance),
       documents: scene.documents
         .filter(d => !(d as any)._snapOnly)
@@ -916,9 +903,6 @@ export class CadApp {
       // Backwards-compat: aktive Scene flach.
       ...this._serializeOneScene(this.scene),
       labels: this.labelManager.list().map(l => ({ ...l })),
-      stickers: this.stickers.map(s => ({ id: s.id, name: s.name, items: s.items, createdAt: s.createdAt })),
-      _stickerEditInstanceId: this._stickerEditInstanceId,
-      _stickerEditSnapshot: this._stickerEditSnapshot,
       libraryDefinitions: serializeDefinitions(this.libraryDefinitions),
       libraryFolders: serializeFolders(this.libraryFolders),
       // Multi-Sheet-State
@@ -970,13 +954,6 @@ export class CadApp {
     // Restore labels first
     if (Array.isArray(data.labels) && (this.labelManager as any).restore) {
       try { (this.labelManager as any).restore(data.labels); } catch {}
-    }
-    // Restore stickers
-    if (Array.isArray(data.stickers)) {
-      this.stickers = data.stickers.map((s: any) => ({
-        id: s.id, name: s.name, items: s.items, createdAt: s.createdAt || Date.now(),
-      }));
-      this.onStickersChange?.();
     }
     // Bibliotheksdefinitionen (additiv, fehlende Daten => leere Liste)
     this.libraryDefinitions = restoreDefinitions(data.libraryDefinitions);
@@ -1044,9 +1021,6 @@ export class CadApp {
       this.renderer.scene = activeScene;
       this.topology.scene = activeScene;
     }
-    // Restore Sticker-Edit-Mode
-    this._stickerEditInstanceId = data._stickerEditInstanceId || null;
-    this._stickerEditSnapshot = data._stickerEditSnapshot || null;
     this.clearSelection();
     this.setSelectedLabelId(null);
     this.pointEditMenu.hide();
@@ -1110,6 +1084,26 @@ export class CadApp {
 
   private _emitHistoryChange() {
     this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
+    this.onSceneCommitted?.();
+  }
+
+  /**
+   * Übernimmt eine von außen eingespielte Änderung (Zusammenarbeit) in den
+   * Vergleichsstand, damit sie KEINEN eigenen Verlaufsschritt erzeugt.
+   */
+  markExternalChange() {
+    if (this._destroyed) return;
+    const snap = this._serializeScene();
+    this._lastSnapshot = snap;
+    if (this._historyIndex >= 0 && this._historyIndex < this._history.length) {
+      this._history[this._historyIndex] = snap;
+    }
+  }
+
+  /** Serialisierungsstand für die Zusammenarbeit (schreibgeschützt). */
+  serializeForCollab(): string | null {
+    if (this._destroyed) return null;
+    return this._serializeScene();
   }
 
   undo() {
@@ -1154,7 +1148,6 @@ export class CadApp {
     this._syncMeasureSettingsFromContext();
     this._syncTextSettingsFromContext();
     this._updateSettingsVisibility();
-    this._syncStickerInstanceHub();
     this.onSelectionChange?.();
   }
 
@@ -1339,11 +1332,6 @@ export class CadApp {
     try { this.renderer?.render(); } catch { /* noop */ }
   }
 
-  getSelectedStickerInstance() {
-    if (!this.selection || this.selection.type !== SelectionType.STICKER_INSTANCE) return null;
-    return this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
-  }
-
   getSelectedWall() {
     if (!this.selection) return null;
     const wallId = (this.selection as any).wallId;
@@ -1381,263 +1369,6 @@ export class CadApp {
     for (const s of targets) if (setStrokeAutoShape(s, on)) changed = true;
     if (changed) { (this as any).requestRender?.(); this.commitHistorySnapshot?.(); }
     return changed;
-  }
-
-  /* ===== Sticker Edit Mode ("Ghost Scene") ===== */
-  isStickerEditing(): boolean { return !!this._stickerEditInstanceId; }
-  getStickerEditInstanceId(): string | null { return this._stickerEditInstanceId; }
-  getStickerEditSnapshot() { return this._stickerEditSnapshot; }
-
-  /** Materialisiert die Items einer Sticker-Instanz als echte Scene-Objekte (World-Space) und entfernt die Instanz. */
-  enterStickerEdit(inst: { id: string; name: string; defId: string | null; labelId: string; position: Vec2; rotationRad: number; scale: number; items: any[] }) {
-    if (this._stickerEditInstanceId) return; // schon im Edit
-    const editId = inst.id;
-    this._stickerEditInstanceId = editId;
-    this._stickerEditSnapshot = {
-      name: inst.name, defId: inst.defId, labelId: inst.labelId,
-      position: { x: inst.position.x, y: inst.position.y },
-      rotationRad: inst.rotationRad, scale: inst.scale,
-    };
-
-    // Items in World-Space transformieren und als echte Scene-Objekte materialisieren.
-    const worldItems = transformedInstanceItems(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-    this.scene._currentEditOwnerId = editId;
-    try {
-      for (const it of worldItems) {
-        if (it.kind === "segment") {
-          this.scene.createSegment(it.a, it.b, { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId });
-        } else if (it.kind === "hatch") {
-          this.scene.createHatch(it.points, {
-            fillColor: it.fillColor, strokeColor: it.strokeColor,
-            fillAlphaPct: it.fillAlphaPct, strokeWidthPx: it.strokeWidthPx,
-            labelId: it.labelId, areaLabel: it.areaLabel,
-            patternEnabled: (it as any).patternEnabled, patternId: (it as any).patternId, patternScale: (it as any).patternScale, patternAngleDeg: (it as any).patternAngleDeg, patternSkewDeg: (it as any).patternSkewDeg, patternStretch: (it as any).patternStretch, patternOffsetX: (it as any).patternOffsetX, patternOffsetY: (it as any).patternOffsetY,
-          });
-        } else if (it.kind === "dimension") {
-          this.scene.createDimension(it.p1, it.p2, it.placementPoint, it.mode, it.refDir, {
-            textColor: it.textColor, textSizePx: it.textSizePx, lineColor: it.lineColor,
-            decimals: it.decimals, tickLengthM: it.tickLengthM, showExtensions: it.showExtensions,
-            useFreeText: it.useFreeText, freeText: it.freeText,
-            textBgEnabled: it.textBgEnabled, textBgColor: it.textBgColor, textBgAlpha: it.textBgAlpha,
-            bulge: (it as any).bulge || 0, p3: (it as any).p3 || null,
-            labelId: it.labelId,
-          });
-        } else if (it.kind === "wall") {
-          this.scene.createWall({
-            kind: it.wallKind as any, thicknessM: it.thicknessM,
-            referenceSide: it.referenceSide as any,
-            corners: it.corners, color: it.color, fillColor: it.fillColor,
-            priority: it.priority, labelId: it.labelId,
-            patternId: (it as any).patternId, patternScale: (it as any).patternScale,
-            patternAlignToWall: (it as any).patternAlignToWall,
-            patternAngleDeg: (it as any).patternAngleDeg ?? 0,
-          });
-        } else if (it.kind === "textbox") {
-          this.scene.createTextBox(it.center, it.widthM, it.heightM, { ...(it.style || {}), labelId: it.labelId }, it.html || "", it.rotationRad || 0);
-        }
-      }
-    } finally {
-      this.scene._currentEditOwnerId = null;
-    }
-
-    // Original-Instanz aus Scene entfernen (sie lebt nun als Ghost-Objekte).
-    const original = this.scene.getStickerInstanceById(editId);
-    if (original) this.scene.removeStickerInstance(original);
-
-    this.clearSelection();
-    this.pointEditMenu.hide();
-    this.refreshLabelUI();
-    // Snapshot direkt nach Enter, damit Undo den Edit-Mode nicht zerschießt.
-    this._lastSnapshot = this._serializeScene();
-  }
-
-  /** Sammelt alle Owner-Objekte, transformiert sie zurück in lokale Items und erzeugt eine neue Sticker-Instanz. */
-  exitStickerEdit() {
-    const editId = this._stickerEditInstanceId;
-    const snap = this._stickerEditSnapshot;
-    if (!editId || !snap) return;
-
-    // Sammle alle Owner-Objekte
-    const ownedSegs = this.scene.segments.filter(s => s._stickerEditOwnerId === editId);
-    const ownedHatches = this.scene.hatches.filter(h => h._stickerEditOwnerId === editId);
-    const ownedDims = this.scene.dimensions.filter(d => d._stickerEditOwnerId === editId);
-    const ownedTexts = this.scene.textBoxes.filter(t => t._stickerEditOwnerId === editId);
-    const ownedWalls = this.scene.walls.filter(w => w._stickerEditOwnerId === editId);
-
-    // Wenn alles gelöscht wurde: Edit-Mode beenden, Instanz nicht wiederherstellen.
-    const totalCount = ownedSegs.length + ownedHatches.length + ownedDims.length + ownedTexts.length + ownedWalls.length;
-    if (totalCount === 0) {
-      this._stickerEditInstanceId = null;
-      this._stickerEditSnapshot = null;
-      this._lastSnapshot = this._serializeScene();
-      return;
-    }
-
-    // Berechne neue Center (Centroid der Owner-Objekte in World-Space).
-    let sx = 0, sy = 0, n = 0;
-    for (const s of ownedSegs) { sx += (s.a.x + s.b.x) / 2; sy += (s.a.y + s.b.y) / 2; n++; }
-    for (const h of ownedHatches) {
-      let cx = 0, cy = 0;
-      for (const p of h.points) { cx += p.x; cy += p.y; }
-      sx += cx / h.points.length; sy += cy / h.points.length; n++;
-    }
-    for (const d of ownedDims) { sx += (d.p1.x + d.p2.x) / 2; sy += (d.p1.y + d.p2.y) / 2; n++; }
-    for (const t of ownedTexts) { sx += t.center.x; sy += t.center.y; n++; }
-    for (const w of ownedWalls) {
-      let cx = 0, cy = 0;
-      for (const p of w.corners) { cx += p.x; cy += p.y; }
-      sx += cx / w.corners.length; sy += cy / w.corners.length; n++;
-    }
-    const newPos = (n > 0) ? { x: sx / n, y: sy / n } : { x: snap.position.x, y: snap.position.y };
-
-    // Neue Items in lokalen Koordinaten = Translation zurück um newPos (Rotation/Scale = identity, da User die Geometrie direkt bearbeitet hat).
-    const newItems: any[] = [];
-    for (const s of ownedSegs) {
-      newItems.push({
-        kind: "segment",
-        a: { x: s.a.x - newPos.x, y: s.a.y - newPos.y },
-        b: { x: s.b.x - newPos.x, y: s.b.y - newPos.y },
-        color: s.color, thicknessM: s.thicknessM, labelId: s.labelId,
-      });
-    }
-    for (const h of ownedHatches) {
-      newItems.push({
-        kind: "hatch",
-        points: h.points.map(p => ({ x: p.x - newPos.x, y: p.y - newPos.y })),
-        fillColor: h.fillColor, strokeColor: h.strokeColor,
-        fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
-        labelId: h.labelId, areaLabel: { ...h.areaLabel },
-      });
-    }
-    for (const d of ownedDims) {
-      newItems.push({
-        kind: "dimension",
-        p1: { x: d.p1.x - newPos.x, y: d.p1.y - newPos.y },
-        p2: { x: d.p2.x - newPos.x, y: d.p2.y - newPos.y },
-        placementPoint: { x: d.placementPoint.x - newPos.x, y: d.placementPoint.y - newPos.y },
-        mode: d.mode, refDir: d.refDir ? { x: d.refDir.x, y: d.refDir.y } : null, bulge: (d as any).bulge || 0,
-        p3: d.p3 ? { x: d.p3.x - newPos.x, y: d.p3.y - newPos.y } : null,
-        textColor: d.textColor, textSizePx: d.textSizePx, lineColor: d.lineColor,
-        decimals: d.decimals, tickLengthM: d.tickLengthM, showExtensions: d.showExtensions,
-        useFreeText: d.useFreeText, freeText: d.freeText,
-        textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
-        labelId: d.labelId,
-      });
-    }
-    for (const t of ownedTexts) {
-      newItems.push({
-        kind: "textbox",
-        center: { x: t.center.x - newPos.x, y: t.center.y - newPos.y },
-        widthM: t.widthM, heightM: t.heightM, rotationRad: t.rotationRad,
-        html: t.html, style: { ...t.style }, labelId: t.labelId,
-      });
-    }
-
-    for (const w of ownedWalls) {
-      newItems.push({
-        kind: "wall",
-        corners: w.corners.map(p => ({ x: p.x - newPos.x, y: p.y - newPos.y })),
-        wallKind: w.kind, thicknessM: w.thicknessM, referenceSide: w.referenceSide,
-        color: w.color, fillColor: w.fillColor, priority: w.priority, labelId: w.labelId,
-      });
-    }
-
-    // Owner-Objekte aus Scene entfernen.
-    for (const w of ownedWalls) this.scene.removeWall(w);
-    this.scene.removeSegmentsByIds(ownedSegs.map(s => s.id));
-    this.scene.removeHatchesByIds(ownedHatches.map(h => h.id));
-    this.scene.removeDimensionsByIds(ownedDims.map(d => d.id));
-    this.scene.removeTextBoxesByIds(ownedTexts.map(t => t.id));
-
-    // Neue Sticker-Instanz mit identischer ID anlegen — wir stellen die alte ID wieder her,
-    // indem wir createStickerInstance aufrufen und die ID anschließend überschreiben.
-    const newInst = this.scene.createStickerInstance({
-      defId: snap.defId, name: snap.name, items: newItems,
-      position: newPos, rotationRad: 0, scale: 1, labelId: snap.labelId,
-    });
-    // Behalte die ursprüngliche Instanz-ID, damit Selektion + Hub konsistent bleiben.
-    (newInst as any).id = editId;
-    (this.scene as any)._rebuildStickerIdMap?.();
-
-    this._stickerEditInstanceId = null;
-    this._stickerEditSnapshot = null;
-    this.refreshLabelUI();
-    this._lastSnapshot = this._serializeScene();
-  }
-
-  /** Liefert die World-Space-AABB der aktuellen Sticker-Edit-Owner-Objekte (oder null). */
-  getStickerEditWorldBounds(): { minX: number; minY: number; maxX: number; maxY: number } | null {
-    const editId = this._stickerEditInstanceId;
-    if (!editId) return null;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    const acc = (x: number, y: number) => { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; };
-    for (const s of this.scene.segments) if (s._stickerEditOwnerId === editId) { acc(s.a.x, s.a.y); acc(s.b.x, s.b.y); }
-    for (const h of this.scene.hatches) if (h._stickerEditOwnerId === editId) for (const p of h.points) acc(p.x, p.y);
-    for (const d of this.scene.dimensions) if (d._stickerEditOwnerId === editId) { acc(d.p1.x, d.p1.y); acc(d.p2.x, d.p2.y); }
-    for (const t of this.scene.textBoxes) if (t._stickerEditOwnerId === editId) {
-      const w2 = t.widthM / 2, h2 = t.heightM / 2;
-      acc(t.center.x - w2, t.center.y - h2); acc(t.center.x + w2, t.center.y + h2);
-    }
-    for (const w of this.scene.walls) if (w._stickerEditOwnerId === editId) {
-      const t2 = w.thicknessM / 2;
-      for (const p of w.corners) { acc(p.x - t2, p.y - t2); acc(p.x + t2, p.y + t2); }
-    }
-    if (!isFinite(minX)) return null;
-    // Etwas Padding (Welt-Einheiten) damit "Klick außerhalb" nicht direkt am Rand triggert.
-    const pad = 0.2;
-    return { minX: minX - pad, minY: minY - pad, maxX: maxX + pad, maxY: maxY + pad };
-  }
-
-  /** Prüft, ob der Mausklick außerhalb der aktuellen Edit-Bounding-Box liegt (zum Verlassen). */
-  isPointOutsideStickerEdit(mouseW: Vec2): boolean {
-    const b = this.getStickerEditWorldBounds();
-    if (!b) return true;
-    return mouseW.x < b.minX || mouseW.x > b.maxX || mouseW.y < b.minY || mouseW.y > b.maxY;
-  }
-
-  /** Public alias: Tools können den Sticker-Hub nach Live-Updates (Drag) refreshen. */
-  syncStickerInstanceHub() { this._syncStickerInstanceHub(); }
-
-  /** Hub für Sticker-Instanz: Länge = Skalierung %, Winkel = Rotation °. */
-  private _syncStickerInstanceHub() {
-    const inst = this.getSelectedStickerInstance();
-    if (!inst) {
-      // Hub nur ausblenden, wenn er gerade als Sticker-Hub aktiv war
-      if ((this.hub as any)._stickerMode) {
-        this.hub.hide();
-        this.hub.bindCommit(null);
-        (this.hub as any)._stickerMode = false;
-      }
-      return;
-    }
-    (this.hub as any)._stickerMode = true;
-    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-    let cx = 0, cy = 0;
-    for (const c of corners) { cx += c.x; cy += c.y; }
-    cx /= corners.length; cy /= corners.length;
-    const screen = this.camera.worldToScreen(cx, cy);
-    this.hub.showAt(screen.x, screen.y);
-    // Inputs editierbar machen, damit der User Werte eintippen kann
-    this.hub.enterEditMode();
-    const scalePct = inst.scale * 100;
-    const rotDeg = (inst.rotationRad * 180 / Math.PI + 360) % 360;
-    // Aktuell fokussiertes Input NICHT überschreiben (sonst kann man nicht tippen)
-    if (document.activeElement !== this.hub.lenInputEl) {
-      this.hub.lenInputEl.value = `${scalePct.toFixed(1)} %`;
-    }
-    if (document.activeElement !== this.hub.angInputEl) {
-      this.hub.angInputEl.value = `${rotDeg.toFixed(1)}°`;
-    }
-    this.hub.bindCommit(() => {
-      const cur = this.getSelectedStickerInstance();
-      if (!cur) return;
-      // lenInput hier als Skalierung in % interpretiert
-      const rawLen = parseFloat(this.hub.lenInputEl.value);
-      const rawAng = parseFloat(this.hub.angInputEl.value);
-      if (Number.isFinite(rawLen) && rawLen > 0) cur.scale = rawLen / 100;
-      if (Number.isFinite(rawAng)) cur.rotationRad = rawAng * Math.PI / 180;
-      this._syncStickerInstanceHub();
-    });
   }
 
 
@@ -2571,10 +2302,6 @@ export class CadApp {
       }
 
 
-      if (e.key === "Enter" && this.activeTool === this.stickerTool && !isHubInput) {
-        if (this.stickerTool.handleEnterKey()) { e.preventDefault(); return; }
-      }
-
       if (e.key === "Enter" && this.activeTool === this.measureTool && !isHubInput) {
         if (this.measureTool.finishCollect()) { e.preventDefault(); return; }
       }
@@ -2593,7 +2320,6 @@ export class CadApp {
       if (e.key === "m" || e.key === "M") this.setTool(ToolIds.MEASURE);
       if (e.key === "t" || e.key === "T") this.setTool(ToolIds.TEXT);
       if (e.key === "p" || e.key === "P") this.setTool(ToolIds.PIPETTE);
-      if (e.key === "o" || e.key === "O") this.setTool(ToolIds.STICKER);
       if (e.key === "d" || e.key === "D") this.setTool(ToolIds.DOCUMENT);
       if (e.key === "f" || e.key === "F") this.setTool(ToolIds.FREE);
       if (e.key === "e" || e.key === "E") this.setTool(ToolIds.ERASER);
@@ -2666,7 +2392,6 @@ export class CadApp {
         // ESC im Tabellen-Zellmodus: nur den Zellmodus beenden, Tabelle bleibt
         // als normales CAD-Objekt ausgewählt.
         if (this.tableEditId) { e.preventDefault(); this.endTableEdit(); return; }
-        if (this.isStickerEditing()) { this.exitStickerEdit(); this.clearSelection(); return; }
 
         if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
         // Stufe 1: Läuft gerade eine Zeichen-Aktion? Dann NUR diese abbrechen —
@@ -2678,7 +2403,6 @@ export class CadApp {
             t.cancel();
             return;
           }
-          if (t === this.stickerTool && this.stickerTool.phase !== "idle") { e.preventDefault(); this.stickerTool.cancel(); return; }
           if (t === this.documentTool && this.documentTool.phase !== "idle") { e.preventDefault(); this.documentTool.cancel(); return; }
         }
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
@@ -2707,12 +2431,6 @@ export class CadApp {
         }
         if ((this.activeTool as any) === this.libraryTool) {
           if (this.libraryTool.phase !== "idle") { this.libraryTool.cancel(); return; }
-          this.setTool(ToolIds.SELECT);
-          return;
-        }
-        if (this.activeTool === this.stickerTool) {
-          // Erst aktive Platzierung abbrechen, sonst Tool wechseln
-          if (this.stickerTool.phase !== "idle") { this.stickerTool.cancel(); return; }
           this.setTool(ToolIds.SELECT);
           return;
         }
@@ -2809,11 +2527,6 @@ export class CadApp {
         if (this.selection && this.selection.type === SelectionType.LIBRARY_INSTANCE) {
           const inst = this.scene.getLibraryInstanceById((this.selection as any).libraryInstanceId);
           if (inst) { this.scene.removeLibraryInstance(inst); this.clearSelection(); this.refreshLabelUI(); }
-          return;
-        }
-        if (this.selection && this.selection.type === SelectionType.STICKER_INSTANCE) {
-          const inst = this.scene.getStickerInstanceById((this.selection as any).stickerInstanceId);
-          if (inst) { this.scene.removeStickerInstance(inst); this.clearSelection(); }
           return;
         }
         if (this.selection && this.selection.type === SelectionType.DOCUMENT) {
@@ -2922,68 +2635,6 @@ export class CadApp {
     this.canvas.style.cursor = "";
   }
 
-  /* ---- Sticker library ---- */
-  createStickerFromSelection(name: string): StickerDefinition | null {
-    const def = buildStickerFromSelection(this, name);
-    if (!def) return null;
-    this.stickers.push(def);
-    this.onStickersChange?.();
-    return def;
-  }
-
-  createStickerFromIds(ids: StickerIdSet, name: string): StickerDefinition | null {
-    const def = buildStickerFromIds(this, ids, name);
-    if (!def) return null;
-    this.stickers.push(def);
-    this.onStickersChange?.();
-    return def;
-  }
-
-  renameSticker(id: string, name: string): boolean {
-    const s = this.stickers.find(x => x.id === id);
-    if (!s) return false;
-    s.name = name.trim() || s.name;
-    this.onStickersChange?.();
-    return true;
-  }
-
-  removeSticker(id: string): boolean {
-    const before = this.stickers.length;
-    this.stickers = this.stickers.filter(s => s.id !== id);
-    if (this.stickers.length === before) return false;
-    if (this.stickerTool.activeDef?.id === id) this.stickerTool.cancel();
-    this.onStickersChange?.();
-    return true;
-  }
-
-  beginStickerPlacement(id: string) {
-    const def = this.stickers.find(s => s.id === id);
-    if (!def) return;
-    if (this.activeTool !== this.stickerTool) this.setTool(ToolIds.STICKER);
-    this.stickerTool.beginPlacement(def);
-    this.onStickersChange?.();
-  }
-
-  /** Öffnet Edit-Mode für die erste platzierte Instanz dieses Stickers (oder gibt false zurück). */
-  openStickerEditByDefId(defId: string): boolean {
-    if (this.isStickerEditing()) return false;
-    const inst = this.scene.stickerInstances.find(si => si.defId === defId);
-    if (!inst) return false;
-    this.setTool(ToolIds.SELECT);
-    this.enterStickerEdit(inst as any);
-    return true;
-  }
-
-  /** Öffnet Edit-Mode für eine konkrete Instanz-ID. */
-  openStickerEditByInstanceId(instanceId: string): boolean {
-    if (this.isStickerEditing()) return false;
-    const inst = this.scene.getStickerInstanceById(instanceId);
-    if (!inst) return false;
-    this.setTool(ToolIds.SELECT);
-    this.enterStickerEdit(inst as any);
-    return true;
-  }
-
   /* ------------------------------------------------ Bibliothek (CAD-only) */
 
   /** Vorschau-Info zur aktuellen Auswahl (unterstützt/nicht unterstützt). */
@@ -3059,18 +2710,6 @@ export class CadApp {
   }
 
 
-
-  exportStickers(): string {
-    return exportStickersToJson(this.stickers);
-  }
-
-  importStickers(json: string): number {
-    const incoming = importStickersFromJson(json);
-    if (incoming.length === 0) return 0;
-    this.stickers.push(...incoming);
-    this.onStickersChange?.();
-    return incoming.length;
-  }
 
   private _commitPasteAtMouse() {
     if (!this.clipboard) { this.cancelPastePreview(); return; }
@@ -3168,7 +2807,6 @@ export class CadApp {
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
-    else if (id === ToolIds.STICKER) { this.activeTool = this.stickerTool; this.stickerTool.activate(); }
     // Bibliothek: solange nichts platziert wird, arbeitet die normale Auswahl
     // weiter (Klick, Shift-Klick, Rahmenauswahl). Erst `beginPlacement()`
     // übernimmt das Bibliothekswerkzeug die Eingabe.

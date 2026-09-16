@@ -92,10 +92,6 @@ export function migrateSceneData<T>(scene: T): T {
     fill(d, "filters", []);
   });
 
-  mapArray(scene, "stickerInstances", (s) => {
-    fill(s, "rotationRad", 0);
-    fill(s, "scale", 1);
-  });
 
   // Bibliotheksinstanzen (additiv; alte Szenen haben das Feld nicht).
   fill(scene, "libraryInstances", []);
@@ -132,7 +128,7 @@ defineSchema({
       up: (data: any) => {
         if (!isObj(data)) return data;
         fill(data, "labels", []);
-        fill(data, "stickers", []);
+        // Altbestand "stickers" wird beim Laden ignoriert (Werkzeug entfernt).
         fill(data, "libraryDefinitions", []);
         fill(data, "libraryFolders", []);
         fill(data, "sheets", []);
