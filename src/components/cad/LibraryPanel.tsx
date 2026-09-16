@@ -135,7 +135,7 @@ function LibraryActionMenu({
 }
 
 function fileSafe(name: string) {
-  return (name || "bibliotheksobjekt").replace(/[^\w\-]+/g, "_");
+  return (name || "bibliotheksobjekt").replace(/[^\w-]+/g, "_");
 }
 
 /**
@@ -185,7 +185,7 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
       try {
         setSelInfo(app.getLibrarySelectionInfo());
         const inst = app.getSelectedLibraryInstance();
-        const defId = inst ? ((inst as any).definitionId as string) : null;
+        const defId = inst?.definitionId ?? null;
         setInstanceDefId(defId);
         if (defId) setSelectedId(defId);
         setPlacingId(app.libraryTool?.activeDefinitionId || null);
