@@ -665,6 +665,8 @@ export class SelectTool {
 
   cancel() {
     this._restoreTextBoxEdit();
+    // ESC während einer Bibliotheks-Transformation: Ausgangszustand zurück.
+    this._restoreLibraryEdit();
     this._clearEditState();
     this.app.pointEditMenu.hide();
     this.app.hub.hide();
@@ -683,8 +685,6 @@ export class SelectTool {
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
-    // ESC während einer Bibliotheks-Transformation: Ausgangszustand zurück.
-    this._restoreLibraryEdit();
     if (this.rotateTextBoxId) {
       // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
       const rb = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
