@@ -6,7 +6,13 @@
  * übertragen, wird der vorherige mit dem neuen Stand Objekt für Objekt
  * verglichen; daraus entstehen einzelne Operationen.
  */
-import { CAD_OBJECT_KINDS, type CadObjectKind, type LocalCadOp } from "./types";
+import {
+  CAD_LIBRARY_KINDS,
+  CAD_LIBRARY_SHEET_ID,
+  CAD_OBJECT_KINDS,
+  type CadObjectKind,
+  type LocalCadOp,
+} from "./types";
 
 /** sheetId → kind → objectId → JSON-Text des Objekts. */
 export type SceneIndex = Map<string, Map<CadObjectKind, Map<string, string>>>;
