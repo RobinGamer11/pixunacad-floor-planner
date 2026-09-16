@@ -841,8 +841,25 @@ export class CadCollabSession {
     this.opts.onStatus?.(this.status);
   }
 
+  /**
+   * Prüft, ob aus dem reinen Lokalbetrieb eine Anwesenheitsverbindung werden
+   * muss (ein Mitglied wurde zwischenzeitlich eingeladen).
+   */
+  syncPolicy() {
+    if (this.destroyed || this.mode !== "local") return;
+    if (projectAccessStore.otherMemberCount(this.opts.projectId) === 0) return;
+    this.mode = "standby";
+    this.setStatus({ mode: "standby" });
+    this.report({ mode: "standby" });
+    this.connectPresence();
+  }
+
   destroy() {
     this.destroyed = true;
+    if (this.baseKey) saveBaseline(this.baseKey, this.cloudHashes);
+    this.unregisterSync?.();
+    this.unregisterSync = null;
+    window.clearTimeout(this.policyTimer);
     window.clearTimeout(this.sendTimer);
     window.clearInterval(this.heartbeatTimer);
     window.clearInterval(this.sweepTimer);
