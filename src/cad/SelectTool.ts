@@ -9,7 +9,6 @@ import { getEffectiveContourGeometry } from "./effectiveGeometry";
 
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
 import type { TextBox } from "./Scene";
-import { pointInInstance, instanceBoundingCornersWorld } from "./StickerManager";
 import { instanceCornersWorld, pointInInstanceBounds } from "./library/libraryGeometry";
 import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld, documentEdgeMidpointsWorld, documentAnchorsWorld } from "./documentGeometry";
 import { pointInDocumentVisible } from "./documentBgRemove";
@@ -153,12 +152,6 @@ export class SelectTool {
   /** 2-Punkt-Skalierung: aktueller Zielpunkt des Referenzpunkts. */
   scale2ptTargetWorld: Vec2 | null = null;
 
-  // Sticker-Instanz Drag-State (Translate)
-  dragStickerId: string | null = null;
-  dragStickerOrigin: Vec2 | null = null; // Position der Instanz beim Drag-Start
-  dragStickerMouseStart: Vec2 | null = null; // Mausposition (Welt) bei Drag-Start
-  dragStickerGrabOffset: Vec2 | null = null; // mouseStart - instanceOrigin (Greifpunkt-Offset relativ zur Position)
-  dragStickerSnap: Snap | null = null; // letzter aktiver Snap während Drag (für Overlay)
 
   // Document Drag-State (Translate via Mausziehen, snap-fähig)
   dragDocId: string | null = null;
@@ -470,7 +463,6 @@ export class SelectTool {
       case "textbox":
       case "table":      return { type: SelectionType.TEXTBOX, textBoxId: ref.id, handleIndex: null };
       case "document":   return { type: SelectionType.DOCUMENT, documentId: ref.id, handleIndex: null };
-      case "sticker":    return { type: SelectionType.STICKER_INSTANCE, stickerInstanceId: ref.id, handleIndex: null };
       case "library":    return { type: SelectionType.LIBRARY_INSTANCE, libraryInstanceId: ref.id, handleIndex: null } as any;
       default:           return null;
     }
@@ -3423,39 +3415,6 @@ export class SelectTool {
     // Hinweis: Bibliotheksobjekte haben bewusst KEINEN direkten Maus-Drag mehr.
     // Verschieben/Drehen/Skalieren läuft ausschließlich über das Fangpunkt-Menü.
 
-    // Active sticker drag with point snapping
-    if (this.dragStickerId) {
-      const inst = this.app.scene.getStickerInstanceById(this.dragStickerId);
-      if (!inst || !this.dragStickerOrigin || !this.dragStickerMouseStart || !this.dragStickerGrabOffset) {
-        this.dragStickerId = null;
-        this.dragStickerOrigin = null;
-        this.dragStickerMouseStart = null;
-        this.dragStickerGrabOffset = null;
-        this.dragStickerSnap = null;
-        this._clearTransformGuides();
-      } else {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        if (this._tryToggleTransformGuide(input, {}, this.dragStickerMouseStart)) return;
-        // Snap gegen Scene-Punkte/Linien (Sticker-Instanzen sind dort nicht enthalten).
-        const snap = this._findTransformSnap(input);
-        this.dragStickerSnap = snap;
-        // Wir wollen, dass der ursprünglich gegriffene Punkt der Sticker-Instanz an mouseW (oder snap) landet.
-        const target = (snap && snap.world) ? snap.world : mouseW;
-        inst.position = {
-          x: target.x - this.dragStickerGrabOffset.x,
-          y: target.y - this.dragStickerGrabOffset.y,
-        };
-        if (!input.mouse.left) {
-          this.dragStickerId = null;
-          this.dragStickerOrigin = null;
-          this.dragStickerMouseStart = null;
-          this.dragStickerGrabOffset = null;
-          this.dragStickerSnap = null;
-          this._clearTransformGuides();
-        }
-        return;
-      }
-    }
 
     // Active document drag with point snapping
     if (this.dragDocId) {
@@ -3905,11 +3864,7 @@ export class SelectTool {
     }
 
     this.app.renderer.setHoverSegmentId(null);
-    // Hub nur ausblenden, wenn KEINE Sticker-Instanz selektiert ist
-    // (für Sticker-Selection wird der Hub von _syncStickerInstanceHub verwaltet).
-    if (!this.app.selection || this.app.selection.type !== SelectionType.STICKER_INSTANCE) {
-      this.app.hub.hide();
-    }
+    this.app.hub.hide();
 
     // Hover indicator for textboxes (so user sees they can be clicked)
     const hoverBox = this._hitTextBox(input);
@@ -3926,14 +3881,6 @@ export class SelectTool {
       }
     }
 
-    // Double-click on a sticker instance → enter sticker edit mode
-    if (input.doubleClicked && !this.app.isStickerEditing()) {
-      const stickerHit = this._hitStickerInstance(input);
-      if (stickerHit) {
-        this.app.enterStickerEdit(stickerHit as any);
-        return;
-      }
-    }
 
     // Double-click on hatch edge → insert point (outer or hole)
     if (input.doubleClicked) {
@@ -4103,32 +4050,7 @@ export class SelectTool {
         }
       }
 
-      if (this.app.isStickerEditing()) {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        if (this.app.isPointOutsideStickerEdit(mouseW)) {
-          this.app.exitStickerEdit();
-          this.app.clearSelection();
-          return;
-        }
-        // Innerhalb: ganz normal Innenobjekte selektieren (kein Sticker-Hit-Test, da die Instanz im Edit-Mode nicht existiert).
-      } else {
-        // Eck-Handle der bereits selektierten Sticker-Instanz? → Translate-Drag mit Eckpunkt als Greifanker
-        const cornerHit = this._hitStickerCorner(input);
-        if (cornerHit) {
-          const inst = this.app.scene.getStickerInstanceById(cornerHit.instId);
-          if (inst) {
-            this._clearTransformGuides();
-            const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-            const cornerW = corners[cornerHit.cornerIndex];
-            this.dragStickerId = inst.id;
-            this.dragStickerOrigin = { x: inst.position.x, y: inst.position.y };
-            this.dragStickerMouseStart = { x: cornerW.x, y: cornerW.y };
-            // Greifpunkt = Eckpunkt: offset = corner - position
-            this.dragStickerGrabOffset = { x: cornerW.x - inst.position.x, y: cornerW.y - inst.position.y };
-            this.dragStickerSnap = null;
-            return;
-          }
-        }
+      {
         // Bibliotheksinstanzen (eigener Objekttyp) vor den normalen Objekten prüfen.
         if (!input.keys?.shift) {
           // 1) Fangpunkt der bereits gewählten Instanz → Transformationsmenü.
@@ -4166,21 +4088,6 @@ export class SelectTool {
           }
         }
 
-        // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
-        const stickerHit = this._hitStickerInstance(input);
-        if (stickerHit) {
-          this._clearTransformGuides();
-          this.app.setSelection({ type: SelectionType.STICKER_INSTANCE, stickerInstanceId: stickerHit.id });
-          // Drag vorbereiten (verschieben, solange Maustaste gedrückt bleibt)
-          const mouseW0 = v(input.mouse.wx, input.mouse.wy);
-          this.dragStickerId = stickerHit.id;
-          this.dragStickerOrigin = { x: stickerHit.position.x, y: stickerHit.position.y };
-          this.dragStickerMouseStart = mouseW0;
-          // Greifpunkt-Offset: position + offset = mouse → offset = mouse - position
-          this.dragStickerGrabOffset = { x: mouseW0.x - stickerHit.position.x, y: mouseW0.y - stickerHit.position.y };
-          this.dragStickerSnap = null;
-          return;
-        }
       }
 
       // AreaLabel (m²-Anzeige) der selektierten Schraffur → Ecken-HUB ODER ziehen zum Verschieben.
@@ -4713,24 +4620,6 @@ export class SelectTool {
       ctx.restore();
     }
 
-    // Sticker-Drag-Snap-Marker
-    if (this.dragStickerId && this.dragStickerSnap) {
-      const sn = this.dragStickerSnap;
-      if ((sn.type === SnapType.LINE || sn.type === SnapType.GUIDE) && sn.lineA && sn.lineB) {
-        const a = cam.worldToScreen(sn.lineA.x, sn.lineA.y);
-        const b = cam.worldToScreen(sn.lineB.x, sn.lineB.y);
-        ctx.save();
-        ctx.strokeStyle = "rgba(77,163,255,0.42)";
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        ctx.restore();
-      }
-      if (sn.world) {
-        const s = cam.worldToScreen(sn.world.x, sn.world.y);
-        drawSnapDot(ctx, s.x, s.y, { ring: true });
-      }
-      return;
-    }
 
     // Document-Drag-Snap-Marker
     if (this.dragDocId && this.dragDocSnap) {
@@ -4932,7 +4821,6 @@ export class SelectTool {
         case "textbox":  return boxCornersWorld(obj);
         case "table":    return boxCornersWorld(obj);
         case "document": return documentCornersWorld(obj);
-        case "sticker":  return instanceBoundingCornersWorld(obj.items, obj.position, obj.rotationRad, obj.scale);
         case "library": {
           const geom = this._libraryGeometryOf(obj);
           return geom ? instanceCornersWorld(geom, this._libraryTransformOf(obj)) as any : [];
@@ -4975,7 +4863,6 @@ export class SelectTool {
     for (const o of s.textBoxes || [])        if (selectable(o)) yield { kind: "textbox",    id: o.id, obj: o };
     for (const o of s.tables || [])           if (selectable(o)) yield { kind: "table",      id: o.id, obj: o };
     for (const o of s.documents || [])        if (selectable(o)) yield { kind: "document",   id: o.id, obj: o };
-    for (const o of s.stickerInstances || []) if (selectable(o)) yield { kind: "sticker",    id: o.id, obj: o };
     for (const o of s.libraryInstances || []) if (selectable(o)) yield { kind: "library",    id: o.id, obj: o };
   }
 
@@ -5044,7 +4931,6 @@ export class SelectTool {
       ["textBoxId", "textbox"],
       ["tableId", "table"],
       ["documentId", "document"],
-      ["stickerInstanceId", "sticker"],
       ["freeStrokeId", "freeStroke"],
     ];
     for (const [prop, kind] of map) {
@@ -5084,7 +4970,6 @@ export class SelectTool {
           case "textbox":    { const o = scene.getTextBoxById(id);         if (o) scene.removeTextBox(o); break; }
           case "table":      { const o = (scene as any).getTableById(id);   if (o) (scene as any).removeTable(o); break; }
           case "document":   { const o = scene.getDocumentById(id);        if (o) scene.removeDocument(o); break; }
-          case "sticker":    { const o = scene.getStickerInstanceById(id); if (o) scene.removeStickerInstance(o); break; }
           case "library":    { const o = (scene as any).getLibraryInstanceById(id); if (o) (scene as any).removeLibraryInstance(o); break; }
         }
       } catch { /* ignore individual failures */ }
@@ -5413,7 +5298,6 @@ export class SelectTool {
       case "textbox":    return s.getTextBoxById?.(id);
       case "table":      return s.getTableById?.(id);
       case "document":   return s.getDocumentById?.(id);
-      case "sticker":    return s.getStickerInstanceById?.(id);
       default: return null;
     }
   }
