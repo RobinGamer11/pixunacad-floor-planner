@@ -101,7 +101,6 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
       offBlocked();
       offSync();
       offAccess();
-      offProjects();
       projectStore.setWriteGuard(null);
       setSharedProjectIdsProvider(null);
       if (client && channel) void client.removeChannel(channel);
