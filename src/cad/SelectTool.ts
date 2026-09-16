@@ -291,6 +291,10 @@ export class SelectTool {
       this.hatchScaleBaseDist = radius > 1e-9 ? radius : null;
       this.hatchScaleLocked = false;
       this.app.hub.bindCommit((vals) => this._applyScaleHubValues(vals));
+    } else if (action === PointEditAction.SCALE_2PT) {
+      this.hatchScaleBaseDist = radius > 1e-9 ? radius : null;
+      this.hatchScaleLocked = false;
+      this.app.hub.bindCommit((vals) => this._applyScale2PtHubValues(vals));
     } else if (action === PointEditAction.ROTATE) {
       this.app.hub.bindCommit((vals) => this._applyRotateHubValues(vals));
     } else {
