@@ -23,6 +23,21 @@ export const CAD_OBJECT_KINDS = [
 
 export type CadObjectKind = (typeof CAD_OBJECT_KINDS)[number];
 
+/**
+ * Bibliotheksdaten gehören zum Projekt, nicht zu einer Zeichenseite. Sie
+ * laufen deshalb über eine eigene, feste „Seite".
+ */
+export const CAD_LIBRARY_SHEET_ID = "__library__";
+
+/** Bibliotheksarten, die zusätzlich synchronisiert werden. */
+export const CAD_LIBRARY_KINDS = ["libraryDefinitions", "libraryFolders"] as const;
+
+export type CadLibraryKind = (typeof CAD_LIBRARY_KINDS)[number];
+
+export function isLibraryKind(kind: string): kind is CadLibraryKind {
+  return kind === "libraryDefinitions" || kind === "libraryFolders";
+}
+
 export type CadChangeType = "create" | "update" | "delete";
 
 /** Eine einzelne, dauerhafte Objektänderung. */
