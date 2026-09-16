@@ -39,6 +39,9 @@ export function isLibraryKind(kind: string): kind is CadLibraryKind {
   return kind === "libraryDefinitions" || kind === "libraryFolders";
 }
 
+/** Alle synchronisierten Arten (Szene + Bibliothek). */
+export type CadObjectKind = CadSceneKind | CadLibraryKind;
+
 export type CadChangeType = "create" | "update" | "delete";
 
 /** Eine einzelne, dauerhafte Objektänderung. */
