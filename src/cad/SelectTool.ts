@@ -686,8 +686,8 @@ export class SelectTool {
     this.dragTextBoxId = null;
     this.dragTextBoxGrabOffset = null;
     this.dragTextBoxSnap = null;
-    // ESC während eines Bibliotheks-Drags: Ausgangsposition wiederherstellen.
-    this._endLibraryDrag(true);
+    // ESC während einer Bibliotheks-Transformation: Ausgangszustand zurück.
+    this._restoreLibraryEdit();
     if (this.rotateTextBoxId) {
       // ESC während des freien Drehens: Ausgangsrotation wiederherstellen.
       const rb = (this.app.scene as any).getBoxById(this.rotateTextBoxId);
@@ -1902,7 +1902,9 @@ export class SelectTool {
     const nextAng = ((vals.angleDeg != null ? vals.angleDeg : angleDeg(this.fixedPoint!, this.otherPointOriginal!)) % 360 + 360) % 360;
 
     const p = pointFromLengthAngle(this.fixedPoint!, nextLen, nextAng);
-    if (!this._applyHatchRotate(nextAng)) this._applyMovingPoint(p, this.fixedPoint!);
+    if (!this._applyLibraryRotate(nextAng) && !this._applyHatchRotate(nextAng)) {
+      this._applyMovingPoint(p, this.fixedPoint!);
+    }
 
     this.app.hub.setValues(nextLen, nextAng);
     this.app.hub.updateDisplay(nextLen, nextAng);
@@ -2080,6 +2082,8 @@ export class SelectTool {
       const wall = this.app.scene.getWallById(this.editTarget.wallId);
       if (!wall) return;
       wall.corners[this.editTarget.pointIndex] = v(newPoint.x, newPoint.y);
+    } else if ((this.editTarget as any).kind === "libraryHandle") {
+      this._applyLibraryMove(newPoint);
     }
   }
 
@@ -2190,7 +2194,7 @@ export class SelectTool {
     if (!base) return;
     const len = vals.lengthM != null ? Math.max(0.0001, vals.lengthM) : base;
     this.hatchScaleLocked = true;
-    this._applyHatchScale(len / base);
+    if (!this._applyLibraryScale(len / base)) this._applyHatchScale(len / base);
     const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
     this.app.hub.setValues(len, ang);
     this.app.hub.updateDisplay(len, ang);
@@ -2416,6 +2420,11 @@ export class SelectTool {
     this.moveHubAngleDeg = null;
     this._clearTransformGuides();
     this.wallPointsOriginal = null;
+    this.libraryPositionOriginal = null;
+    this.libraryHandleOriginal = null;
+    this.libraryRotationOriginal = 0;
+    this.libraryScaleXOriginal = 1;
+    this.libraryScaleYOriginal = 1;
     this.freeStrokePointsOriginal = null;
     this.wallPreviewPoint = null;
     this.wallPreviewDelta = null;
@@ -3393,53 +3402,8 @@ export class SelectTool {
 
 
 
-    // Bibliotheksobjekt: Klick wählt nur aus — der Drag startet erst nach
-    // einer echten Mausbewegung aus dem Vormerk-Zustand heraus.
-    if (this.pendingLibraryDrag && !this.dragLibraryId) {
-      const p = this.pendingLibraryDrag;
-      if (!input.mouse.left) {
-        this.pendingLibraryDrag = null;
-      } else {
-        const dsx = input.mouse.sx - p.screen.x;
-        const dsy = input.mouse.sy - p.screen.y;
-        if (Math.hypot(dsx, dsy) > 3) {
-          const inst = (this.app.scene as any).getLibraryInstanceById(p.id);
-          if (inst) {
-            this.dragLibraryId = p.id;
-            this.dragLibraryMouseStart = v(p.world.x, p.world.y);
-            this.dragLibraryGrabOffset = v(p.grab.x, p.grab.y);
-            this.dragLibraryOrigin = v(inst.position.x, inst.position.y);
-          }
-          this.pendingLibraryDrag = null;
-        }
-      }
-    }
-
-    // Aktiver Bibliotheksobjekt-Drag (mit Punkt-Snapping)
-    if (this.dragLibraryId) {
-      const inst = (this.app.scene as any).getLibraryInstanceById(this.dragLibraryId);
-      if (!inst || !this.dragLibraryGrabOffset) {
-        this._endLibraryDrag(false);
-      } else {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        if (this._tryToggleTransformGuide(input, {}, this.dragLibraryMouseStart || mouseW)) return;
-        const snap = this._findTransformSnap(input);
-        const target = (snap && snap.world) ? snap.world : mouseW;
-        inst.position = {
-          x: target.x - this.dragLibraryGrabOffset.x,
-          y: target.y - this.dragLibraryGrabOffset.y,
-        };
-        if (!input.mouse.left) {
-          const moved = !this.dragLibraryOrigin
-            || Math.abs(inst.position.x - this.dragLibraryOrigin.x) > 1e-9
-            || Math.abs(inst.position.y - this.dragLibraryOrigin.y) > 1e-9;
-          this._endLibraryDrag(false);
-          // Genau ein Undo-Schritt pro abgeschlossener Verschiebung.
-          if (moved) this.app.commitHistorySnapshot();
-        }
-        return;
-      }
-    }
+    // Hinweis: Bibliotheksobjekte haben bewusst KEINEN direkten Maus-Drag mehr.
+    // Verschieben/Drehen/Skalieren läuft ausschließlich über das Fangpunkt-Menü.
 
     // Active sticker drag with point snapping
     if (this.dragStickerId) {
@@ -3793,6 +3757,8 @@ export class SelectTool {
             this._applyWallRotateHubValues({ lengthM: null, angleDeg: ang });
           } else if ((this.editTarget as any)?.kind === "freeStroke") {
             this._applyFreeStrokeRotate(ang);
+          } else if (this._applyLibraryRotate(ang)) {
+            // Bibliotheksinstanz als Ganzes gedreht.
           } else if (this._applyHatchRotate(ang)) {
             // Schraffur wurde als Ganzes gedreht.
           } else {
@@ -3816,7 +3782,7 @@ export class SelectTool {
         if (base && document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
           const mouseW = v(input.mouse.wx, input.mouse.wy);
           const len = Math.max(0.0001, dist(this.fixedPoint!, mouseW));
-          this._applyHatchScale(len / base);
+          if (!this._applyLibraryScale(len / base)) this._applyHatchScale(len / base);
           const ang = angleDeg(this.fixedPoint!, this.otherPointOriginal!);
           this.app.hub.showAt(input.mouse.sx, input.mouse.sy);
           this.app.hub.updateDisplay(len, ang);
@@ -4119,23 +4085,39 @@ export class SelectTool {
           }
         }
         // Bibliotheksinstanzen (eigener Objekttyp) vor den normalen Objekten prüfen.
-        const libHit = input.keys?.shift ? null : this._hitLibraryInstance(input);
-        if (libHit) {
-          this._clearTransformGuides();
-          // Einfacher Linksklick wählt nur aus. Der Drag wird lediglich
-          // vorgemerkt und startet erst nach echter Mausbewegung.
-          this.app.setSelection({ type: SelectionType.LIBRARY_INSTANCE, libraryInstanceId: libHit.id } as any);
-          // Auch als Mehrfachauswahl-Eintrag führen, damit Drehen/Ankerpunkt
-          // über dieselbe Transformationsbedienung wie bei anderen Objekten geht.
-          this.marqueeSelectedIds = [{ kind: "library", id: libHit.id }];
-          const mouseL = v(input.mouse.wx, input.mouse.wy);
-          this.pendingLibraryDrag = {
-            id: libHit.id,
-            screen: v(input.mouse.sx, input.mouse.sy),
-            world: mouseL,
-            grab: v(mouseL.x - libHit.position.x, mouseL.y - libHit.position.y),
-          };
-          return;
+        if (!input.keys?.shift) {
+          // 1) Fangpunkt der bereits gewählten Instanz → Transformationsmenü.
+          const handleHit = this._hitLibraryHandle(input);
+          if (handleHit) {
+            this._clearTransformGuides();
+            this.app.setSelection({
+              type: SelectionType.LIBRARY_INSTANCE,
+              libraryInstanceId: handleHit.inst.id,
+              handleIndex: handleHit.handleIndex,
+            } as any);
+            const pts = this._libraryHandleWorlds(handleHit.inst);
+            const hp = pts[handleHit.handleIndex];
+            const sp = this.app.camera.worldToScreen(hp.x, hp.y);
+            this.app.pointEditMenu.showAt(sp.x, sp.y, [
+              PointEditAction.MOVE,
+              PointEditAction.ROTATE,
+              PointEditAction.SCALE,
+            ]);
+            return;
+          }
+          // 2) Objekt-Treffer: Linksklick wählt ausschließlich aus.
+          const libHit = this._hitLibraryInstance(input);
+          if (libHit) {
+            this._clearTransformGuides();
+            this.app.setSelection({
+              type: SelectionType.LIBRARY_INSTANCE,
+              libraryInstanceId: libHit.id,
+              handleIndex: null,
+            } as any);
+            this.marqueeSelectedIds = [{ kind: "library", id: libHit.id }];
+            this.app.pointEditMenu.hide();
+            return;
+          }
         }
 
         // Sticker-Instanzen haben höchste Priorität (sie liegen visuell oben)
