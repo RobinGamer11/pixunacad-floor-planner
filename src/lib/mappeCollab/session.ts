@@ -667,6 +667,10 @@ export class MappeCollabSession {
 
   destroy() {
     this.destroyed = true;
+    if (this.baseKey) saveBaseline(this.baseKey, this.cloudHashes);
+    this.unregisterSync?.();
+    this.unregisterSync = null;
+    window.clearInterval(this.policyTimer);
     window.clearTimeout(this.sendTimer);
     window.clearInterval(this.heartbeatTimer);
     window.clearInterval(this.sweepTimer);
