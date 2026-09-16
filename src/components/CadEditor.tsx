@@ -176,6 +176,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const pointDeleteBtnRef = useRef<HTMLButtonElement>(null);
   const pointOffsetBtnRef = useRef<HTMLButtonElement>(null);
   const pointScaleBtnRef = useRef<HTMLButtonElement>(null);
+  const pointScale2PtBtnRef = useRef<HTMLButtonElement>(null);
   const pointInsertPointBtnRef = useRef<HTMLButtonElement>(null);
   const pointBulgeBtnRef = useRef<HTMLButtonElement>(null);
   const pointSplitBtnRef = useRef<HTMLButtonElement>(null);
@@ -737,6 +738,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         [PointEditAction.DELETE]: pointDeleteBtnRef.current,
         [PointEditAction.OFFSET]: pointOffsetBtnRef.current,
         [PointEditAction.SCALE]: pointScaleBtnRef.current!,
+        [PointEditAction.SCALE_2PT]: pointScale2PtBtnRef.current!,
         [PointEditAction.INSERT_POINT]: pointInsertPointBtnRef.current!,
         [PointEditAction.BULGE]: pointBulgeBtnRef.current!,
         [PointEditAction.SPLIT]: pointSplitBtnRef.current!,
@@ -1979,6 +1981,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button ref={pointTranslateBtnRef} title="Verschieben">✥</button>
           <button ref={pointRotateBtnRef} title="Drehen">⟳</button>
           <button ref={pointScaleBtnRef} title="Skalierung (Objekt am Fangpunkt größer/kleiner)">⤢</button>
+          <button ref={pointScale2PtBtnRef} title="2-Punkt skalieren (Fixpunkt wählen, Referenzpunkt auf Zielpunkt ziehen)">↔</button>
           <button ref={pointOffsetBtnRef} title="Kante rein-/rausziehen">⇆</button>
           <button ref={pointInsertPointBtnRef} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={pointBulgeBtnRef} title="Kante wölben (rein-/rauswölben)">◠</button>
