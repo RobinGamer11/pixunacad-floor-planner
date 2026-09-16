@@ -10,10 +10,21 @@ const channel = {
   send() { return Promise.resolve("ok"); },
 };
 
+/** Tabellenabfragen liefern leere Ergebnisse (noch nichts in der Cloud). */
+const emptyQuery: Record<string, unknown> = {};
+["select", "eq", "gt", "order", "limit"].forEach((fn) => {
+  emptyQuery[fn] = () => emptyQuery;
+});
+emptyQuery.maybeSingle = () => Promise.resolve({ data: null, error: null });
+emptyQuery.then = (resolve: (value: unknown) => unknown) => resolve({ data: [], error: null });
+
 vi.mock("@/lib/networkClient", () => ({
+  isMissingSchemaError: () => false,
   getNetworkClient: () => ({
     channel: () => channel,
     removeChannel: () => Promise.resolve("ok"),
+    from: () => emptyQuery,
+    rpc: () => Promise.resolve({ data: null, error: null }),
   }),
 }));
 
