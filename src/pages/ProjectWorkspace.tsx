@@ -1579,7 +1579,7 @@ export default function ProjectWorkspace() {
       {/* Far-left tool rail */}
       <aside
         ref={leftRailScroll}
-        className="flex flex-col items-center gap-0.5 py-1.5 shrink-0 border-r overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain"
+        className="tool-rail-scroll flex flex-col items-center gap-0.5 py-1.5 shrink-0 min-h-0 border-r overflow-y-auto overflow-x-hidden no-scrollbar overscroll-contain"
         style={{
           width: 56,
           borderColor: "hsl(var(--hairline))",

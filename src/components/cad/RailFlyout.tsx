@@ -71,7 +71,7 @@ export const RailFlyout: React.FC<{
           ref={menuRef}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
-          className="fixed z-[1200] flex flex-col gap-0.5 p-1 rounded-lg shadow-xl max-h-[80vh] overflow-y-auto no-scrollbar"
+          className="fixed z-[1200] flex flex-col gap-0.5 p-1 rounded-lg shadow-xl max-h-[80dvh] overflow-y-auto no-scrollbar"
           style={{
             left: pos?.left ?? -9999,
             top: pos?.top ?? -9999,
