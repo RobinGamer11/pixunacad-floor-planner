@@ -1084,6 +1084,26 @@ export class CadApp {
 
   private _emitHistoryChange() {
     this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
+    this.onSceneCommitted?.();
+  }
+
+  /**
+   * Übernimmt eine von außen eingespielte Änderung (Zusammenarbeit) in den
+   * Vergleichsstand, damit sie KEINEN eigenen Verlaufsschritt erzeugt.
+   */
+  markExternalChange() {
+    if (this._destroyed) return;
+    const snap = this._serializeScene();
+    this._lastSnapshot = snap;
+    if (this._historyIndex >= 0 && this._historyIndex < this._history.length) {
+      this._history[this._historyIndex] = snap;
+    }
+  }
+
+  /** Serialisierungsstand für die Zusammenarbeit (schreibgeschützt). */
+  serializeForCollab(): string | null {
+    if (this._destroyed) return null;
+    return this._serializeScene();
   }
 
   undo() {
