@@ -3980,14 +3980,22 @@ export class SelectTool {
           }
         }
         // Bibliotheksinstanzen (eigener Objekttyp) vor den normalen Objekten prüfen.
-        const libHit = this._hitLibraryInstance(input);
+        const libHit = input.keys?.shift ? null : this._hitLibraryInstance(input);
         if (libHit) {
           this._clearTransformGuides();
+          // Einfacher Linksklick wählt nur aus. Der Drag wird lediglich
+          // vorgemerkt und startet erst nach echter Mausbewegung.
           this.app.setSelection({ type: SelectionType.LIBRARY_INSTANCE, libraryInstanceId: libHit.id } as any);
+          // Auch als Mehrfachauswahl-Eintrag führen, damit Drehen/Ankerpunkt
+          // über dieselbe Transformationsbedienung wie bei anderen Objekten geht.
+          this.marqueeSelectedIds = [{ kind: "library", id: libHit.id }];
           const mouseL = v(input.mouse.wx, input.mouse.wy);
-          this.dragLibraryId = libHit.id;
-          this.dragLibraryMouseStart = mouseL;
-          this.dragLibraryGrabOffset = { x: mouseL.x - libHit.position.x, y: mouseL.y - libHit.position.y };
+          this.pendingLibraryDrag = {
+            id: libHit.id,
+            screen: v(input.mouse.sx, input.mouse.sy),
+            world: mouseL,
+            grab: v(mouseL.x - libHit.position.x, mouseL.y - libHit.position.y),
+          };
           return;
         }
 
