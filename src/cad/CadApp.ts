@@ -479,6 +479,12 @@ export class CadApp {
   private _snapshotTimer: number | null = null;
   private _isRestoring = false;
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
+  /**
+   * Wird nach jeder bestätigten Änderung der Zeichnung ausgelöst.
+   * Wird von der CAD-Zusammenarbeit genutzt, um einzelne Objektänderungen
+   * zu erkennen. Der Zeichenkern selbst bleibt davon unberührt.
+   */
+  onSceneCommitted?: () => void;
 
   onToolChange?: (toolId: string) => void;
 
