@@ -424,8 +424,10 @@ export class MappeCollabSession {
 
   private async flush(): Promise<void> {
     if (this.destroyed || this.applyingRemote) return;
+    // Allein: nichts übertragen – nur den Hinweis auf offene Änderungen führen.
     if (this.mode !== "live") {
       this.lastIndex = indexProject(currentProject(this.opts.projectId));
+      this.refreshDirty();
       return;
     }
     if (this.flushing) { this.flushAgain = true; return; }
