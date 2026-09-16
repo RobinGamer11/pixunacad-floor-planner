@@ -3,7 +3,6 @@ import { CommentLayer } from "@/components/comments/CommentLayer";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
-import { ToolHelpNotes } from "@/components/cad/ToolHelpNotes";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 import { StepHints } from "@/components/cad/StepHints";
@@ -6115,9 +6114,6 @@ function RightInspector({
               onCancelTable={onCancelTable}
               onNewTable={onNewTable}
             />
-          )}
-          {tab === "tools" && activeTool !== "guide" && activeTool !== "text" && activeTool !== "eraser" && activeTool !== null && activeTool !== "pipette" && activeTool !== "ruler" && activeTool !== "document" && activeTool !== "cad" && activeTool !== "table" && activeTool !== "hatch" && activeTool !== "polygon" && !isLinePageTool(activeTool) && (
-            <ToolHelpNotes toolId={activeTool} />
           )}
           {tab === "layers" && page && (
             <div className="space-y-2">

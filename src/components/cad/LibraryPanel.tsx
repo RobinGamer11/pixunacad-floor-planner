@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Boxes, ChevronDown, ChevronRight, Folder, FolderPlus,
   MoreHorizontal, Plus, Save, Ungroup, Upload, X,
@@ -42,8 +43,99 @@ const selectCls = "cad-settings-select w-full h-9 text-[12px] px-2";
 const muted = { color: "hsl(var(--cad-toolbar-muted))" };
 const border = { borderColor: "hsl(var(--cad-hub-border))" };
 
+type MenuItem = { label: string; run: () => void; danger?: boolean };
+
+function LibraryActionMenu({
+  open,
+  onToggle,
+  onClose,
+  items,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  items: MenuItem[];
+}) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [position, setPosition] = useState<{ left: number; top: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = 208;
+      const height = items.length * 37 + 8;
+      const gap = 4;
+      const top = window.innerHeight - rect.bottom >= height + gap
+        ? rect.bottom + gap
+        : Math.max(8, rect.top - height - gap);
+      setPosition({
+        left: Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width)),
+        top,
+        width,
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [items.length, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, open]);
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        title="Weitere Aktionen"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="cad-toolbar-btn h-8 w-8 justify-center p-0"
+        onClick={(event) => { event.stopPropagation(); onToggle(); }}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open && position && createPortal(
+        <div
+          role="menu"
+          className="fixed z-[200] rounded-md border py-1 shadow-xl"
+          style={{ ...border, background: "hsl(var(--cad-settings-bg))", left: position.left, top: position.top, width: position.width }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              className="block w-full px-3 py-2.5 text-left text-[12px] hover:bg-[hsl(var(--cad-toolbar-hover))]"
+              style={item.danger ? { color: "hsl(var(--destructive))" } : undefined}
+              onClick={() => { onClose(); item.run(); }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
 function fileSafe(name: string) {
-  return (name || "bibliotheksobjekt").replace(/[^\w\-]+/g, "_");
+  return (name || "bibliotheksobjekt").replace(/[^\w-]+/g, "_");
 }
 
 /**
@@ -93,7 +185,7 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
       try {
         setSelInfo(app.getLibrarySelectionInfo());
         const inst = app.getSelectedLibraryInstance();
-        const defId = inst ? ((inst as any).definitionId as string) : null;
+        const defId = inst?.definitionId ?? null;
         setInstanceDefId(defId);
         if (defId) setSelectedId(defId);
         setPlacingId(app.libraryTool?.activeDefinitionId || null);
@@ -251,28 +343,13 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
 
   /* ------------------------------------------------------------ Bausteine */
 
-  const menu = (id: string, items: { label: string; run: () => void; danger?: boolean }[]) => (
-    <div className="relative">
-      <button type="button" title="Weitere Aktionen"
-        className="cad-toolbar-btn h-8 w-8 justify-center p-0"
-        onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === id ? null : id); }}>
-        <MoreHorizontal className="h-4 w-4" />
-      </button>
-      {openMenu === id && (
-        <div className="absolute right-0 top-9 z-50 min-w-[190px] rounded-md border py-1 shadow-lg"
-          style={{ ...border, background: "hsl(var(--cad-settings-bg))" }}
-          onClick={(e) => e.stopPropagation()}>
-          {items.map((it) => (
-            <button key={it.label} type="button"
-              className="block w-full px-3 py-2 text-left text-[12px] hover:opacity-80"
-              style={it.danger ? { color: "hsl(var(--destructive))" } : undefined}
-              onClick={() => { setOpenMenu(null); it.run(); }}>
-              {it.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+  const menu = (id: string, items: MenuItem[]) => (
+    <LibraryActionMenu
+      open={openMenu === id}
+      onToggle={() => setOpenMenu(openMenu === id ? null : id)}
+      onClose={() => setOpenMenu(null)}
+      items={items}
+    />
   );
 
   const objectRow = (d: LibraryDefinition, depth: number) => (
@@ -307,9 +384,9 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
         { label: "Bearbeiten", run: () => { setMeta(metaFromDefinition(d)); setMode({ kind: "edit", id: d.id }); } },
         { label: "Duplizieren", run: () => app.duplicateLibraryDefinition(d.id) },
         { label: "Verschieben nach …", run: () => moveToFolderPrompt(d) },
-        { label: "Export Pixuna", run: () => exportPxobj(d) },
-        { label: "Export SVG", run: () => exportSvg(d) },
-        { label: "Export DXF", run: () => exportDxf(d) },
+        { label: "Pixuna exportieren", run: () => exportPxobj(d) },
+        { label: "SVG exportieren", run: () => exportSvg(d) },
+        { label: "DXF exportieren", run: () => exportDxf(d) },
         {
           label: "Löschen", danger: true, run: () => {
             if (window.confirm(`„${d.name}“ löschen? Platzierte Exemplare werden ebenfalls entfernt.`)) {
@@ -606,9 +683,10 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <div className="relative flex-1">
-            <button type="button" className="cad-toolbar-btn w-full justify-center h-9 text-[12px]"
+            <button type="button" className="cad-toolbar-btn w-full justify-center h-10 border text-[12.5px] font-semibold"
+              style={{ ...border, background: "hsl(var(--cad-toolbar-hover))" }}
               onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === "import" ? null : "import"); }}>
               <Upload className="h-4 w-4" /> Importieren
             </button>
@@ -624,9 +702,17 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
               </div>
             )}
           </div>
-          {menu("global", [
-            { label: "Neuer Ordner", run: () => { const n = window.prompt("Name des neuen Ordners:", "Neuer Ordner"); if (n) app.createLibraryFolder(n, null); } },
-          ])}
+          <button
+            type="button"
+            className="cad-toolbar-btn w-full justify-center h-10 border text-[12.5px] font-semibold"
+            style={{ ...border, background: "hsl(var(--cad-toolbar-hover))" }}
+            onClick={() => {
+              const name = window.prompt("Name des neuen Ordners:", "Neuer Ordner");
+              if (name) app.createLibraryFolder(name, null);
+            }}
+          >
+            <FolderPlus className="h-4 w-4" /> Neuer Ordner
+          </button>
         </div>
       </div>
 
@@ -714,9 +800,9 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             { label: "Bearbeiten", run: () => { setMeta(metaFromDefinition(selectedDef)); setMode({ kind: "edit", id: selectedDef.id }); } },
             { label: "Duplizieren", run: () => app.duplicateLibraryDefinition(selectedDef.id) },
             { label: "Verschieben nach …", run: () => moveToFolderPrompt(selectedDef) },
-            { label: "Export Pixuna", run: () => exportPxobj(selectedDef) },
-            { label: "Export SVG", run: () => exportSvg(selectedDef) },
-            { label: "Export DXF", run: () => exportDxf(selectedDef) },
+            { label: "Pixuna exportieren", run: () => exportPxobj(selectedDef) },
+            { label: "SVG exportieren", run: () => exportSvg(selectedDef) },
+            { label: "DXF exportieren", run: () => exportDxf(selectedDef) },
             {
               label: "Löschen", danger: true, run: () => {
                 if (window.confirm(`„${selectedDef.name}“ löschen? Platzierte Exemplare werden ebenfalls entfernt.`)) {
