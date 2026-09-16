@@ -4513,6 +4513,18 @@ function ElementView({
     const paint = () => {
       raf = 0;
       if (node) node.style.transform = `translate(${tdx}px, ${tdy}px) ${baseTransform}`.trim();
+      // Flüchtige Live-Vorschau für andere Personen (nichts wird gespeichert).
+      const livePageId = parent?.dataset.pageId;
+      const pageRect = parent?.getBoundingClientRect();
+      if (livePageId && pageRect && pageRect.width > 0 && pageRect.height > 0) {
+        previewMappeElement(livePageId, el.id, {
+          x: (el.x ?? 0) + (tdx / pageRect.width) * 100,
+          y: (el.y ?? 0) + (tdy / pageRect.height) * 100,
+          w: el.w,
+          h: el.h,
+          rotation: el.rotation,
+        });
+      }
     };
 
     const handleMove = (ev: PointerEvent) => {
