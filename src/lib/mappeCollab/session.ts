@@ -28,6 +28,7 @@ import {
   claimObjectLock,
   fetchLatestSeq,
   fetchObjectLocks,
+  fetchObjectRevisions,
   fetchObjectState,
   fetchOpsSince,
   isCollabSchemaMissing,
