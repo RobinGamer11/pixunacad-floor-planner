@@ -899,6 +899,26 @@ export default function ProjectWorkspace() {
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
 
+  /* Live-Zusammenarbeit in der Projektmappe: einzelne Seiten und Elemente. */
+  const mappeCollab = useMappeCollab({
+    projectId,
+    pageId: activePage?.id ?? null,
+    selectedElementId: selectedElementId ?? null,
+    editingElementId: selectedElement?.kind === "text" || selectedElement?.kind === "table"
+      ? selectedElement.id
+      : null,
+    onFieldConflict: (id) => {
+      const name = mappeCollabRef.current?.getStatus().locksByObject.get(id)?.displayName;
+      toast({
+        title: "Gleichzeitige Bearbeitung",
+        description: name
+          ? `${name} hat dieses Element ebenfalls geändert – der gespeicherte Stand wurde übernommen.`
+          : "Dieses Element wurde gleichzeitig geändert – der gespeicherte Stand wurde übernommen.",
+      });
+    },
+  });
+  const mappeCollabRef = mappeCollab.session;
+
   // Objektbezogene Werkzeugwahl festhalten. Auswahlwerkzeug (null) und
   // Nicht-Objektwerkzeuge löschen den Filter absichtlich nicht.
   useEffect(() => {
