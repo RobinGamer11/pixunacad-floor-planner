@@ -618,6 +618,10 @@ export class CadApp {
         this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);
         return;
       }
+      if (sel && sel.type === SelectionType.LIBRARY_INSTANCE && (sel as any).libraryInstanceId && (sel as any).handleIndex != null) {
+        this.selectTool.beginLibraryHandleEdit((sel as any).libraryInstanceId, (sel as any).handleIndex, action);
+        return;
+      }
       if (sel && sel.type === SelectionType.AREA_LABEL_HANDLE && (sel as any).hatchId && (sel as any).handleIndex != null) {
         this.selectTool.beginAreaLabelHandleEdit((sel as any).hatchId, (sel as any).handleIndex, action);
         return;
