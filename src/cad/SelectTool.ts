@@ -978,16 +978,6 @@ export class SelectTool {
     return null;
   }
 
-  /** Returns the topmost sticker instance under the mouse, or null. */
-  private _hitStickerInstance(input: Input) {
-    const mouseW = v(input.mouse.wx, input.mouse.wy);
-    for (let i = this.app.scene.stickerInstances.length - 1; i >= 0; i--) {
-      const inst = this.app.scene.stickerInstances[i];
-      if (!this.app.labelManager.isEditable(inst.labelId)) continue;
-      if (pointInInstance(inst.items as any, inst.position, inst.rotationRad, inst.scale, mouseW)) return inst;
-    }
-    return null;
-  }
 
   /** Returns the topmost document under the mouse, or null. */
   private _hitDocument(input: Input) {
@@ -1038,22 +1028,6 @@ export class SelectTool {
 
 
 
-  /** Hit-Test gegen die 4 Eck-Handles der aktuell selektierten Sticker-Instanz. */
-  private _hitStickerCorner(input: Input): { instId: string; cornerIndex: number } | null {
-    const sel = this.app.selection;
-    if (!sel || sel.type !== SelectionType.STICKER_INSTANCE) return null;
-    const inst = this.app.scene.getStickerInstanceById((sel as any).stickerInstanceId);
-    if (!inst || !this.app.labelManager.isEditable(inst.labelId)) return null;
-    const corners = instanceBoundingCornersWorld(inst.items as any, inst.position, inst.rotationRad, inst.scale);
-    const mouseS = v(input.mouse.sx, input.mouse.sy);
-    for (let i = 0; i < corners.length; i++) {
-      const sp = this.app.camera.worldToScreen(corners[i].x, corners[i].y);
-      if (Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y) <= Defaults.hitPx + 2) {
-        return { instId: inst.id, cornerIndex: i };
-      }
-    }
-    return null;
-  }
 
   /** ENTER (z. B. Tablet-Hilfsrad) bestätigt die laufende Fangpunkt-Aktion. */
   requestEnterCommit(): boolean {
