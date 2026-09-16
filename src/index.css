@@ -1440,23 +1440,22 @@
     min-height: 0;
   }
 
-  .cad-desktop-density .workspace-header button.h-8 {
+  .cad-desktop-density .workspace-header button {
     height: 28px;
   }
 
-  .cad-desktop-density .workspace-header button.w-8 {
-    width: 28px;
-  }
-
-  .cad-desktop-density .workspace-header .text-sm {
-    font-size: 12px;
-    line-height: 16px;
-  }
-
-  .cad-desktop-density .workspace-header .text-xs,
-  .cad-desktop-density .workspace-header .text-\[11px\] {
+  .cad-desktop-density .workspace-header {
     font-size: 10px;
     line-height: 14px;
+  }
+
+  .cad-desktop-density .workspace-header button[title^="Zurück"],
+  .cad-desktop-density .workspace-header button[title^="Kopieren"],
+  .cad-desktop-density .workspace-header button[title^="Einfügen"],
+  .cad-desktop-density .workspace-header button[title^="Auswahl löschen"],
+  .cad-desktop-density .workspace-header button[title^="Rückgängig"],
+  .cad-desktop-density .workspace-header button[title^="Wiederherstellen"] {
+    width: 28px;
   }
 
   .cad-desktop-density .cad-tool-rail {
@@ -1522,8 +1521,9 @@
   }
 
   .cad-desktop-density .cad-settings-panel label,
-  .cad-desktop-density .cad-settings-panel .text-xs,
-  .cad-desktop-density .cad-settings-panel .text-\[11px\] {
+  .cad-desktop-density .cad-settings-panel input,
+  .cad-desktop-density .cad-settings-panel select,
+  .cad-desktop-density .cad-settings-panel button {
     font-size: 10px;
     line-height: 14px;
   }
@@ -1534,18 +1534,6 @@
     min-height: 26px;
     padding-block: 3px;
     font-size: 10px;
-  }
-
-  .cad-desktop-density .cad-settings-panel .h-10 {
-    height: 32px;
-  }
-
-  .cad-desktop-density .cad-settings-panel .h-9 {
-    height: 30px;
-  }
-
-  .cad-desktop-density .cad-settings-panel .h-8 {
-    height: 28px;
   }
 
   .cad-desktop-density .cad-sheet-tab-head {
