@@ -62,3 +62,15 @@
 - Stempel-Werkzeug vollständig entfernt (Werkzeug, Panel, Auswahl, Renderer, Serialisierung); alte Stempel-Daten werden beim Laden ignoriert, das Altfeld `_stickerEditOwnerId` bleibt aus Kompatibilitätsgründen erhalten.
 - Raster startet mit 85 % Transparenz (Deckkraft 0.15).
 - Neue Kollaborationsschicht `src/lib/cadCollab/*`: Änderungserkennung je Objekt aus dem bestehenden Serialisierungsstand, Einzeloperationen in `cad_object_ops`, weiche Sperren in `cad_object_locks` (RLS über bestehende Projektmitgliedschaft), Realtime-Vorschau und Präsenz nur flüchtig. Fremde Änderungen erzeugen keinen eigenen Verlaufsschritt (`markExternalChange`). Der gemeinsame Projektstand bleibt Initialstand und Sicherheitskopie.
+
+## Live-Zusammenarbeit (CAD + Projektmappe)
+- Serverseitige Revisionen: `cad_object_state` / `mappe_object_state` mit
+  `cad_write_object` / `mappe_write_object` (Migration
+  `db/migrations/20260916150000_collab_revisions.sql` – im SQL-Editor ausführen).
+- CAD: Live-Vorschau während Gesten, weiche Sperren an Auswahl/Werkzeugwechsel,
+  Präsenz je Blatt inkl. Zeiger, Bibliotheksdefinitionen und Ordner mitsynchron.
+- Projektmappe: eigene Schicht `src/lib/mappeCollab/*` (Seiten und Elemente
+  einzeln), Vorschau beim Verschieben, Sperrhinweis, Präsenz je Seite,
+  Text-/Tabelleneingaben werden bei Konflikt nicht still überschrieben.
+- Gesamtstand (`project_documents`) bleibt nur Erststand und Sicherheitskopie.
+- Offen: Abnahme mit zwei Browser-Sitzungen, Übertragung nach GitHub main.

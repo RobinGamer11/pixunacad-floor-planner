@@ -1,5 +1,9 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
 import { CommentLayer } from "@/components/comments/CommentLayer";
+import { useMappeCollab } from "@/lib/mappeCollab/useMappeCollab";
+import { MappeCollabPageLayer } from "@/components/mappe/MappeCollabLayer";
+import { previewMappeElement } from "@/lib/mappeCollab/store";
+import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
@@ -898,6 +902,25 @@ export default function ProjectWorkspace() {
   const activePage = project?.pages.find((p) => p.id === activePageId) ?? project?.pages[0];
   const selectedElement = activePage?.elements.find((e) => e.id === selectedElementId);
   const bgPage = bgOverlay.pageId ? project?.pages.find((p) => p.id === bgOverlay.pageId) : undefined;
+
+  /* Live-Zusammenarbeit in der Projektmappe: einzelne Seiten und Elemente. */
+  const mappeCollab = useMappeCollab({
+    projectId,
+    pageId: activePage?.id ?? null,
+    selectedElementId: selectedElementId ?? null,
+    editingElementId: selectedElement?.kind === "text" || selectedElement?.kind === "table"
+      ? selectedElement.id
+      : null,
+    onFieldConflict: (id) => {
+      const name = mappeCollabRef.current?.getStatus().locksByObject.get(id)?.displayName;
+      toast("Gleichzeitige Bearbeitung", {
+        description: name
+          ? `${name} hat dieses Element ebenfalls geändert – der gespeicherte Stand wurde übernommen.`
+          : "Dieses Element wurde gleichzeitig geändert – der gespeicherte Stand wurde übernommen.",
+      });
+    },
+  });
+  const mappeCollabRef = mappeCollab.session;
 
   // Objektbezogene Werkzeugwahl festhalten. Auswahlwerkzeug (null) und
   // Nicht-Objektwerkzeuge löschen den Filter absichtlich nicht.
@@ -3341,6 +3364,9 @@ function PageCanvas({
         {/* Kommentare (getrennt gespeichert, kein Seitenelement) */}
         <CommentLayer projectId={projectId} pageId={page.id}  />
 
+        {/* Live-Zusammenarbeit: fremde Bearbeitung und laufende Bewegungen */}
+        <MappeCollabPageLayer page={page} />
+
         {/* Marquee-Overlay (Rahmen-Auswahl). Farbe je nach Modus:
             touch=orange (Crossing), enclose=blau (Window) — Archicad-Konvention. */}
         {marquee && (() => {
@@ -4488,6 +4514,18 @@ function ElementView({
     const paint = () => {
       raf = 0;
       if (node) node.style.transform = `translate(${tdx}px, ${tdy}px) ${baseTransform}`.trim();
+      // Flüchtige Live-Vorschau für andere Personen (nichts wird gespeichert).
+      const livePageId = parent?.dataset.pageId;
+      const pageRect = parent?.getBoundingClientRect();
+      if (livePageId && pageRect && pageRect.width > 0 && pageRect.height > 0) {
+        previewMappeElement(livePageId, el.id, {
+          x: (el.x ?? 0) + (tdx / pageRect.width) * 100,
+          y: (el.y ?? 0) + (tdy / pageRect.height) * 100,
+          w: el.w,
+          h: el.h,
+          rotation: el.rotation,
+        });
+      }
     };
 
     const handleMove = (ev: PointerEvent) => {
@@ -4518,6 +4556,10 @@ function ElementView({
       window.removeEventListener("pointercancel", handleUp);
       window.removeEventListener("keydown", handleKey, true);
       unregisterAbort?.(); unregisterAbort = null;
+      // Vorschau beenden: Beim Bestätigen folgt genau eine dauerhafte
+      // Änderung, beim Abbruch sieht die Gegenseite wieder den alten Stand.
+      const livePageId = (node?.parentElement as HTMLElement | null)?.dataset.pageId;
+      if (livePageId) previewMappeElement(livePageId, el.id, null);
       if (commit && (tdx !== 0 || tdy !== 0)) onDrag?.(tdx, tdy, ev?.altKey);
     };
     const handleUp = (ev: PointerEvent) => finish(true, ev);
