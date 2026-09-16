@@ -469,9 +469,11 @@ export class CadCollabSession {
 
   private async flush(): Promise<void> {
     if (this.destroyed || this.applyingRemote) return;
-    // Solo-Betrieb: der bestehende gemeinsame Projektstand ist der Speicherweg.
+    // Solo-Betrieb: nichts übertragen – nur den Hinweis auf offene Änderungen
+    // aktualisieren. Gesichert wird ausschließlich per Klick.
     if (this.mode !== "live") {
       this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
+      this.refreshDirty();
       return;
     }
     if (this.flushing) { this.flushAgain = true; return; }
