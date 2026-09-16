@@ -321,12 +321,57 @@ export class CadCollabSession {
 
   /* ------------------------------------------------------- Live-Vorschau */
 
+  /**
+   * Flüchtige Vorschau aller gerade veränderten Objekte während einer
+   * laufenden Geste (Verschieben, Drehen, Skalieren, Referenzstrecke,
+   * Bibliotheks- und Dokumenttransformation). Es wird nichts gespeichert.
+   */
+  previewLocalChanges(): void {
+    if (!this.channel || !this.status.connected || this.applyingRemote) return;
+    if (!projectAccessStore.canEdit(this.opts.projectId)) return;
+    const now = Date.now();
+    if (now - this.lastPreviewAt < PREVIEW_THROTTLE_MS) return;
+    this.lastPreviewAt = now;
+    const ops = diffSceneIndexes(this.lastIndex, indexSnapshot(this.opts.app.serializeForCollab()));
+    for (const op of ops) {
+      if (isLibraryKind(op.objectKind)) continue; // Definitionen nie als Vorschau
+      this.previewed.set(`${op.sheetId}|${op.objectId}`, op);
+      this.emitPreview(op.sheetId, op.objectId, op.objectKind, op.payload);
+    }
+  }
+
+  /**
+   * Beendet eine Vorschau ohne dauerhafte Änderung (Escape): Die Gegenseite
+   * erhält eine leere Vorschau und sieht damit wieder den bestätigten Stand.
+   */
+  cancelPreview(): void {
+    for (const op of this.previewed.values()) {
+      this.emitPreview(op.sheetId, op.objectId, op.objectKind, null);
+    }
+    this.previewed.clear();
+  }
+
+  /** Nach dem Loslassen: die dauerhafte Änderung übernimmt die Darstellung. */
+  finishPreview(): void {
+    this.previewed.clear();
+  }
+
   /** Gedrosselte, flüchtige Vorschau während des Ziehens (nichts gespeichert). */
   sendPreview(sheetId: string, objectId: string, objectKind: CadObjectKind, payload: Record<string, unknown> | null) {
     if (!this.channel || !this.status.connected) return;
     const now = Date.now();
     if (payload && now - this.lastPreviewAt < PREVIEW_THROTTLE_MS) return;
     this.lastPreviewAt = now;
+    this.emitPreview(sheetId, objectId, objectKind, payload);
+  }
+
+  private emitPreview(
+    sheetId: string,
+    objectId: string,
+    objectKind: CadObjectKind,
+    payload: Record<string, unknown> | null,
+  ) {
+    if (!this.channel) return;
     void this.channel.send({
       type: "broadcast",
       event: "preview",
