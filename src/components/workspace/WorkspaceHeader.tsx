@@ -174,6 +174,9 @@ export function WorkspaceHeader({
       {/* Right: Undo/Redo · Zoom · Präsentieren · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
 
+        <CloudSaveControl projectId={projectId} />
+
+
         <button
           onClick={onCenterView}
           disabled={!onCenterView}
