@@ -14,6 +14,7 @@ import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
 import { CadCommentLayer } from "@/components/cad/CadCommentLayer";
 import { CadPresenceBar } from "@/components/cad/CadPresenceBar";
+import { CadCollabOverlay } from "@/components/cad/CadCollabOverlay";
 import { useCadCollab } from "@/lib/cadCollab/useCadCollab";
 import { TableEditContext, TableFormulaPickContext, type FormulaFn, type TableSelection } from "@/components/page/TableElementView";
 import { TableToolSettings } from "@/components/page/TableToolSettings";
@@ -2035,7 +2036,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         />
 
         {/* Live-Zusammenarbeit: wer ist gerade mit auf dieser Zeichnung */}
-        {!presenting && <CadPresenceBar peers={collab.status.peers} connected={collab.status.connected} />}
+        {!presenting && (
+          <CadPresenceBar
+            peers={collab.status.peers.filter((p) => p.sheetId === appRef.current?.activeSheetId)}
+            connected={collab.status.connected}
+          />
+        )}
+        {!presenting && (
+          <CadCollabOverlay app={appRef.current} status={collab.status} session={collab.session} />
+        )}
 
         {/* Kommentare (DOM-Overlay, kein Zeichenobjekt) */}
         {!presenting && (
