@@ -300,7 +300,10 @@ export class MappeCollabSession {
     }
   }
 
-  /** Umschalten in die echte Zusammenarbeit (gemeinsamer Stand zuerst). */
+  /**
+   * Umschalten in die echte Zusammenarbeit: erst die eigenen offenen
+   * Änderungen objektweise abgleichen, dann den gemeinsamen Stand laden.
+   */
   private async goLive(): Promise<void> {
     if (this.destroyed || this.mode === "live" || this.activating) return;
     window.clearTimeout(this.graceTimer);
@@ -308,8 +311,10 @@ export class MappeCollabSession {
     this.activating = true;
     const { projectId } = this.opts;
     try {
+      await this.saveToCloud();
       const state = await fetchObjectState(projectId);
       this.revisions = new Map(state.map((op) => [`${op.pageId}|${op.objectId}`, op.objectVersion]));
+      this.revisionsLoaded = true;
       this.applyRemoteOps(state);
       this.lastSeq = await fetchLatestSeq(projectId);
       this.lastIndex = indexProject(currentProject(projectId));
@@ -322,8 +327,9 @@ export class MappeCollabSession {
     this.mode = "live";
     this.activating = false;
     this.setStatus({ mode: "live" });
+    this.baselineFromCurrent();
+    this.report({ mode: "live", dirty: false, saving: false, error: null });
     this.trackPresence();
-    this.unsubscribe = projectStore.subscribe(() => this.notifyLocalChange());
 
     this.connect();
     this.heartbeatTimer = window.setInterval(() => { void this.renewOwnLocks(); }, LOCK_HEARTBEAT_MS);
@@ -338,7 +344,7 @@ export class MappeCollabSession {
     }, COLLAB_GRACE_MS);
   }
 
-  /** Zurück zum normalen Speicherweg der Projektmappe. */
+  /** Zurück zum lokalen Speicherweg der Projektmappe. */
   private async goStandby(): Promise<void> {
     if (this.mode !== "live") return;
     this.mode = "standby";
@@ -348,13 +354,13 @@ export class MappeCollabSession {
     this.heartbeatTimer = 0;
     this.sweepTimer = 0;
     this.previewed.clear();
-    this.unsubscribe?.();
-    this.unsubscribe = null;
     await this.unlockAll();
     const client = getNetworkClient();
     if (client && this.channel) await client.removeChannel(this.channel);
     this.channel = null;
     this.setStatus({ mode: "standby", locksByObject: new Map(), previewByObject: new Map() });
+    this.baselineFromCurrent();
+    this.report({ mode: "standby", dirty: false, saving: false });
     this.trackPresence();
   }
 
