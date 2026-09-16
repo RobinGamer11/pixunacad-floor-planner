@@ -210,7 +210,10 @@ async function loadAccess(): Promise<void> {
       }
     }
 
-    state = { loading: false, ready: true, schemaMissing: false, myId, byProject };
+    const otherMembersByProject = new Map<string, number>();
+    for (const [projectId, people] of peopleByProject) otherMembersByProject.set(projectId, people.size);
+
+    state = { loading: false, ready: true, schemaMissing: false, myId, byProject, otherMembersByProject };
     emit();
   } catch (error) {
     state = {
