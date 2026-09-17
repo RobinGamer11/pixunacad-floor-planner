@@ -2618,6 +2618,18 @@ export class CadApp {
   startPastePreview(): boolean {
     if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.textEditor?.isActive()) return false;
+    // Klick in der Kopfzeile: Es gibt noch keine gültige Cursorposition auf der
+    // Zeichenfläche. Dann nur „bereit“ schalten — die Kopie entsteht erst beim
+    // ersten echten Pointer-Ereignis im Canvas, exakt unter dem Zeiger.
+    if (!this.input?.pointerInside) { this.pasteArmed = true; return true; }
+    return this._beginPasteFloatNow();
+  }
+
+  /** Wartender Einfügemodus („bereit“, Kopie folgt beim Eintritt in den Canvas). */
+  pasteArmed = false;
+
+  private _beginPasteFloatNow(): boolean {
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.activeTool !== this.selectTool) {
       this._toolBeforePaste = (this.activeTool as any).id || ToolIds.SELECT;
       this.setTool(ToolIds.SELECT);
