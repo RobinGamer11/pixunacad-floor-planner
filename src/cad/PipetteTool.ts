@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { Defaults } from "./constants";
 import { Vec2, v, projectPointToSegment, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -5,15 +6,26 @@ import type { Input } from "./Input";
 import type { Segment, Hatch, Dimension, TextBox, FreeStroke } from "./Scene";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
+import { pointInDocument, documentCornersWorld } from "./documentGeometry";
+import { wallRefCorners } from "./wallGeom";
 
-type PickKind = "segment" | "hatch" | "dimension" | "textbox" | "free";
+type PickKind = "segment" | "hatch" | "dimension" | "textbox" | "free" | "wall" | "table" | "document";
 
 type PickedSource =
   | { kind: "segment"; obj: Segment }
   | { kind: "hatch"; obj: Hatch }
   | { kind: "dimension"; obj: Dimension }
   | { kind: "textbox"; obj: TextBox }
-  | { kind: "free"; obj: FreeStroke };
+  | { kind: "free"; obj: FreeStroke }
+  | { kind: "wall"; obj: any }
+  | { kind: "table"; obj: any }
+  | { kind: "document"; obj: any };
+
+/** Klarnamen der Objektarten für verständliche Rückmeldungen. */
+const KIND_LABEL: Record<PickKind, string> = {
+  segment: "Linie", hatch: "Schraffur", dimension: "Maßkette", textbox: "Text",
+  free: "Freihand", wall: "Wand", table: "Tabelle", document: "Dokument",
+};
 
 /** Stil-Eigenschaften je Objektart, die die Pipette überträgt. */
 /** Kontur-Effekte gelten werkzeugübergreifend und werden mitübertragen. */
@@ -26,9 +38,16 @@ const STYLE_KEYS: Record<PickKind, string[]> = {
           "patternSkewDeg", "patternOffsetX", "patternOffsetY", "patternOrigin",
           "patternRotateWithShape", "patternColor", ...EFFECT_KEYS],
   dimension: ["textColor", "textSizePx", "lineColor", "decimals", "tickLengthM", "showExtensions",
-              "textBgEnabled", "textBgColor", "textBgAlpha"],
+              "textBgEnabled", "textBgColor", "textBgAlpha", "extensionStyle", "extensionColor",
+              "extensionAlpha", "showUnit", "unit", "textGapPx", "mirror"],
   textbox: ["style"],
   free: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "blobSpacingM", "blobSizeM", "smoothing", ...EFFECT_KEYS],
+  // Wand: nur Darstellung (Farbe, Füllung, Muster) — Dicke/Geometrie bleibt.
+  wall: ["color", "fillColor", "patternId", "patternScale", "patternAngleDeg", "patternAlignToWall"],
+  // Tabelle: nur der Darstellungsstil, niemals Zelleninhalte.
+  table: ["style"],
+  // Dokument: nur sichtbare Bilddarstellung, niemals Inhalt oder Zuschnitt.
+  document: ["opacity", "filters", "activeFilterId", "bgRemoval"],
 };
 
 
@@ -127,17 +146,39 @@ export class PipetteTool {
     }
 
     // 3) Gleichartiges, anderes Objekt → Stil übertragen.
-    if (hit.kind === this.pickedSource.kind && hitId !== (this.pickedSource.obj as any).id) {
+    if (hit.kind === this.pickedSource.kind) {
+      if (hitId === (this.pickedSource.obj as any).id) return;
       this.originals.set(hitId, snapshotStyle(hit.kind, hit.obj));
       applyStyle(hit.obj, this.sourceSnap);
       this._touch();
+      return;
     }
+
+    // 4) Andere Objektart → ruhige Rückmeldung statt stiller Wirkungslosigkeit.
+    this._notifyIncompatible(this.pickedSource.kind, hit.kind);
+  }
+
+  /** Hinweis bei nicht zueinander passenden Objektarten (höchstens alle 1,5 s). */
+  private _lastNotice = 0;
+  private _notifyIncompatible(from: PickKind, to: PickKind) {
+    const now = Date.now();
+    if (now - this._lastNotice < 1500) return;
+    this._lastNotice = now;
+    try {
+      toast("Pipette", {
+        description: `Der Stil einer ${KIND_LABEL[from]} lässt sich nicht auf ${KIND_LABEL[to] === "Text" ? "einen Text" : "eine " + KIND_LABEL[to]} übertragen.`,
+      });
+    } catch { /* Hinweis ist optional */ }
   }
 
   private _touch() {
     try { (this.app as any).refreshLabelUI?.(); } catch {}
     try { (this.app as any)._changeDirty = true; } catch {}
     try { (this.app as any).pushHistory?.("Pipette"); } catch {}
+    // Projektmappe: eine angewandte Pipette ist eine bestätigte Änderung und
+    // muss sofort als genau ein Historien-Schritt gesichert werden.
+    try { (this.app as any)._flushHistorySnapshot?.(); } catch {}
+    try { (this.app as any).renderer?.requestDraw?.(); } catch {}
   }
 
   private _pickAt(input: Input): PickedSource | null {
@@ -157,6 +198,14 @@ export class PipetteTool {
       const box = this.app.scene.textBoxes[i];
       if (!visible(box.labelId)) continue;
       if (pointInOrientedBox(mouseW, box)) return { kind: "textbox", obj: box };
+    }
+
+    // Tabellen (nutzen dieselbe Box-Geometrie wie Textfelder)
+    const tables: any[] = (this.app.scene as any).tables || [];
+    for (let i = tables.length - 1; i >= 0; i--) {
+      const t = tables[i];
+      if (!visible(t.labelId)) continue;
+      if (pointInOrientedBox(mouseW, t)) return { kind: "table", obj: t };
     }
 
     // Linien
@@ -195,6 +244,27 @@ export class PipetteTool {
     for (const hatch of this.app.scene.hatches) {
       if (!visible(hatch.labelId)) continue;
       if (hatch.points.length >= 3 && pointInPolygon(mouseW, hatch.points)) return { kind: "hatch", obj: hatch };
+    }
+
+    // Wände (Treffer innerhalb des Wandkörpers)
+    for (const wall of ((this.app.scene as any).walls || []) as any[]) {
+      if (!visible(wall.labelId)) continue;
+      const corners = wallRefCorners(wall);
+      if (corners.length < 2) continue;
+      const half = Math.max(wall.thicknessM || 0, 0) / 2;
+      for (let i = 1; i < corners.length; i++) {
+        const proj = projectPointToSegment(mouseW, corners[i - 1], corners[i]);
+        const dW = Math.hypot(proj.q.x - mouseW.x, proj.q.y - mouseW.y);
+        if (dW <= half || distPx(proj.q) <= Defaults.hitPx) return { kind: "wall", obj: wall };
+      }
+    }
+
+    // Dokumente (unterste Ebene)
+    const docs: any[] = (this.app.scene as any).documents || [];
+    for (let i = docs.length - 1; i >= 0; i--) {
+      const doc = docs[i];
+      if (doc._snapOnly || !visible(doc.labelId)) continue;
+      if (pointInDocument(mouseW, doc)) return { kind: "document", obj: doc };
     }
 
     return null;
@@ -242,7 +312,23 @@ export class PipetteTool {
         if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
       }
       ctx.closePath(); ctx.stroke();
-    } else if (src.kind === "textbox") {
+    } else if (src.kind === "wall") {
+      const corners = wallRefCorners(src.obj);
+      ctx.beginPath();
+      corners.forEach((p: Vec2, i: number) => {
+        const sp = cam.worldToScreen(p.x, p.y);
+        if (i === 0) ctx.moveTo(sp.x, sp.y); else ctx.lineTo(sp.x, sp.y);
+      });
+      ctx.stroke();
+    } else if (src.kind === "document") {
+      const corners = documentCornersWorld(src.obj).map((p: Vec2) => cam.worldToScreen(p.x, p.y));
+      if (corners.length) {
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+        ctx.closePath(); ctx.stroke();
+      }
+    } else if (src.kind === "textbox" || src.kind === "table") {
       const cx = src.obj.center.x, cy = src.obj.center.y;
       const w = src.obj.widthM, h = src.obj.heightM;
       const rot = src.obj.rotationRad || 0;

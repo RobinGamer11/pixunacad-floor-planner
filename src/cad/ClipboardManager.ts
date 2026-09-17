@@ -57,7 +57,28 @@ interface LibrarySnap {
   position: Vec2; rotationRad: number; scaleX: number; scaleY: number; labelId: string;
 }
 
-export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap | LibrarySnap;
+/** Tabellenobjekt (Inhalt + Maßstab, keine Verknüpfung zum Original). */
+interface TableSnap {
+  kind: "table"; center: Vec2; rotationRad: number;
+  data: any; mPerMm: number; scale: number; labelId: string;
+}
+
+/** Dokument (PDF-Seite/Bild) inklusive sichtbarer Darstellungseinstellungen. */
+interface DocumentSnap {
+  kind: "document"; position: Vec2; data: Record<string, any>;
+}
+
+/**
+ * Tür/Fenster. Türen hängen immer an einer Wand: Wird die Wand mitkopiert,
+ * verweist `wallRef` auf deren Index in der Kopie; sonst bleibt die Tür an der
+ * Originalwand (Duplikat auf derselben Wand).
+ */
+interface DoorSnap {
+  kind: "door"; wallId: string; wallRef: number | null; props: Record<string, any>;
+}
+
+export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap
+  | LibrarySnap | TableSnap | DocumentSnap | DoorSnap;
 
 
 export interface Clipboard {
@@ -121,6 +142,52 @@ function snapLibrary(i: any): LibrarySnap {
     scaleX: i.scaleX, scaleY: i.scaleY, labelId: i.labelId };
 }
 
+const DOC_FIELDS = [
+  "name", "kind", "src", "pageIndex", "widthM", "heightM", "rotationRad",
+  "pixelWidth", "pixelHeight", "labelId", "importScaleDenom", "eraseMaskDataUrl",
+  "pdfSourceB64", "guideEdges", "cropM", "opacity", "filters", "activeFilterId",
+  "bgRemoval", "anchors", "warpCorners", "flipX", "flipY",
+];
+
+const DOOR_FIELDS = [
+  "posM", "widthM", "heightM", "breakHeightM", "breakHeightVisible", "kind",
+  "side", "hand", "edge", "color", "jambEnabled", "jambColor", "jambLenM",
+  "jambThickM", "sashEnabled", "glassColor", "glassThickM", "glassFillColor", "labelId",
+];
+
+const pickFields = (obj: any, keys: string[]): Record<string, any> => {
+  const out: Record<string, any> = {};
+  for (const k of keys) {
+    if (obj?.[k] === undefined) continue;
+    const val = obj[k];
+    out[k] = val && typeof val === "object" ? JSON.parse(JSON.stringify(val)) : val;
+  }
+  return out;
+};
+
+function snapTable(t: any): TableSnap {
+  return { kind: "table", center: v(t.center.x, t.center.y), rotationRad: t.rotationRad || 0,
+    data: JSON.parse(JSON.stringify(t.data ?? {})), mPerMm: t.mPerMm, scale: t.scale || 1,
+    labelId: t.labelId };
+}
+
+function snapDocument(d: any): DocumentSnap {
+  return { kind: "document", position: v(d.position.x, d.position.y), data: pickFields(d, DOC_FIELDS) };
+}
+
+function snapDoor(d: any, wallRef: number | null): DoorSnap {
+  return { kind: "door", wallId: d.wallId, wallRef, props: pickFields(d, DOOR_FIELDS) };
+}
+
+function snapWallObj(o: any): WallSnap {
+  return { kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
+    wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
+    color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
+    patternId: o.patternId, patternScale: o.patternScale, patternAlignToWall: o.patternAlignToWall,
+    patternAngleDeg: o.patternAngleDeg ?? 0,
+    bulges: Array.isArray(o.bulges) ? [...o.bulges] : undefined } as any;
+}
+
 function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
   if (it.kind === "hatch") return polygonCentroid(it.points);
@@ -128,6 +195,8 @@ function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "wall") return polygonCentroid(it.corners);
   if (it.kind === "free") return polygonCentroid(it.points);
   if (it.kind === "library") return v(it.position.x, it.position.y);
+  if (it.kind === "document") return v(it.position.x, it.position.y);
+  if (it.kind === "door") return v(0, 0);
   return v(it.center.x, it.center.y);
 }
 
@@ -140,6 +209,8 @@ function itemPoints(it: ClipboardItem): Vec2[] {
   if (it.kind === "wall") return it.corners;
   if (it.kind === "free") return it.points;
   if (it.kind === "library") return [it.position];
+  if (it.kind === "document") return [it.position];
+  if (it.kind === "door") return [];
   return [it.center];
 }
 
@@ -174,6 +245,8 @@ function itemsAnchor(items: ClipboardItem[], near?: Vec2 | null): Vec2 {
  */
 export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 | null): Clipboard | null {
   const items: ClipboardItem[] = [];
+  /** Wand-ID → Index des Wand-Snapshots (für mitkopierte Türen/Fenster). */
+  const copiedWalls = new Map<string, number>();
 
   const seg = app.getSelectedSegment();
   const hatch = app.getSelectedHatch();
@@ -191,22 +264,27 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       else if (kind === "textbox") { const o = s.getTextBoxById?.(id); if (o) items.push(snapTextBox(o)); }
       else if (kind === "freeStroke" || kind === "free") { const o = s.getFreeStrokeById?.(id); if (o) items.push(snapFree(o)); }
       else if (kind === "library") { const o = s.getLibraryInstanceById?.(id); if (o) items.push(snapLibrary(o)); }
+      else if (kind === "table") { const o = s.getTableById?.(id); if (o) items.push(snapTable(o)); }
+      else if (kind === "document") { const o = s.getDocumentById?.(id); if (o && !o._snapOnly) items.push(snapDocument(o)); }
       else if (kind === "wall") {
         const o = s.getWallById?.(id);
-        if (o) items.push({ kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
-          wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
-          color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
-          patternId: o.patternId, patternScale: o.patternScale, patternAlignToWall: o.patternAlignToWall,
-          patternAngleDeg: (o as any).patternAngleDeg ?? 0 });
+        if (o) { copiedWalls.set(o.id, items.length); items.push(snapWallObj(o)); }
       }
     }
   }
 
   if (items.length === 0) {
+    const table = (app as any).getSelectedTable?.();
+    const doc = (app as any).getSelectedDocument?.()
+      ?? ((app.selection as any)?.documentId ? app.scene.getDocumentById((app.selection as any).documentId) : null);
+    const wall = (app as any).getSelectedWall?.();
     if (seg) items.push(snapSegment(seg));
     else if (hatch) items.push(snapHatch(hatch));
     else if (dim) items.push(snapDimension(dim));
+    else if (table) items.push(snapTable(table));
     else if (tb) items.push(snapTextBox(tb));
+    else if (doc && !(doc as any)._snapOnly) items.push(snapDocument(doc));
+    else if (wall) { copiedWalls.set(wall.id, items.length); items.push(snapWallObj(wall)); }
     else if ((app as any).getSelectedLibraryInstance?.()) {
       items.push(snapLibrary((app as any).getSelectedLibraryInstance()));
     }
@@ -219,7 +297,17 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       for (const d of app.scene.getDimensionsByLabelId(app.selectedLabelId)) items.push(snapDimension(d));
       for (const t of app.scene.getTextBoxesByLabelId(app.selectedLabelId)) items.push(snapTextBox(t));
       for (const f of app.scene.getFreeStrokesByLabelId(app.selectedLabelId)) items.push(snapFree(f));
+      for (const t of ((app.scene as any).tables || []).filter((x: any) => x.labelId === app.selectedLabelId)) items.push(snapTable(t));
+      for (const d of app.scene.getDocumentsByLabelId(app.selectedLabelId)) { if (!(d as any)._snapOnly) items.push(snapDocument(d)); }
+      for (const w of ((app.scene as any).walls || []).filter((x: any) => x.labelId === app.selectedLabelId)) {
+        copiedWalls.set(w.id, items.length); items.push(snapWallObj(w));
+      }
     }
+  }
+
+  // Türen/Fenster gehören zu ihrer Wand: Wird die Wand mitkopiert, wandern sie mit.
+  for (const [wallId, ref] of copiedWalls) {
+    for (const d of ((app.scene as any).getDoorsByWallId?.(wallId) || [])) items.push(snapDoor(d, ref));
   }
 
   if (items.length === 0) return null;
@@ -254,6 +342,9 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
     if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (it.kind === "free") return { ...it, points: it.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (it.kind === "library") return { ...it, position: { x: it.position.x + dx, y: it.position.y + dy } };
+    if (it.kind === "document") return { ...it, position: { x: it.position.x + dx, y: it.position.y + dy } };
+    if (it.kind === "table") return { ...it, center: { x: it.center.x + dx, y: it.center.y + dy } };
+    if (it.kind === "door") return it;
     return translatedText(it, dx, dy);
   });
 }
@@ -266,7 +357,10 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
   const dx = mouseW.x - clip.anchor.x;
   const dy = mouseW.y - clip.anchor.y;
   const created: { kind: string; id: string }[] = [];
-  for (const it of clip.items) {
+  /** Index des Wand-Snapshots → ID der neu erzeugten Wand (für Türen/Fenster). */
+  const newWallIds = new Map<number, string>();
+  for (let idx = 0; idx < clip.items.length; idx++) {
+    const it = clip.items[idx];
     if (it.kind === "segment") {
       const o = app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
         { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId, bulge: (it as any).bulge,
@@ -314,7 +408,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         patternId: it.patternId, patternScale: it.patternScale, patternAlignToWall: it.patternAlignToWall,
         patternAngleDeg: it.patternAngleDeg ?? 0,
       });
-      if (o) created.push({ kind: "wall", id: o.id });
+      if (o) { newWallIds.set(idx, o.id); created.push({ kind: "wall", id: o.id }); }
     } else if (it.kind === "free") {
       const o = app.scene.createFreeStroke(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })), {
         color: it.color, thicknessM: it.thicknessM, opacity: it.opacity, lineStyle: it.lineStyle,
@@ -334,6 +428,24 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         labelId: it.labelId,
       });
       if (o) created.push({ kind: "library", id: o.id });
+    } else if (it.kind === "table") {
+      const o = (app.scene as any).createTable(
+        { x: it.center.x + dx, y: it.center.y + dy },
+        JSON.parse(JSON.stringify(it.data ?? {})), it.mPerMm,
+        { rotationRad: it.rotationRad, labelId: it.labelId, scale: it.scale });
+      if (o) created.push({ kind: "table", id: o.id });
+    } else if (it.kind === "document") {
+      const o = app.scene.createDocument({
+        ...(JSON.parse(JSON.stringify(it.data)) as any),
+        position: { x: it.position.x + dx, y: it.position.y + dy },
+      });
+      if (o) created.push({ kind: "document", id: o.id });
+    } else if (it.kind === "door") {
+      const wallId = (it.wallRef !== null ? newWallIds.get(it.wallRef) : null) || it.wallId;
+      if ((app.scene as any).getWallById?.(wallId)) {
+        const o = (app.scene as any).createDoor({ ...(it.props as any), wallId });
+        if (o) created.push({ kind: "door", id: o.id });
+      }
     } else {
       const o = app.scene.createTextBox(
         { x: it.center.x + dx, y: it.center.y + dy },
