@@ -2394,7 +2394,7 @@ export class CadApp {
         // als normales CAD-Objekt ausgewählt.
         if (this.tableEditId) { e.preventDefault(); this.endTableEdit(); return; }
 
-        if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
+        if (this.pastePreviewActive || this.pasteArmed) { this.cancelPastePreview(); return; }
         // Stufe 1: Läuft gerade eine Zeichen-Aktion? Dann NUR diese abbrechen —
         // das Werkzeug bleibt aktiv. Erst der nächste ESC wechselt zur Auswahl.
         {
