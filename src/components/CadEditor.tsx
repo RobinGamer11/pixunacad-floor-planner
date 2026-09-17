@@ -421,10 +421,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
   // Mehrfach-Einfügen: Zustand an den Kopf melden (gelbe Hervorhebung).
   useEffect(() => {
-    const app = appRef.current;
-    if (!app) return;
-    app.onMultiPasteChange = onMultiPasteChange;
-    return () => { if (app.onMultiPasteChange === onMultiPasteChange) app.onMultiPasteChange = undefined; };
+    if (!onMultiPasteChange) return;
+    let raf = 0;
+    let last = false;
+    const tick = () => {
+      const a = appRef.current?.multiPasteActive ?? false;
+      if (a !== last) { last = a; onMultiPasteChange(a); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [onMultiPasteChange]);
 
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
