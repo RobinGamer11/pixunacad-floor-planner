@@ -3131,6 +3131,11 @@ export class MiniCad {
 
 
       this.input.update(this.camera);
+      // Bereitstehendes Einfügen: erst mit echter Cursorposition ausführen.
+      if (this.pasteArmed && this.input.pointerInside) {
+        this.pasteArmed = false;
+        if (!this._pasteClipboardNow()) this.stopMultiPaste();
+      }
 
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend, identisch zur großen CAD-Oberfläche.
