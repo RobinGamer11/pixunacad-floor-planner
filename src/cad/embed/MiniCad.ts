@@ -2601,6 +2601,7 @@ export class MiniCad {
         try { if (this.textEditor.isActive()) { this.textEditor.commit(); return; } } catch {}
         let pasteCancelled = false;
         if (this.multiPasteActive) { this.multiPasteActive = false; this.onMultiPasteChange?.(false); }
+        if (this.pasteArmed) { this.pasteArmed = false; return; }
         try { pasteCancelled = this.selectTool.cancelPasteFloat(); } catch {}
         if (pasteCancelled) return;
         if (this.hasActiveAction()) {
