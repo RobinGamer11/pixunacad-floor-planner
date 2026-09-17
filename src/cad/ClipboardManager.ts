@@ -357,7 +357,10 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
   const dx = mouseW.x - clip.anchor.x;
   const dy = mouseW.y - clip.anchor.y;
   const created: { kind: string; id: string }[] = [];
-  for (const it of clip.items) {
+  /** Index des Wand-Snapshots → ID der neu erzeugten Wand (für Türen/Fenster). */
+  const newWallIds = new Map<number, string>();
+  for (let idx = 0; idx < clip.items.length; idx++) {
+    const it = clip.items[idx];
     if (it.kind === "segment") {
       const o = app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
         { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId, bulge: (it as any).bulge,
