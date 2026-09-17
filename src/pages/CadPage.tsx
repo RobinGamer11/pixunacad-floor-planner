@@ -325,6 +325,7 @@ const CadPage = () => {
           onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
           onZoomChange={setZoom}
           onCanDeleteChange={setCanDelete}
+          onMultiPasteChange={setMultiPaste}
           presenting={presenting}
           helpOn={mappeHelpOn}
         />
