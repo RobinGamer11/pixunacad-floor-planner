@@ -2593,7 +2593,17 @@ export class CadApp {
         anchor = { x: p.x, y: p.y };
       }
     }
-    if (!anchor) anchor = { x: this.input.mouse.wx, y: this.input.mouse.wy };
+    // Bibliotheksobjekt/Dokument: deren definierter Einfügepunkt.
+    if (!anchor) {
+      const lib = (this as any).getSelectedLibraryInstance?.();
+      if (lib?.position) anchor = { x: lib.position.x, y: lib.position.y };
+    }
+    if (!anchor) {
+      const doc = (this as any).getSelectedDocument?.();
+      if (doc?.position) anchor = { x: doc.position.x, y: doc.position.y };
+    }
+    // Sonst bestimmt buildClipboardFromSelection den Fangpunkt der Auswahl,
+    // der dem Mauszeiger am nächsten liegt (bewusst angeklickter Griffpunkt).
     const clip = buildClipboardFromSelection(this, anchor);
     if (!clip) return false;
     this.clipboard = clip;
@@ -2620,7 +2630,7 @@ export class CadApp {
     this.pastePreviewActive = false;
     const created = commitClipboardAt(this, this.clipboard, v(this.clipboard.anchor.x, this.clipboard.anchor.y));
     if (!created.length) return false;
-    this.selectTool.beginPasteFloat(created);
+    this.selectTool.beginPasteFloat(created, v(this.clipboard.anchor.x, this.clipboard.anchor.y));
     this.refreshLabelUI();
     return true;
   }

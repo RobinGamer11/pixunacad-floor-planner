@@ -487,7 +487,7 @@ export class SelectTool {
 
 
   /** Startet den Einfüge-Modus für die frisch erzeugten Objekte. */
-  beginPasteFloat(ids: { kind: string; id: string }[]) {
+  beginPasteFloat(ids: { kind: string; id: string }[], grabAnchor?: Vec2 | null) {
     if (!ids.length) return;
     this.cancelGroupTransform(false);
     this.groupAnchor = null;
@@ -498,7 +498,11 @@ export class SelectTool {
     const mouse = this.app.input?.mouse;
     if (!mouse) return;
     const cursor = v(mouse.wx, mouse.wy);
-    const anchor = this._nearestGroupPoint(cursor.x, cursor.y)
+    // Der beim Kopieren festgelegte Fangpunkt ist der Greifpunkt und liegt
+    // nach dem Einfügen exakt unter dem Mauszeiger. Nur ohne Anker wird auf
+    // den nächstgelegenen Punkt bzw. den Schwerpunkt zurückgefallen.
+    const anchor = (grabAnchor ? v(grabAnchor.x, grabAnchor.y) : null)
+      ?? this._nearestGroupPoint(cursor.x, cursor.y)
       ?? groupCentroid(this.app, this.marqueeSelectedIds);
     if (!anchor) return;
     const target = this._snapWorldPoint(cursor);

@@ -1937,16 +1937,56 @@ export class MiniCad {
     return out;
   }
 
+  /** Einfügeanker der Zwischenablage (Weltkoordinaten der Kopiervorlage). */
+  private _miniClipboardAnchor: { x: number; y: number } | null = null;
+
+  /** Echte Fangpunkte eines Zwischenablage-Eintrags. */
+  private _clipItemPoints(it: { kind: string; data: any }): { x: number; y: number }[] {
+    const d = it.data || {};
+    if (it.kind === "segment") return [d.a, d.b].filter(Boolean);
+    if (it.kind === "hatch") return Array.isArray(d.points) ? d.points : [];
+    if (it.kind === "freeStroke") return Array.isArray(d.points) ? d.points : [];
+    if (it.kind === "dimension") return [d.p1, d.p2, d.placementPoint].filter(Boolean);
+    if (it.kind === "textBox") return d.center ? [d.center] : [];
+    if (it.kind === "document") return d.position ? [d.position] : [];
+    return [];
+  }
+
+  /**
+   * Gemeinsamer Einfügeanker: der echte Objekt-Fangpunkt, der beim Kopieren
+   * dem Mauszeiger am nächsten liegt. Ohne echten Punkt bleibt er leer.
+   */
+  private _clipAnchor(clip: { kind: string; data: any }[]): { x: number; y: number } | null {
+    const m: any = (this as any).input?.mouse;
+    if (!m || !Number.isFinite(m.wx) || !Number.isFinite(m.wy)) return null;
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (const it of clip) {
+      for (const p of this._clipItemPoints(it)) {
+        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+        const d = Math.hypot(p.x - m.wx, p.y - m.wy);
+        if (d < bestD) { bestD = d; best = { x: p.x, y: p.y }; }
+      }
+    }
+    return best;
+  }
+
+  /** Anker der zuletzt kopierten Auswahl (für die Mappen-Zwischenablage). */
+  getCopyAnchor(): { x: number; y: number } | null { return this._miniClipboardAnchor; }
+
   /** Serialisierbarer Snapshot der aktuellen Auswahl (engine-unabhängig). */
   copySelectionSnapshot(): { kind: string; data: any }[] | null {
     const items = this._buildClipboardItems();
-    return items.length ? items : null;
+    if (!items.length) return null;
+    this._miniClipboardAnchor = this._clipAnchor(items);
+    return items;
   }
 
   /** Fügt einen extern gehaltenen Snapshot ein (zentrale Mappen-Zwischenablage). */
-  pasteClipboardItems(items: { kind: string; data: any }[]): boolean {
+  pasteClipboardItems(items: { kind: string; data: any }[], anchor?: { x: number; y: number } | null): boolean {
     if (!items || items.length === 0) return false;
     this._miniClipboard = items.map((it) => ({ kind: it.kind, data: JSON.parse(JSON.stringify(it.data)) }));
+    this._miniClipboardAnchor = anchor ? { x: anchor.x, y: anchor.y } : null;
     this._miniPasteRound = 0;
     return this.pasteClipboard();
   }
@@ -1955,6 +1995,7 @@ export class MiniCad {
     const clip = this._buildClipboardItems();
     if (clip.length === 0) return false;
     this._miniClipboard = clip;
+    this._miniClipboardAnchor = this._clipAnchor(clip);
     this._miniPasteRound = 0;
     return true;
   }
@@ -2090,7 +2131,7 @@ export class MiniCad {
       try {
         if (this._activeTool !== "select") this.setTool("select");
         this.clearSelection?.();
-        this.selectTool.beginPasteFloat(created);
+        this.selectTool.beginPasteFloat(created, this._miniClipboardAnchor);
       } catch { /* Auswahl optional */ }
     }
     this._changeDirty = true;
