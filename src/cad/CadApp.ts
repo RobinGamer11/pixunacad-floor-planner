@@ -2828,6 +2828,9 @@ export class CadApp {
     // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
     this.endTableEdit();
     if (this.pastePreviewActive) this.cancelPastePreview();
+    // Ein anderes Werkzeug (z. B. Bibliotheks-/Dokumentplatzierung) beendet
+    // den Mehrfach-Einfüge-Modus sauber.
+    if (this.multiPasteActive && id !== ToolIds.SELECT) this.stopMultiPaste();
 
 
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
