@@ -2546,6 +2546,7 @@ export class MiniCad {
       if (e.key === "Escape" && !inField) {
         try { if (this.textEditor.isActive()) { this.textEditor.commit(); return; } } catch {}
         let pasteCancelled = false;
+        if (this.multiPasteActive) { this.multiPasteActive = false; this.onMultiPasteChange?.(false); }
         try { pasteCancelled = this.selectTool.cancelPasteFloat(); } catch {}
         if (pasteCancelled) return;
         if (this.hasActiveAction()) {
