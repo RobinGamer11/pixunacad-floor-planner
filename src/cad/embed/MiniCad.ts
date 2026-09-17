@@ -2407,6 +2407,7 @@ export class MiniCad {
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
       patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0, patternRotateWithShape: this.defaultHatchPatternRotateWithShape,
+      displayGradient: copyDisplayGradient((this as any).defaultHatchDisplayGradient),
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
