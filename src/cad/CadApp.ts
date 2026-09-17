@@ -2660,10 +2660,16 @@ export class CadApp {
     this.setSelectedLabelId(null);
     this.pointEditMenu.hide();
     this.pastePreviewActive = false;
-    const created = commitClipboardAt(this, this.clipboard, v(this.clipboard.anchor.x, this.clipboard.anchor.y));
+    // Zielpunkt zuerst: aktuelle echte Cursorposition, auf vorhandene
+    // Fangpunkte gesnappt. Die Kopie entsteht direkt dort — nie am Original.
+    const cursor = v(this.input?.mouse?.wx ?? 0, this.input?.mouse?.wy ?? 0);
+    let target = cursor;
+    try { target = this.selectTool.snapWorldPointPublic(cursor) || cursor; } catch { target = cursor; }
+    const created = commitClipboardAt(this, this.clipboard, v(target.x, target.y));
     if (!created.length) return false;
-    this.selectTool.beginPasteFloat(created, v(this.clipboard.anchor.x, this.clipboard.anchor.y));
+    this.selectTool.beginPasteFloat(created, v(target.x, target.y), true);
     this.refreshLabelUI();
+
     return true;
   }
 
