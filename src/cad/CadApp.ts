@@ -2654,8 +2654,20 @@ export class CadApp {
 
   cancelPastePreview() {
     this.pastePreviewActive = false;
+    this.pasteArmed = false;
     this._toolBeforePaste = null;
     this.canvas.style.cursor = "";
+  }
+
+  /**
+   * Wird im Frame-Takt aufgerufen: Sobald der Zeiger die Zeichenfläche
+   * erreicht, entsteht die bereitstehende Kopie exakt unter dem Cursor.
+   */
+  private _resolveArmedPaste() {
+    if (!this.pasteArmed) return;
+    if (!this.input?.pointerInside) return;
+    this.pasteArmed = false;
+    if (!this._beginPasteFloatNow()) this.stopMultiPaste();
   }
 
   /* ---- Mehrfach einfügen (fortlaufendes Platzieren) ---- */
