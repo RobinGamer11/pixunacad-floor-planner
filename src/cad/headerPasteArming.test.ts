@@ -11,6 +11,7 @@ function armedApp(pointerEventSeq = 7) {
       mouse: { sx: 900, sy: 700, wx: 99, wy: 88 },
     },
     textEditor: { isActive: () => false },
+    canvas: { style: { cursor: "copy" } },
     pasteArmed: false,
     multiPasteActive: false,
     onMultiPasteChange: vi.fn(),
