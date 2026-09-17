@@ -975,6 +975,29 @@ export class MiniCad {
   /** Alias für `setActiveTool` — DocumentTool ruft `app.setTool(...)`. */
   setTool(tool: MiniTool) { this.setActiveTool(tool); }
 
+  /* ---- Mehrfach einfügen (fortlaufendes Platzieren) ---- */
+  multiPasteActive = false;
+  onMultiPasteChange?: (on: boolean) => void;
+  /** Wird nach jeder gesetzten Kopie im Mehrfach-Modus aufgerufen. */
+  onMultiPasteRepeat?: () => void;
+  private _multiPasteBusy = false;
+
+  setMultiPasteActive(on: boolean) {
+    const next = !!on;
+    if (this.multiPasteActive === next) return;
+    this.multiPasteActive = next;
+    this.onMultiPasteChange?.(next);
+    if (!next) { try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ } }
+  }
+
+  stopMultiPaste() { this.setMultiPasteActive(false); }
+
+  afterPasteFloatConfirmed() {
+    if (!this.multiPasteActive || this._multiPasteBusy) return;
+    this._multiPasteBusy = true;
+    try { this.onMultiPasteRepeat?.(); } finally { this._multiPasteBusy = false; }
+  }
+
   /** Startet die Dokument-Platzierung (nach erfolgreichem Datei-Import).
    *  Aktiviert das Dokument-Werkzeug und übergibt die Import-Daten. */
   beginDocumentPlacement(opts: {
