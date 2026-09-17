@@ -170,7 +170,7 @@ interface CadEditorProps {
   /** Hilfe-Modus (Kopfzeilen-Button) — steuert Hilfe-Overlay + Ebenen-Hinweis. */
   helpOn?: boolean;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, presenting, helpOn = true }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -418,6 +418,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [onCanDeleteChange]);
+
+  // Mehrfach-Einfügen: Zustand an den Kopf melden (gelbe Hervorhebung).
+  useEffect(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.onMultiPasteChange = onMultiPasteChange;
+    return () => { if (app.onMultiPasteChange === onMultiPasteChange) app.onMultiPasteChange = undefined; };
+  }, [onMultiPasteChange]);
 
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   /** Spiegel des aktiven Werkzeugs für Callbacks außerhalb des Render-Closures. */
