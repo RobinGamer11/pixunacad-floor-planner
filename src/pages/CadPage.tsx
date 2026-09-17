@@ -27,6 +27,7 @@ const CadPage = () => {
   const [canDelete, setCanDelete] = useState(false);
   const [zoom, setZoom] = useState<number | undefined>(undefined);
   const [canPaste, setCanPaste] = useState(false);
+  const [multiPaste, setMultiPaste] = useState(false);
 
   const doCopy = () => {
     const ok = editorRef.current?.copySelection() ?? false;
@@ -34,6 +35,7 @@ const CadPage = () => {
     return ok;
   };
   const doPaste = () => editorRef.current?.pasteClipboard() ?? false;
+  const doMultiPaste = () => { editorRef.current?.toggleMultiPaste(); };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -295,6 +297,8 @@ const CadPage = () => {
 
         canPaste={canPaste}
         onPaste={doPaste}
+        multiPasteActive={multiPaste}
+        onMultiPaste={doMultiPaste}
         zoomPercent={zoom}
         onPresent={handlePresent}
         onShare={() => {}}
