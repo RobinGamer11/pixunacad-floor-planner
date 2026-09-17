@@ -1295,6 +1295,8 @@ export default function ProjectWorkspace() {
       copiedAt: Date.now(),
       pageElements,
       cadObjects,
+      // Fangpunkt der Kopiervorlage — liegt beim Einfügen exakt am Mauszeiger.
+      cadAnchor: cadObjects.length > 0 ? (eng?.getCopyAnchor?.() ?? null) : null,
     });
     return true;
   };
@@ -1333,7 +1335,7 @@ export default function ProjectWorkspace() {
         kind: it.kind,
         data: stripSpanGroup(JSON.parse(JSON.stringify(it.data))),
       }));
-      cadOk = !!eng?.pasteClipboardItems?.(items);
+      cadOk = !!eng?.pasteClipboardItems?.(items, clip.cadAnchor ?? null);
     }
     // Zwischenablage bleibt für weitere Einfügevorgänge erhalten.
     return newIds.length > 0 || cadOk;

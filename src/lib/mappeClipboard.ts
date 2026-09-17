@@ -18,6 +18,8 @@ export interface MappeClipboardSnapshot {
   pageElements: any[];
   /** Serialisierte MiniCad-Objekte (Linien, Schraffuren, Freihand, Dokumente …). */
   cadObjects: { kind: string; data: any }[];
+  /** Fangpunkt der Kopiervorlage (Weltkoordinaten) — Greifpunkt beim Einfügen. */
+  cadAnchor?: { x: number; y: number } | null;
 }
 
 let current: MappeClipboardSnapshot | null = null;
