@@ -1005,7 +1005,7 @@ export class Renderer {
       const filtered = this._getFilteredBitmap(doc, adaptive, baseW, baseH, `adp:${baseW}`);
       const srcAdp: CanvasImageSource = (filtered || adaptive) as CanvasImageSource;
       if (warp) {
-        drawWarpedImage(ctx, srcAdp, baseW, baseH, wPx, hPx, warp);
+        drawWarpedImage(g, srcAdp, baseW, baseH, wPx, hPx, warp);
       } else {
         g.drawImage(srcAdp, -wPx / 2, -hPx / 2, wPx, hPx);
         // Darüber das scharfe Viewport-Tile (nur wenn vorhanden) — Adobe-ähnliche Schärfe.
@@ -1034,7 +1034,7 @@ export class Renderer {
         g.imageSmoothingEnabled = false;
       }
       if (warp) {
-        drawWarpedImage(ctx, finalSrc, baseW, baseH, wPx, hPx, warp);
+        drawWarpedImage(g, finalSrc, baseW, baseH, wPx, hPx, warp);
       } else {
         g.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
       }
@@ -1053,8 +1053,8 @@ export class Renderer {
         { x: docLayer.x, y: docLayer.y, w: docLayer.w, h: docLayer.h }, docGradient);
       ctx.drawImage(docLayer.canvas, docLayer.x, docLayer.y, docLayer.w, docLayer.h);
     }
-    ctx.imageSmoothingEnabled = prevSmoothing;
-    if (prevQuality) (ctx as any).imageSmoothingQuality = prevQuality;
+    g.imageSmoothingEnabled = prevSmoothing;
+    if (prevQuality) (g as any).imageSmoothingQuality = prevQuality;
     ctx.restore();
   }
 
