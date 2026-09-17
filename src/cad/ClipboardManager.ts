@@ -342,6 +342,9 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
     if (it.kind === "wall") return { ...it, corners: it.corners.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (it.kind === "free") return { ...it, points: it.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     if (it.kind === "library") return { ...it, position: { x: it.position.x + dx, y: it.position.y + dy } };
+    if (it.kind === "document") return { ...it, position: { x: it.position.x + dx, y: it.position.y + dy } };
+    if (it.kind === "table") return { ...it, center: { x: it.center.x + dx, y: it.center.y + dy } };
+    if (it.kind === "door") return it;
     return translatedText(it, dx, dy);
   });
 }
