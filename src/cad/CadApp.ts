@@ -3228,6 +3228,8 @@ export class CadApp {
       if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
+      // Bereitstehendes Einfügen: erst jetzt, mit echter Cursorposition.
+      this._resolveArmedPaste();
 
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend. Linien-/Wandwerkzeug und der Punkt-Edit des
