@@ -1261,6 +1261,8 @@ export default function ProjectWorkspace() {
   // Ein Kopiervorgang erfasst Seiten-Elemente UND MiniCad-Objekte zusammen und
   // legt sie im projektbezogenen Store ab (überlebt Seiten-/Buchwechsel).
   const [canPasteElements, setCanPasteElements] = useState(() => hasMappeClipboard(projectId));
+  const [multiPasteActive, setMultiPasteActive] = useState(false);
+  const multiPasteRef = useRef(false);
 
   useEffect(() => {
     const sync = () => setCanPasteElements(hasMappeClipboard(projectId));
@@ -1335,6 +1337,34 @@ export default function ProjectWorkspace() {
     }
     // Zwischenablage bleibt für weitere Einfügevorgänge erhalten.
     return newIds.length > 0 || cadOk;
+  };
+
+  /** „Mehrfach einfügen“: nach jeder gesetzten Kopie hängt sofort die nächste
+   *  Vorschau am Mauszeiger — gleiche Einfüge-, Fang- und Undo-Logik. */
+  const runToggleMultiPaste = () => {
+    const eng = cadEngineApiRef.current?.engine as any;
+    if (multiPasteRef.current) {
+      multiPasteRef.current = false;
+      setMultiPasteActive(false);
+      eng?.stopMultiPaste?.();
+      return;
+    }
+    if (!project || !hasMappeClipboard(project.id)) return;
+    multiPasteRef.current = true;
+    setMultiPasteActive(true);
+    if (eng) {
+      eng.onMultiPasteChange = (on: boolean) => {
+        multiPasteRef.current = on;
+        setMultiPasteActive(on);
+      };
+      eng.onMultiPasteRepeat = () => { runPasteClipboard(); };
+      eng.setMultiPasteActive?.(true);
+    }
+    if (!runPasteClipboard()) {
+      eng?.setMultiPasteActive?.(false);
+      multiPasteRef.current = false;
+      setMultiPasteActive(false);
+    }
   };
 
 
