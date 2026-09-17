@@ -146,6 +146,9 @@ export interface CadEditorHandle {
   hasDeletableSelection: () => boolean;
   copySelection: () => boolean;
   pasteClipboard: () => boolean;
+  /** Mehrfach einfügen umschalten (fortlaufendes Platzieren). */
+  toggleMultiPaste: () => boolean;
+  stopMultiPaste: () => void;
   hasClipboard: () => boolean;
   /** CSS-Pixel pro Welt-Meter (camera.scale). */
   getCameraScale: () => number;
