@@ -86,3 +86,25 @@
 - CAD und Projektmappe melden sich als Quellen an und sichern objektweise.
 - Entfernt: automatischer Projekt-Upload (`scheduleSharedSave`) und `saveProjectDocument`.
 - Persönliche Einstellungen bleiben getrennt (`workspaceSync.tsx`).
+
+## Grundfunktionen-Matrix (Undo/Redo, Kopieren/Einfügen, Pipette)
+
+| Objektart | Undo/Redo | Kopieren/Einfügen | Mehrfach-Einfügen | Pipette |
+| --- | --- | --- | --- | --- |
+| Linie / Bogen / Rechteck | ja | ja | ja | ja (Farbe, Stärke, Linienart, Transparenz, Effekte) |
+| Polygon | ja | ja | ja | ja (wie Schraffur/Kontur) |
+| Wand | ja | ja (inkl. Türen/Fenster der Wand) | ja | ja (Farbe, Füllung, Muster) |
+| Tür / Fenster | ja | ja (folgt der kopierten Wand) | ja | – (keine freien Stileigenschaften) |
+| Schraffur inkl. Muster | ja | ja | ja | ja (vollständige Musterübertragung) |
+| Freihand / Stift | ja | ja | ja | ja |
+| Text | ja | ja | ja | ja (Textformat, nie Inhalt) |
+| Maß / Maßkette | ja | ja | ja | ja (Maßketten-Stil) |
+| Tabelle | ja | ja (Inhalt + Maßstab, neue ID) | ja | ja (nur Darstellungsstil, nie Zellen) |
+| Dokument (PDF/Bild) | ja | ja (inkl. Darstellungseinstellungen) | ja | ja (Transparenz, Filter, Freistellen) |
+| Bibliotheksobjekt | ja | ja (Instanz mit Einfügepunkt, Drehung, Skalierung) | ja | – (keine freien Stileigenschaften) |
+| Projektmappen-Elemente | ja | ja | ja | ja (über die eingebettete Zeichenfläche) |
+
+Regeln: Vorschau/Hover erzeugt keinen Undo-Schritt; jede bestätigte Aktion genau
+einen; Abbruch einer schwebenden Kopie entfernt alle Kopien ohne Historienrest.
+Die Pipette überträgt nie Geometrie, Position, Größe, Drehung, Inhalt oder IDs
+und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
