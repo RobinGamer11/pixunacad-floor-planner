@@ -196,6 +196,14 @@ export class PipetteTool {
       if (pointInOrientedBox(mouseW, box)) return { kind: "textbox", obj: box };
     }
 
+    // Tabellen (nutzen dieselbe Box-Geometrie wie Textfelder)
+    const tables: any[] = (this.app.scene as any).tables || [];
+    for (let i = tables.length - 1; i >= 0; i--) {
+      const t = tables[i];
+      if (!visible(t.labelId)) continue;
+      if (pointInOrientedBox(mouseW, t)) return { kind: "table", obj: t };
+    }
+
     // Linien
     let bestSeg: Segment | null = null;
     let bestSegPx = Infinity;
