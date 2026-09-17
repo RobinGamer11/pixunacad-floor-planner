@@ -569,9 +569,11 @@ export class DocumentObject {
   /** Spiegelung links/rechts bzw. oben/unten. */
   flipX?: boolean;
   flipY?: boolean;
+  /** Optionaler Transparenzverlauf auf der bereits gerenderten Darstellung. */
+  displayGradient?: DisplayGradient;
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval, anchors, warpCorners, flipX, flipY }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval, anchors, warpCorners, flipX, flipY, displayGradient }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
@@ -587,6 +589,7 @@ export class DocumentObject {
     warpCorners?: { x: number; y: number }[] | null;
     flipX?: boolean;
     flipY?: boolean;
+    displayGradient?: Partial<DisplayGradient>;
   }) {
     this.id = id;
     this.name = name || "Dokument";
@@ -632,6 +635,7 @@ export class DocumentObject {
       : null;
     this.flipX = !!flipX;
     this.flipY = !!flipY;
+    this.displayGradient = normalizeDisplayGradient(displayGradient);
   }
 }
 
@@ -1229,6 +1233,7 @@ export class Scene {
     warpCorners?: { x: number; y: number }[] | null;
     flipX?: boolean;
     flipY?: boolean;
+    displayGradient?: Partial<DisplayGradient>;
   }): DocumentObject {
     const doc = new DocumentObject({ id: this._makeId(), ...opts });
     this.documents.push(doc);
@@ -1503,6 +1508,7 @@ export class Scene {
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
     patternOrigin?: { x: number; y: number } | null; patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
+    displayGradient?: Partial<DisplayGradient>;
   } & StrokeEffectsInit = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
@@ -1515,6 +1521,7 @@ export class Scene {
       patternScale: style.patternScale, patternAngleDeg: style.patternAngleDeg,
       patternSkewDeg: style.patternSkewDeg, patternStretch: style.patternStretch, patternOffsetX: style.patternOffsetX, patternOffsetY: style.patternOffsetY,
       patternOrigin: style.patternOrigin, patternRotateWithShape: style.patternRotateWithShape,
+      displayGradient: style.displayGradient,
     });
 
     hatch._stickerEditOwnerId = this._currentEditOwnerId;
