@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { CadApp } from "./CadApp";
+import { Camera } from "./Camera";
+import { SelectionType, SnapType } from "./constants";
+import { v } from "./geometry";
+import { Scene } from "./Scene";
+import { SelectTool } from "./SelectTool";
 
 function armedApp(pointerEventSeq = 7) {
   const beginNow = vi.fn(() => true);
@@ -77,5 +82,28 @@ describe("Einfügen aus der Kopfzeile", () => {
     expect(app.pasteArmed).toBe(false);
     expect(app.multiPasteActive).toBe(false);
     expect(app.onMultiPasteChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it("legt ausschließlich den gespeicherten Clipboard-Anker auf den gesnappten Cursor", () => {
+    const scene = new Scene();
+    const pasted = scene.createSegment(v(2, 3), v(6, 3));
+    const camera = new Camera();
+    camera.scale = 100;
+    const snappedTarget = v(12, 9);
+    const app = {
+      scene,
+      camera,
+      input: { mouse: { wx: 11.96, wy: 9.03, sx: 1196, sy: 903 } },
+      topology: {
+        findBestSnap: vi.fn(() => ({ type: SnapType.POINT, world: snappedTarget })),
+      },
+      selection: { type: SelectionType.SEGMENT, segmentId: pasted.id },
+    } as unknown as CadApp;
+    const selectTool = new SelectTool(app);
+
+    selectTool.beginPasteFloat([{ kind: "segment", id: pasted.id }], v(2, 3));
+
+    expect(pasted.a).toEqual(snappedTarget);
+    expect(pasted.b).toEqual(v(16, 9));
   });
 });
