@@ -989,7 +989,10 @@ export class MiniCad {
     if (this.multiPasteActive === next) return;
     this.multiPasteActive = next;
     this.onMultiPasteChange?.(next);
-    if (!next) { try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ } }
+    if (!next) {
+      this.pasteArmed = false;
+      try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
+    }
   }
 
   stopMultiPaste() { this.setMultiPasteActive(false); }
