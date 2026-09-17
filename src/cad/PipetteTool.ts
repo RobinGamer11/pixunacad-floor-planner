@@ -175,6 +175,10 @@ export class PipetteTool {
     try { (this.app as any).refreshLabelUI?.(); } catch {}
     try { (this.app as any)._changeDirty = true; } catch {}
     try { (this.app as any).pushHistory?.("Pipette"); } catch {}
+    // Projektmappe: eine angewandte Pipette ist eine bestätigte Änderung und
+    // muss sofort als genau ein Historien-Schritt gesichert werden.
+    try { (this.app as any)._flushHistorySnapshot?.(); } catch {}
+    try { (this.app as any).renderer?.requestDraw?.(); } catch {}
   }
 
   private _pickAt(input: Input): PickedSource | null {
