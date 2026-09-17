@@ -9,6 +9,8 @@ import {
   type RoughenParams, type StrokePatternParams,
 } from "./strokeEffects";
 
+import { normalizeDisplayGradient, type DisplayGradient } from "./displayGradient";
+
 /** Gemeinsame Kontur-Effekte (Linienart + Roughen) für Linie/Polygon/Schraffur/Freihand. */
 export interface StrokeEffectsInit {
   strokePattern?: Partial<StrokePatternParams>;
