@@ -118,7 +118,7 @@ export function rotateGroup(app: any, refs: GroupRef[], angle: number, center: V
 
     for (const p of movablePoints(r.kind, o)) rot(p, center, cos, sin);
 
-    if (r.kind === "textbox" || r.kind === "library") {
+    if (r.kind === "textbox" || r.kind === "library" || r.kind === "table") {
       o.rotationRad = (o.rotationRad || 0) + angle;
     } else if (r.kind === "hatch") {
       if (o.areaLabel) o.areaLabel.rotationRad = (o.areaLabel.rotationRad || 0) + angle;
