@@ -38,9 +38,16 @@ const STYLE_KEYS: Record<PickKind, string[]> = {
           "patternSkewDeg", "patternOffsetX", "patternOffsetY", "patternOrigin",
           "patternRotateWithShape", "patternColor", ...EFFECT_KEYS],
   dimension: ["textColor", "textSizePx", "lineColor", "decimals", "tickLengthM", "showExtensions",
-              "textBgEnabled", "textBgColor", "textBgAlpha"],
+              "textBgEnabled", "textBgColor", "textBgAlpha", "extensionStyle", "extensionColor",
+              "extensionAlpha", "showUnit", "unit", "textGapPx", "mirror"],
   textbox: ["style"],
   free: ["color", "thicknessM", "opacity", "lineStyle", "gapM", "blobSpacingM", "blobSizeM", "smoothing", ...EFFECT_KEYS],
+  // Wand: nur Darstellung (Farbe, Füllung, Muster) — Dicke/Geometrie bleibt.
+  wall: ["color", "fillColor", "patternId", "patternScale", "patternAngleDeg", "patternAlignToWall"],
+  // Tabelle: nur der Darstellungsstil, niemals Zelleninhalte.
+  table: ["style"],
+  // Dokument: nur sichtbare Bilddarstellung, niemals Inhalt oder Zuschnitt.
+  document: ["opacity", "filters", "activeFilterId", "bgRemoval"],
 };
 
 
