@@ -12,6 +12,7 @@
  * margin ring.
  */
 
+import { copyDisplayGradient } from "../displayGradient";
 import { migrateSceneData } from "@/lib/persistence";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "../strokeEffects";
 
@@ -1447,6 +1448,7 @@ export class MiniCad {
         patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
         patternOrigin: (h as any).patternOrigin ? { ...(h as any).patternOrigin } : null,
         patternRotateWithShape: (h as any).patternRotateWithShape !== false,
+        displayGradient: copyDisplayGradient((h as any).displayGradient),
         bulges: Array.isArray((h as any).bulges) ? [...(h as any).bulges] : undefined,
         holeBulges: Array.isArray((h as any).holeBulges) ? (h as any).holeBulges.map((l: number[]) => [...l]) : undefined,
         midpointSnap: !!(h as any).midpointSnap,
@@ -1483,6 +1485,7 @@ export class MiniCad {
           warpCorners: (d as any).warpCorners ? (d as any).warpCorners.map((c: any) => ({ x: c.x, y: c.y })) : null,
           flipX: !!(d as any).flipX,
           flipY: !!(d as any).flipY,
+          displayGradient: copyDisplayGradient((d as any).displayGradient),
         })),
     };
   }
@@ -1579,6 +1582,7 @@ export class MiniCad {
             areaLabel: h.areaLabel,
             patternEnabled: h.patternEnabled, patternId: h.patternId, patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg, patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
             bulges: h.bulges, holeBulges: h.holeBulges,
+            displayGradient: h.displayGradient,
             ...copyStrokeEffects(h),
           });
         } catch (e) { console.error("MiniCad restore hatch:", e); }
@@ -1612,6 +1616,7 @@ export class MiniCad {
             warpCorners: Array.isArray((d as any).warpCorners) ? (d as any).warpCorners : null,
             flipX: !!(d as any).flipX,
             flipY: !!(d as any).flipY,
+            displayGradient: (d as any).displayGradient,
           });
         } catch (e) { console.error("MiniCad restore document:", e); }
       }
@@ -2118,7 +2123,8 @@ export class MiniCad {
             fillColor: o.fillColor, strokeColor: o.strokeColor, fillAlphaPct: o.fillAlphaPct,
             strokeWidthPx: o.strokeWidthPx, labelId: o.labelId, areaLabel: o.areaLabel,
             patternEnabled: o.patternEnabled, patternId: o.patternId, patternScale: o.patternScale, patternAngleDeg: o.patternAngleDeg, patternSkewDeg: o.patternSkewDeg, patternStretch: o.patternStretch, patternOffsetX: o.patternOffsetX, patternOffsetY: o.patternOffsetY,
-            bulges: o.bulges, holeBulges: o.holeBulges, });
+            bulges: o.bulges, holeBulges: o.holeBulges,
+            displayGradient: o.displayGradient, });
           if (n) created.push({ kind: "hatch", id: n.id });
         } else if (it.kind === "textBox") {
           const n = this.scene.createTextBox(mv(o.center), o.widthM, o.heightM, o.style, o.html, o.rotationRad);
@@ -2401,6 +2407,7 @@ export class MiniCad {
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
       patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0, patternRotateWithShape: this.defaultHatchPatternRotateWithShape,
+      displayGradient: copyDisplayGradient((this as any).defaultHatchDisplayGradient),
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,

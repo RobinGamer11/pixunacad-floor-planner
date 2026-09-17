@@ -14,6 +14,7 @@ import {
 } from "@/cad/documentFilters";
 import { Plus, Trash2, Pencil, Check, ChevronDown, ChevronRight } from "lucide-react";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
+import { DisplayGradientSettings } from "@/components/cad/DisplayGradientSettings";
 
 interface Props {
   app: CadApp | null;
@@ -201,7 +202,15 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
 
         {editOpen && (
           <>
-            {/* Hintergrund entfernen — erster Bereich der erweiterten Bearbeitung */}
+            {/* Transparenzverlauf — wirkt auf die fertige Darstellung */}
+            <DisplayGradientSettings
+              targets={doc ? [doc] : []}
+              commit={commit}
+              onDragStart={beginDrag}
+              onDragEnd={endDrag}
+            />
+
+            {/* Hintergrund entfernen */}
             {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
 
             {/* Filter-Liste */}

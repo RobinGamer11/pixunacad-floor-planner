@@ -1,3 +1,4 @@
+import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
@@ -728,6 +729,7 @@ export class CadApp {
         patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
         patternOrigin: (h as any).patternOrigin ? { ...(h as any).patternOrigin } : null,
         patternRotateWithShape: (h as any).patternRotateWithShape !== false,
+        displayGradient: copyDisplayGradient((h as any).displayGradient),
         bulges: [...((h as any).bulges || [])],
         holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
         isPolygon: (h as any).isPolygon === true,
@@ -838,6 +840,7 @@ export class CadApp {
           warpCorners: (d as any).warpCorners ? (d as any).warpCorners.map((c: any) => ({ x: c.x, y: c.y })) : null,
           flipX: !!(d as any).flipX,
           flipY: !!(d as any).flipY,
+          displayGradient: copyDisplayGradient((d as any).displayGradient),
         };
       }),
 
@@ -1595,6 +1598,7 @@ export class CadApp {
       patternScale: this.defaultHatchPatternScale,
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
       patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0, patternRotateWithShape: this.defaultHatchPatternRotateWithShape,
+      displayGradient: copyDisplayGradient((this as any).defaultHatchDisplayGradient),
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,

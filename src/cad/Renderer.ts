@@ -19,6 +19,7 @@ import { normalizeTable, isCovered, effectiveFormat, effectiveBorders } from "@/
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
 import { strokeHatchSeal } from "./hatchSeal";
+import { applyDisplayGradientMask, isDisplayGradientActive } from "./displayGradient";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, patternAlwaysFollowsWall, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
 import type { LibraryDefinition, LibraryGeometrySnapshot } from "./library/types";
@@ -920,6 +921,28 @@ export class Renderer {
     return c;
   }
 
+  /**
+   * Temporäre Zwischenebene in CSS-Pixel-Koordinaten. Darauf wird der bereits
+   * bestehende Inhalt (Schraffurfüllung + Muster bzw. Dokumentbild) gezeichnet,
+   * anschließend die Verlaufsmaske angewandt und das Ergebnis unverändert in
+   * die Hauptfläche zurückkopiert.
+   */
+  private _makeMaskLayer(x: number, y: number, w: number, h: number):
+    { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; x: number; y: number; w: number; h: number } | null {
+    if (!(w > 0) || !(h > 0)) return null;
+    const dpr = (typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
+    const cw = Math.ceil(w * dpr), ch = Math.ceil(h * dpr);
+    if (cw < 1 || ch < 1 || cw * ch > 40_000_000) return null;
+    let canvas: HTMLCanvasElement;
+    try { canvas = document.createElement("canvas"); } catch { return null; }
+    canvas.width = cw;
+    canvas.height = ch;
+    const c = canvas.getContext("2d");
+    if (!c) return null;
+    c.setTransform(dpr, 0, 0, dpr, -x * dpr, -y * dpr);
+    return { canvas, ctx: c, x, y, w, h };
+  }
+
   private _drawSingleDocument(doc: DocumentObject) {
     // Snap-only Dokumente (z. B. Projektmappen-PDF/Bild als Snap-Quelle) werden
     // nicht gezeichnet — der echte Inhalt liegt im DOM darunter. Snap-Marker,
@@ -962,11 +985,19 @@ export class Renderer {
         ctx.clip();
       }
     }
+    // Transparenzverlauf: Erst wird das Dokument wie bisher gezeichnet
+    // (Filter, Hintergrundentfernung, Warp); die Maske wirkt danach auf das
+    // fertige Ergebnis und dreht/spiegelt sich dadurch mit dem Dokument mit.
+    const docGradient = (doc as any).displayGradient;
+    const docLayer = isDisplayGradientActive(docGradient)
+      ? this._makeMaskLayer(-wPx / 2, -hPx / 2, wPx, hPx) : null;
+    const g: CanvasRenderingContext2D = docLayer ? docLayer.ctx : ctx;
+
     // High-Quality-Smoothing: sorgt für saubere Zwischenstufen bis das scharfe Tile da ist.
-    const prevSmoothing = ctx.imageSmoothingEnabled;
-    const prevQuality = (ctx as any).imageSmoothingQuality;
-    ctx.imageSmoothingEnabled = true;
-    (ctx as any).imageSmoothingQuality = "high";
+    const prevSmoothing = g.imageSmoothingEnabled;
+    const prevQuality = (g as any).imageSmoothingQuality;
+    g.imageSmoothingEnabled = true;
+    (g as any).imageSmoothingQuality = "high";
     const warp = getDocWarp(doc);
     if (adaptive) {
       // Zuerst die Low-Res-Fallback-Vollseite zeichnen — nie leere Fläche beim Panning/Zoomen.
@@ -974,9 +1005,9 @@ export class Renderer {
       const filtered = this._getFilteredBitmap(doc, adaptive, baseW, baseH, `adp:${baseW}`);
       const srcAdp: CanvasImageSource = (filtered || adaptive) as CanvasImageSource;
       if (warp) {
-        drawWarpedImage(ctx, srcAdp, baseW, baseH, wPx, hPx, warp);
+        drawWarpedImage(g, srcAdp, baseW, baseH, wPx, hPx, warp);
       } else {
-        ctx.drawImage(srcAdp, -wPx / 2, -hPx / 2, wPx, hPx);
+        g.drawImage(srcAdp, -wPx / 2, -hPx / 2, wPx, hPx);
         // Darüber das scharfe Viewport-Tile (nur wenn vorhanden) — Adobe-ähnliche Schärfe.
         const tile = this._getDocPdfTile(doc, wPx, hPx);
         if (tile) {
@@ -984,7 +1015,7 @@ export class Renderer {
           const ty = -hPx / 2 + tile.v0 * hPx;
           const tw = (tile.u1 - tile.u0) * wPx;
           const th = (tile.v1 - tile.v0) * hPx;
-          ctx.drawImage(tile.canvas, tx, ty, tw, th);
+          g.drawImage(tile.canvas, tx, ty, tw, th);
         }
       }
     } else if (img) {
@@ -1000,25 +1031,30 @@ export class Renderer {
       // Pixelobjekte bleiben beim Hineinzoomen scharf statt zu verwaschen.
       const magnify = baseW > 0 ? wPx / baseW : 1;
       if (magnify > 1.5) {
-        ctx.imageSmoothingEnabled = false;
+        g.imageSmoothingEnabled = false;
       }
       if (warp) {
-        drawWarpedImage(ctx, finalSrc, baseW, baseH, wPx, hPx, warp);
+        drawWarpedImage(g, finalSrc, baseW, baseH, wPx, hPx, warp);
       } else {
-        ctx.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
+        g.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
       }
-      ctx.imageSmoothingEnabled = true;
+      g.imageSmoothingEnabled = true;
     } else {
-      ctx.fillStyle = "rgba(180,180,180,0.3)";
-      ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.font = "12px system-ui";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("Lade …", 0, 0);
+      g.fillStyle = "rgba(180,180,180,0.3)";
+      g.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
+      g.fillStyle = "rgba(0,0,0,0.6)";
+      g.font = "12px system-ui";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText("Lade …", 0, 0);
     }
-    ctx.imageSmoothingEnabled = prevSmoothing;
-    if (prevQuality) (ctx as any).imageSmoothingQuality = prevQuality;
+    if (docLayer) {
+      applyDisplayGradientMask(docLayer.ctx,
+        { x: docLayer.x, y: docLayer.y, w: docLayer.w, h: docLayer.h }, docGradient);
+      ctx.drawImage(docLayer.canvas, docLayer.x, docLayer.y, docLayer.w, docLayer.h);
+    }
+    g.imageSmoothingEnabled = prevSmoothing;
+    if (prevQuality) (g as any).imageSmoothingQuality = prevQuality;
     ctx.restore();
   }
 
@@ -2062,28 +2098,55 @@ export class Renderer {
     const contourRings: Vec2[][] = getEffectiveContourGeometry(hatch as any).rings;
 
 
-    ctx.beginPath();
+    // Transparenzverlauf: Füllung UND Muster laufen gemeinsam über eine
+    // Zwischenebene, damit beide innerhalb derselben Kontur (inkl. Löcher)
+    // weich ausblenden. Kontur, Auswahl und Fangpunkte bleiben unberührt.
+    const gradient = (hatch as any).displayGradient;
+    let layer: ReturnType<Renderer["_makeMaskLayer"]> = null;
+    if (isDisplayGradientActive(gradient)) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const ring of contourRings) {
+        for (const p of ring) {
+          const sp = cam.worldToScreen(p.x, p.y);
+          if (sp.x < minX) minX = sp.x;
+          if (sp.y < minY) minY = sp.y;
+          if (sp.x > maxX) maxX = sp.x;
+          if (sp.y > maxY) maxY = sp.y;
+        }
+      }
+      if (Number.isFinite(minX)) {
+        layer = this._makeMaskLayer(minX - 2, minY - 2, (maxX - minX) + 4, (maxY - minY) + 4);
+      }
+    }
+    const fctx = layer ? layer.ctx : ctx;
+
+    fctx.beginPath();
     for (const ring of contourRings) {
       if (ring.length < 3) continue;
       const s0 = cam.worldToScreen(ring[0].x, ring[0].y);
-      ctx.moveTo(s0.x, s0.y);
+      fctx.moveTo(s0.x, s0.y);
       for (let i = 1; i < ring.length; i++) {
         const sp = cam.worldToScreen(ring[i].x, ring[i].y);
-        ctx.lineTo(sp.x, sp.y);
+        fctx.lineTo(sp.x, sp.y);
       }
-      ctx.closePath();
+      fctx.closePath();
     }
-    ctx.fillStyle = fillCol;
-    ctx.fill("evenodd");
+    fctx.fillStyle = fillCol;
+    fctx.fill("evenodd");
 
     // Haarlinien-Versiegelung — REIN OPTISCH auf dem bereits festgeschriebenen
     // Face-Polygon (siehe hatchSeal.ts). Verändert weder Topologie noch die
     // ermittelte Fill-Geometrie und nimmt keine weiteren Segmente auf.
     if (fillAlpha >= 0.999) {
-      strokeHatchSeal(ctx, fillCol, typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
+      strokeHatchSeal(fctx, fillCol, typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
     }
 
-    this._paintHatchPattern(ctx, cam, hatch);
+    this._paintHatchPattern(fctx, cam, hatch);
+
+    if (layer) {
+      applyDisplayGradientMask(layer.ctx, { x: layer.x, y: layer.y, w: layer.w, h: layer.h }, gradient);
+      ctx.drawImage(layer.canvas, layer.x, layer.y, layer.w, layer.h);
+    }
 
     // Konturlinie: nur noch Linienart anwenden — die Roughen-Geometrie ist
     // oben bereits berechnet und wird 1:1 weiterverwendet.

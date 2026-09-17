@@ -8,6 +8,7 @@ import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
+import { DisplayGradientSettings } from "@/components/cad/DisplayGradientSettings";
 
 const MODES: { value: HatchDrawMode; label: string; Icon: React.ElementType }[] = [
   { value: "polygon", label: "Polygon", Icon: Spline },
@@ -238,6 +239,24 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
 
       {/* Aufrauen */}
       <StrokeEffectsSettings app={app} kind="hatch" sections={["roughen"]} />
+
+      {/* Transparenzverlauf (Füllung + Muster gemeinsam) */}
+      <DisplayGradientSettings
+        targets={selected() ? [selected()] : []}
+        defaultValue={(app as any)?.defaultHatchDisplayGradient}
+        onDefault={(g) => { if (app) (app as any).defaultHatchDisplayGradient = g; }}
+        commit={() => {
+          (app as any)?.renderer?.render?.();
+          (app as any)?.requestRender?.();
+          force((x) => x + 1);
+        }}
+        onDragStart={() => { if (app) (app as any).suspendHistory = true; }}
+        onDragEnd={() => {
+          if (!app) return;
+          (app as any).suspendHistory = false;
+          try { (app as any).commitHistorySnapshot?.(); } catch { /* noop */ }
+        }}
+      />
 
       {/* Rahmen (Kontur) an/aus */}
       <SettingsToggleButton

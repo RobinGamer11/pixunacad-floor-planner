@@ -36,7 +36,7 @@ const STYLE_KEYS: Record<PickKind, string[]> = {
   hatch: ["fillColor", "strokeColor", "fillAlphaPct", "strokeWidthPx",
           "patternEnabled", "patternId", "patternScale", "patternAngleDeg", "patternStretch",
           "patternSkewDeg", "patternOffsetX", "patternOffsetY", "patternOrigin",
-          "patternRotateWithShape", "patternColor", ...EFFECT_KEYS],
+          "patternRotateWithShape", "patternColor", "displayGradient", ...EFFECT_KEYS],
   dimension: ["textColor", "textSizePx", "lineColor", "decimals", "tickLengthM", "showExtensions",
               "textBgEnabled", "textBgColor", "textBgAlpha", "extensionStyle", "extensionColor",
               "extensionAlpha", "showUnit", "unit", "textGapPx", "mirror"],
@@ -47,7 +47,7 @@ const STYLE_KEYS: Record<PickKind, string[]> = {
   // Tabelle: nur der Darstellungsstil, niemals Zelleninhalte.
   table: ["style"],
   // Dokument: nur sichtbare Bilddarstellung, niemals Inhalt oder Zuschnitt.
-  document: ["opacity", "filters", "activeFilterId", "bgRemoval"],
+  document: ["opacity", "filters", "activeFilterId", "bgRemoval", "displayGradient"],
 };
 
 

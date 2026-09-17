@@ -1,3 +1,4 @@
+import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -104,6 +105,7 @@ function snapHatch(h: Hatch): HatchSnap {
     isPolygon: (h as any).isPolygon === true, thicknessM: (h as any).thicknessM, alpha: (h as any).alpha,
     closed: (h as any).closed !== false, shapeMode: (h as any).shapeMode,
     midpointSnap: !!(h as any).midpointSnap, divisionSnap: (h as any).divisionSnap,
+    displayGradient: copyDisplayGradient((h as any).displayGradient),
     ...copyStrokeEffects(h) } as any;
 }
 function snapDimension(d: Dimension): DimensionSnap {
@@ -146,7 +148,7 @@ const DOC_FIELDS = [
   "name", "kind", "src", "pageIndex", "widthM", "heightM", "rotationRad",
   "pixelWidth", "pixelHeight", "labelId", "importScaleDenom", "eraseMaskDataUrl",
   "pdfSourceB64", "guideEdges", "cropM", "opacity", "filters", "activeFilterId",
-  "bgRemoval", "anchors", "warpCorners", "flipX", "flipY",
+  "bgRemoval", "anchors", "warpCorners", "flipX", "flipY", "displayGradient",
 ];
 
 const DOOR_FIELDS = [
@@ -381,6 +383,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
           labelId: it.labelId, areaLabel: it.areaLabel,
           patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg, patternStretch: it.patternStretch, patternOffsetX: it.patternOffsetX, patternOffsetY: it.patternOffsetY,
           bulges: (it as any).bulges, holeBulges: (it as any).holeBulges,
+          displayGradient: (it as any).displayGradient,
           ...copyStrokeEffects(it) });
       if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "dimension") {

@@ -90,6 +90,7 @@ export function migrateSceneData<T>(scene: T): T {
     fill(d, "flipX", false);
     fill(d, "flipY", false);
     fill(d, "filters", []);
+    // displayGradient ist optional: fehlt es, bleibt es bewusst undefiniert.
   });
 
 
