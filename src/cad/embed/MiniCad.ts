@@ -916,6 +916,8 @@ export class MiniCad {
     const objTool = asObjectToolId(tool);
     if (objTool) this.selectionFilterTool = objTool;
     if (this._activeTool === tool) return;
+    // Ein anderes Werkzeug beendet das fortlaufende Platzieren.
+    if (this.multiPasteActive && tool !== "select") this.stopMultiPaste();
 
     // Deactivate previous.
     if (this._activeTool === "line") this.lineTool.cancel();
