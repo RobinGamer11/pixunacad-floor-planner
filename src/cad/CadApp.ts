@@ -2689,6 +2689,7 @@ export class CadApp {
   stopMultiPaste() {
     if (!this.multiPasteActive) return;
     this.multiPasteActive = false;
+    this.pasteArmed = false;
     this.onMultiPasteChange?.(false);
     try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
   }
