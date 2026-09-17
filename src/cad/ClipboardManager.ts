@@ -223,7 +223,9 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
   }
 
   if (items.length === 0) return null;
-  const anchor = anchorOverride ? v(anchorOverride.x, anchorOverride.y) : itemsAnchor(items);
+  const m = (app as any).input?.mouse;
+  const near = m && Number.isFinite(m.wx) && Number.isFinite(m.wy) ? v(m.wx, m.wy) : null;
+  const anchor = anchorOverride ? v(anchorOverride.x, anchorOverride.y) : itemsAnchor(items, near);
   return { items, anchor };
 }
 
