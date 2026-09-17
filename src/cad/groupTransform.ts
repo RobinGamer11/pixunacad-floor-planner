@@ -38,6 +38,7 @@ function movablePoints(kind: string, o: any): Vec2[] {
     case "freeStroke": for (const p of o.points || []) out.push(p); break;
     case "dimension": out.push(o.p1, o.p2, o.placementPoint); break;
     case "textbox": out.push(o.center); break;
+    case "table": out.push(o.center); break;
     case "document": out.push(o.position); break;
     // Bibliotheksinstanz: nur der Einfügepunkt wandert; die Definition bleibt unberührt.
     case "library": out.push(o.position); break;
