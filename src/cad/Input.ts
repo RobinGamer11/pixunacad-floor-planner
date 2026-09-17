@@ -86,6 +86,12 @@ export class Input {
    * gültige Cursorposition und die Kopie darf noch nicht erzeugt werden.
    */
   pointerInside = false;
+  /**
+   * Laufende Nummer echter Canvas-Zeigerereignisse. Ein wartender Vorgang kann
+   * damit eindeutig auf ein Ereignis NACH seiner Aktivierung reagieren, statt
+   * aus dem allgemeinen Hover-Zustand auf eine gültige Position zu schließen.
+   */
+  pointerEventSeq = 0;
 
   clicked = false;
   /** Echter Stift-/Finger-Kontakt, der vom Tablet-Gate abgefangen wurde. */
@@ -148,6 +154,7 @@ export class Input {
       this.mouse.sx = e.clientX - r.left;
       this.mouse.sy = e.clientY - r.top;
       this.pointerInside = true;
+      this.pointerEventSeq += 1;
     };
     const onPointerLeave = () => { this.pointerInside = false; };
     c.addEventListener("pointerenter", onPointerEnter);
@@ -161,6 +168,7 @@ export class Input {
       this.mouse.sy = e.clientY - r.top;
       this.mouse.pressure = readPointerPressure(e);
       this.pointerInside = true;
+      this.pointerEventSeq += 1;
 
       // Multi-Touch: Pinch/Two-Finger-Pan
       if (e.pointerType === "touch" && this._touches.has(e.pointerId)) {
@@ -249,6 +257,7 @@ export class Input {
         this.mouse.sy = e.clientY - r.top;
         this.mouse.pressure = readPointerPressure(e);
         this.pointerInside = true;
+        this.pointerEventSeq += 1;
       }
 
       // ── Stift-Kontakt bei aktivem Tablet-Hilfsrad: IMMER die aktuelle

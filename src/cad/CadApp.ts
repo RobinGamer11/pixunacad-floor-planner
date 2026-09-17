@@ -2622,15 +2622,31 @@ export class CadApp {
   startPastePreview(): boolean {
     if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.textEditor?.isActive()) return false;
-    // Klick in der Kopfzeile: Es gibt noch keine gültige Cursorposition auf der
-    // Zeichenfläche. Dann nur „bereit“ schalten — die Kopie entsteht erst beim
-    // ersten echten Pointer-Ereignis im Canvas, exakt unter dem Zeiger.
-    if (!this.input?.pointerInside) { this.pasteArmed = true; return true; }
+    // Tastatur außerhalb der Zeichenfläche wartet ebenso auf ein neues echtes
+    // Canvas-Ereignis; innerhalb darf sie die aktuelle Canvas-Position nutzen.
+    if (!this.input?.pointerInside) return this._armPasteForNextCanvasPointer();
     return this._beginPasteFloatNow();
   }
 
   /** Wartender Einfügemodus („bereit“, Kopie folgt beim Eintritt in den Canvas). */
   pasteArmed = false;
+  private _pasteArmedAfterPointerSeq = -1;
+
+  private _armPasteForNextCanvasPointer(): boolean {
+    this.pasteArmed = true;
+    this._pasteArmedAfterPointerSeq = this.input?.pointerEventSeq ?? 0;
+    return true;
+  }
+
+  /**
+   * Expliziter Pfad für das Einfüge-Symbol in der Kopfzeile. Er erzeugt nie
+   * sofort eine Kopie und verwendet keine zuvor gespeicherte Mausposition.
+   */
+  armPasteFromHeader(): boolean {
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
+    if (this.textEditor?.isActive()) return false;
+    return this._armPasteForNextCanvasPointer();
+  }
 
   private _beginPasteFloatNow(): boolean {
     if (!this.clipboard || this.clipboard.items.length === 0) return false;
@@ -2659,6 +2675,11 @@ export class CadApp {
   cancelPastePreview() {
     this.pastePreviewActive = false;
     this.pasteArmed = false;
+    this._pasteArmedAfterPointerSeq = -1;
+    if (this.multiPasteActive) {
+      this.multiPasteActive = false;
+      this.onMultiPasteChange?.(false);
+    }
     this._toolBeforePaste = null;
     this.canvas.style.cursor = "";
   }
@@ -2669,8 +2690,12 @@ export class CadApp {
    */
   private _resolveArmedPaste() {
     if (!this.pasteArmed) return;
-    if (!this.input?.pointerInside) return;
+    // Ausschließlich ein echtes Canvas-Ereignis NACH dem Scharfstellen darf
+    // den Vorgang starten. `input.update()` hat dessen aktuelle Position im
+    // selben Frame bereits in Weltkoordinaten umgerechnet.
+    if (!this.input || this.input.pointerEventSeq <= this._pasteArmedAfterPointerSeq) return;
     this.pasteArmed = false;
+    this._pasteArmedAfterPointerSeq = -1;
     if (!this._beginPasteFloatNow()) this.stopMultiPaste();
   }
 
@@ -2689,11 +2714,22 @@ export class CadApp {
     return true;
   }
 
+  /** Kopfzeilen-Toggle: erste Kopie immer erst beim nächsten Canvas-Ereignis. */
+  toggleMultiPasteFromHeader(): boolean {
+    if (this.multiPasteActive) { this.stopMultiPaste(); return false; }
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
+    this.multiPasteActive = true;
+    this.onMultiPasteChange?.(true);
+    if (!this.armPasteFromHeader()) { this.stopMultiPaste(); return false; }
+    return true;
+  }
+
   /** Beendet den Mehrfach-Modus sauber (ESC, Rechtsklick, Werkzeugwechsel). */
   stopMultiPaste() {
     if (!this.multiPasteActive) return;
     this.multiPasteActive = false;
     this.pasteArmed = false;
+    this._pasteArmedAfterPointerSeq = -1;
     this.onMultiPasteChange?.(false);
     try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
   }
