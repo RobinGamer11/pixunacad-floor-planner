@@ -245,6 +245,8 @@ function itemsAnchor(items: ClipboardItem[], near?: Vec2 | null): Vec2 {
  */
 export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 | null): Clipboard | null {
   const items: ClipboardItem[] = [];
+  /** Wand-ID → Index des Wand-Snapshots (für mitkopierte Türen/Fenster). */
+  const copiedWalls = new Map<string, number>();
 
   const seg = app.getSelectedSegment();
   const hatch = app.getSelectedHatch();
