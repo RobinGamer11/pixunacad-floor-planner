@@ -7,7 +7,7 @@ import type { Segment, Hatch, Dimension, TextBox, FreeStroke } from "./Scene";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
 import { pointInDocument, documentCornersWorld } from "./documentGeometry";
-import { computeWallLines, wallRefCorners } from "./wallGeom";
+import { wallRefCorners } from "./wallGeom";
 
 type PickKind = "segment" | "hatch" | "dimension" | "textbox" | "free" | "wall" | "table" | "document";
 
