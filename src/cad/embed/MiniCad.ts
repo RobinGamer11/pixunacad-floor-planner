@@ -2131,7 +2131,7 @@ export class MiniCad {
       try {
         if (this._activeTool !== "select") this.setTool("select");
         this.clearSelection?.();
-        this.selectTool.beginPasteFloat(created);
+        this.selectTool.beginPasteFloat(created, this._miniClipboardAnchor);
       } catch { /* Auswahl optional */ }
     }
     this._changeDirty = true;
