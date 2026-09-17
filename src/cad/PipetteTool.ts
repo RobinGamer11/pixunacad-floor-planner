@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { Defaults } from "./constants";
 import { Vec2, v, projectPointToSegment, pointInPolygon } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -5,15 +6,26 @@ import type { Input } from "./Input";
 import type { Segment, Hatch, Dimension, TextBox, FreeStroke } from "./Scene";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
+import { pointInDocument, documentCornersWorld } from "./documentGeometry";
+import { computeWallLines, wallRefCorners } from "./wallGeom";
 
-type PickKind = "segment" | "hatch" | "dimension" | "textbox" | "free";
+type PickKind = "segment" | "hatch" | "dimension" | "textbox" | "free" | "wall" | "table" | "document";
 
 type PickedSource =
   | { kind: "segment"; obj: Segment }
   | { kind: "hatch"; obj: Hatch }
   | { kind: "dimension"; obj: Dimension }
   | { kind: "textbox"; obj: TextBox }
-  | { kind: "free"; obj: FreeStroke };
+  | { kind: "free"; obj: FreeStroke }
+  | { kind: "wall"; obj: any }
+  | { kind: "table"; obj: any }
+  | { kind: "document"; obj: any };
+
+/** Klarnamen der Objektarten für verständliche Rückmeldungen. */
+const KIND_LABEL: Record<PickKind, string> = {
+  segment: "Linie", hatch: "Schraffur", dimension: "Maßkette", textbox: "Text",
+  free: "Freihand", wall: "Wand", table: "Tabelle", document: "Dokument",
+};
 
 /** Stil-Eigenschaften je Objektart, die die Pipette überträgt. */
 /** Kontur-Effekte gelten werkzeugübergreifend und werden mitübertragen. */
