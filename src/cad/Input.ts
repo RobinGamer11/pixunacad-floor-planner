@@ -143,11 +143,24 @@ export class Input {
       window.removeEventListener("keyup", onKeyUp);
     });
 
+    const onPointerEnter = (e: PointerEvent) => {
+      const r = c.getBoundingClientRect();
+      this.mouse.sx = e.clientX - r.left;
+      this.mouse.sy = e.clientY - r.top;
+      this.pointerInside = true;
+    };
+    const onPointerLeave = () => { this.pointerInside = false; };
+    c.addEventListener("pointerenter", onPointerEnter);
+    c.addEventListener("pointerleave", onPointerLeave);
+    this._cleanups.push(() => c.removeEventListener("pointerenter", onPointerEnter));
+    this._cleanups.push(() => c.removeEventListener("pointerleave", onPointerLeave));
+
     const onPointerMove = (e: PointerEvent) => {
       const r = c.getBoundingClientRect();
       this.mouse.sx = e.clientX - r.left;
       this.mouse.sy = e.clientY - r.top;
       this.mouse.pressure = readPointerPressure(e);
+      this.pointerInside = true;
 
       // Multi-Touch: Pinch/Two-Finger-Pan
       if (e.pointerType === "touch" && this._touches.has(e.pointerId)) {
