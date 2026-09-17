@@ -1559,6 +1559,8 @@ export default function ProjectWorkspace() {
 
         canPaste={canPasteElements}
         onPaste={runPasteClipboard}
+        multiPasteActive={multiPasteActive}
+        onMultiPaste={runToggleMultiPaste}
         onPresent={() => setPresenting(true)}
         onShare={() => {}}
         onExport={() => setPrintMode((v) => !v)}
