@@ -120,6 +120,7 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
       patternScale: h.patternScale, patternAngleDeg: h.patternAngleDeg,
       patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
       patternOrigin: h.patternOrigin, patternRotateWithShape: h.patternRotateWithShape,
+      displayGradient: h.displayGradient,
       bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
       holeBulges: Array.isArray(h.holeBulges) ? h.holeBulges : undefined,
       strokePattern: h.strokePattern, roughen: h.roughen, appearanceSeed: h.appearanceSeed,
@@ -211,6 +212,7 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
       warpCorners: Array.isArray(d.warpCorners) ? d.warpCorners : null,
       flipX: !!d.flipX,
       flipY: !!d.flipY,
+      displayGradient: d.displayGradient,
     });
     if (d.id) (doc as any).id = d.id;
   }

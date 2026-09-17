@@ -728,6 +728,7 @@ export class CadApp {
         patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
         patternOrigin: (h as any).patternOrigin ? { ...(h as any).patternOrigin } : null,
         patternRotateWithShape: (h as any).patternRotateWithShape !== false,
+        displayGradient: copyDisplayGradient((h as any).displayGradient),
         bulges: [...((h as any).bulges || [])],
         holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
         isPolygon: (h as any).isPolygon === true,
@@ -838,6 +839,7 @@ export class CadApp {
           warpCorners: (d as any).warpCorners ? (d as any).warpCorners.map((c: any) => ({ x: c.x, y: c.y })) : null,
           flipX: !!(d as any).flipX,
           flipY: !!(d as any).flipY,
+          displayGradient: copyDisplayGradient((d as any).displayGradient),
         };
       }),
 
