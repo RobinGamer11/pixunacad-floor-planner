@@ -3197,6 +3197,12 @@ export class CadApp {
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend. Linien-/Wandwerkzeug und der Punkt-Edit des
       // Auswahlwerkzeugs bringen eigene Hilfslinien mit und bleiben unberührt.
+      // Rechtsklick beendet das fortlaufende Platzieren.
+      if (this.input.rightClicked && this.multiPasteActive) {
+        this.input.rightClicked = false;
+        this.stopMultiPaste();
+      }
+
       if (this.input.rightClicked) {
         const ownGuides = this.activeTool === this.lineTool || this.activeTool === this.wallTool
           || (this.activeTool === this.selectTool && this.selectTool.isEditing());
