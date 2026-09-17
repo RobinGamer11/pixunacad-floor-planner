@@ -141,17 +141,20 @@ export class Hatch {
   strokePattern!: StrokePatternParams;
   roughen!: RoughenParams;
   appearanceSeed!: number;
+  /** Optionaler Transparenzverlauf für Füllung + Muster (reine Anzeige). */
+  displayGradient?: DisplayGradient;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
     patternEnabled, patternId, patternScale, patternAngleDeg, patternSkewDeg, patternStretch,
-    patternOffsetX, patternOffsetY, patternOrigin, patternRotateWithShape, bulges, holeBulges, strokePattern, roughen, appearanceSeed }: {
+    patternOffsetX, patternOffsetY, patternOrigin, patternRotateWithShape, bulges, holeBulges, displayGradient, strokePattern, roughen, appearanceSeed }: {
     id: string; points: Vec2[]; holes?: Vec2[][]; fillColor?: string; strokeColor?: string;
     fillAlphaPct?: number; strokeWidthPx?: number; labelId?: string; areaLabel?: Partial<AreaLabel>;
     patternEnabled?: boolean; patternId?: string; patternScale?: number;
     patternAngleDeg?: number; patternSkewDeg?: number; patternStretch?: number; patternOffsetX?: number; patternOffsetY?: number;
     patternOrigin?: { x: number; y: number } | null; patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
+    displayGradient?: Partial<DisplayGradient>;
   } & StrokeEffectsInit) {
 
     this.id = id;
