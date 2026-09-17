@@ -201,6 +201,18 @@ export function WorkspaceHeader({
         >
           <ClipboardPaste size={16} />
         </button>
+        <button
+          onClick={onMultiPaste}
+          disabled={(!canPaste && !multiPasteActive) || !onMultiPaste}
+          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          style={multiPasteActive
+            ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }
+            : undefined}
+          aria-pressed={multiPasteActive}
+          title="Mehrfach einfügen – platzierte Kopie bleibt am Mauszeiger"
+        >
+          <ClipboardPlus size={16} />
+        </button>
 
         <button
           onClick={onDelete}
