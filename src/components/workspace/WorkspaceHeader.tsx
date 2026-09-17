@@ -17,6 +17,7 @@ import {
   Copy,
   Crosshair,
   ClipboardPaste,
+  ClipboardPlus,
   HelpCircle,
   TabletSmartphone,
   Wallet,
@@ -41,6 +42,9 @@ interface Props {
   onCenterView?: () => void;
   canPaste?: boolean;
   onPaste?: () => void;
+  /** Mehrfach einfügen — Kopie bleibt nach dem Setzen am Mauszeiger. */
+  multiPasteActive?: boolean;
+  onMultiPaste?: () => void;
   zoomPercent?: number;          // display-only; may be undefined
   onPresent?: () => void;
   onShare?: () => void;
@@ -73,6 +77,8 @@ export function WorkspaceHeader({
   onCenterView,
   canPaste = false,
   onPaste,
+  multiPasteActive = false,
+  onMultiPaste,
   zoomPercent,
   onPresent,
   onShare,
