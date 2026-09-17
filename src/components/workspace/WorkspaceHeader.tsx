@@ -17,6 +17,7 @@ import {
   Copy,
   Crosshair,
   ClipboardPaste,
+  ClipboardPlus,
   HelpCircle,
   TabletSmartphone,
   Wallet,
@@ -41,6 +42,9 @@ interface Props {
   onCenterView?: () => void;
   canPaste?: boolean;
   onPaste?: () => void;
+  /** Mehrfach einfügen — Kopie bleibt nach dem Setzen am Mauszeiger. */
+  multiPasteActive?: boolean;
+  onMultiPaste?: () => void;
   zoomPercent?: number;          // display-only; may be undefined
   onPresent?: () => void;
   onShare?: () => void;
@@ -73,6 +77,8 @@ export function WorkspaceHeader({
   onCenterView,
   canPaste = false,
   onPaste,
+  multiPasteActive = false,
+  onMultiPaste,
   zoomPercent,
   onPresent,
   onShare,
@@ -200,6 +206,18 @@ export function WorkspaceHeader({
           title="Einfügen (Shift+V / Strg+V)"
         >
           <ClipboardPaste size={16} />
+        </button>
+        <button
+          onClick={onMultiPaste}
+          disabled={(!canPaste && !multiPasteActive) || !onMultiPaste}
+          className="h-8 w-8 rounded-md flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          style={multiPasteActive
+            ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }
+            : undefined}
+          aria-pressed={multiPasteActive}
+          title="Mehrfach einfügen – platzierte Kopie bleibt am Mauszeiger"
+        >
+          <ClipboardPlus size={16} />
         </button>
 
         <button

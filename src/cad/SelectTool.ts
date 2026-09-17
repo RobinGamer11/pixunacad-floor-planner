@@ -523,6 +523,8 @@ export class SelectTool {
     this.marqueeSelectedIds = [];
     this.cancelGroupTransform(false);
     (this.app as any).commitHistorySnapshot?.();
+    // Mehrfach-Einfügen: der Host darf sofort die nächste Kopie anhängen.
+    try { (this.app as any).afterPasteFloatConfirmed?.(); } catch { /* optional */ }
     return true;
   }
 

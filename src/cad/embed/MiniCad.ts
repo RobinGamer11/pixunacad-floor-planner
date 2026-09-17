@@ -916,6 +916,8 @@ export class MiniCad {
     const objTool = asObjectToolId(tool);
     if (objTool) this.selectionFilterTool = objTool;
     if (this._activeTool === tool) return;
+    // Ein anderes Werkzeug beendet das fortlaufende Platzieren.
+    if (this.multiPasteActive && tool !== "select") this.stopMultiPaste();
 
     // Deactivate previous.
     if (this._activeTool === "line") this.lineTool.cancel();
@@ -974,6 +976,29 @@ export class MiniCad {
 
   /** Alias für `setActiveTool` — DocumentTool ruft `app.setTool(...)`. */
   setTool(tool: MiniTool) { this.setActiveTool(tool); }
+
+  /* ---- Mehrfach einfügen (fortlaufendes Platzieren) ---- */
+  multiPasteActive = false;
+  onMultiPasteChange?: (on: boolean) => void;
+  /** Wird nach jeder gesetzten Kopie im Mehrfach-Modus aufgerufen. */
+  onMultiPasteRepeat?: () => void;
+  private _multiPasteBusy = false;
+
+  setMultiPasteActive(on: boolean) {
+    const next = !!on;
+    if (this.multiPasteActive === next) return;
+    this.multiPasteActive = next;
+    this.onMultiPasteChange?.(next);
+    if (!next) { try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ } }
+  }
+
+  stopMultiPaste() { this.setMultiPasteActive(false); }
+
+  afterPasteFloatConfirmed() {
+    if (!this.multiPasteActive || this._multiPasteBusy) return;
+    this._multiPasteBusy = true;
+    try { this.onMultiPasteRepeat?.(); } finally { this._multiPasteBusy = false; }
+  }
 
   /** Startet die Dokument-Platzierung (nach erfolgreichem Datei-Import).
    *  Aktiviert das Dokument-Werkzeug und übergibt die Import-Daten. */
@@ -2521,6 +2546,7 @@ export class MiniCad {
       if (e.key === "Escape" && !inField) {
         try { if (this.textEditor.isActive()) { this.textEditor.commit(); return; } } catch {}
         let pasteCancelled = false;
+        if (this.multiPasteActive) { this.multiPasteActive = false; this.onMultiPasteChange?.(false); }
         try { pasteCancelled = this.selectTool.cancelPasteFloat(); } catch {}
         if (pasteCancelled) return;
         if (this.hasActiveAction()) {
@@ -3053,6 +3079,12 @@ export class MiniCad {
 
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend, identisch zur großen CAD-Oberfläche.
+      // Rechtsklick beendet das fortlaufende Platzieren.
+      if (this.input.rightClicked && this.multiPasteActive) {
+        this.input.rightClicked = false;
+        this.stopMultiPaste();
+      }
+
       if (this.input.rightClicked) {
         const ownGuides = this._activeTool === "line" || this._activeTool === "guide"
           || (this._activeTool === "select" && !!this.selectTool?.isEditing?.());

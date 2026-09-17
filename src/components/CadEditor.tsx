@@ -146,6 +146,9 @@ export interface CadEditorHandle {
   hasDeletableSelection: () => boolean;
   copySelection: () => boolean;
   pasteClipboard: () => boolean;
+  /** Mehrfach einfügen umschalten (fortlaufendes Platzieren). */
+  toggleMultiPaste: () => boolean;
+  stopMultiPaste: () => void;
   hasClipboard: () => boolean;
   /** CSS-Pixel pro Welt-Meter (camera.scale). */
   getCameraScale: () => number;
@@ -160,12 +163,14 @@ interface CadEditorProps {
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   onZoomChange?: (percent: number) => void;
   onCanDeleteChange?: (canDelete: boolean) => void;
+  /** Meldet, ob der Mehrfach-Einfüge-Modus aktiv ist. */
+  onMultiPasteChange?: (active: boolean) => void;
   /** Präsentations-Modus: blendet linke Werkzeug- und rechte Einstellungsleiste aus. */
   presenting?: boolean;
   /** Hilfe-Modus (Kopfzeilen-Button) — steuert Hilfe-Overlay + Ebenen-Hinweis. */
   helpOn?: boolean;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, presenting, helpOn = true }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -344,6 +349,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     deleteSelection: () => { appRef.current?.deleteSelection(); },
     copySelection: () => appRef.current?.copySelection() ?? false,
     pasteClipboard: () => appRef.current?.startPastePreview() ?? false,
+    toggleMultiPaste: () => appRef.current?.toggleMultiPaste() ?? false,
+    stopMultiPaste: () => { appRef.current?.stopMultiPaste(); },
     hasClipboard: () => !!appRef.current?.clipboard,
     hasDeletableSelection: () => appRef.current?.hasDeletableSelection() ?? false,
     getCameraScale: () => appRef.current?.camera.scale ?? 80,
@@ -411,6 +418,20 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [onCanDeleteChange]);
+
+  // Mehrfach-Einfügen: Zustand an den Kopf melden (gelbe Hervorhebung).
+  useEffect(() => {
+    if (!onMultiPasteChange) return;
+    let raf = 0;
+    let last = false;
+    const tick = () => {
+      const a = appRef.current?.multiPasteActive ?? false;
+      if (a !== last) { last = a; onMultiPasteChange(a); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [onMultiPasteChange]);
 
   const [activeTool, setActiveTool] = useState<string>(ToolIds.SELECT);
   /** Spiegel des aktiven Werkzeugs für Callbacks außerhalb des Render-Closures. */

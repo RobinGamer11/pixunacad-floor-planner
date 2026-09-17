@@ -2379,6 +2379,7 @@ export class CadApp {
         try { this.pointEditMenu?.hide?.(); } catch {}
         if (this.selectTool.pasteFloatActive) {
           e.preventDefault();
+          if (this.multiPasteActive) { this.multiPasteActive = false; this.onMultiPasteChange?.(false); }
           this.selectTool.cancelGroupTransform(true);
           this.selectTool.deleteMarqueeSelection();
           this.selectTool.pasteFloatActive = false;
@@ -2635,6 +2636,40 @@ export class CadApp {
     this.canvas.style.cursor = "";
   }
 
+  /* ---- Mehrfach einfügen (fortlaufendes Platzieren) ---- */
+  multiPasteActive = false;
+  onMultiPasteChange?: (on: boolean) => void;
+  private _multiPasteBusy = false;
+
+  /** Startet/beendet den Mehrfach-Einfüge-Modus (Toggle). */
+  toggleMultiPaste(): boolean {
+    if (this.multiPasteActive) { this.stopMultiPaste(); return false; }
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
+    this.multiPasteActive = true;
+    this.onMultiPasteChange?.(true);
+    if (!this.startPastePreview()) { this.stopMultiPaste(); return false; }
+    return true;
+  }
+
+  /** Beendet den Mehrfach-Modus sauber (ESC, Rechtsklick, Werkzeugwechsel). */
+  stopMultiPaste() {
+    if (!this.multiPasteActive) return;
+    this.multiPasteActive = false;
+    this.onMultiPasteChange?.(false);
+    try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
+  }
+
+  /** Nach jeder gesetzten Kopie hängt die nächste Vorschau am Mauszeiger. */
+  afterPasteFloatConfirmed() {
+    if (!this.multiPasteActive || this._multiPasteBusy) return;
+    this._multiPasteBusy = true;
+    try {
+      if (!this.startPastePreview()) this.stopMultiPaste();
+    } finally {
+      this._multiPasteBusy = false;
+    }
+  }
+
   /* ------------------------------------------------ Bibliothek (CAD-only) */
 
   /** Vorschau-Info zur aktuellen Auswahl (unterstützt/nicht unterstützt). */
@@ -2793,6 +2828,9 @@ export class CadApp {
     // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
     this.endTableEdit();
     if (this.pastePreviewActive) this.cancelPastePreview();
+    // Ein anderes Werkzeug (z. B. Bibliotheks-/Dokumentplatzierung) beendet
+    // den Mehrfach-Einfüge-Modus sauber.
+    if (this.multiPasteActive && id !== ToolIds.SELECT) this.stopMultiPaste();
 
 
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
@@ -3159,6 +3197,12 @@ export class CadApp {
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend. Linien-/Wandwerkzeug und der Punkt-Edit des
       // Auswahlwerkzeugs bringen eigene Hilfslinien mit und bleiben unberührt.
+      // Rechtsklick beendet das fortlaufende Platzieren.
+      if (this.input.rightClicked && this.multiPasteActive) {
+        this.input.rightClicked = false;
+        this.stopMultiPaste();
+      }
+
       if (this.input.rightClicked) {
         const ownGuides = this.activeTool === this.lineTool || this.activeTool === this.wallTool
           || (this.activeTool === this.selectTool && this.selectTool.isEditing());
