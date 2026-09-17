@@ -2635,6 +2635,40 @@ export class CadApp {
     this.canvas.style.cursor = "";
   }
 
+  /* ---- Mehrfach einfügen (fortlaufendes Platzieren) ---- */
+  multiPasteActive = false;
+  onMultiPasteChange?: (on: boolean) => void;
+  private _multiPasteBusy = false;
+
+  /** Startet/beendet den Mehrfach-Einfüge-Modus (Toggle). */
+  toggleMultiPaste(): boolean {
+    if (this.multiPasteActive) { this.stopMultiPaste(); return false; }
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
+    this.multiPasteActive = true;
+    this.onMultiPasteChange?.(true);
+    if (!this.startPastePreview()) { this.stopMultiPaste(); return false; }
+    return true;
+  }
+
+  /** Beendet den Mehrfach-Modus sauber (ESC, Rechtsklick, Werkzeugwechsel). */
+  stopMultiPaste() {
+    if (!this.multiPasteActive) return;
+    this.multiPasteActive = false;
+    this.onMultiPasteChange?.(false);
+    try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
+  }
+
+  /** Nach jeder gesetzten Kopie hängt die nächste Vorschau am Mauszeiger. */
+  afterPasteFloatConfirmed() {
+    if (!this.multiPasteActive || this._multiPasteBusy) return;
+    this._multiPasteBusy = true;
+    try {
+      if (!this.startPastePreview()) this.stopMultiPaste();
+    } finally {
+      this._multiPasteBusy = false;
+    }
+  }
+
   /* ------------------------------------------------ Bibliothek (CAD-only) */
 
   /** Vorschau-Info zur aktuellen Auswahl (unterstützt/nicht unterstützt). */
