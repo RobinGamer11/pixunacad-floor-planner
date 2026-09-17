@@ -1,3 +1,4 @@
+import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";

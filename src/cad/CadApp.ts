@@ -1,3 +1,4 @@
+import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";

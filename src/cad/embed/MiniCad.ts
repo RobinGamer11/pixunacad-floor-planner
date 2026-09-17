@@ -12,6 +12,7 @@
  * margin ring.
  */
 
+import { copyDisplayGradient } from "../displayGradient";
 import { migrateSceneData } from "@/lib/persistence";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "../strokeEffects";
 
