@@ -142,6 +142,52 @@ function snapLibrary(i: any): LibrarySnap {
     scaleX: i.scaleX, scaleY: i.scaleY, labelId: i.labelId };
 }
 
+const DOC_FIELDS = [
+  "name", "kind", "src", "pageIndex", "widthM", "heightM", "rotationRad",
+  "pixelWidth", "pixelHeight", "labelId", "importScaleDenom", "eraseMaskDataUrl",
+  "pdfSourceB64", "guideEdges", "cropM", "opacity", "filters", "activeFilterId",
+  "bgRemoval", "anchors", "warpCorners", "flipX", "flipY",
+];
+
+const DOOR_FIELDS = [
+  "posM", "widthM", "heightM", "breakHeightM", "breakHeightVisible", "kind",
+  "side", "hand", "edge", "color", "jambEnabled", "jambColor", "jambLenM",
+  "jambThickM", "sashEnabled", "glassColor", "glassThickM", "glassFillColor", "labelId",
+];
+
+const pickFields = (obj: any, keys: string[]): Record<string, any> => {
+  const out: Record<string, any> = {};
+  for (const k of keys) {
+    if (obj?.[k] === undefined) continue;
+    const val = obj[k];
+    out[k] = val && typeof val === "object" ? JSON.parse(JSON.stringify(val)) : val;
+  }
+  return out;
+};
+
+function snapTable(t: any): TableSnap {
+  return { kind: "table", center: v(t.center.x, t.center.y), rotationRad: t.rotationRad || 0,
+    data: JSON.parse(JSON.stringify(t.data ?? {})), mPerMm: t.mPerMm, scale: t.scale || 1,
+    labelId: t.labelId };
+}
+
+function snapDocument(d: any): DocumentSnap {
+  return { kind: "document", position: v(d.position.x, d.position.y), data: pickFields(d, DOC_FIELDS) };
+}
+
+function snapDoor(d: any, wallRef: number | null): DoorSnap {
+  return { kind: "door", wallId: d.wallId, wallRef, props: pickFields(d, DOOR_FIELDS) };
+}
+
+function snapWallObj(o: any): WallSnap {
+  return { kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
+    wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
+    color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
+    patternId: o.patternId, patternScale: o.patternScale, patternAlignToWall: o.patternAlignToWall,
+    patternAngleDeg: o.patternAngleDeg ?? 0,
+    bulges: Array.isArray(o.bulges) ? [...o.bulges] : undefined } as any;
+}
+
 function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
   if (it.kind === "hatch") return polygonCentroid(it.points);
@@ -149,6 +195,8 @@ function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "wall") return polygonCentroid(it.corners);
   if (it.kind === "free") return polygonCentroid(it.points);
   if (it.kind === "library") return v(it.position.x, it.position.y);
+  if (it.kind === "document") return v(it.position.x, it.position.y);
+  if (it.kind === "door") return v(0, 0);
   return v(it.center.x, it.center.y);
 }
 
@@ -161,6 +209,8 @@ function itemPoints(it: ClipboardItem): Vec2[] {
   if (it.kind === "wall") return it.corners;
   if (it.kind === "free") return it.points;
   if (it.kind === "library") return [it.position];
+  if (it.kind === "document") return [it.position];
+  if (it.kind === "door") return [];
   return [it.center];
 }
 
