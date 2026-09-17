@@ -486,8 +486,16 @@ export class SelectTool {
 
 
 
+  /**
+   * Öffentliche Fangabfrage für den Einfügeweg: liefert den gesnappten
+   * Weltpunkt zur aktuellen Cursorposition (oder den Punkt selbst).
+   */
+  snapWorldPointPublic(p: Vec2): Vec2 {
+    return this._snapWorldPoint(p);
+  }
+
   /** Startet den Einfüge-Modus für die frisch erzeugten Objekte. */
-  beginPasteFloat(ids: { kind: string; id: string }[], grabAnchor?: Vec2 | null) {
+  beginPasteFloat(ids: { kind: string; id: string }[], grabAnchor?: Vec2 | null, alreadyPlacedAtAnchor = false) {
     if (!ids.length) return;
     this.cancelGroupTransform(false);
     this.groupAnchor = null;
@@ -498,6 +506,20 @@ export class SelectTool {
     const mouse = this.app.input?.mouse;
     if (!mouse) return;
     const cursor = v(mouse.wx, mouse.wy);
+    // Normaler Einfügeweg: Die Kopie wurde bereits exakt am Zielpunkt erzeugt.
+    // Dann darf es keine nachträgliche Verschiebung mehr geben.
+    if (alreadyPlacedAtAnchor && grabAnchor) {
+      const target = v(grabAnchor.x, grabAnchor.y);
+      this.groupDragActive = true;
+      this._groupDragMoved = false;
+      this._groupDragDx = 0;
+      this._groupDragDy = 0;
+      this._groupDragLast = cursor;
+      this._groupDragAnchor = target;
+      this._groupDragMouseStart = v(cursor.x, cursor.y);
+      this._groupDragAnchorStart = v(target.x, target.y);
+      return;
+    }
     // Der beim Kopieren festgelegte Fangpunkt ist der Greifpunkt und liegt
     // nach dem Einfügen exakt unter dem Mauszeiger. Nur ohne Anker wird auf
     // den nächstgelegenen Punkt bzw. den Schwerpunkt zurückgefallen.
@@ -518,6 +540,7 @@ export class SelectTool {
     this._groupDragMouseStart = v(cursor.x, cursor.y);
     this._groupDragAnchorStart = v(anchor.x, anchor.y);
   }
+
 
   /** Bestätigt die eingefügte Kopie (Häkchen / Enter). */
   confirmPasteFloat(): boolean {
