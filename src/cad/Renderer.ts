@@ -2085,28 +2085,55 @@ export class Renderer {
     const contourRings: Vec2[][] = getEffectiveContourGeometry(hatch as any).rings;
 
 
-    ctx.beginPath();
+    // Transparenzverlauf: Füllung UND Muster laufen gemeinsam über eine
+    // Zwischenebene, damit beide innerhalb derselben Kontur (inkl. Löcher)
+    // weich ausblenden. Kontur, Auswahl und Fangpunkte bleiben unberührt.
+    const gradient = (hatch as any).displayGradient;
+    let layer: ReturnType<Renderer["_makeMaskLayer"]> = null;
+    if (isDisplayGradientActive(gradient)) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const ring of contourRings) {
+        for (const p of ring) {
+          const sp = cam.worldToScreen(p.x, p.y);
+          if (sp.x < minX) minX = sp.x;
+          if (sp.y < minY) minY = sp.y;
+          if (sp.x > maxX) maxX = sp.x;
+          if (sp.y > maxY) maxY = sp.y;
+        }
+      }
+      if (Number.isFinite(minX)) {
+        layer = this._makeMaskLayer(minX - 2, minY - 2, (maxX - minX) + 4, (maxY - minY) + 4);
+      }
+    }
+    const fctx = layer ? layer.ctx : ctx;
+
+    fctx.beginPath();
     for (const ring of contourRings) {
       if (ring.length < 3) continue;
       const s0 = cam.worldToScreen(ring[0].x, ring[0].y);
-      ctx.moveTo(s0.x, s0.y);
+      fctx.moveTo(s0.x, s0.y);
       for (let i = 1; i < ring.length; i++) {
         const sp = cam.worldToScreen(ring[i].x, ring[i].y);
-        ctx.lineTo(sp.x, sp.y);
+        fctx.lineTo(sp.x, sp.y);
       }
-      ctx.closePath();
+      fctx.closePath();
     }
-    ctx.fillStyle = fillCol;
-    ctx.fill("evenodd");
+    fctx.fillStyle = fillCol;
+    fctx.fill("evenodd");
 
     // Haarlinien-Versiegelung — REIN OPTISCH auf dem bereits festgeschriebenen
     // Face-Polygon (siehe hatchSeal.ts). Verändert weder Topologie noch die
     // ermittelte Fill-Geometrie und nimmt keine weiteren Segmente auf.
     if (fillAlpha >= 0.999) {
-      strokeHatchSeal(ctx, fillCol, typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
+      strokeHatchSeal(fctx, fillCol, typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
     }
 
-    this._paintHatchPattern(ctx, cam, hatch);
+    this._paintHatchPattern(fctx, cam, hatch);
+
+    if (layer) {
+      applyDisplayGradientMask(layer.ctx, { x: layer.x, y: layer.y, w: layer.w, h: layer.h }, gradient);
+      ctx.drawImage(layer.canvas, layer.x, layer.y, layer.w, layer.h);
+    }
 
     // Konturlinie: nur noch Linienart anwenden — die Roughen-Geometrie ist
     // oben bereits berechnet und wird 1:1 weiterverwendet.
