@@ -308,7 +308,23 @@ export class PipetteTool {
         if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
       }
       ctx.closePath(); ctx.stroke();
-    } else if (src.kind === "textbox") {
+    } else if (src.kind === "wall") {
+      const corners = wallRefCorners(src.obj);
+      ctx.beginPath();
+      corners.forEach((p: Vec2, i: number) => {
+        const sp = cam.worldToScreen(p.x, p.y);
+        if (i === 0) ctx.moveTo(sp.x, sp.y); else ctx.lineTo(sp.x, sp.y);
+      });
+      ctx.stroke();
+    } else if (src.kind === "document") {
+      const corners = documentCornersWorld(src.obj).map((p: Vec2) => cam.worldToScreen(p.x, p.y));
+      if (corners.length) {
+        ctx.beginPath();
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (let i = 1; i < corners.length; i++) ctx.lineTo(corners[i].x, corners[i].y);
+        ctx.closePath(); ctx.stroke();
+      }
+    } else if (src.kind === "textbox" || src.kind === "table") {
       const cx = src.obj.center.x, cy = src.obj.center.y;
       const w = src.obj.widthM, h = src.obj.heightM;
       const rot = src.obj.rotationRad || 0;
