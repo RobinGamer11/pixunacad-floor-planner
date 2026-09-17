@@ -262,22 +262,27 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       else if (kind === "textbox") { const o = s.getTextBoxById?.(id); if (o) items.push(snapTextBox(o)); }
       else if (kind === "freeStroke" || kind === "free") { const o = s.getFreeStrokeById?.(id); if (o) items.push(snapFree(o)); }
       else if (kind === "library") { const o = s.getLibraryInstanceById?.(id); if (o) items.push(snapLibrary(o)); }
+      else if (kind === "table") { const o = s.getTableById?.(id); if (o) items.push(snapTable(o)); }
+      else if (kind === "document") { const o = s.getDocumentById?.(id); if (o && !o._snapOnly) items.push(snapDocument(o)); }
       else if (kind === "wall") {
         const o = s.getWallById?.(id);
-        if (o) items.push({ kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
-          wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
-          color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
-          patternId: o.patternId, patternScale: o.patternScale, patternAlignToWall: o.patternAlignToWall,
-          patternAngleDeg: (o as any).patternAngleDeg ?? 0 });
+        if (o) { copiedWalls.set(o.id, items.length); items.push(snapWallObj(o)); }
       }
     }
   }
 
   if (items.length === 0) {
+    const table = (app as any).getSelectedTable?.();
+    const doc = (app as any).getSelectedDocument?.()
+      ?? ((app.selection as any)?.documentId ? app.scene.getDocumentById((app.selection as any).documentId) : null);
+    const wall = (app as any).getSelectedWall?.();
     if (seg) items.push(snapSegment(seg));
     else if (hatch) items.push(snapHatch(hatch));
     else if (dim) items.push(snapDimension(dim));
+    else if (table) items.push(snapTable(table));
     else if (tb) items.push(snapTextBox(tb));
+    else if (doc && !(doc as any)._snapOnly) items.push(snapDocument(doc));
+    else if (wall) { copiedWalls.set(wall.id, items.length); items.push(snapWallObj(wall)); }
     else if ((app as any).getSelectedLibraryInstance?.()) {
       items.push(snapLibrary((app as any).getSelectedLibraryInstance()));
     }
@@ -290,7 +295,17 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       for (const d of app.scene.getDimensionsByLabelId(app.selectedLabelId)) items.push(snapDimension(d));
       for (const t of app.scene.getTextBoxesByLabelId(app.selectedLabelId)) items.push(snapTextBox(t));
       for (const f of app.scene.getFreeStrokesByLabelId(app.selectedLabelId)) items.push(snapFree(f));
+      for (const t of ((app.scene as any).tables || []).filter((x: any) => x.labelId === app.selectedLabelId)) items.push(snapTable(t));
+      for (const d of app.scene.getDocumentsByLabelId(app.selectedLabelId)) { if (!(d as any)._snapOnly) items.push(snapDocument(d)); }
+      for (const w of ((app.scene as any).walls || []).filter((x: any) => x.labelId === app.selectedLabelId)) {
+        copiedWalls.set(w.id, items.length); items.push(snapWallObj(w));
+      }
     }
+  }
+
+  // Türen/Fenster gehören zu ihrer Wand: Wird die Wand mitkopiert, wandern sie mit.
+  for (const [wallId, ref] of copiedWalls) {
+    for (const d of ((app.scene as any).getDoorsByWallId?.(wallId) || [])) items.push(snapDoor(d, ref));
   }
 
   if (items.length === 0) return null;
