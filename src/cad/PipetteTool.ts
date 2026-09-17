@@ -242,6 +242,27 @@ export class PipetteTool {
       if (hatch.points.length >= 3 && pointInPolygon(mouseW, hatch.points)) return { kind: "hatch", obj: hatch };
     }
 
+    // Wände (Treffer innerhalb des Wandkörpers)
+    for (const wall of ((this.app.scene as any).walls || []) as any[]) {
+      if (!visible(wall.labelId)) continue;
+      const corners = wallRefCorners(wall);
+      if (corners.length < 2) continue;
+      const half = Math.max(wall.thicknessM || 0, 0) / 2;
+      for (let i = 1; i < corners.length; i++) {
+        const proj = projectPointToSegment(mouseW, corners[i - 1], corners[i]);
+        const dW = Math.hypot(proj.q.x - mouseW.x, proj.q.y - mouseW.y);
+        if (dW <= half || distPx(proj.q) <= Defaults.hitPx) return { kind: "wall", obj: wall };
+      }
+    }
+
+    // Dokumente (unterste Ebene)
+    const docs: any[] = (this.app.scene as any).documents || [];
+    for (let i = docs.length - 1; i >= 0; i--) {
+      const doc = docs[i];
+      if (doc._snapOnly || !visible(doc.labelId)) continue;
+      if (pointInDocument(mouseW, doc)) return { kind: "document", obj: doc };
+    }
+
     return null;
   }
 
