@@ -146,11 +146,29 @@ export class PipetteTool {
     }
 
     // 3) Gleichartiges, anderes Objekt → Stil übertragen.
-    if (hit.kind === this.pickedSource.kind && hitId !== (this.pickedSource.obj as any).id) {
+    if (hit.kind === this.pickedSource.kind) {
+      if (hitId === (this.pickedSource.obj as any).id) return;
       this.originals.set(hitId, snapshotStyle(hit.kind, hit.obj));
       applyStyle(hit.obj, this.sourceSnap);
       this._touch();
+      return;
     }
+
+    // 4) Andere Objektart → ruhige Rückmeldung statt stiller Wirkungslosigkeit.
+    this._notifyIncompatible(this.pickedSource.kind, hit.kind);
+  }
+
+  /** Hinweis bei nicht zueinander passenden Objektarten (höchstens alle 1,5 s). */
+  private _lastNotice = 0;
+  private _notifyIncompatible(from: PickKind, to: PickKind) {
+    const now = Date.now();
+    if (now - this._lastNotice < 1500) return;
+    this._lastNotice = now;
+    try {
+      toast("Pipette", {
+        description: `Der Stil einer ${KIND_LABEL[from]} lässt sich nicht auf ${KIND_LABEL[to] === "Text" ? "einen Text" : "eine " + KIND_LABEL[to]} übertragen.`,
+      });
+    } catch { /* Hinweis ist optional */ }
   }
 
   private _touch() {
