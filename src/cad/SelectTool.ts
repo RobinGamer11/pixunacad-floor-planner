@@ -4977,6 +4977,7 @@ export class SelectTool {
           case "table":      { const o = (scene as any).getTableById(id);   if (o) (scene as any).removeTable(o); break; }
           case "document":   { const o = scene.getDocumentById(id);        if (o) scene.removeDocument(o); break; }
           case "library":    { const o = (scene as any).getLibraryInstanceById(id); if (o) (scene as any).removeLibraryInstance(o); break; }
+          case "door":       { const o = (scene as any).getDoorById?.(id);          if (o) (scene as any).removeDoor(o); break; }
         }
       } catch { /* ignore individual failures */ }
     }
