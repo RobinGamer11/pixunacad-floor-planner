@@ -57,7 +57,28 @@ interface LibrarySnap {
   position: Vec2; rotationRad: number; scaleX: number; scaleY: number; labelId: string;
 }
 
-export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap | LibrarySnap;
+/** Tabellenobjekt (Inhalt + Maßstab, keine Verknüpfung zum Original). */
+interface TableSnap {
+  kind: "table"; center: Vec2; rotationRad: number;
+  data: any; mPerMm: number; scale: number; labelId: string;
+}
+
+/** Dokument (PDF-Seite/Bild) inklusive sichtbarer Darstellungseinstellungen. */
+interface DocumentSnap {
+  kind: "document"; position: Vec2; data: Record<string, any>;
+}
+
+/**
+ * Tür/Fenster. Türen hängen immer an einer Wand: Wird die Wand mitkopiert,
+ * verweist `wallRef` auf deren Index in der Kopie; sonst bleibt die Tür an der
+ * Originalwand (Duplikat auf derselben Wand).
+ */
+interface DoorSnap {
+  kind: "door"; wallId: string; wallRef: number | null; props: Record<string, any>;
+}
+
+export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap
+  | LibrarySnap | TableSnap | DocumentSnap | DoorSnap;
 
 
 export interface Clipboard {
