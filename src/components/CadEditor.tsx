@@ -163,6 +163,8 @@ interface CadEditorProps {
   onHistoryChange?: (canUndo: boolean, canRedo: boolean) => void;
   onZoomChange?: (percent: number) => void;
   onCanDeleteChange?: (canDelete: boolean) => void;
+  /** Meldet, ob der Mehrfach-Einfüge-Modus aktiv ist. */
+  onMultiPasteChange?: (active: boolean) => void;
   /** Präsentations-Modus: blendet linke Werkzeug- und rechte Einstellungsleiste aus. */
   presenting?: boolean;
   /** Hilfe-Modus (Kopfzeilen-Button) — steuert Hilfe-Overlay + Ebenen-Hinweis. */
