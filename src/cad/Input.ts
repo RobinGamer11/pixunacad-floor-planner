@@ -248,6 +248,7 @@ export class Input {
         this.mouse.sx = e.clientX - r.left;
         this.mouse.sy = e.clientY - r.top;
         this.mouse.pressure = readPointerPressure(e);
+        this.pointerInside = true;
       }
 
       // ── Stift-Kontakt bei aktivem Tablet-Hilfsrad: IMMER die aktuelle
