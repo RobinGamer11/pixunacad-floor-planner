@@ -2379,6 +2379,7 @@ export class CadApp {
         try { this.pointEditMenu?.hide?.(); } catch {}
         if (this.selectTool.pasteFloatActive) {
           e.preventDefault();
+          if (this.multiPasteActive) { this.multiPasteActive = false; this.onMultiPasteChange?.(false); }
           this.selectTool.cancelGroupTransform(true);
           this.selectTool.deleteMarqueeSelection();
           this.selectTool.pasteFloatActive = false;
