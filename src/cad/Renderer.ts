@@ -985,11 +985,19 @@ export class Renderer {
         ctx.clip();
       }
     }
+    // Transparenzverlauf: Erst wird das Dokument wie bisher gezeichnet
+    // (Filter, Hintergrundentfernung, Warp); die Maske wirkt danach auf das
+    // fertige Ergebnis und dreht/spiegelt sich dadurch mit dem Dokument mit.
+    const docGradient = (doc as any).displayGradient;
+    const docLayer = isDisplayGradientActive(docGradient)
+      ? this._makeMaskLayer(-wPx / 2, -hPx / 2, wPx, hPx) : null;
+    const g: CanvasRenderingContext2D = docLayer ? docLayer.ctx : ctx;
+
     // High-Quality-Smoothing: sorgt für saubere Zwischenstufen bis das scharfe Tile da ist.
-    const prevSmoothing = ctx.imageSmoothingEnabled;
-    const prevQuality = (ctx as any).imageSmoothingQuality;
-    ctx.imageSmoothingEnabled = true;
-    (ctx as any).imageSmoothingQuality = "high";
+    const prevSmoothing = g.imageSmoothingEnabled;
+    const prevQuality = (g as any).imageSmoothingQuality;
+    g.imageSmoothingEnabled = true;
+    (g as any).imageSmoothingQuality = "high";
     const warp = getDocWarp(doc);
     if (adaptive) {
       // Zuerst die Low-Res-Fallback-Vollseite zeichnen — nie leere Fläche beim Panning/Zoomen.
@@ -999,7 +1007,7 @@ export class Renderer {
       if (warp) {
         drawWarpedImage(ctx, srcAdp, baseW, baseH, wPx, hPx, warp);
       } else {
-        ctx.drawImage(srcAdp, -wPx / 2, -hPx / 2, wPx, hPx);
+        g.drawImage(srcAdp, -wPx / 2, -hPx / 2, wPx, hPx);
         // Darüber das scharfe Viewport-Tile (nur wenn vorhanden) — Adobe-ähnliche Schärfe.
         const tile = this._getDocPdfTile(doc, wPx, hPx);
         if (tile) {
@@ -1007,7 +1015,7 @@ export class Renderer {
           const ty = -hPx / 2 + tile.v0 * hPx;
           const tw = (tile.u1 - tile.u0) * wPx;
           const th = (tile.v1 - tile.v0) * hPx;
-          ctx.drawImage(tile.canvas, tx, ty, tw, th);
+          g.drawImage(tile.canvas, tx, ty, tw, th);
         }
       }
     } else if (img) {
@@ -1023,22 +1031,27 @@ export class Renderer {
       // Pixelobjekte bleiben beim Hineinzoomen scharf statt zu verwaschen.
       const magnify = baseW > 0 ? wPx / baseW : 1;
       if (magnify > 1.5) {
-        ctx.imageSmoothingEnabled = false;
+        g.imageSmoothingEnabled = false;
       }
       if (warp) {
         drawWarpedImage(ctx, finalSrc, baseW, baseH, wPx, hPx, warp);
       } else {
-        ctx.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
+        g.drawImage(finalSrc, -wPx / 2, -hPx / 2, wPx, hPx);
       }
-      ctx.imageSmoothingEnabled = true;
+      g.imageSmoothingEnabled = true;
     } else {
-      ctx.fillStyle = "rgba(180,180,180,0.3)";
-      ctx.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
-      ctx.fillStyle = "rgba(0,0,0,0.6)";
-      ctx.font = "12px system-ui";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("Lade …", 0, 0);
+      g.fillStyle = "rgba(180,180,180,0.3)";
+      g.fillRect(-wPx / 2, -hPx / 2, wPx, hPx);
+      g.fillStyle = "rgba(0,0,0,0.6)";
+      g.font = "12px system-ui";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      g.fillText("Lade …", 0, 0);
+    }
+    if (docLayer) {
+      applyDisplayGradientMask(docLayer.ctx,
+        { x: docLayer.x, y: docLayer.y, w: docLayer.w, h: docLayer.h }, docGradient);
+      ctx.drawImage(docLayer.canvas, docLayer.x, docLayer.y, docLayer.w, docLayer.h);
     }
     ctx.imageSmoothingEnabled = prevSmoothing;
     if (prevQuality) (ctx as any).imageSmoothingQuality = prevQuality;
