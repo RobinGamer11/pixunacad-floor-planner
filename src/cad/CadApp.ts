@@ -2394,7 +2394,7 @@ export class CadApp {
         // als normales CAD-Objekt ausgewählt.
         if (this.tableEditId) { e.preventDefault(); this.endTableEdit(); return; }
 
-        if (this.pastePreviewActive) { this.cancelPastePreview(); return; }
+        if (this.pastePreviewActive || this.pasteArmed) { this.cancelPastePreview(); return; }
         // Stufe 1: Läuft gerade eine Zeichen-Aktion? Dann NUR diese abbrechen —
         // das Werkzeug bleibt aktiv. Erst der nächste ESC wechselt zur Auswahl.
         {
@@ -2618,6 +2618,18 @@ export class CadApp {
   startPastePreview(): boolean {
     if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.textEditor?.isActive()) return false;
+    // Klick in der Kopfzeile: Es gibt noch keine gültige Cursorposition auf der
+    // Zeichenfläche. Dann nur „bereit“ schalten — die Kopie entsteht erst beim
+    // ersten echten Pointer-Ereignis im Canvas, exakt unter dem Zeiger.
+    if (!this.input?.pointerInside) { this.pasteArmed = true; return true; }
+    return this._beginPasteFloatNow();
+  }
+
+  /** Wartender Einfügemodus („bereit“, Kopie folgt beim Eintritt in den Canvas). */
+  pasteArmed = false;
+
+  private _beginPasteFloatNow(): boolean {
+    if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.activeTool !== this.selectTool) {
       this._toolBeforePaste = (this.activeTool as any).id || ToolIds.SELECT;
       this.setTool(ToolIds.SELECT);
@@ -2642,8 +2654,20 @@ export class CadApp {
 
   cancelPastePreview() {
     this.pastePreviewActive = false;
+    this.pasteArmed = false;
     this._toolBeforePaste = null;
     this.canvas.style.cursor = "";
+  }
+
+  /**
+   * Wird im Frame-Takt aufgerufen: Sobald der Zeiger die Zeichenfläche
+   * erreicht, entsteht die bereitstehende Kopie exakt unter dem Cursor.
+   */
+  private _resolveArmedPaste() {
+    if (!this.pasteArmed) return;
+    if (!this.input?.pointerInside) return;
+    this.pasteArmed = false;
+    if (!this._beginPasteFloatNow()) this.stopMultiPaste();
   }
 
   /* ---- Mehrfach einfügen (fortlaufendes Platzieren) ---- */
@@ -2665,6 +2689,7 @@ export class CadApp {
   stopMultiPaste() {
     if (!this.multiPasteActive) return;
     this.multiPasteActive = false;
+    this.pasteArmed = false;
     this.onMultiPasteChange?.(false);
     try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
   }
@@ -3203,6 +3228,8 @@ export class CadApp {
       if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
+      // Bereitstehendes Einfügen: erst jetzt, mit echter Cursorposition.
+      this._resolveArmedPaste();
 
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend. Linien-/Wandwerkzeug und der Punkt-Edit des

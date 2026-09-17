@@ -989,7 +989,10 @@ export class MiniCad {
     if (this.multiPasteActive === next) return;
     this.multiPasteActive = next;
     this.onMultiPasteChange?.(next);
-    if (!next) { try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ } }
+    if (!next) {
+      this.pasteArmed = false;
+      try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
+    }
   }
 
   stopMultiPaste() { this.setMultiPasteActive(false); }
@@ -2072,6 +2075,16 @@ export class MiniCad {
    */
   pasteClipboard(): boolean {
     if (this._miniClipboard.length === 0) return false;
+    // Klick in der Kopfzeile: ohne echte Cursorposition nur „bereit“ schalten.
+    if (!this.input?.pointerInside) { this.pasteArmed = true; return true; }
+    return this._pasteClipboardNow();
+  }
+
+  /** Wartender Einfügemodus (Kopie folgt beim Eintritt in die Zeichenfläche). */
+  pasteArmed = false;
+
+  private _pasteClipboardNow(): boolean {
+    if (this._miniClipboard.length === 0) return false;
     // Eine bereits schwebende Kopie wird vor dem nächsten Einfügen bestätigt;
     // sonst würde ihre Auswahl beim Aufbau der neuen Kopie verloren gehen.
     if (this.selectTool.pasteFloatActive) {
@@ -2588,6 +2601,7 @@ export class MiniCad {
         try { if (this.textEditor.isActive()) { this.textEditor.commit(); return; } } catch {}
         let pasteCancelled = false;
         if (this.multiPasteActive) { this.multiPasteActive = false; this.onMultiPasteChange?.(false); }
+        if (this.pasteArmed) { this.pasteArmed = false; return; }
         try { pasteCancelled = this.selectTool.cancelPasteFloat(); } catch {}
         if (pasteCancelled) return;
         if (this.hasActiveAction()) {
@@ -3117,6 +3131,11 @@ export class MiniCad {
 
 
       this.input.update(this.camera);
+      // Bereitstehendes Einfügen: erst mit echter Cursorposition ausführen.
+      if (this.pasteArmed && this.input.pointerInside) {
+        this.pasteArmed = false;
+        if (!this._pasteClipboardNow()) this.stopMultiPaste();
+      }
 
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend, identisch zur großen CAD-Oberfläche.
