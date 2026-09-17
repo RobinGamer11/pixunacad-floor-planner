@@ -80,6 +80,13 @@ export class Input {
   }
 
 
+  /**
+   * Der Zeiger befindet sich real über der Zeichenfläche. Wird für das
+   * Einfügen über die Kopfzeile gebraucht: Solange false, gibt es keine
+   * gültige Cursorposition und die Kopie darf noch nicht erzeugt werden.
+   */
+  pointerInside = false;
+
   clicked = false;
   /** Echter Stift-/Finger-Kontakt, der vom Tablet-Gate abgefangen wurde. */
   tabletTapped = false;
