@@ -45,6 +45,19 @@ describe("Einfügen aus der Kopfzeile", () => {
     expect(beginNow).toHaveBeenCalledTimes(1);
   });
 
+  it("wartet beim Tastenkürzel außerhalb ebenfalls auf ein neues Canvas-Ereignis", () => {
+    const { app, beginNow } = armedApp();
+    app.input.pointerInside = false;
+
+    expect(app.startPastePreview()).toBe(true);
+    Reflect.get(app, "_resolveArmedPaste").call(app);
+    expect(beginNow).not.toHaveBeenCalled();
+
+    app.input.pointerEventSeq += 1;
+    Reflect.get(app, "_resolveArmedPaste").call(app);
+    expect(beginNow).toHaveBeenCalledTimes(1);
+  });
+
   it("schaltet Mehrfach-Einfügen aus dem Kopf ebenfalls nur scharf", () => {
     const { app, beginNow } = armedApp();
 

@@ -2622,13 +2622,21 @@ export class CadApp {
   startPastePreview(): boolean {
     if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.textEditor?.isActive()) return false;
-    if (!this.input?.pointerInside) { this.pasteArmed = true; return true; }
+    // Tastatur außerhalb der Zeichenfläche wartet ebenso auf ein neues echtes
+    // Canvas-Ereignis; innerhalb darf sie die aktuelle Canvas-Position nutzen.
+    if (!this.input?.pointerInside) return this._armPasteForNextCanvasPointer();
     return this._beginPasteFloatNow();
   }
 
   /** Wartender Einfügemodus („bereit“, Kopie folgt beim Eintritt in den Canvas). */
   pasteArmed = false;
   private _pasteArmedAfterPointerSeq = -1;
+
+  private _armPasteForNextCanvasPointer(): boolean {
+    this.pasteArmed = true;
+    this._pasteArmedAfterPointerSeq = this.input?.pointerEventSeq ?? 0;
+    return true;
+  }
 
   /**
    * Expliziter Pfad für das Einfüge-Symbol in der Kopfzeile. Er erzeugt nie
@@ -2637,9 +2645,7 @@ export class CadApp {
   armPasteFromHeader(): boolean {
     if (!this.clipboard || this.clipboard.items.length === 0) return false;
     if (this.textEditor?.isActive()) return false;
-    this.pasteArmed = true;
-    this._pasteArmedAfterPointerSeq = this.input?.pointerEventSeq ?? 0;
-    return true;
+    return this._armPasteForNextCanvasPointer();
   }
 
   private _beginPasteFloatNow(): boolean {
