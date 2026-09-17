@@ -18,6 +18,7 @@ export function getGroupObject(app: any, kind: string, id: string): any {
     case "freeStroke": return s.getFreeStrokeById?.(id);
     case "dimension":  return s.getDimensionById?.(id);
     case "textbox":    return s.getTextBoxById?.(id);
+    case "table":      return s.getTableById?.(id);
     case "document":   return s.getDocumentById?.(id);
     case "library":    return s.getLibraryInstanceById?.(id);
     default: return null;
