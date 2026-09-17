@@ -428,6 +428,24 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         labelId: it.labelId,
       });
       if (o) created.push({ kind: "library", id: o.id });
+    } else if (it.kind === "table") {
+      const o = (app.scene as any).createTable(
+        { x: it.center.x + dx, y: it.center.y + dy },
+        JSON.parse(JSON.stringify(it.data ?? {})), it.mPerMm,
+        { rotationRad: it.rotationRad, labelId: it.labelId, scale: it.scale });
+      if (o) created.push({ kind: "table", id: o.id });
+    } else if (it.kind === "document") {
+      const o = app.scene.createDocument({
+        ...(JSON.parse(JSON.stringify(it.data)) as any),
+        position: { x: it.position.x + dx, y: it.position.y + dy },
+      });
+      if (o) created.push({ kind: "document", id: o.id });
+    } else if (it.kind === "door") {
+      const wallId = (it.wallRef !== null ? newWallIds.get(it.wallRef) : null) || it.wallId;
+      if ((app.scene as any).getWallById?.(wallId)) {
+        const o = (app.scene as any).createDoor({ ...(it.props as any), wallId });
+        if (o) created.push({ kind: "door", id: o.id });
+      }
     } else {
       const o = app.scene.createTextBox(
         { x: it.center.x + dx, y: it.center.y + dy },
