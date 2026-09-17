@@ -2072,6 +2072,16 @@ export class MiniCad {
    */
   pasteClipboard(): boolean {
     if (this._miniClipboard.length === 0) return false;
+    // Klick in der Kopfzeile: ohne echte Cursorposition nur „bereit“ schalten.
+    if (!this.input?.pointerInside) { this.pasteArmed = true; return true; }
+    return this._pasteClipboardNow();
+  }
+
+  /** Wartender Einfügemodus (Kopie folgt beim Eintritt in die Zeichenfläche). */
+  pasteArmed = false;
+
+  private _pasteClipboardNow(): boolean {
+    if (this._miniClipboard.length === 0) return false;
     // Eine bereits schwebende Kopie wird vor dem nächsten Einfügen bestätigt;
     // sonst würde ihre Auswahl beim Aufbau der neuen Kopie verloren gehen.
     if (this.selectTool.pasteFloatActive) {
