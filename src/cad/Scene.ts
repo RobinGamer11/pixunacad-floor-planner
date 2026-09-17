@@ -196,6 +196,7 @@ export class Hatch {
       scale: Number.isFinite(areaLabel?.scale) ? clamp(areaLabel!.scale!, 0.1, 20) : 1,
     };
     initStrokeEffects(this, { strokePattern, roughen, appearanceSeed });
+    this.displayGradient = normalizeDisplayGradient(displayGradient);
     this._stickerEditOwnerId = null;
   }
 
