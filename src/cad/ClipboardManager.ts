@@ -408,7 +408,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         patternId: it.patternId, patternScale: it.patternScale, patternAlignToWall: it.patternAlignToWall,
         patternAngleDeg: it.patternAngleDeg ?? 0,
       });
-      if (o) created.push({ kind: "wall", id: o.id });
+      if (o) { newWallIds.set(idx, o.id); created.push({ kind: "wall", id: o.id }); }
     } else if (it.kind === "free") {
       const o = app.scene.createFreeStroke(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })), {
         color: it.color, thicknessM: it.thicknessM, opacity: it.opacity, lineStyle: it.lineStyle,
