@@ -3079,6 +3079,12 @@ export class MiniCad {
 
       // Rechtsklick auf einen Fangpunkt setzt/entfernt eine globale Hilfslinie —
       // werkzeugübergreifend, identisch zur großen CAD-Oberfläche.
+      // Rechtsklick beendet das fortlaufende Platzieren.
+      if (this.input.rightClicked && this.multiPasteActive) {
+        this.input.rightClicked = false;
+        this.stopMultiPaste();
+      }
+
       if (this.input.rightClicked) {
         const ownGuides = this._activeTool === "line" || this._activeTool === "guide"
           || (this._activeTool === "select" && !!this.selectTool?.isEditing?.());
