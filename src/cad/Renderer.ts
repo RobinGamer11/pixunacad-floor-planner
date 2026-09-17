@@ -19,6 +19,7 @@ import { normalizeTable, isCovered, effectiveFormat, effectiveBorders } from "@/
 import { layoutTable, cellRectMm } from "@/lib/table/tableLayout";
 import { evalCell } from "@/lib/table/tableFormula";
 import { strokeHatchSeal } from "./hatchSeal";
+import { applyDisplayGradientMask, isDisplayGradientActive } from "./displayGradient";
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, patternAlwaysFollowsWall, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
 import type { LibraryDefinition, LibraryGeometrySnapshot } from "./library/types";
@@ -918,6 +919,28 @@ export class Renderer {
     if (bgSig) c = applyBgRemovalToCanvas(c, doc);
     this._docFilterCache.set(doc.id, { canvas: c, key });
     return c;
+  }
+
+  /**
+   * Temporäre Zwischenebene in CSS-Pixel-Koordinaten. Darauf wird der bereits
+   * bestehende Inhalt (Schraffurfüllung + Muster bzw. Dokumentbild) gezeichnet,
+   * anschließend die Verlaufsmaske angewandt und das Ergebnis unverändert in
+   * die Hauptfläche zurückkopiert.
+   */
+  private _makeMaskLayer(x: number, y: number, w: number, h: number):
+    { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; x: number; y: number; w: number; h: number } | null {
+    if (!(w > 0) || !(h > 0)) return null;
+    const dpr = (typeof window !== "undefined" ? (window.devicePixelRatio || 1) : 1);
+    const cw = Math.ceil(w * dpr), ch = Math.ceil(h * dpr);
+    if (cw < 1 || ch < 1 || cw * ch > 40_000_000) return null;
+    let canvas: HTMLCanvasElement;
+    try { canvas = document.createElement("canvas"); } catch { return null; }
+    canvas.width = cw;
+    canvas.height = ch;
+    const c = canvas.getContext("2d");
+    if (!c) return null;
+    c.setTransform(dpr, 0, 0, dpr, -x * dpr, -y * dpr);
+    return { canvas, ctx: c, x, y, w, h };
   }
 
   private _drawSingleDocument(doc: DocumentObject) {
