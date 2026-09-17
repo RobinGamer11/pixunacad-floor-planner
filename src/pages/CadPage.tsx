@@ -34,8 +34,9 @@ const CadPage = () => {
     if (ok) setCanPaste(true);
     return ok;
   };
-  const doPaste = () => editorRef.current?.pasteClipboard() ?? false;
-  const doMultiPaste = () => { editorRef.current?.toggleMultiPaste(); };
+  const doPasteShortcut = () => editorRef.current?.pasteClipboard() ?? false;
+  const armPasteFromHeader = () => editorRef.current?.armPasteFromHeader() ?? false;
+  const doMultiPasteFromHeader = () => { editorRef.current?.toggleMultiPasteFromHeader(); };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -45,7 +46,7 @@ const CadPage = () => {
       if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
       const k = e.key.toLowerCase();
       if (k === "c") { if (doCopy()) e.preventDefault(); }
-      else if (k === "v") { if (doPaste()) e.preventDefault(); }
+       else if (k === "v") { if (doPasteShortcut()) e.preventDefault(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -296,9 +297,9 @@ const CadPage = () => {
         onCenterView={() => editorRef.current?.centerOnOrigin()}
 
         canPaste={canPaste}
-        onPaste={doPaste}
+        onPaste={armPasteFromHeader}
         multiPasteActive={multiPaste}
-        onMultiPaste={doMultiPaste}
+        onMultiPaste={doMultiPasteFromHeader}
         zoomPercent={zoom}
         onPresent={handlePresent}
         onShare={() => {}}

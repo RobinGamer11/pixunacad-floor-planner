@@ -146,8 +146,11 @@ export interface CadEditorHandle {
   hasDeletableSelection: () => boolean;
   copySelection: () => boolean;
   pasteClipboard: () => boolean;
+  /** Einfügen aus der Kopfzeile: wartet zwingend auf ein neues Canvas-Ereignis. */
+  armPasteFromHeader: () => boolean;
   /** Mehrfach einfügen umschalten (fortlaufendes Platzieren). */
   toggleMultiPaste: () => boolean;
+  toggleMultiPasteFromHeader: () => boolean;
   stopMultiPaste: () => void;
   hasClipboard: () => boolean;
   /** CSS-Pixel pro Welt-Meter (camera.scale). */
@@ -349,7 +352,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     deleteSelection: () => { appRef.current?.deleteSelection(); },
     copySelection: () => appRef.current?.copySelection() ?? false,
     pasteClipboard: () => appRef.current?.startPastePreview() ?? false,
+    armPasteFromHeader: () => appRef.current?.armPasteFromHeader() ?? false,
     toggleMultiPaste: () => appRef.current?.toggleMultiPaste() ?? false,
+    toggleMultiPasteFromHeader: () => appRef.current?.toggleMultiPasteFromHeader() ?? false,
     stopMultiPaste: () => { appRef.current?.stopMultiPaste(); },
     hasClipboard: () => !!appRef.current?.clipboard,
     hasDeletableSelection: () => appRef.current?.hasDeletableSelection() ?? false,
