@@ -1616,6 +1616,7 @@ export class MiniCad {
             warpCorners: Array.isArray((d as any).warpCorners) ? (d as any).warpCorners : null,
             flipX: !!(d as any).flipX,
             flipY: !!(d as any).flipY,
+            displayGradient: (d as any).displayGradient,
           });
         } catch (e) { console.error("MiniCad restore document:", e); }
       }
