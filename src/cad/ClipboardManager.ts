@@ -132,8 +132,36 @@ function itemCenter(it: ClipboardItem): Vec2 {
 }
 
 
-function itemsAnchor(items: ClipboardItem[]): Vec2 {
+/** Alle echten Fangpunkte eines Snapshots (Endpunkte, Ecken, Einfügepunkte). */
+function itemPoints(it: ClipboardItem): Vec2[] {
+  if (it.kind === "segment") return [it.a, it.b];
+  if (it.kind === "hatch") return it.points;
+  if (it.kind === "dimension") return [it.p1, it.p2, it.placementPoint];
+  if (it.kind === "wall") return it.corners;
+  if (it.kind === "free") return it.points;
+  if (it.kind === "library") return [it.position];
+  return [it.center];
+}
+
+/**
+ * Gemeinsamer Einfügeanker der Kopie.
+ * Bevorzugt den echten Objekt-Fangpunkt, der beim Kopieren dem Mauszeiger am
+ * nächsten liegt (der bewusst angeklickte Griffpunkt). Nur wenn kein echter
+ * Punkt existiert, wird der Auswahlmittelpunkt verwendet.
+ */
+function itemsAnchor(items: ClipboardItem[], near?: Vec2 | null): Vec2 {
   if (items.length === 0) return v(0, 0);
+  if (near) {
+    let best: Vec2 | null = null;
+    let bestD = Infinity;
+    for (const it of items) {
+      for (const p of itemPoints(it)) {
+        const d = Math.hypot(p.x - near.x, p.y - near.y);
+        if (d < bestD) { bestD = d; best = v(p.x, p.y); }
+      }
+    }
+    if (best) return best;
+  }
   let sx = 0, sy = 0;
   for (const it of items) { const c = itemCenter(it); sx += c.x; sy += c.y; }
   return v(sx / items.length, sy / items.length);
