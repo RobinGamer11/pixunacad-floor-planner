@@ -1,3 +1,4 @@
+import { registerProjectInCloud } from "@/lib/useCloudProjectLifecycle";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LegalMenuPopover } from "@/components/legal/LegalMenu";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -340,6 +341,8 @@ export default function ProjectsHome() {
   const finishCreateProject = (draft: ProjectDraft) => {
     const id = projectStore.createProject();
     projectStore.updateProject(id, draftToPatch(draft, "create"));
+    // Erst lokal anlegen, dann nicht-blockierend in der Cloud anmelden.
+    void registerProjectInCloud(id);
     syncProjectPeriod(id, draft.projektStart, draft.projektEnde);
     setNewProjectDialogOpen(false);
     setMode("projects");
