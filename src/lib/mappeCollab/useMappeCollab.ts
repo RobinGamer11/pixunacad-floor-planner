@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { projectAccessStore } from "@/lib/projectAccess";
+import { projectAccessStore, useProjectAccess } from "@/lib/projectAccess";
 import { MappeCollabSession, type MappeCollabStatus } from "./session";
 import { setMappeSession, setMappeStatus } from "./store";
 
@@ -39,6 +39,8 @@ export function useMappeCollab({
   onFieldConflict,
 }: UseMappeCollabArgs) {
   const { session: authSession } = useAuth();
+  // Startet neu, sobald ein Projekt in der Cloud registriert wurde.
+  const cloudRegistered = useProjectAccess(projectId).shared;
   const [status, setStatus] = useState<MappeCollabStatus>(EMPTY);
   const sessionRef = useRef<MappeCollabSession | null>(null);
   const editingRef = useRef<string | null>(editingElementId);

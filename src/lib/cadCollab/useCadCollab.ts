@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { projectAccessStore } from "@/lib/projectAccess";
+import { projectAccessStore, useProjectAccess } from "@/lib/projectAccess";
 import { CadCollabSession, type CollabStatus } from "./session";
 
 const EMPTY: CollabStatus = {
@@ -40,6 +40,8 @@ function selectionObjectId(selection: unknown): string | null {
 
 export function useCadCollab(app: CadApp | null, projectId: string | undefined) {
   const { session: authSession } = useAuth();
+  // Startet neu, sobald ein Projekt in der Cloud registriert wurde.
+  const cloudRegistered = useProjectAccess(projectId).shared;
   const [status, setStatus] = useState<CollabStatus>(EMPTY);
   const sessionRef = useRef<CadCollabSession | null>(null);
 

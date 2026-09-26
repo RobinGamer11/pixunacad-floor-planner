@@ -423,7 +423,7 @@ export class MappeCollabSession {
    * Änderungen objektweise abgleichen, dann den gemeinsamen Stand laden.
    */
   private async goLive(): Promise<void> {
-    if (this.destroyed || this.mode === "live" || this.activating) return;
+    if (this.destroyed || this.mode === "live" || this.activating || this.conflict) return;
     window.clearTimeout(this.graceTimer);
     this.graceTimer = 0;
     this.activating = true;
