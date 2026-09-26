@@ -451,3 +451,81 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
     </button>
   );
 }
+
+
+
+function HeaderAidToggle({
+  active,
+  icon,
+  label,
+  title,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-8 px-2 rounded-md flex items-center gap-1.5 border text-[11px] font-medium transition-colors"
+      style={
+        active
+          ? {
+              background: "hsl(var(--accent-gold))",
+              color: "hsl(var(--surface))",
+              borderColor: "hsl(var(--accent-gold))",
+            }
+          : {
+              background: "hsl(var(--surface-muted))",
+              color: "hsl(var(--ink-soft))",
+              borderColor: "hsl(var(--hairline))",
+            }
+      }
+      title={title}
+      aria-pressed={active}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function ModeButton({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="h-7 px-2.5 rounded-[5px] flex items-center gap-1.5 text-[11px] font-medium transition-colors shrink-0"
+      style={{
+        background: active ? "hsl(var(--accent-gold))" : "transparent",
+        color: active ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function ModeDivider() {
+  return (
+    <span
+      aria-hidden
+      className="mx-0.5 inline-block h-4 w-px"
+      style={{ background: "hsl(var(--hairline))" }}
+    />
+  );
+}
