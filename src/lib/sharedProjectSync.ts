@@ -13,6 +13,7 @@
  * Gerät gelesen, solange dort noch kein objektbasierter Stand bekannt ist.
  */
 import type { Project } from "@/lib/projectStore";
+import { loadPendingTrash } from "@/lib/cloudTrash";
 import { projectStore } from "@/lib/projectStore";
 import { projectAccessStore } from "@/lib/projectAccess";
 import { baselineKey, hasBaseline } from "@/lib/cloudBaseline";
@@ -47,8 +48,13 @@ export async function hydrateSharedProject(projectId: string): Promise<boolean> 
   // Projekt fehlt auf diesem Gerät (auf einem anderen Gerät angelegt):
   // leeren Platzhalter anlegen, Inhalte folgen objektweise beim Öffnen.
   if (!projectStore.getState().projects.some((p) => p.id === projectId)) {
+    // Auf diesem Gerät bereits endgültig gelöscht (wartet auf die Cloud): nicht zurückholen.
+    if (loadPendingTrash()[projectId]?.op === "purge") return false;
     const name = projectAccessStore.getState().namesByProject.get(projectId) ?? "Projekt";
     projectStore.ensureCloudStub(projectId, name);
+    // Im cloudweiten Papierkorb → auch hier nur im Papierkorb anzeigen.
+    const deletedAt = projectAccessStore.getState().deletedAtByProject.get(projectId);
+    if (deletedAt) projectStore.applyCloudTrash(projectId, deletedAt);
   }
   if (hasBaseline(baselineKey("mappe", projectId)) || hasBaseline(baselineKey("cad", projectId))) return false;
   try {

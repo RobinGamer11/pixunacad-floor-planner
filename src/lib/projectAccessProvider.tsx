@@ -20,6 +20,7 @@ import {
   sharedProjectIds,
 } from "@/lib/sharedProjectSync";
 import { setSharedProjectIdsProvider } from "@/lib/workspaceStorage";
+import { flushPendingTrash, reconcileCloudTrash, recordTrashOp } from "@/lib/cloudTrash";
 import { toast } from "@/hooks/use-toast";
 
 export function ProjectAccessProvider({ children }: { children: ReactNode }) {
@@ -27,6 +28,7 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session) {
+      projectStore.setTrashHook(null);
       projectStore.setWriteGuard(null);
       setSharedProjectIdsProvider(null);
       resetSharedSyncState();
@@ -34,6 +36,11 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
     }
 
     projectStore.setWriteGuard((projectId) => projectAccessStore.canEdit(projectId));
+    // Papierkorb kontoübergreifend: lokale Aktionen an die Cloud melden,
+    // Cloudstatus nach jedem Rollen-/Projektabgleich übernehmen.
+    projectStore.setTrashHook(recordTrashOp);
+    void flushPendingTrash();
+    const offTrash = projectAccessStore.subscribe(reconcileCloudTrash);
     setSharedProjectIdsProvider(sharedProjectIds);
     void projectAccessStore.reload();
 
@@ -101,6 +108,8 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
       offBlocked();
       offSync();
       offAccess();
+      offTrash();
+      projectStore.setTrashHook(null);
       projectStore.setWriteGuard(null);
       setSharedProjectIdsProvider(null);
       if (client && channel) void client.removeChannel(channel);
