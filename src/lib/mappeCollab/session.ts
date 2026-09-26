@@ -22,6 +22,7 @@ import {
   type BaselineHashes,
 } from "@/lib/cloudBaseline";
 import { registerProjectSyncSource, reportProjectSyncSource } from "@/lib/projectSync";
+import { decideOpen, loadSeenSeq, saveSeenSeq, writeSafetyCopy } from "@/lib/cloudProjectState";
 import { applyMappeOp } from "./apply";
 import { diffMappeIndexes, indexProject, type MappeIndex } from "./diff";
 import {
@@ -142,16 +143,18 @@ export class MappeCollabSession {
     this.lastIndex = indexProject(currentProject(projectId));
     this.unregisterSync = registerProjectSyncSource(projectId, "mappe", {
       save: () => this.saveToCloud(),
+      refresh: () => this.refreshFromCloud(),
+      loadCloud: () => this.loadCloud(),
+      keepDevice: () => this.keepDevice(),
     });
     // Offene Änderungen erkennen, auch ohne Live-Betrieb.
     this.unsubscribe = projectStore.subscribe(() => this.notifyLocalChange());
 
     this.mode = projectAccessStore.otherMemberCount(projectId) === 0 ? "local" : "standby";
     this.setStatus({ mode: this.mode });
+    this.report({ mode: this.mode });
 
-    const firstOpen = !hasBaseline(this.baseKey);
-    if (firstOpen || this.pendingOps().length === 0) await this.pullRemoteState();
-    this.refreshDirty();
+    await this.refreshFromCloud();
 
     if (this.mode === "standby") this.connectPresence();
     else this.policyTimer = window.setInterval(() => this.syncPolicy(), 10_000);
@@ -222,8 +225,9 @@ export class MappeCollabSession {
       const [pageId, kind, objectId] = key.split(BASELINE_SEP);
       ops.push({ pageId, objectId, objectKind: kind as LocalMappeOp["objectKind"], changeType: "delete", payload: null });
     }
-    // Seiten zuerst: ein Element darf nie vor seiner Seite ankommen.
-    ops.sort((a, b) => Number(b.objectKind === "page") - Number(a.objectKind === "page"));
+    // Metadaten und Seiten zuerst: ein Element darf nie vor seiner Seite ankommen.
+    const rank = (k: string) => (k === "meta" ? 2 : k === "page" ? 1 : 0);
+    ops.sort((a, b) => rank(b.objectKind) - rank(a.objectKind));
     return ops;
   }
 
@@ -250,17 +254,126 @@ export class MappeCollabSession {
     reportProjectSyncSource(this.opts.projectId, "mappe", partial);
   }
 
-  private async pullRemoteState(): Promise<void> {
+  private conflict = false;
+  private refreshing = false;
+
+  private keyOf(pageId: string, kind: string, objectId: string): string {
+    return `${pageId}${BASELINE_SEP}${kind}${BASELINE_SEP}${objectId}`;
+  }
+
+  /** Echte Inhalte: nur Seitenelemente (leere Standardseite zählt nicht). */
+  private contentCount(): number {
+    const project = currentProject(this.opts.projectId);
+    return (project?.pages ?? []).reduce((n, p) => n + (p.elements?.length ?? 0), 0);
+  }
+
+  /** Cloudstand prüfen – Öffnen, Rückkehr in die App, „Aus Cloud aktualisieren“. */
+  async refreshFromCloud(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live" || this.refreshing || this.saving) return;
+    this.refreshing = true;
     try {
-      const state = await fetchObjectState(this.opts.projectId);
-      this.revisions = new Map(state.map((op) => [`${op.pageId}|${op.objectId}`, op.objectVersion]));
-      this.revisionsLoaded = true;
-      if (state.length) this.applyRemoteOps(state);
-      this.lastSeq = await fetchLatestSeq(this.opts.projectId);
-      this.lastIndex = indexProject(currentProject(this.opts.projectId));
-      this.baselineFromCurrent();
+      const { projectId } = this.opts;
+      const [state, latestSeq] = await Promise.all([fetchObjectState(projectId), fetchLatestSeq(projectId)]);
+      if (this.destroyed) return;
+      const decision = decideOpen({
+        hasBaseline: hasBaseline(this.baseKey),
+        localContent: this.contentCount(),
+        remoteLive: state.filter((op) => op.changeType !== "delete" && op.objectKind === "element").length,
+        pending: this.pendingOps().length,
+        remoteChanged: latestSeq > loadSeenSeq(this.baseKey),
+      });
+      this.conflict = decision === "conflict";
+      if (decision === "apply" && state.some((op) => op.changeType !== "delete")) {
+        this.replaceWithRemote(state);
+        this.lastSeq = latestSeq;
+        saveSeenSeq(this.baseKey, latestSeq);
+      } else {
+        this.revisions = new Map(state.map((op) => [`${op.pageId}|${op.objectId}`, op.objectVersion]));
+        this.revisionsLoaded = true;
+        if (decision === "apply" && !hasBaseline(this.baseKey)) {
+          // Beide Seiten leer: der leere Stand ist trivial abgeglichen,
+          // gilt aber nie als verbindlicher Cloudstand.
+        }
+      }
+      this.report({
+        conflict: this.conflict,
+        updateAvailable: decision === "updateAvailable",
+        deviceOnly: decision === "deviceOnly" || (decision === "apply" && !state.some((op) => op.changeType !== "delete")),
+      });
+      this.refreshDirty();
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+    } finally {
+      this.refreshing = false;
+    }
+  }
+
+  /** Lokalen Mappenstand durch den Cloudstand ersetzen – keine Mischung. */
+  private replaceWithRemote(state: MappeObjectOp[]) {
+    this.revisions = new Map(state.map((op) => [`${op.pageId}|${op.objectId}`, op.objectVersion]));
+    this.revisionsLoaded = true;
+    const remoteKeys = new Set(state.map((op) => this.keyOf(op.pageId, op.objectKind, op.objectId)));
+    const local = this.flatten(indexProject(currentProject(this.opts.projectId)));
+    const removals: MappeObjectOp[] = [];
+    for (const [key, entry] of local) {
+      if (remoteKeys.has(key) || entry.kind === "meta") continue;
+      const [pageId, , objectId] = key.split(BASELINE_SEP);
+      removals.push({
+        id: `local-${objectId}`, projectId: this.opts.projectId, pageId, objectId,
+        objectKind: entry.kind, changeType: "delete", payload: null,
+        objectVersion: this.revisions.get(`${pageId}|${objectId}`) ?? 0,
+        actorId: null, createdAt: "", seq: 0,
+      });
+    }
+    // Elemente vor Seiten löschen; Metadaten und Seiten vor Elementen anlegen.
+    removals.sort((a, b) => Number(a.objectKind === "page") - Number(b.objectKind === "page"));
+    const rank = (k: string) => (k === "meta" ? 2 : k === "page" ? 1 : 0);
+    const ordered = [...state].sort((a, b) => rank(b.objectKind) - rank(a.objectKind));
+    this.applyRemoteOps([...ordered, ...removals]);
+    this.lastIndex = indexProject(currentProject(this.opts.projectId));
+    this.conflict = false;
+    this.baselineFromCurrent();
+  }
+
+  /** Ausdrückliche Wahl: Cloudstand laden. */
+  async loadCloud(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live") return;
+    try {
+      const { projectId } = this.opts;
+      const [state, latestSeq] = await Promise.all([fetchObjectState(projectId), fetchLatestSeq(projectId)]);
+      if (this.destroyed) return;
+      this.replaceWithRemote(state);
+      this.lastSeq = latestSeq;
+      saveSeenSeq(this.baseKey, latestSeq);
+      this.report({ conflict: false, updateAvailable: false, deviceOnly: false, error: null });
+      this.refreshDirty();
+    } catch (error) {
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({ error: "Der Cloudstand konnte nicht geladen werden." });
+    }
+  }
+
+  /** Ausdrückliche Wahl: Gerätestand wird Hauptstand (vorher Sicherheitskopie). */
+  async keepDevice(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live") return;
+    const { projectId } = this.opts;
+    const project = currentProject(projectId);
+    if (project) writeSafetyCopy("mappe", projectId, JSON.stringify(project));
+    try {
+      const state = await fetchObjectState(projectId);
+      this.revisions = new Map(state.map((op) => [`${op.pageId}|${op.objectId}`, op.objectVersion]));
+      this.revisionsLoaded = true;
+      this.cloudHashes = new Map();
+      for (const op of state) {
+        if (op.changeType === "delete" || !op.payload) continue;
+        this.cloudHashes.set(this.keyOf(op.pageId, op.objectKind, op.objectId), hashText(JSON.stringify(op.payload)));
+      }
+      this.conflict = false;
+      this.report({ conflict: false, updateAvailable: false });
+      await this.saveToCloud();
+    } catch (error) {
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({ error: "Der Gerätestand konnte nicht übernommen werden." });
     }
   }
 
@@ -269,6 +382,7 @@ export class MappeCollabSession {
     if (this.destroyed || this.mode === "off" || this.mode === "live" || this.saving) return;
     const { projectId } = this.opts;
     if (!projectAccessStore.canEdit(projectId)) return;
+    if (this.conflict) { this.report({ conflict: true }); return; }
     const ops = this.pendingOps();
     if (ops.length === 0) { this.report({ dirty: false, error: null }); return; }
     this.saving = true;
@@ -284,7 +398,11 @@ export class MappeCollabSession {
       }
       saveBaseline(this.baseKey, this.cloudHashes);
       this.lastIndex = indexProject(currentProject(projectId));
-      this.report({ saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null });
+      try { saveSeenSeq(this.baseKey, await fetchLatestSeq(projectId)); } catch { /* beim nächsten Abgleich */ }
+      this.report({
+        saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null,
+        deviceOnly: false, updateAvailable: false,
+      });
     } catch (error) {
       saveBaseline(this.baseKey, this.cloudHashes);
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });

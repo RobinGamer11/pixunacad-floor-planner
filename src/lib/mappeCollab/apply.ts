@@ -7,7 +7,7 @@
  * keinen eigenen Rückgängig-Schritt.
  */
 import type { PageElement, Project, ProjectPage } from "@/lib/projectStore";
-import { MAPPE_ROOT_PAGE_ID, type MappeObjectOp } from "./types";
+import { MAPPE_META_FIELDS, MAPPE_ROOT_PAGE_ID, type MappeObjectOp } from "./types";
 
 export interface ApplyOptions {
   /**

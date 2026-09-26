@@ -6,7 +6,7 @@
  * das tatsächlich betroffene Objekt.
  */
 import type { PageElement, Project, ProjectPage } from "@/lib/projectStore";
-import { MAPPE_ROOT_PAGE_ID, type LocalMappeOp, type MappeObjectKind } from "./types";
+import { MAPPE_META_FIELDS, MAPPE_META_ID, MAPPE_ROOT_PAGE_ID, type LocalMappeOp, type MappeObjectKind } from "./types";
 
 /** pageId → objectId → { kind, json } */
 export type MappeIndex = Map<string, Map<string, { kind: MappeObjectKind; json: string }>>;
