@@ -7,7 +7,7 @@
  * keinen eigenen Rückgängig-Schritt.
  */
 import type { PageElement, Project, ProjectPage } from "@/lib/projectStore";
-import { MAPPE_ROOT_PAGE_ID, type MappeObjectOp } from "./types";
+import { MAPPE_META_FIELDS, MAPPE_ROOT_PAGE_ID, type MappeObjectOp } from "./types";
 
 export interface ApplyOptions {
   /**
@@ -29,6 +29,15 @@ export function applyMappeOp(
   op: MappeObjectOp,
   options: ApplyOptions = {},
 ): Project | null {
+  if (op.objectKind === "meta") {
+    if (op.changeType === "delete" || !op.payload) return null;
+    const next = { ...project } as unknown as Record<string, unknown>;
+    for (const field of MAPPE_META_FIELDS) {
+      if (field in op.payload) next[field] = (op.payload as Record<string, unknown>)[field];
+    }
+    return next as unknown as Project;
+  }
+
   if (op.objectKind === "page") {
     const pages = project.pages ?? [];
     if (op.changeType === "delete") {

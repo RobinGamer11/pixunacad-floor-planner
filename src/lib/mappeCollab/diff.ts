@@ -6,7 +6,7 @@
  * das tatsächlich betroffene Objekt.
  */
 import type { PageElement, Project, ProjectPage } from "@/lib/projectStore";
-import { MAPPE_ROOT_PAGE_ID, type LocalMappeOp, type MappeObjectKind } from "./types";
+import { MAPPE_META_FIELDS, MAPPE_META_ID, MAPPE_ROOT_PAGE_ID, type LocalMappeOp, type MappeObjectKind } from "./types";
 
 /** pageId → objectId → { kind, json } */
 export type MappeIndex = Map<string, Map<string, { kind: MappeObjectKind; json: string }>>;
@@ -29,6 +29,10 @@ export function indexProject(project: Project | null | undefined): MappeIndex {
       put(index, page.id, el.id, "element", el);
     });
   });
+  const meta: Record<string, unknown> = {};
+  const src = project as unknown as Record<string, unknown>;
+  for (const field of MAPPE_META_FIELDS) if (src[field] !== undefined) meta[field] = src[field];
+  put(index, MAPPE_ROOT_PAGE_ID, MAPPE_META_ID, "meta", meta);
   return index;
 }
 

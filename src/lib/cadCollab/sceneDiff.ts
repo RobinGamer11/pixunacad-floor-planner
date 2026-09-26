@@ -10,6 +10,8 @@ import {
   CAD_LIBRARY_KINDS,
   CAD_LIBRARY_SHEET_ID,
   CAD_OBJECT_KINDS,
+  CAD_STRUCTURE_KINDS,
+  CAD_STRUCTURE_SHEET_ID,
   type CadObjectKind,
   type LocalCadOp,
 } from "./types";
@@ -71,6 +73,23 @@ export function indexSnapshot(snapshot: string | null | undefined): SceneIndex {
     lib.set(kind, byId);
   }
   if (hasLib) index.set(CAD_LIBRARY_SHEET_ID, lib);
+  // Blätter und Ebenen (inkl. Reihenfolge) als eigene Strukturobjekte.
+  const structure = new Map<CadObjectKind, Map<string, string>>();
+  let hasStructure = false;
+  for (const kind of CAD_STRUCTURE_KINDS) {
+    const list = data[kind];
+    const byId = new Map<string, string>();
+    if (Array.isArray(list)) {
+      hasStructure = true;
+      list.forEach((obj, order) => {
+        const id = (obj as { id?: unknown } | null)?.id;
+        if (typeof id !== "string" || !id) return;
+        byId.set(id, JSON.stringify({ ...(obj as Record<string, unknown>), __order: order }));
+      });
+    }
+    structure.set(kind, byId);
+  }
+  if (hasStructure) index.set(CAD_STRUCTURE_SHEET_ID, structure);
   return index;
 }
 

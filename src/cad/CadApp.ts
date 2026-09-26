@@ -1109,6 +1109,22 @@ export class CadApp {
     return this._serializeScene();
   }
 
+  /**
+   * Übernimmt Blatt- bzw. Ebenenliste aus der Cloud – ohne Undo-Schritt und
+   * ohne Werkzeug, Kamera oder Auswahl zu verändern.
+   */
+  applyCollabStructure(kind: "sheets" | "labels", list: Record<string, unknown>[]) {
+    if (this._destroyed) return;
+    if (kind === "sheets") {
+      if (!list.length) return;
+      this.sheetManager.restore(list as any);
+      this._syncSheetSceneMap();
+    } else {
+      this.labelManager.restore(list as any);
+    }
+    this.renderer?.render?.();
+  }
+
   undo() {
     this._maybeSnapshot();
     if (this._historyIndex <= 0) return;

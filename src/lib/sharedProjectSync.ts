@@ -44,6 +44,12 @@ function isPlausibleProject(value: unknown): value is Project {
 export async function hydrateSharedProject(projectId: string): Promise<boolean> {
   const access = projectAccessStore.accessFor(projectId);
   if (!access.shared || access.role === null) return false;
+  // Projekt fehlt auf diesem Gerät (auf einem anderen Gerät angelegt):
+  // leeren Platzhalter anlegen, Inhalte folgen objektweise beim Öffnen.
+  if (!projectStore.getState().projects.some((p) => p.id === projectId)) {
+    const name = projectAccessStore.getState().namesByProject.get(projectId) ?? "Projekt";
+    projectStore.ensureCloudStub(projectId, name);
+  }
   if (hasBaseline(baselineKey("mappe", projectId)) || hasBaseline(baselineKey("cad", projectId))) return false;
   try {
     const doc = await loadProjectDocument(projectId);

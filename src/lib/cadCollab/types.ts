@@ -39,8 +39,21 @@ export function isLibraryKind(kind: string): kind is CadLibraryKind {
   return kind === "libraryDefinitions" || kind === "libraryFolders";
 }
 
-/** Alle synchronisierten Arten (Szene + Bibliothek). */
-export type CadObjectKind = CadSceneKind | CadLibraryKind;
+/**
+ * Zeichnungsstruktur (Blätter und Ebenen) gehört ebenfalls zum Projekt und
+ * läuft über eine eigene, feste „Seite". Ohne sie gingen Objekte auf
+ * weiteren Blättern auf einem zweiten Gerät verloren.
+ */
+export const CAD_STRUCTURE_SHEET_ID = "__structure__";
+export const CAD_STRUCTURE_KINDS = ["sheets", "labels"] as const;
+export type CadStructureKind = (typeof CAD_STRUCTURE_KINDS)[number];
+
+export function isStructureKind(kind: string): kind is CadStructureKind {
+  return kind === "sheets" || kind === "labels";
+}
+
+/** Alle synchronisierten Arten (Szene + Bibliothek + Struktur). */
+export type CadObjectKind = CadSceneKind | CadLibraryKind | CadStructureKind;
 
 export type CadChangeType = "create" | "update" | "delete";
 

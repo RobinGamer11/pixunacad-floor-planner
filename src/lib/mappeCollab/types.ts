@@ -7,7 +7,23 @@
  */
 
 /** Ein synchronisierbares Objekt der Projektmappe. */
-export const MAPPE_KINDS = ["page", "element"] as const;
+export const MAPPE_KINDS = ["page", "element", "meta"] as const;
+
+/** Einziges Metadaten-Objekt je Projekt (Name, Adresse, Mappenstruktur …). */
+export const MAPPE_META_ID = "project";
+
+/**
+ * Synchronisierte Projektmetadaten. Bewusst NICHT enthalten: Seiten (eigene
+ * Objekte), CAD-Blätter (laufen über die CAD-Schicht), Dateiablage und
+ * Vorschaubild (groß), sowie gerätespezifische Oberfläche (aktive Mappe,
+ * Sortierung, Ordner, Favorit, Papierkorb).
+ */
+export const MAPPE_META_FIELDS = [
+  "name", "ort", "bauherr", "projektTyp", "status", "erstelltAm", "createdAtIso",
+  "adrStrasse", "adrHausnummer", "adrPlz", "adrOrt", "adrLand",
+  "projektStart", "projektEnde", "tasks", "events", "konzept", "konzeptTitle",
+  "customFields", "mappen", "settings", "textSpanTemplates",
+] as const;
 export type MappeObjectKind = (typeof MAPPE_KINDS)[number];
 
 /** Seiten liegen nicht auf einer Seite – sie nutzen diese Kennung. */

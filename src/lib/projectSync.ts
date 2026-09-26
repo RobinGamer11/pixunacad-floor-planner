@@ -27,11 +27,26 @@ export interface ProjectSyncState {
   saving: boolean;
   error: string | null;
   lastSavedAt: number | null;
+  /**
+   * Gerätestand und Cloudstand weichen beim ersten Öffnen auf diesem Gerät
+   * voneinander ab – es muss ausdrücklich gewählt werden.
+   */
+  conflict: boolean;
+  /** In der Cloud liegt ein neuerer Stand, lokal gibt es aber offene Änderungen. */
+  updateAvailable: boolean;
+  /** Es liegt noch kein Cloud-Erststand vor (nur auf diesem Gerät). */
+  deviceOnly: boolean;
 }
 
 export interface ProjectSyncSource {
   /** Überträgt ausschließlich die geänderten Objekte. */
   save(): Promise<void>;
+  /** Cloudstand prüfen und – ohne offene lokale Änderungen – übernehmen. */
+  refresh?(): Promise<void>;
+  /** Ausdrückliche Wahl: Cloudstand laden (lokale Abweichungen verwerfen). */
+  loadCloud?(): Promise<void>;
+  /** Ausdrückliche Wahl: Gerätestand wird Hauptstand (mit Sicherheitskopie). */
+  keepDevice?(): Promise<void>;
 }
 
 interface SourceEntry {
@@ -45,6 +60,9 @@ const EMPTY: ProjectSyncState = {
   saving: false,
   error: null,
   lastSavedAt: null,
+  conflict: false,
+  updateAvailable: false,
+  deviceOnly: false,
 };
 
 const sources = new Map<string, Map<string, SourceEntry>>();
@@ -63,14 +81,20 @@ function recompute(projectId: string) {
     let saving = false;
     let error: string | null = null;
     let lastSavedAt: number | null = null;
+    let conflict = false;
+    let updateAvailable = false;
+    let deviceOnly = false;
     for (const entry of entries) {
       if (MODE_RANK[entry.state.mode] > MODE_RANK[mode]) mode = entry.state.mode;
       dirty = dirty || entry.state.dirty;
       saving = saving || entry.state.saving;
       error = error ?? entry.state.error;
+      conflict = conflict || entry.state.conflict;
+      updateAvailable = updateAvailable || entry.state.updateAvailable;
+      deviceOnly = deviceOnly || entry.state.deviceOnly;
       if (entry.state.lastSavedAt) lastSavedAt = Math.max(lastSavedAt ?? 0, entry.state.lastSavedAt);
     }
-    combined.set(projectId, { mode, dirty, saving, error, lastSavedAt });
+    combined.set(projectId, { mode, dirty, saving, error, lastSavedAt, conflict, updateAvailable, deviceOnly });
   }
   listeners.forEach((fn) => fn());
 }
@@ -115,6 +139,21 @@ export async function saveProjectToCloud(projectId: string): Promise<void> {
   const entries = [...(sources.get(projectId)?.values() ?? [])];
   for (const entry of entries) {
     await entry.source.save();
+  }
+}
+
+/** Cloudstand prüfen (Öffnen, Rückkehr in die App, Button „Aus Cloud aktualisieren“). */
+export async function refreshProjectFromCloud(projectId: string): Promise<void> {
+  const entries = [...(sources.get(projectId)?.values() ?? [])];
+  for (const entry of entries) await entry.source.refresh?.();
+}
+
+/** Ausdrückliche Konfliktentscheidung für alle Quellen des Projekts. */
+export async function resolveProjectConflict(projectId: string, choice: "cloud" | "device"): Promise<void> {
+  const entries = [...(sources.get(projectId)?.values() ?? [])];
+  for (const entry of entries) {
+    if (choice === "cloud") await entry.source.loadCloud?.();
+    else await entry.source.keepDevice?.();
   }
 }
 
