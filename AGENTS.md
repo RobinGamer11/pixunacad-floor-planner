@@ -295,3 +295,7 @@ Falls der Push nicht erfolgreich war, muss dies deutlich hervorgehoben werden.
 
 Jede Abschlussmeldung endet mit einem vollständigen PowerShell-Befehl für den
 jeweils nächsten sinnvollen Schritt.
+
+## Kontoübergreifende Projektspeicherung
+- Öffnen/Laden/Übernehmen folgt ausschließlich `decideOpen` in `src/lib/cloudProjectState.ts` (CAD und Mappe gleich) – so gibt es nur eine Regel: Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
+- CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`), Projektmetadaten als Mappen-Objekt `meta` – ohne sie fehlen Inhalte auf dem zweiten Gerät.
