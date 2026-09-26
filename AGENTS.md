@@ -299,3 +299,5 @@ jeweils nächsten sinnvollen Schritt.
 ## Kontoübergreifende Projektspeicherung
 - Öffnen/Laden/Übernehmen folgt ausschließlich `decideOpen` in `src/lib/cloudProjectState.ts` (CAD und Mappe gleich) – so gibt es nur eine Regel: Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
 - CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`), Projektmetadaten als Mappen-Objekt `meta` – ohne sie fehlen Inhalte auf dem zweiten Gerät.
+- `cloud` (Cloudbasis, darf laden/sichern) und `shared` (mind. eine weitere berechtigte Person) sind getrennt in `ProjectAccess`; Realtime/Präsenz/Sperren nur bei weiteren Personen – verhindert Team-Anzeigen und Kosten bei Solo-Cloudprojekten.
+- Papierkorb von Cloudprojekten folgt `network_projects.deleted_at` über `src/lib/cloudTrash.ts` (offene lokale Aktionen haben Vorrang) – damit gelöschte Projekte nicht als Platzhalter zurückkehren.

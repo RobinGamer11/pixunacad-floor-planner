@@ -109,4 +109,4 @@ einen; Abbruch einer schwebenden Kopie entfernt alle Kopien ohne Historienrest.
 Die Pipette überträgt nie Geometrie, Position, Größe, Drehung, Inhalt oder IDs
 und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 
-- [x] Kontoübergreifende Projektspeicherung (Code fertig; Abnahme mit zwei echten Geräten + SQL-Migrationen offen)
+- [x] Kontoübergreifende Projektspeicherung inkl. cloud/shared-Trennung, Mappen-CAD-Ausschnitte aus Cloud, cloudweiter Papierkorb (offen: SQL-Migrationen, Abnahme auf zwei echten Geräten)
