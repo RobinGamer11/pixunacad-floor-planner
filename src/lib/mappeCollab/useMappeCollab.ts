@@ -40,7 +40,7 @@ export function useMappeCollab({
 }: UseMappeCollabArgs) {
   const { session: authSession } = useAuth();
   // Startet neu, sobald ein Projekt in der Cloud registriert wurde.
-  const cloudRegistered = useProjectAccess(projectId).shared;
+  const cloudRegistered = useProjectAccess(projectId).cloud;
   const [status, setStatus] = useState<MappeCollabStatus>(EMPTY);
   const sessionRef = useRef<MappeCollabSession | null>(null);
   const editingRef = useRef<string | null>(editingElementId);
@@ -51,7 +51,7 @@ export function useMappeCollab({
   useEffect(() => {
     const userId = authSession?.user?.id;
     if (!projectId || !userId) return;
-    if (!projectAccessStore.accessFor(projectId).shared) return;
+    if (!projectAccessStore.accessFor(projectId).cloud) return;
 
     const displayName =
       (authSession?.user?.user_metadata?.display_name as string | undefined) ||

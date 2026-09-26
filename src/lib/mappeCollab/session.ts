@@ -137,7 +137,7 @@ export class MappeCollabSession {
   async start(): Promise<void> {
     const { projectId } = this.opts;
     const access = projectAccessStore.accessFor(projectId);
-    if (!access.shared || access.role === null) return; // rein persönliche Mappe
+    if (!access.cloud || access.role === null) return; // rein persönliche Mappe
     this.baseKey = baselineKey("mappe", projectId);
     this.cloudHashes = loadBaseline(this.baseKey);
     this.lastIndex = indexProject(currentProject(projectId));

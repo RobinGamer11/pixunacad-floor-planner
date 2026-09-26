@@ -41,7 +41,7 @@ function selectionObjectId(selection: unknown): string | null {
 export function useCadCollab(app: CadApp | null, projectId: string | undefined) {
   const { session: authSession } = useAuth();
   // Startet neu, sobald ein Projekt in der Cloud registriert wurde.
-  const cloudRegistered = useProjectAccess(projectId).shared;
+  const cloudRegistered = useProjectAccess(projectId).cloud;
   const [status, setStatus] = useState<CollabStatus>(EMPTY);
   const sessionRef = useRef<CadCollabSession | null>(null);
 
@@ -49,7 +49,7 @@ export function useCadCollab(app: CadApp | null, projectId: string | undefined) 
     const userId = authSession?.user?.id;
     if (!app || !projectId || !userId) return;
     const access = projectAccessStore.accessFor(projectId);
-    if (!access.shared) return; // rein persönliches Projekt: unverändert lokal
+    if (!access.cloud) return; // rein persönliches Projekt: unverändert lokal
 
     const displayName =
       (authSession?.user?.user_metadata?.display_name as string | undefined) ||

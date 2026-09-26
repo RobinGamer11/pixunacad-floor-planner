@@ -39,7 +39,12 @@ export interface ProjectAccess {
   projectId: string;
   /** null = keine Mitgliedschaft bekannt (fremdes oder unbekanntes Projekt). */
   role: ProjectRole | null;
-  /** true, wenn das Projekt in der gemeinsamen Datenbasis geführt wird. */
+  /** true, wenn das Projekt eine Cloudbasis hat (darf laden/sichern). */
+  cloud: boolean;
+  /**
+   * true, wenn mindestens eine weitere berechtigte Person zum Projekt gehört.
+   * Nur dann gibt es Team-/Freigabe-Anzeigen, Realtime, Präsenz und Sperren.
+   */
   shared: boolean;
   overrides: ProjectPermissionOverrides;
   permissions: ProjectPermissions;
@@ -91,6 +96,7 @@ function deviationsOf(role: ProjectRole, perms: ProjectPermissions): (keyof Proj
 
 const LOCAL_OWNER: Omit<ProjectAccess, "projectId"> = {
   role: "owner",
+  cloud: false,
   shared: false,
   overrides: {},
   permissions: permissionsForRole("owner"),
@@ -122,6 +128,8 @@ interface AccessState {
   otherMembersByProject: Map<string, number>;
   /** projectId → Projektname aus der Cloud (für Projekte, die lokal noch fehlen). */
   namesByProject: Map<string, string>;
+  /** projectId → cloudweiter Papierkorb-Zeitpunkt (null = aktiv). */
+  deletedAtByProject: Map<string, string | null>;
 }
 
 let state: AccessState = {
@@ -132,6 +140,7 @@ let state: AccessState = {
   byProject: new Map(),
   otherMembersByProject: new Map(),
   namesByProject: new Map(),
+  deletedAtByProject: new Map(),
 };
 
 const listeners = new Set<() => void>();
@@ -153,7 +162,8 @@ function buildAccess(projectId: string, role: ProjectRole, overrides: ProjectPer
   return {
     projectId,
     role,
-    shared: true,
+    cloud: true,
+    shared: false, // wird nach dem Zählen der Mitglieder gesetzt
     overrides,
     permissions,
     deviations: deviationsOf(role, permissions),
@@ -172,8 +182,15 @@ async function loadAccess(): Promise<void> {
   }
   const myId = session.user.id;
   try {
+    // `deleted_at` kommt aus 20260926120000_project_trash.sql. Fehlt die
+    // Spalte noch, ohne Papierkorbstatus weiterarbeiten.
+    const loadOwned = async () => {
+      const withTrash = await client.from("network_projects").select("id,owner_id,name,deleted_at");
+      if (!withTrash.error) return withTrash;
+      return client.from("network_projects").select("id,owner_id,name");
+    };
     const [{ data: owned, error: ownedErr }, { data: memberships, error: memberErr }] = await Promise.all([
-      client.from("network_projects").select("id,owner_id,name"),
+      loadOwned(),
       client.from("project_members").select("project_id,user_id,role,permissions"),
     ]);
     if (ownedErr) throw ownedErr;
@@ -198,8 +215,10 @@ async function loadAccess(): Promise<void> {
     }
     // Ownership hat immer Vorrang und wird nie von Overrides berührt.
     const namesByProject = new Map<string, string>();
-    for (const row of (owned ?? []) as { id: string; owner_id: string; name?: string | null }[]) {
+    const deletedAtByProject = new Map<string, string | null>();
+    for (const row of (owned ?? []) as { id: string; owner_id: string; name?: string | null; deleted_at?: string | null }[]) {
       if (row.name) namesByProject.set(row.id, row.name);
+      if ("deleted_at" in row) deletedAtByProject.set(row.id, row.deleted_at ?? null);
       addPerson(row.id, row.owner_id);
       if (row.owner_id === myId) byProject.set(row.id, buildAccess(row.id, "owner", {}));
       else if (!byProject.has(row.id)) {
@@ -207,6 +226,7 @@ async function loadAccess(): Promise<void> {
         byProject.set(row.id, {
           projectId: row.id,
           role: null,
+          cloud: true,
           shared: true,
           overrides: {},
           permissions: { canEdit: false, canManageMembers: false, canComment: false },
@@ -217,8 +237,14 @@ async function loadAccess(): Promise<void> {
 
     const otherMembersByProject = new Map<string, number>();
     for (const [projectId, people] of peopleByProject) otherMembersByProject.set(projectId, people.size);
+    // „shared“ = Teamprojekt: mindestens eine weitere berechtigte Person.
+    for (const [projectId, access] of byProject) {
+      if (access.role === null) continue;
+      const shared = (otherMembersByProject.get(projectId) ?? 0) > 0;
+      if (shared !== access.shared) byProject.set(projectId, { ...access, shared });
+    }
 
-    state = { loading: false, ready: true, schemaMissing: false, myId, byProject, otherMembersByProject, namesByProject };
+    state = { loading: false, ready: true, schemaMissing: false, myId, byProject, otherMembersByProject, namesByProject, deletedAtByProject };
     emit();
   } catch (error) {
     state = {
@@ -229,6 +255,7 @@ async function loadAccess(): Promise<void> {
       byProject: new Map(),
       otherMembersByProject: new Map(),
       namesByProject: new Map(),
+      deletedAtByProject: new Map(),
     };
     emit();
   }

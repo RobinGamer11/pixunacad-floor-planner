@@ -178,7 +178,7 @@ export class CadCollabSession {
   async start(): Promise<void> {
     const { projectId } = this.opts;
     const access = projectAccessStore.accessFor(projectId);
-    if (!access.shared || access.role === null) return; // rein lokales Projekt
+    if (!access.cloud || access.role === null) return; // rein lokales Projekt
     this.baseKey = baselineKey("cad", projectId);
     this.cloudHashes = loadBaseline(this.baseKey);
     this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());

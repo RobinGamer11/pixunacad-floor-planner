@@ -742,6 +742,14 @@ function changeSignature(a: Project, b: Project): string {
  * Serverseitig gilt dieselbe Regel zusätzlich per RLS. */
 let _writeGuard: ((projectId: string) => boolean) | null = null;
 let _systemWrite = false;
+/** Meldet lokale Papierkorb-Aktionen an die cloudweite Papierkorb-Synchronisierung. */
+let _trashHook: ((op: "delete" | "restore" | "purge", projectId: string) => void) | null = null;
+function systemWrite(fn: () => void) {
+  _systemWrite = true;
+  const prevSuspend = _suspendHistory;
+  _suspendHistory = true;
+  try { fn(); } finally { _suspendHistory = prevSuspend; _systemWrite = false; }
+}
 const writeBlockListeners = new Set<(projectId: string) => void>();
 
 function canWriteProject(id: string): boolean {
@@ -1094,6 +1102,40 @@ export const projectStore = {
         p.id === id ? { ...p, deletedAt: new Date().toISOString() } : p
       ),
     }));
+    _trashHook?.("delete", id);
+  },
+  /** Blattszenen aus dem CAD-Cloudstand übernehmen (ohne Verlauf, ohne Upload). */
+  applyCloudSheets: (id: string, sheets: Sheet[]) => {
+    if (!state.projects.some((p) => p.id === id)) return;
+    systemWrite(() => setState((s) => ({
+      projects: s.projects.map((p) => (p.id === id ? { ...p, sheets } : p)),
+    })));
+  },
+  setTrashHook: (hook: ((op: "delete" | "restore" | "purge", projectId: string) => void) | null) => {
+    _trashHook = hook;
+  },
+  /** Cloudweiten Papierkorbstatus übernehmen (ohne erneute Meldung an die Cloud). */
+  applyCloudTrash: (id: string, deletedAt: string | null) => {
+    const cur = state.projects.find((p) => p.id === id);
+    if (!cur) return;
+    if ((cur.deletedAt ?? null) === deletedAt || (!!cur.deletedAt && !!deletedAt)) return;
+    systemWrite(() => setState((s) => ({
+      projects: s.projects.map((p) => {
+        if (p.id !== id) return p;
+        return deletedAt
+          ? { ...p, deletedAt }
+          : { ...p, deletedAt: undefined, sortIndex: nextTopIndex(s.projects, p.folderId ?? null) };
+      }),
+    })));
+  },
+  /** Auf einem anderen Gerät endgültig gelöscht → hier ebenfalls entfernen. */
+  purgeProjectFromCloud: (id: string) => {
+    if (!state.projects.some((p) => p.id === id)) return;
+    systemWrite(() => setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) })));
+    try {
+      import("./timelineStore").then((m) => m.timelineStore.deleteProject(id)).catch(() => {});
+      localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
+    } catch {}
   },
   /**
    * Erstellt eine 1:1-Kopie eines Projekts (Seiten, Elemente, Mappen, Blätter,
@@ -2355,10 +2397,12 @@ export const projectStore = {
         p.id === id ? { ...p, deletedAt: undefined, sortIndex: nextTopIndex(s.projects, p.folderId ?? null) } : p
       ),
     }));
+    _trashHook?.("restore", id);
     return true;
   },
   purgeProject: (id: string) => {
     setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) }));
+    _trashHook?.("purge", id);
     try {
       import("./timelineStore").then((m) => m.timelineStore.deleteProject(id)).catch(() => {});
       localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);

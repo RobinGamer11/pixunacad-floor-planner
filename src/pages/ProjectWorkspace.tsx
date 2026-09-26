@@ -11,6 +11,8 @@ import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 import { StepHints } from "@/components/cad/StepHints";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { refreshCadSheetsFromCloud, useCloudSheetLoading } from "@/lib/cadCollab/cloudSheetPreview";
+import { useProjectAccess } from "@/lib/projectAccess";
 import {
   ChevronLeft,
   ChevronRight,
@@ -244,10 +246,32 @@ type ProjectZoomAnchor =
   | { kind: "page"; pageId: string; xRatio: number; yRatio: number; clientX: number; clientY: number }
   | { kind: "viewport"; contentX: number; contentY: number; mx: number; my: number };
 
+/** Mappe: CAD-Ausschnitte beim Öffnen und bei Rückkehr aus der Cloud prüfen. */
+function useCloudCadSheets(projectId: string | undefined) {
+  const cloud = useProjectAccess(projectId).cloud;
+  React.useEffect(() => {
+    if (!projectId || !cloud) return;
+    void refreshCadSheetsFromCloud(projectId, true);
+    let last = Date.now();
+    const onReturn = () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < 15_000) return;
+      last = Date.now();
+      void refreshCadSheetsFromCloud(projectId, false);
+    };
+    document.addEventListener("visibilitychange", onReturn);
+    window.addEventListener("focus", onReturn);
+    return () => {
+      document.removeEventListener("visibilitychange", onReturn);
+      window.removeEventListener("focus", onReturn);
+    };
+  }, [projectId, cloud]);
+}
+
 export default function ProjectWorkspace() {
   // Linke Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne Scrollbar.
   const leftRailScroll = useDragScroll<HTMLElement>("y");
   const { projectId } = useParams();
+  useCloudCadSheets(projectId);
   const rawProject = useProject(projectId);
   const navigate = useNavigate();
 
@@ -6017,6 +6041,8 @@ function renderCadViewSnapshot(
 
 function CadViewportViewHost({ element }: { element: PageElement }) {
   const projects = useProjects();
+  const { projectId: routeProjectId } = useParams();
+  const cloudLoading = useCloudSheetLoading(routeProjectId);
   const { sheet } = React.useMemo(() => {
     let s: import("@/lib/projectStore").Sheet | undefined;
     if (element.sheetId) {
@@ -6029,6 +6055,18 @@ function CadViewportViewHost({ element }: { element: PageElement }) {
   }, [projects, element.sheetId]);
   // Automatische Aktualisierung ist pro CAD-Blatt-Objekt einstellbar.
   const autoUpdate = element.autoUpdate !== false;
+  // Neuerer CAD-Cloudstand wird geladen: keinen veralteten Ausschnitt zeigen.
+  if (cloudLoading && autoUpdate) {
+    return (
+      <div
+        className="w-full h-full flex items-center justify-center text-xs text-muted-foreground border border-dashed"
+        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}
+        role="status"
+      >
+        CAD-Stand wird aus der Cloud aktualisiert …
+      </div>
+    );
+  }
   return (
     <CadViewportView
       element={element}
