@@ -93,6 +93,10 @@ function isCloudProject(projectId: string): boolean {
 /** Lokale Papierkorb-Aktion vermerken und an die Cloud übertragen. */
 export function recordTrashOp(op: TrashOp, projectId: string): void {
   if (!isCloudProject(projectId)) return;
+  // Nur Besitzer (endgültig löschen) bzw. Besitzer/Admins (Papierkorb) wirken
+  // cloudweit – für alle anderen bleibt es wie bisher eine lokale Aktion.
+  const role = projectAccessStore.accessFor(projectId).role;
+  if (op === "purge" ? role !== "owner" : role !== "owner" && role !== "admin") return;
   const pending = loadPendingTrash();
   pending[projectId] = { op, at: new Date().toISOString() };
   write(PENDING_KEY, pending);

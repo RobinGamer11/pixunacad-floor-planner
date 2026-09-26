@@ -10,6 +10,17 @@ Alle Dateien sind additiv und wiederholbar (idempotent). Bestehende
 3. `20260831093000_project_access.sql` – Rollen, Rechte, geteilte Projektdokumente
 4. `20260901090000_time_devices_attachments.sql` – Zeiten, Abwesenheiten, Geräte, Anhänge
 5. `20260902090000_comments.sql` – Kommentare in CAD/Projektmappe
+6. `20260907120000_contact_by_email.sql` und `20260907130000_contact_by_email_fix.sql` – Kontakte per E-Mail
+7. `20260916120000_cad_collab.sql` – objektbasierte CAD-Zusammenarbeit
+8. `20260916150000_collab_revisions.sql` – Revisionen, Objektzustand, Mappen-Zusammenarbeit
+9. **`20260916170000_collab_ops_prune.sql` – NEU und notwendig:** begrenzt die
+   Operationslisten (`cad_object_ops` / `mappe_object_ops`). Ohne diese Datei
+   wachsen die Listen unbegrenzt und die Cloud-Sicherung läuft ins
+   Speicherkontingent. Löscht nur Operationen, deren Zustand sicher in den
+   Zustandstabellen steht; der Projektstand bleibt vollständig erhalten.
+10. **`20260926120000_project_trash.sql` – NEU:** cloudweiter Papierkorb
+    (`network_projects.deleted_at`). Ohne diese Datei funktioniert alles
+    weiter, der Papierkorb bleibt dann aber je Gerät getrennt.
 
 Jede Datei komplett in den SQL-Editor kopieren und einzeln ausführen. `NOTICE …
 skipping` bei Wiederholungen ist erwartet.
