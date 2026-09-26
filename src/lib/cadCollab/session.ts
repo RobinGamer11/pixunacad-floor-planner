@@ -26,6 +26,7 @@ import {
   type BaselineHashes,
 } from "@/lib/cloudBaseline";
 import { registerProjectSyncSource, reportProjectSyncSource } from "@/lib/projectSync";
+import { decideOpen, loadSeenSeq, saveSeenSeq, writeSafetyCopy } from "@/lib/cloudProjectState";
 import { applyLibraryOp } from "./applyLibraryOps";
 import { applyOpToScene } from "./applyOps";
 import { diffSceneIndexes, indexSnapshot, type SceneIndex } from "./sceneDiff";
@@ -43,7 +44,9 @@ import {
   type RemoteLock,
 } from "./opsRepo";
 import {
+  CAD_STRUCTURE_SHEET_ID,
   isLibraryKind,
+  isStructureKind,
   presenceColor,
   type CadLibraryKind,
   type CadObjectKind,
@@ -78,6 +81,8 @@ export interface CollabCadApp {
   libraryDefinitions?: unknown[];
   libraryFolders?: unknown[];
   onLibraryChange?: () => void;
+  /** Übernimmt Blatt- bzw. Ebenenliste aus der Cloud (ohne Undo-Schritt). */
+  applyCollabStructure?(kind: "sheets" | "labels", list: Record<string, unknown>[]): void;
   /** Serialisierungsstand der gesamten Zeichnung (bestehende Methode). */
   serializeForCollab(): string | null;
 }
@@ -147,6 +152,9 @@ export class CadCollabSession {
   private policyTimer = 0;
   private saving = false;
   private unregisterSync: (() => void) | null = null;
+  /** Gerätestand und Cloudstand weichen ab – bis zur ausdrücklichen Wahl gesperrt. */
+  private conflict = false;
+  private refreshing = false;
   private status: CollabStatus = {
     connected: false,
     mode: "off",
@@ -177,18 +185,18 @@ export class CadCollabSession {
     this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
     this.unregisterSync = registerProjectSyncSource(projectId, "cad", {
       save: () => this.saveToCloud(),
+      refresh: () => this.refreshFromCloud(),
+      loadCloud: () => this.loadCloud(),
+      keepDevice: () => this.keepDevice(),
     });
 
     this.mode = projectAccessStore.otherMemberCount(projectId) === 0 ? "local" : "standby";
     this.setStatus({ mode: this.mode });
+    this.report({ mode: this.mode });
 
-    // Beim Öffnen den gemeinsamen Objektstand holen – aber nur, wenn lokal
-    // nichts Ungesichertes wartet. Eigene Arbeit wird nie überschrieben.
-    const firstOpen = !hasBaseline(this.baseKey);
-    if (firstOpen || this.pendingOps().length === 0) {
-      await this.pullRemoteState();
-    }
-    this.refreshDirty();
+    // Beim Öffnen den Cloudstand prüfen. Eigene offene Arbeit wird nie
+    // überschrieben, lokaler Leerstand nie in die Cloud gedrückt.
+    await this.refreshFromCloud();
     if (this.mode === "standby") this.connectPresence();
     else this.policyTimer = window.setInterval(() => this.syncPolicy(), 10_000);
   }
@@ -252,7 +260,10 @@ export class CadCollabSession {
       ops.push({ sheetId, objectId, objectKind: kind as CadObjectKind, changeType: "delete", payload: null });
     }
     // Bibliotheksdefinitionen zuerst: eine Instanz darf nie ohne Geometrie ankommen.
-    ops.sort((a, b) => Number(isLibraryKind(b.objectKind)) - Number(isLibraryKind(a.objectKind)));
+    // Blätter/Ebenen zuerst, dann Bibliotheksdefinitionen: Objekte kommen nie
+    // ohne ihr Blatt bzw. ihre Geometrie an.
+    const rank = (k: string) => (isStructureKind(k) ? 2 : isLibraryKind(k) ? 1 : 0);
+    ops.sort((a, b) => rank(b.objectKind) - rank(a.objectKind));
     return ops;
   }
 
@@ -282,18 +293,131 @@ export class CadCollabSession {
     reportProjectSyncSource(this.opts.projectId, "cad", partial);
   }
 
-  /** Holt den gemeinsamen Objektstand (reines Lesen). */
-  private async pullRemoteState(): Promise<void> {
+  private keyOf(sheetId: string, kind: string, objectId: string): string {
+    return `${sheetId}${BASELINE_SEP}${kind}${BASELINE_SEP}${objectId}`;
+  }
+
+  /** Echte Zeichnungsobjekte (ohne Blätter, Ebenen und Bibliotheksdefinitionen). */
+  private contentCount(flat: Map<string, string>): number {
+    let n = 0;
+    for (const key of flat.keys()) {
+      const kind = key.split(BASELINE_SEP)[1];
+      if (!isLibraryKind(kind) && !isStructureKind(kind)) n += 1;
+    }
+    return n;
+  }
+
+  /**
+   * Cloudstand prüfen – beim Öffnen, bei Rückkehr in die App und über
+   * „Aus Cloud aktualisieren“. Entscheidung nach `decideOpen`.
+   */
+  async refreshFromCloud(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live" || this.refreshing || this.saving) return;
+    this.refreshing = true;
     try {
-      const state = await fetchObjectState(this.opts.projectId);
-      this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
-      this.revisionsLoaded = true;
-      if (state.length) this.applyRemoteOps(state);
-      this.lastSeq = await fetchLatestSeq(this.opts.projectId);
-      this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
-      this.baselineFromCurrent();
+      const { projectId } = this.opts;
+      const [state, latestSeq] = await Promise.all([fetchObjectState(projectId), fetchLatestSeq(projectId)]);
+      if (this.destroyed) return;
+      const local = this.flatten(indexSnapshot(this.opts.app.serializeForCollab()));
+      const decision = decideOpen({
+        hasBaseline: hasBaseline(this.baseKey),
+        localContent: this.contentCount(local),
+        remoteLive: state.filter((op) => op.changeType !== "delete").length,
+        pending: this.pendingOps().length,
+        remoteChanged: latestSeq > loadSeenSeq(this.baseKey),
+      });
+      this.conflict = decision === "conflict";
+      if (decision === "apply") {
+        this.replaceWithRemote(state);
+        this.lastSeq = latestSeq;
+        saveSeenSeq(this.baseKey, latestSeq);
+      } else {
+        this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
+        this.revisionsLoaded = true;
+      }
+      this.report({
+        conflict: this.conflict,
+        updateAvailable: decision === "updateAvailable",
+        deviceOnly: decision === "deviceOnly",
+      });
+      this.refreshDirty();
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+    } finally {
+      this.refreshing = false;
+    }
+  }
+
+  /**
+   * Ersetzt den lokalen Zeichnungsstand durch den Cloudstand: Cloud-Objekte
+   * übernehmen, lokal zusätzlich vorhandene Objekte entfernen. Keine Mischung.
+   */
+  private replaceWithRemote(state: CadObjectOp[]) {
+    this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
+    this.revisionsLoaded = true;
+    const remoteKeys = new Set(state.map((op) => this.keyOf(op.sheetId, op.objectKind, op.objectId)));
+    const local = this.flatten(indexSnapshot(this.opts.app.serializeForCollab()));
+    const removals: CadObjectOp[] = [];
+    for (const key of local.keys()) {
+      if (remoteKeys.has(key)) continue;
+      const [sheetId, kind, objectId] = key.split(BASELINE_SEP);
+      // Das Standardblatt bleibt immer bestehen.
+      if (isStructureKind(kind)) continue;
+      removals.push({
+        id: `local-${objectId}`, projectId: this.opts.projectId, sheetId, objectId,
+        objectKind: kind as CadObjectKind, changeType: "delete", payload: null,
+        objectVersion: this.revisions.get(`${sheetId}|${objectId}`) ?? 0,
+      } as CadObjectOp);
+    }
+    this.applyRemoteOps([...state, ...removals]);
+    this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
+    this.conflict = false;
+    this.baselineFromCurrent();
+  }
+
+  /** Ausdrückliche Wahl: Cloudstand laden. */
+  async loadCloud(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live") return;
+    try {
+      const { projectId } = this.opts;
+      const [state, latestSeq] = await Promise.all([fetchObjectState(projectId), fetchLatestSeq(projectId)]);
+      if (this.destroyed) return;
+      this.replaceWithRemote(state);
+      this.lastSeq = latestSeq;
+      saveSeenSeq(this.baseKey, latestSeq);
+      this.report({ conflict: false, updateAvailable: false, deviceOnly: false, error: null });
+      this.refreshDirty();
+    } catch (error) {
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({ error: "Der Cloudstand konnte nicht geladen werden." });
+    }
+  }
+
+  /**
+   * Ausdrückliche Wahl: Gerätestand wird Hauptstand. Vorher lokale
+   * Sicherheitskopie; danach werden alle abweichenden Objekte geschrieben und
+   * in der Cloud überzählige Objekte gelöscht (Löschzustände bleiben erhalten).
+   */
+  async keepDevice(): Promise<void> {
+    if (this.destroyed || this.mode === "off" || this.mode === "live") return;
+    const { projectId } = this.opts;
+    const snapshot = this.opts.app.serializeForCollab();
+    if (snapshot) writeSafetyCopy("cad", projectId, snapshot);
+    try {
+      const state = await fetchObjectState(projectId);
+      this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
+      this.revisionsLoaded = true;
+      this.cloudHashes = new Map();
+      for (const op of state) {
+        if (op.changeType === "delete" || !op.payload) continue;
+        this.cloudHashes.set(this.keyOf(op.sheetId, op.objectKind, op.objectId), hashText(JSON.stringify(op.payload)));
+      }
+      this.conflict = false;
+      this.report({ conflict: false, updateAvailable: false });
+      await this.saveToCloud();
+    } catch (error) {
+      this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({ error: "Der Gerätestand konnte nicht übernommen werden." });
     }
   }
 
@@ -305,6 +429,8 @@ export class CadCollabSession {
     if (this.destroyed || this.mode === "off" || this.mode === "live" || this.saving) return;
     const { projectId } = this.opts;
     if (!projectAccessStore.canEdit(projectId)) return;
+    // Bei abweichenden Ständen nie automatisch mischen – erst ausdrücklich wählen.
+    if (this.conflict) { this.report({ conflict: true }); return; }
     const ops = this.pendingOps();
     if (ops.length === 0) { this.report({ dirty: false, error: null }); return; }
     this.saving = true;
@@ -320,7 +446,11 @@ export class CadCollabSession {
       }
       saveBaseline(this.baseKey, this.cloudHashes);
       this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
-      this.report({ saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null });
+      try { saveSeenSeq(this.baseKey, await fetchLatestSeq(projectId)); } catch { /* beim nächsten Abgleich */ }
+      this.report({
+        saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null,
+        deviceOnly: false, updateAvailable: false,
+      });
     } catch (error) {
       saveBaseline(this.baseKey, this.cloudHashes);
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
@@ -343,7 +473,7 @@ export class CadCollabSession {
    * Ausgangsbasis bilden, danach Einzeloperationen und Vorschauen.
    */
   private async goLive(): Promise<void> {
-    if (this.destroyed || this.mode === "live" || this.activating) return;
+    if (this.destroyed || this.mode === "live" || this.activating || this.conflict) return;
     window.clearTimeout(this.graceTimer);
     this.graceTimer = 0;
     this.activating = true;
@@ -543,12 +673,50 @@ export class CadCollabSession {
 
   /* --------------------------------------------------- Fremde Änderungen */
 
+  /** Blatt- und Ebenenliste aus Einzeloperationen neu zusammensetzen. */
+  private applyStructureOps(ops: CadObjectOp[]): boolean {
+    const app = this.opts.app;
+    if (!app.applyCollabStructure || ops.length === 0) return false;
+    let data: Record<string, unknown> = {};
+    try { data = JSON.parse(app.serializeForCollab() ?? "{}") as Record<string, unknown>; } catch { /* leer */ }
+    let changed = false;
+    for (const kind of ["sheets", "labels"] as const) {
+      const mine = ops.filter((op) => op.objectKind === kind);
+      if (mine.length === 0) continue;
+      const current = (Array.isArray(data[kind]) ? data[kind] : []) as Record<string, unknown>[];
+      const byId = new Map<string, Record<string, unknown> & { __order?: number }>();
+      current.forEach((item, i) => { if (typeof item?.id === "string") byId.set(item.id, { ...item, __order: i }); });
+      for (const op of mine) {
+        if (op.changeType === "delete") byId.delete(op.objectId);
+        else if (op.payload) byId.set(op.objectId, { ...(op.payload as Record<string, unknown>), id: op.objectId });
+      }
+      const list = [...byId.values()]
+        .sort((a, b) => (a.__order ?? 0) - (b.__order ?? 0))
+        .map(({ __order: _o, ...rest }) => rest);
+      if (kind === "sheets" && list.length === 0) continue; // mindestens ein Blatt
+      app.applyCollabStructure(kind, list);
+      changed = true;
+    }
+    return changed;
+  }
+
   private applyRemoteOps(ops: CadObjectOp[]) {
     if (ops.length === 0) return;
     this.applyingRemote = true;
     let changed = false;
     try {
+      const structure: CadObjectOp[] = [];
       for (const op of ops) {
+        if (!isStructureKind(op.objectKind)) continue;
+        const key = `${op.sheetId}|${op.objectId}`;
+        const known = this.revisions.get(key) ?? 0;
+        if (op.objectVersion < known) continue;
+        this.revisions.set(key, Math.max(known, op.objectVersion));
+        structure.push(op);
+      }
+      changed = this.applyStructureOps(structure) || changed;
+      for (const op of ops) {
+        if (isStructureKind(op.objectKind)) continue;
         const key = `${op.sheetId}|${op.objectId}`;
         const known = this.revisions.get(key) ?? 0;
         if (op.objectVersion < known) continue; // älterer Stand gewinnt nie
