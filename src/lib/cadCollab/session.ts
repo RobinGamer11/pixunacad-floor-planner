@@ -44,7 +44,6 @@ import {
   type RemoteLock,
 } from "./opsRepo";
 import {
-  CAD_STRUCTURE_SHEET_ID,
   isLibraryKind,
   isStructureKind,
   presenceColor,
