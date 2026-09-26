@@ -29,6 +29,10 @@ export function indexProject(project: Project | null | undefined): MappeIndex {
       put(index, page.id, el.id, "element", el);
     });
   });
+  const meta: Record<string, unknown> = {};
+  const src = project as unknown as Record<string, unknown>;
+  for (const field of MAPPE_META_FIELDS) if (src[field] !== undefined) meta[field] = src[field];
+  put(index, MAPPE_ROOT_PAGE_ID, MAPPE_META_ID, "meta", meta);
   return index;
 }
 
