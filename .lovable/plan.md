@@ -34,6 +34,34 @@ Derselbe Benutzer sieht auf allen Geräten denselben gespeicherten CAD- und Mapp
 6. **Gleiches Konto auf mehreren Geräten**
    - Erkennung über Revisionsvergleich (kein Realtime nötig). Präsenzzählung zählt weiterhin nur andere Personen für den Teammodus.
 
+## Verbindliche Zusatzpunkte
+
+7. **Vollständiger objektbasierter Cloud-Erststand bei Übernahme**
+   - Registrierung allein reicht nicht: der gewählte Gerätestand wird komplett objektweise veröffentlicht.
+   - Umfang: alle CAD-Objekte inkl. Bibliotheksobjekte, Dokumente, Ebenenzuordnung; alle Mappenseiten und Elemente; Projektname und Seitenstruktur; Löschzustände (Tombstones), damit alte Objekte nicht wieder auftauchen.
+   - Erst nach vollständig erfolgreichem Upload wird das Projekt als „In Cloud gesichert“ markiert; danach Rücklese-Prüfung (Objektanzahl/Revision) wie auf einem frischen zweiten Gerät.
+
+8. **Neue Projekte scheitern nie am Cloudzugriff**
+   - Projekt zuerst lokal anlegen, dann `ensureSharedProject` nicht-blockierend starten.
+   - Bei Offline/keine Anmeldung/DB-Fehler: Projekt bleibt nutzbar, Status „Nur auf diesem Gerät“; erneuter Versuch beim nächsten Öffnen oder über „In Cloud sichern“.
+   - Leere oder halbfertige Cloudprojekte (ohne abgeschlossenen Erststand) gelten nie als verbindlicher Stand.
+
+9. **Cloudstand hat nach Migration Vorrang**
+   - Lokaler Leerstand auf einem neuen Gerät überschreibt nie den Cloudstand.
+   - Übernahme aus der Cloud nur ohne ungesicherte lokale Änderungen.
+   - Bei Konflikt immer explizite Wahl „Cloudstand laden“ / „Gerätestand als Hauptstand übernehmen“.
+   - Vor „Gerätestand als Hauptstand übernehmen“ wird eine lokale Sicherheitskopie angelegt.
+
+10. **Trennung Projektdaten / Geräteoberfläche**
+    - Synchronisiert: CAD-Zeichnung, Mappeninhalt, Seiten, Objekte, Ebenen, Bibliotheksinstanzen, relevante Projektmetadaten.
+    - Lokal pro Gerät: aktives Werkzeug, Zoom/Kamera, offene Panels, Auswahl, persönliche Anzeigepräferenzen.
+
+11. **Abnahme mit demselben Konto**
+    - Gerät A ändert und sichert → Gerät B öffnet/holt in den Vordergrund → CAD und Mappe identisch.
+    - Gerät B überschreibt Stand A nicht durch Leerstand.
+    - Derselbe Test für ein altes, bisher rein lokales Projekt.
+    - Umsetzung als automatisierte Tests mit zwei simulierten Geräten (getrennte lokale Speicher, gemeinsames Cloud-Repo); echte Browser-Abnahme erfordert eine Anmeldung in der Vorschau.
+
 ## Unverändert
 - Zeichenlogik, Renderer, Werkzeuge.
 - `user_workspaces` bleibt reine Einstellungs-Sicherung (keine Gesamtsnapshots).

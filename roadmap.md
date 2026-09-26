@@ -108,3 +108,5 @@ Regeln: Vorschau/Hover erzeugt keinen Undo-Schritt; jede bestätigte Aktion gena
 einen; Abbruch einer schwebenden Kopie entfernt alle Kopien ohne Historienrest.
 Die Pipette überträgt nie Geometrie, Position, Größe, Drehung, Inhalt oder IDs
 und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
+
+- [ ] Kontoübergreifende Projektspeicherung (Cloud-Erststand, Vorrang Cloud, Statusanzeige) – Plan wartet auf Freigabe
