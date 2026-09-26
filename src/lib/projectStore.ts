@@ -1104,6 +1104,13 @@ export const projectStore = {
     }));
     _trashHook?.("delete", id);
   },
+  /** Blattszenen aus dem CAD-Cloudstand übernehmen (ohne Verlauf, ohne Upload). */
+  applyCloudSheets: (id: string, sheets: Sheet[]) => {
+    if (!state.projects.some((p) => p.id === id)) return;
+    systemWrite(() => setState((s) => ({
+      projects: s.projects.map((p) => (p.id === id ? { ...p, sheets } : p)),
+    })));
+  },
   setTrashHook: (hook: ((op: "delete" | "restore" | "purge", projectId: string) => void) | null) => {
     _trashHook = hook;
   },
