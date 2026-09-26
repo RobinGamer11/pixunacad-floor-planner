@@ -183,7 +183,7 @@ export function useCadCollab(app: CadApp | null, projectId: string | undefined) 
       sessionRef.current = null;
       setStatus(EMPTY);
     };
-  }, [app, projectId, authSession]);
+  }, [app, projectId, authSession, cloudRegistered]);
 
   return { status, session: sessionRef };
 }

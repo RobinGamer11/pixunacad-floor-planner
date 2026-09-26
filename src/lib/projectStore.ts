@@ -1017,6 +1017,44 @@ export const projectStore = {
       _systemWrite = false;
     }
   },
+  /**
+   * Leerer lokaler Platzhalter für ein Projekt, das nur in der Cloud existiert
+   * (z. B. auf einem anderen Gerät angelegt). Inhalte kommen beim Öffnen
+   * objektweise aus der Cloud; der Platzhalter überschreibt sie nie, weil er
+   * keine Inhaltsobjekte enthält.
+   */
+  ensureCloudStub: (id: string, name: string) => {
+    if (getState().projects.some((p) => p.id === id)) return;
+    const firstPageId = `${id}-p1`;
+    const mappeId = `m-${id}-main`;
+    const stub: Project = {
+      id,
+      name: name || "Projekt",
+      ort: "",
+      thumbnail: placeholder(name || "Projekt"),
+      createdAtIso: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      pages: [
+        { id: firstPageId, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
+      ],
+      sheets: [],
+      tasks: [],
+      events: [],
+      mappen: [{ id: mappeId, name: "Hauptmappe", konzept: "", pageIds: [firstPageId] }],
+      activeMappeId: mappeId,
+      files: [],
+      settings: { timelinePosition: "bottom", mappeHelpOn: true },
+    };
+    _systemWrite = true;
+    const prevSuspend = _suspendHistory;
+    _suspendHistory = true;
+    try {
+      setState((s) => ({ projects: [...s.projects, { ...migrateProject(stub), sortIndex: nextTopIndex(s.projects, null) }] }));
+    } finally {
+      _suspendHistory = prevSuspend;
+      _systemWrite = false;
+    }
+  },
   createProject: () => {
     const id = `p-${Date.now().toString(36)}`;
     const firstPageId = `${id}-p1`;

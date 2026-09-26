@@ -120,6 +120,8 @@ interface AccessState {
   byProject: Map<string, ProjectAccess>;
   /** projectId → Anzahl weiterer berechtigter Personen (ohne einen selbst). */
   otherMembersByProject: Map<string, number>;
+  /** projectId → Projektname aus der Cloud (für Projekte, die lokal noch fehlen). */
+  namesByProject: Map<string, string>;
 }
 
 let state: AccessState = {
@@ -129,6 +131,7 @@ let state: AccessState = {
   myId: null,
   byProject: new Map(),
   otherMembersByProject: new Map(),
+  namesByProject: new Map(),
 };
 
 const listeners = new Set<() => void>();
@@ -170,7 +173,7 @@ async function loadAccess(): Promise<void> {
   const myId = session.user.id;
   try {
     const [{ data: owned, error: ownedErr }, { data: memberships, error: memberErr }] = await Promise.all([
-      client.from("network_projects").select("id,owner_id"),
+      client.from("network_projects").select("id,owner_id,name"),
       client.from("project_members").select("project_id,user_id,role,permissions"),
     ]);
     if (ownedErr) throw ownedErr;
@@ -194,7 +197,9 @@ async function loadAccess(): Promise<void> {
       byProject.set(row.project_id, buildAccess(row.project_id, role, parseOverrides(row.permissions)));
     }
     // Ownership hat immer Vorrang und wird nie von Overrides berührt.
-    for (const row of (owned ?? []) as { id: string; owner_id: string }[]) {
+    const namesByProject = new Map<string, string>();
+    for (const row of (owned ?? []) as { id: string; owner_id: string; name?: string | null }[]) {
+      if (row.name) namesByProject.set(row.id, row.name);
       addPerson(row.id, row.owner_id);
       if (row.owner_id === myId) byProject.set(row.id, buildAccess(row.id, "owner", {}));
       else if (!byProject.has(row.id)) {
@@ -213,7 +218,7 @@ async function loadAccess(): Promise<void> {
     const otherMembersByProject = new Map<string, number>();
     for (const [projectId, people] of peopleByProject) otherMembersByProject.set(projectId, people.size);
 
-    state = { loading: false, ready: true, schemaMissing: false, myId, byProject, otherMembersByProject };
+    state = { loading: false, ready: true, schemaMissing: false, myId, byProject, otherMembersByProject, namesByProject };
     emit();
   } catch (error) {
     state = {
@@ -223,6 +228,7 @@ async function loadAccess(): Promise<void> {
       myId,
       byProject: new Map(),
       otherMembersByProject: new Map(),
+      namesByProject: new Map(),
     };
     emit();
   }

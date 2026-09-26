@@ -86,7 +86,7 @@ export function useMappeCollab({
       sessionRef.current = null;
       setStatus(EMPTY);
     };
-  }, [projectId, authSession]);
+  }, [projectId, authSession, cloudRegistered]);
 
   // Präsenz je geöffneter Seite.
   useEffect(() => {
