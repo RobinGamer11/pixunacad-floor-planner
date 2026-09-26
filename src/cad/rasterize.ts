@@ -401,3 +401,47 @@ export function maybeRasterize(app: any, input: RasterInput): void {
   }
   rasterizeObject(app, input);
 }
+
+/**
+ * Ermittelt das aktuell ausgewählte, nachträglich in Pixel umwandelbare
+ * Vektorobjekt (Linie, Freihand, Schraffur/Polygon, Text).
+ * - `null`: keine Auswahl
+ * - `{ unsupported: true }`: Auswahl vorhanden, aber nicht sicher umwandelbar
+ */
+export function getConvertibleSelection(
+  app: any,
+): RasterInput | { unsupported: true } | null {
+  const sel = app?.selection;
+  const scene = app?.scene;
+  if (!sel || !scene) return null;
+  const t = sel.type;
+  if ((t === "segment" || t === "point") && sel.segmentId) {
+    const seg = scene.getSegmentById?.(sel.segmentId);
+    if (seg && !seg.isGuide) return { type: "segment", obj: seg };
+  } else if (t === "free_stroke" && sel.freeStrokeId) {
+    const fs = scene.getFreeStrokeById?.(sel.freeStrokeId);
+    if (fs) return { type: "free", obj: fs };
+  } else if (t === "hatch" && sel.hatchId) {
+    const h = scene.getHatchById?.(sel.hatchId);
+    if (h) return { type: "hatch", obj: h };
+  } else if ((t === "textbox" || t === "textbox_handle") && sel.textBoxId) {
+    const tb = scene.getTextBoxById?.(sel.textBoxId);
+    if (tb) return { type: "text", obj: tb };
+  }
+  return { unsupported: true };
+}
+
+/**
+ * Nachträgliche Umwandlung eines ausgewählten Vektorobjekts — exakt derselbe
+ * Weg wie bei neu im Pixelmodus gezeichneten Objekten (rasterizeIntoLayer).
+ * Das Vektororiginal wird erst nach erfolgreichem Einbrennen entfernt; ein
+ * Undo-Schritt stellt es wieder her. Kein Bildobjekt-Fallback.
+ */
+export function convertSelectionToPixel(app: any): boolean {
+  const target = getConvertibleSelection(app);
+  if (!target || "unsupported" in target) return false;
+  if (!app?.rasterLayers?.get) return false;
+  const ok = rasterizeIntoLayer(app, target);
+  if (ok) app.defaultDrawRasterMode = "pixel";
+  return ok;
+}
