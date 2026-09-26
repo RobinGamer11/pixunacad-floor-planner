@@ -2,6 +2,11 @@ import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { projectStore } from "@/lib/projectStore";
+import { convertSelectionToPixel, getConvertibleSelection } from "@/cad/rasterize";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Props {
   app: CadApp | MiniCad | null | undefined;
@@ -62,9 +67,34 @@ export const RasterModeToggle: React.FC<Props> = ({ app, projectId }) => {
     saveQuality({ dpi: next });
   };
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
+
   const apply = (next: "vector" | "pixel") => {
+    setHint(null);
+    if (next === "pixel" && app) {
+      const target = getConvertibleSelection(app);
+      if (target && !("unsupported" in target)) {
+        // Ausgewähltes Vektorobjekt: erst nach Bestätigung umwandeln.
+        setConfirmOpen(true);
+        return;
+      }
+      if (target) {
+        setHint("Dieses ausgewählte Objekt kann nicht in Pixel umgewandelt werden. Der Pixelmodus gilt nur für neu gezeichnete Objekte.");
+      }
+    }
     if (app) (app as any).defaultDrawRasterMode = next;
     setMode(next);
+  };
+
+  const confirmConvert = () => {
+    setConfirmOpen(false);
+    if (!app) return;
+    if (convertSelectionToPixel(app)) {
+      setMode("pixel");
+    } else {
+      setHint("Umwandlung fehlgeschlagen – das Objekt bleibt unverändert als Vektor bestehen.");
+    }
   };
 
   const btn = (value: "vector" | "pixel", label: string) => (
@@ -90,6 +120,23 @@ export const RasterModeToggle: React.FC<Props> = ({ app, projectId }) => {
           ? "Pixel: Das fertige Objekt wird als Bild abgelegt — Radiergummi (auch Smooth) funktioniert wie bei PNGs, aber Punkte/Text/Muster sind danach nicht mehr editierbar."
           : "Vektor: Objekt bleibt jederzeit editierbar (Punkte, Text, Muster)."}
       </div>
+      {hint && (
+        <div className="text-[10px] leading-tight mt-1.5 text-destructive">{hint}</div>
+      )}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>In Pixel umwandeln?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Das Objekt wird auf die Pixeloberfläche eingebrannt. Punkte, Text-, Muster- und Vektoreinstellungen können danach nicht mehr bearbeitet werden. Rückgängig ist direkt über Rückgängig möglich.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmConvert}>In Pixel umwandeln</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {mode === "pixel" && (
         <div className="mt-2 pt-2 space-y-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
           <div>
