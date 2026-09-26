@@ -769,7 +769,7 @@ export class CadCollabSession {
     this.lastPreviewAt = now;
     const ops = diffSceneIndexes(this.lastIndex, indexSnapshot(this.opts.app.serializeForCollab()));
     for (const op of ops) {
-      if (isLibraryKind(op.objectKind)) continue; // Definitionen nie als Vorschau
+      if (isLibraryKind(op.objectKind) || isStructureKind(op.objectKind)) continue; // nie als Vorschau
       this.previewed.set(`${op.sheetId}|${op.objectId}`, op);
       this.emitPreview(op.sheetId, op.objectId, op.objectKind, op.payload);
     }

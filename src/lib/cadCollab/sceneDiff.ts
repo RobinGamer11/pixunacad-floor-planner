@@ -10,6 +10,8 @@ import {
   CAD_LIBRARY_KINDS,
   CAD_LIBRARY_SHEET_ID,
   CAD_OBJECT_KINDS,
+  CAD_STRUCTURE_KINDS,
+  CAD_STRUCTURE_SHEET_ID,
   type CadObjectKind,
   type LocalCadOp,
 } from "./types";
