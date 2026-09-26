@@ -1024,7 +1024,7 @@ export const projectStore = {
    * keine Inhaltsobjekte enthält.
    */
   ensureCloudStub: (id: string, name: string) => {
-    if (getState().projects.some((p) => p.id === id)) return;
+    if (state.projects.some((p) => p.id === id)) return;
     const firstPageId = `${id}-p1`;
     const mappeId = `m-${id}-main`;
     const stub: Project = {
