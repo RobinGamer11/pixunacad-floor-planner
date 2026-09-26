@@ -43,7 +43,7 @@ function isPlausibleProject(value: unknown): value is Project {
  */
 export async function hydrateSharedProject(projectId: string): Promise<boolean> {
   const access = projectAccessStore.accessFor(projectId);
-  if (!access.shared || access.role === null) return false;
+  if (!access.cloud || access.role === null) return false;
   // Projekt fehlt auf diesem Gerät (auf einem anderen Gerät angelegt):
   // leeren Platzhalter anlegen, Inhalte folgen objektweise beim Öffnen.
   if (!projectStore.getState().projects.some((p) => p.id === projectId)) {
@@ -78,7 +78,7 @@ export function resetSharedSyncState(_projectId?: string) {
 export function sharedProjectIds(): Set<string> {
   const ids = new Set<string>();
   projectAccessStore.getState().byProject.forEach((access, id) => {
-    if (access.shared && access.role !== null) ids.add(id);
+    if (access.cloud && access.role !== null) ids.add(id);
   });
   return ids;
 }

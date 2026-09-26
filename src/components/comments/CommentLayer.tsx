@@ -80,7 +80,7 @@ export function CommentLayer({
 
   const place = (e: React.PointerEvent) => {
     if (!ui.mode) return;
-    if (access.shared && !access.permissions.canComment) return;
+    if (access.cloud && !access.permissions.canComment) return;
     const r = hostRef.current?.getBoundingClientRect();
     if (!r || r.width <= 0 || r.height <= 0) return;
     e.stopPropagation();
