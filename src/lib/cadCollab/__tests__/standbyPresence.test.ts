@@ -30,7 +30,7 @@ vi.mock("@/lib/networkClient", () => ({
 
 vi.mock("@/lib/projectAccess", () => ({
   projectAccessStore: {
-    accessFor: () => ({ shared: true, role: "editor" }),
+    accessFor: () => ({ cloud: true, shared: true, role: "editor" }),
     otherMemberCount: () => 1,
     canEdit: () => true,
   },
