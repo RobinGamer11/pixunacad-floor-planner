@@ -2591,6 +2591,20 @@ export class MiniCad {
         }
       }
 
+      // Schraffurwerkzeug: wie im normalen CAD über die bestehenden HatchTool-Methoden abschließen.
+      if (!inField && this._activeTool === "hatch") {
+        const ht: any = this.hatchTool;
+        if (e.key === "Enter") {
+          let done = false;
+          if (ht.drawMode === "circle" && ht.circleState === "arc") { ht.finishCircleFromKey(); done = true; }
+          else done = !!ht.finishFromKey();
+          if (done) { e.preventDefault(); this._changeDirty = true; try { this.onSelectionChange?.(); } catch {} return; }
+        }
+        if (e.key === "Backspace" && typeof ht.removeLastPoint === "function") {
+          if (ht.removeLastPoint()) { e.preventDefault(); return; }
+        }
+      }
+
       // ENTER platziert ein schwebendes Dokument (PNG/JPG/PDF) endgültig.
       if (e.key === "Enter" && !inField && this._activeTool === "document") {
         if ((this.documentTool as any).finishFromKey?.()) {
