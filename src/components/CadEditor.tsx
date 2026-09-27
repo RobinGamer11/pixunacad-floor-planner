@@ -1629,8 +1629,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             style={{
               left: Math.max(8, doorHub.screenX + 12),
               top: Math.max(8, doorHub.screenY + 12),
-              background: "white",
-              border: "1px solid hsl(var(--border))",
+              background: "hsl(var(--surface-card))",
+              color: "hsl(var(--ink))",
+              border: "1px solid hsl(var(--hairline))",
               boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
             }}
             onMouseDown={(e) => e.stopPropagation()}
@@ -1855,8 +1856,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               style={{
                 left: Math.max(8, docHub.screenX + 12),
                 top: Math.max(8, docHub.screenY + 12),
-                background: "white",
-                border: "1px solid hsl(var(--border))",
+                background: "hsl(var(--surface-card))",
+                color: "hsl(var(--ink))",
+                border: "1px solid hsl(var(--hairline))",
                 boxShadow: "0 4px 16px -4px rgba(0,0,0,0.18)",
               }}
               onMouseDown={(e) => e.stopPropagation()}
