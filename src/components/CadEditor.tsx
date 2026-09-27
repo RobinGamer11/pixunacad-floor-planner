@@ -1657,7 +1657,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 }
               }}
               className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
-              style={{ borderColor: "hsl(var(--border))" }}
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}
               title="Breite (m)"
             />
             <span className="text-[10px] opacity-60 mr-1">m</span>
@@ -1682,7 +1682,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 }
               }}
               className="text-[11px] w-[72px] px-1.5 py-1 rounded border tabular-nums"
-              style={{ borderColor: "hsl(var(--border))" }}
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}
               title="Position auf Wand (m ab Wandanfang)"
             />
             <span className="text-[10px] opacity-60">m</span>
@@ -1879,7 +1879,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     onChange={(e) => setDocHubDx(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") applyMove(); else if (e.key === "Escape") closeHub(); }}
                     className="text-[11px] w-[60px] px-1.5 py-1 rounded border tabular-nums"
-                    style={{ borderColor: "hsl(var(--border))" }}
+                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}
                     title="Δx (m)" placeholder="Δx"
                   />
                   <input
@@ -1888,7 +1888,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     onChange={(e) => setDocHubDy(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") applyMove(); else if (e.key === "Escape") closeHub(); }}
                     className="text-[11px] w-[60px] px-1.5 py-1 rounded border tabular-nums"
-                    style={{ borderColor: "hsl(var(--border))" }}
+                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}
                     title="Δy (m)" placeholder="Δy"
                   />
                   <span className="text-[10px] opacity-60 mr-1">m</span>
@@ -1913,7 +1913,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     onChange={(e) => setDocHubRot(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") applyRotate(); else if (e.key === "Escape") closeHub(); }}
                     className="text-[11px] w-[64px] px-1.5 py-1 rounded border tabular-nums"
-                    style={{ borderColor: "hsl(var(--border))" }}
+                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}
                     title="Drehwinkel absolut (°)" placeholder="°"
                   />
                   <span className="text-[10px] opacity-60">°</span>
