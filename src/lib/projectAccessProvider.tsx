@@ -77,7 +77,8 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
       sharedProjectIds().forEach((id) => {
         if (hydrated.has(id)) return;
         hydrated.add(id);
-        void hydrateSharedProject(id);
+        // Erst Papierkorbstatus abgleichen, danach hydratisieren.
+        void flushPendingTrash().then(() => { reconcileCloudTrash(); return hydrateSharedProject(id); });
       });
     };
     const offAccess = projectAccessStore.subscribe(hydrateAll);

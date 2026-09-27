@@ -49,11 +49,13 @@ export async function hydrateSharedProject(projectId: string): Promise<boolean> 
   // leeren Platzhalter anlegen, Inhalte folgen objektweise beim Öffnen.
   if (!projectStore.getState().projects.some((p) => p.id === projectId)) {
     // Auf diesem Gerät bereits endgültig gelöscht (wartet auf die Cloud): nicht zurückholen.
-    if (loadPendingTrash()[projectId]?.op === "purge") return false;
+    // Ausstehende Lösch-/Papierkorbaktion dieses Geräts: nie als aktiven Platzhalter zurückholen.
+    const pendingOp = loadPendingTrash()[projectId]?.op;
+    if (pendingOp === "purge" || pendingOp === "delete") return false;
     const name = projectAccessStore.getState().namesByProject.get(projectId) ?? "Projekt";
-    projectStore.ensureCloudStub(projectId, name);
-    // Im cloudweiten Papierkorb → auch hier nur im Papierkorb anzeigen.
     const deletedAt = projectAccessStore.getState().deletedAtByProject.get(projectId);
+    projectStore.ensureCloudStub(projectId, name);
+    // Im cloudweiten Papierkorb → im selben Schritt nur im Papierkorb anzeigen.
     if (deletedAt) projectStore.applyCloudTrash(projectId, deletedAt);
   }
   if (hasBaseline(baselineKey("mappe", projectId)) || hasBaseline(baselineKey("cad", projectId))) return false;
