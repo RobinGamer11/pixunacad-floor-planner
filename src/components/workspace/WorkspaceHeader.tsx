@@ -303,6 +303,12 @@ const buttonStyle = {
   color: "hsl(var(--ink))",
   borderColor: "hsl(var(--hairline))",
 };
+/** Auffälliger Gold-Stil wie die aktive Bedienungshilfe – für Cloud-Hinweise, die der Nutzer sehen soll. */
+const highlightStyle = {
+  background: "hsl(var(--accent-gold))",
+  color: "hsl(var(--surface))",
+  borderColor: "hsl(var(--accent-gold))",
+};
 
 function CloudSaveControl({ projectId }: { projectId?: string }) {
   useCloudProjectLifecycle(projectId);
@@ -362,7 +368,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
           if (!res.ok) toast({ title: "Nur auf diesem Gerät", description: res.message, variant: "destructive" });
         }}
         className={`${chip} border`}
-        style={buttonStyle}
+        style={highlightStyle}
         title="Dieses Projekt ist noch nicht mit deinem Konto verbunden. Klicken, um es in der Cloud anzumelden."
       >
         <Smartphone size={14} /> Nur auf diesem Gerät
@@ -374,7 +380,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
     return (
       <span
         className={chip}
-        style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
+        style={highlightStyle}
         title="Alle Änderungen werden direkt mit dem Team synchronisiert."
       >
         <Users size={14} /> Live im Team
@@ -384,7 +390,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
 
   if (sync.saving) {
     return (
-      <span className={chip} style={mutedStyle}>
+      <span className={chip} style={highlightStyle}>
         <Loader2 size={14} className="animate-spin" /> Synchronisiere Änderungen …
       </span>
     );
@@ -396,7 +402,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
         <button
           onClick={() => setDecisionOpen(true)}
           className={`${chip} border`}
-          style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}
+          style={highlightStyle}
           title="Bitte wählen, welcher Stand gelten soll."
         >
           <AlertTriangle size={14} /> {sync.conflict ? "Stände abweichend" : "Aktualisierung verfügbar"}
@@ -411,7 +417,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
       <button
         onClick={() => { void saveProjectToCloud(projectId); }}
         className={`${chip} border`}
-        style={{ borderColor: "hsl(var(--destructive))", color: "hsl(var(--destructive))" }}
+        style={highlightStyle}
         title={`${sync.error} Erneut versuchen?`}
       >
         <CloudUpload size={14} /> Sicherung fehlgeschlagen
@@ -428,7 +434,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
         <button
           onClick={() => { void refreshProjectFromCloud(projectId); }}
           className="h-8 w-8 rounded-md grid place-items-center"
-          style={mutedStyle}
+          style={highlightStyle}
           title="Aus Cloud aktualisieren"
           aria-label="Aus Cloud aktualisieren"
         >
@@ -442,7 +448,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
     <button
       onClick={() => { void saveProjectToCloud(projectId); }}
       className={`${chip} border`}
-      style={buttonStyle}
+      style={highlightStyle}
       title={sync.deviceOnly
         ? "Noch kein Cloudstand – klicken, um den Stand dieses Geräts vollständig in die Cloud zu übernehmen."
         : "Lokal gespeichert – noch nicht in Cloud gesichert"}
