@@ -30,7 +30,7 @@ CAD-Modus bleibt optisch und funktional unverändert (`Seiten | Werkzeug | Ebene
 ## 6. Aktive Exportseite lokal
 - Die zuletzt geöffnete Exportseite wird derzeit mit dem Projektstand gespeichert (`activePlanId` beim Wiederherstellen). Das entfällt: nicht mehr in Snapshots, Verlauf oder Cloud.
 - Stattdessen lokal je Projekt und Gerät merken; beim Wechsel CAD -> Export öffnet sich die zuletzt genutzte Seite (sonst die erste). Eintreffende Cloud-Änderungen schalten die Seite nie um; wird die aktive Seite anderswo gelöscht, fällt die Ansicht auf die erste Seite zurück.
-- Undo darf die Seite weiterhin aktivieren, deren Änderung zurückgenommen wird (nur lokal, kein gespeicherter Zustand).
+- Undo/Redo verändert ausschließlich die Inhalte und Einstellungen der betroffenen Exportseite. Die aktuell geöffnete Seite bleibt dabei unverändert und ist nie Teil eines Undo-/Redo-Schritts.
 
 ## 7. Altes Feld `Plan.selected` trennen
 - `selected` wird nur noch vom alten Druckplan-Panel im CAD-Modus genutzt (Häkchen, „Ausgewählte drucken“). Es wird aus dem gemeinsamen Planmodell, der Serialisierung, dem Verlauf und dem Cloud-Abgleich entfernt und als lokaler Zustand des alten Druckplan-Panels geführt. Alte Daten mit `selected` werden beim Lesen ignoriert.
@@ -38,6 +38,7 @@ CAD-Modus bleibt optisch und funktional unverändert (`Seiten | Werkzeug | Ebene
 
 ## Prüfung
 - Typprüfung, Build, bestehende Tests; Unit-Tests für Fangpunkte (Rand/Lochung je Seite) und dafür, dass `collapsed` nicht serialisiert wird.
+- Unit-Tests dafür, dass `activePlanId` und `Plan.selected` nicht serialisiert oder per Cloud-Diff übertragen werden.
 - Browser-Test nur ohne Anmeldung möglich (bekannte Einschränkung), sonst Sichtprüfung durch dich: CAD unverändert, Export-Reihenfolge links, genau eine rechte Leiste, keine Druckpläne im Export, Randfang funktioniert und fehlt in der PDF.
 
 ## Technische Details
