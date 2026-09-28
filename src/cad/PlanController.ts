@@ -227,7 +227,7 @@ export class PlanController {
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
       if (this.isSourceMissing(proj)) {
-        const sc = this.app.camera.worldToScreen({ x: proj.x / 1000, y: proj.y / 1000 } as any);
+        const sc = this.app.camera.worldToScreen(proj.x / 1000, proj.y / 1000);
         ctx.save();
         ctx.font = "12px sans-serif";
         ctx.textAlign = "center";
