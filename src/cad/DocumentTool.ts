@@ -49,6 +49,11 @@ export class DocumentTool {
   /** Ziel-Dokument für die Verzerrung + aktiv gezogene Ecke. */
   warpTargetDocId: string | null = null;
   warpDragIdx = -1;
+  /** Ursprungsposition (UV) des ausgewählten, noch unbestätigten Eckpunkts. */
+  warpOrig: { x: number; y: number } | null = null;
+  warpGrabOffset: Vec2 | null = null;
+  /** true, solange ein Eckpunkt ausgewählt, aber noch nicht bestätigt ist. */
+  get warpPending(): boolean { return this.phase === "warp" && this.warpDragIdx >= 0 && !!this.warpOrig; }
   /** Achsen-Beschränkung beim Ziehen: frei | nur X | nur Y. */
   warpAxis: "free" | "x" | "y" = "free";
 
@@ -73,8 +78,15 @@ export class DocumentTool {
     this.scalePoint3 = null;
     this.scaleSnap = null;
     this.anchorTargetDocId = null;
+    // ESC/Beenden verwirft eine noch nicht bestätigte Eckpunkt-Änderung.
+    if (this.warpPending && this.warpTargetDocId) {
+      const d: any = this.app.scene.getDocumentById(this.warpTargetDocId);
+      if (d && Array.isArray(d.warpCorners)) d.warpCorners[this.warpDragIdx] = { ...this.warpOrig! };
+    }
     this.warpTargetDocId = null;
     this.warpDragIdx = -1;
+    this.warpOrig = null;
+    this.warpGrabOffset = null;
     this.app.hub.bindCommit(null);
     this.app.hub.angInputEl.readOnly = true;
     this.onPhaseChange?.();
@@ -115,6 +127,18 @@ export class DocumentTool {
     this.app.setSelection({ type: SelectionType.DOCUMENT, documentId: docId } as any);
     this.onPhaseChange?.();
     this.app.renderer.render();
+  }
+
+  /** Enter/Doppelklick: bestätigt den ausgewählten Eckpunkt (ein Undo-Schritt). */
+  confirmWarpPoint(): boolean {
+    if (!this.warpPending) return false;
+    this.warpDragIdx = -1;
+    this.warpOrig = null;
+    this.warpGrabOffset = null;
+    try { (this.app as any).commitHistorySnapshot?.(); } catch {}
+    (this.app as any)._changeDirty = true;
+    this.app.renderer.render();
+    return true;
   }
 
   isWarping() { return this.phase === "warp"; }
@@ -169,6 +193,7 @@ export class DocumentTool {
   /** ENTER: platziert das schwebende Dokument endgültig (Bild/PDF/JPG).
    *  Ohne vorherigen Linksklick wird die aktuelle Cursor-/Snap-Position genutzt. */
   finishFromKey(): boolean {
+    if (this.phase === "warp") return this.confirmWarpPoint();
     if (this.phase !== "placing" || !this.pendingDoc) return false;
     const pending = this.pendingDoc;
     const target = this.placedPos
@@ -312,30 +337,39 @@ export class DocumentTool {
       const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy));
       this.scaleSnap = snap;
       const mouseS = v(input.mouse.sx, input.mouse.sy);
-      if (input.mouse.left) {
-        if (this.warpDragIdx < 0) {
-          // Ecke greifen
-          let best = -1, bestD = 16;
-          for (let i = 0; i < 4; i++) {
-            const w = this._warpCornerWorld(doc, i);
-            const sp = this.app.camera.worldToScreen(w.x, w.y);
-            const d = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
-            if (d < bestD) { bestD = d; best = i; }
-          }
-          this.warpDragIdx = best;
+      const pointerW = v(input.mouse.wx, input.mouse.wy);
+      // Bestätigen: Doppelklick setzt den ausgewählten Eckpunkt fest.
+      if (input.doubleClicked && this.warpDragIdx >= 0) {
+        this.confirmWarpPoint();
+        return;
+      }
+      // Auswahl: Tippen/Klicken/Drücken nahe einer Ecke wählt sie nur aus.
+      if (this.warpDragIdx < 0 && (input.mouse.left || input.clicked || (input as any).tabletTapped)) {
+        let best = -1, bestD = 22;
+        for (let i = 0; i < 4; i++) {
+          const w = this._warpCornerWorld(doc, i);
+          const sp = this.app.camera.worldToScreen(w.x, w.y);
+          const d = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
+          if (d < bestD) { bestD = d; best = i; }
         }
-        if (this.warpDragIdx >= 0) {
-          const target = snap ? snap.world : v(input.mouse.wx, input.mouse.wy);
-          const uv = this._worldToWarpUV(doc, target);
-          const cur = doc.warpCorners[this.warpDragIdx];
-          const next = { x: uv.x, y: uv.y };
-          if (this.warpAxis === "x") next.y = cur.y;
-          if (this.warpAxis === "y") next.x = cur.x;
-          doc.warpCorners[this.warpDragIdx] = next;
+        if (best >= 0) {
+          this.warpDragIdx = best;
+          this.warpOrig = { ...doc.warpCorners[best] };
+          const cw = this._warpCornerWorld(doc, best);
+          this.warpGrabOffset = v(cw.x - pointerW.x, cw.y - pointerW.y);
           this.app.renderer.render();
         }
-      } else if (this.warpDragIdx >= 0) {
-        this.warpDragIdx = -1;
+        return;
+      }
+      // Live-Vorschau: ausgewählter Punkt folgt Finger/Maus (Snap aktiv).
+      if (this.warpDragIdx >= 0 && this.warpOrig) {
+        const target = snap ? snap.world
+          : v(pointerW.x + (this.warpGrabOffset?.x ?? 0), pointerW.y + (this.warpGrabOffset?.y ?? 0));
+        const uv = this._worldToWarpUV(doc, target);
+        const next = { x: uv.x, y: uv.y };
+        if (this.warpAxis === "x") next.y = this.warpOrig.y;
+        if (this.warpAxis === "y") next.x = this.warpOrig.x;
+        doc.warpCorners[this.warpDragIdx] = next;
         this.app.renderer.render();
       }
       return;

@@ -1056,6 +1056,7 @@ export class CadApp {
     // Don't snapshot during an active point edit (Bewegen/Verschieben/Drehen/Offset),
     // damit Undo den gesamten Edit als einen Schritt zurücknimmt.
     if (this.selectTool && this.selectTool.isEditing()) return;
+    if ((this.documentTool as any)?.warpPending) return;
 
     const snap = this._serializeScene();
     if (snap === this._lastSnapshot) return;
