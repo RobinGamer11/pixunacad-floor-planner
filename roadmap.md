@@ -112,3 +112,4 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Kontoübergreifende Projektspeicherung inkl. cloud/shared-Trennung, Mappen-CAD-Ausschnitte aus Cloud, cloudweiter Papierkorb (offen: SQL-Migrationen, Abnahme auf zwei echten Geräten)
 
 - [ ] Export-Bereich auf CAD-Plan-Engine (Plan mit Präzisierungen, wartet auf Freigabe)
+- [ ] Export: Undo erfasst alle Exportseiten/Ordner/Overlays über Seiten- und Moduswechsel hinweg

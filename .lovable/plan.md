@@ -45,7 +45,15 @@ Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entste
    - Plan-Anmerkungs-Scenes
 
    Der bestehende Weg (`sceneDiff`/`applyOps`/`opsRepo`, `__structure__`) wird vor der Umsetzung im Code geprüft und mit einem Zwei-Geräte-Test abgesichert.
-8. **Mappe unangetastet:** keine Migration, keine Umleitung, keine Löschung.
+8. **Rückgängig-Verlauf projektweit:** Jeder Verlaufsschritt erfasst den vollständigen Zustand:
+   - alle CAD-Blätter
+   - alle Exportseiten und ihre Anmerkungs-Scenes
+   - Ordner und Reihenfolgen
+   - Seiteneinstellungen und Transparenzpausen
+   - Ausschnitt-Referenzen
+
+   Die bestehende Serialisierung `plans`/`planScenesById` wird dafür geprüft und um Ordner und Overlays ergänzt. Eine Änderung auf Seite A bleibt nach dem Wechsel zu Seite B oder zu CAD im Verlauf. Beim Rückgängigmachen wird der betroffene Bereich wieder aktiviert. Ein Test deckt die Abfolge A ändern, zu B wechseln, zu CAD wechseln, Undo ab.
+9. **Mappe unangetastet:** keine Migration, keine Umleitung, keine Löschung.
 
 ## Umsetzung
 
