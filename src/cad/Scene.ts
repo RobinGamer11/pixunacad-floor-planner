@@ -1526,7 +1526,7 @@ export class Scene {
 
     hatch._stickerEditOwnerId = this._currentEditOwnerId;
     this.hatches.push(hatch);
-    this._rebuildHatchIdMap();
+    this._hatchIdMap.set(hatch.id, hatch);
     return hatch;
   }
 
