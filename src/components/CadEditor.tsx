@@ -3487,17 +3487,21 @@ function PdfDissolveControl({ app, docId, docName }: { app: any; docId: string; 
   const [state, setState] = useState<
     | { phase: "idle" }
     | { phase: "analyzing" }
-    | { phase: "confirm"; prep: any }
+    | { phase: "choose"; prep: any; partial: boolean }
     | { phase: "running"; done: number; total: number }
   >({ phase: "idle" });
+  const [inc, setInc] = useState({ texts: true, hatches: true, segments: true });
+  const [useLimit, setUseLimit] = useState(false);
+  const [limit, setLimit] = useState(2000);
   const abortRef = useRef<{ aborted: boolean }>({ aborted: false });
   useEffect(() => { setState({ phase: "idle" }); }, [docId]);
   const fmt = (n: number) => n.toLocaleString("de-DE");
 
-  const runPrep = async (prep: any) => {
+  const runPrep = async (prep: any, opts: { include?: typeof inc; maxObjects?: number } = {}) => {
     abortRef.current = { aborted: false };
     setState({ phase: "running", done: 0, total: prep.counts.total });
     const res = await prep.run({
+      ...opts,
       signal: abortRef.current,
       onProgress: (done: number, total: number) => setState({ phase: "running", done, total }),
     });
@@ -3506,36 +3510,87 @@ function PdfDissolveControl({ app, docId, docName }: { app: any; docId: string; 
       const extra = prep.counts.skippedSpecial
         ? `\n\n${fmt(prep.counts.skippedSpecial)} PDF-Spezialfüllungen (Verläufe/Muster) sind nicht als CAD-Objekt übertragbar und bleiben in der PDF-Unterlage sichtbar.`
         : "";
-      window.alert(`Auflösen erfolgreich:\n${fmt(res.segments)} Linien · ${fmt(res.hatches)} Schraffuren · ${fmt(res.texts)} Texte${extra}`);
+      window.alert(`Auflösen erfolgreich:\n${fmt(res.segments)} Linien · ${fmt(res.hatches)} Flächen · ${fmt(res.texts)} Texte${extra}\n\nNicht übernommene Inhalte bleiben in der PDF-Unterlage sichtbar.`);
     }
   };
 
   const start = async () => {
     if (!app) return;
-    if (!window.confirm(`PDF "${docName}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden in eine neue Ebene "PDF-Import — ${docName}" extrahiert; radierte Bereiche bleiben ausgespart.`)) return;
     setState({ phase: "analyzing" });
     const prep = await app.documentTool.prepareDissolvePdf(docId);
     if (!prep) { setState({ phase: "idle" }); return; }
-    if (prep.counts.total >= PDF_DISSOLVE_WARN_AT) { setState({ phase: "confirm", prep }); return; }
-    await runPrep(prep);
+    setState({ phase: "choose", prep, partial: false });
   };
 
   const box = { borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" } as const;
 
-  if (state.phase === "confirm") {
+  if (state.phase === "choose") {
     const c = state.prep.counts;
+    const high = c.total >= PDF_DISSOLVE_WARN_AT;
+    const selCount = (inc.texts ? c.texts : 0) + (inc.hatches ? c.hatches : 0) + (inc.segments ? c.segments : 0);
+    const partialCount = useLimit ? Math.min(selCount, Math.max(1, limit)) : selCount;
+    const bigBtn = "w-full rounded-md border px-3 py-2 text-left transition-colors hover:opacity-90";
+    const opt = (key: keyof typeof inc, label: string, n: number) => (
+      <label className="flex items-center gap-2 py-1 cursor-pointer">
+        <input type="checkbox" checked={inc[key]} onChange={(e) => setInc({ ...inc, [key]: e.target.checked })} />
+        <span className="flex-1">{label}</span>
+        <span className="tabular-nums text-muted-foreground">{fmt(n)}</span>
+      </label>
+    );
     return (
       <div className="rounded-md border p-2 space-y-2 text-[11px]" style={box}>
-        <div className="font-medium">
-          Diese PDF erzeugt voraussichtlich {fmt(c.total)} bearbeitbare CAD-Objekte. Das kann auf Tablets die Bearbeitung verlangsamen.
+        <div className="font-semibold text-xs">PDF „{docName}“ auflösen</div>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 tabular-nums">
+          <span>Linien</span><span className="text-right">{fmt(c.segments)}</span>
+          <span>Flächen/Schraffuren</span><span className="text-right">{fmt(c.hatches)}</span>
+          <span>Texte</span><span className="text-right">{fmt(c.texts)}</span>
+          <span className="font-semibold">CAD-Objekte gesamt</span><span className="text-right font-semibold">{fmt(c.total)}</span>
         </div>
-        <div className="text-muted-foreground">{fmt(c.segments)} Linien · {fmt(c.hatches)} Flächen · {fmt(c.texts)} Texte</div>
-        <button type="button" className="cad-toolbar-btn w-full justify-center h-9" onClick={() => runPrep(state.prep)}>
-          Vollständig auflösen
-        </button>
-        <button type="button" className="cad-toolbar-btn w-full justify-center h-9" onClick={() => setState({ phase: "idle" })}>
-          Als PDF behalten
-        </button>
+        {high && (
+          <div className="rounded border px-2 py-1.5 font-medium" style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.15)" }}>
+            Achtung: {fmt(c.total)} Objekte können die Bearbeitung – besonders auf Tablets – deutlich verlangsamen.
+          </div>
+        )}
+        {!state.partial ? (
+          <>
+            <button type="button" className={bigBtn} style={box} onClick={() => runPrep(state.prep)}>
+              <div className="text-xs font-semibold">Vollständig auflösen</div>
+              <div className="text-muted-foreground">Alle Linien, Flächen und Texte werden bearbeitbare CAD-Objekte.</div>
+            </button>
+            <button type="button" className={bigBtn} style={box} onClick={() => setState({ ...state, partial: true })}>
+              <div className="text-xs font-semibold">Teilweise auflösen</div>
+              <div className="text-muted-foreground">Selbst wählen, welche Inhalte übernommen werden.</div>
+            </button>
+            <button type="button" className={bigBtn} style={box} onClick={() => setState({ phase: "idle" })}>
+              <div className="text-xs font-semibold">Als PDF behalten</div>
+              <div className="text-muted-foreground">Nichts ändern.</div>
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="font-medium">Welche Inhalte sollen CAD-Objekte werden?</div>
+            {opt("texts", "Texte", c.texts)}
+            {opt("hatches", "Flächen/Schraffuren", c.hatches)}
+            {opt("segments", "Linien", c.segments)}
+            <label className="flex items-center gap-2 py-1 cursor-pointer">
+              <input type="checkbox" checked={useLimit} onChange={(e) => setUseLimit(e.target.checked)} />
+              <span className="flex-1">Höchstens</span>
+              <input type="number" min={1} step={100} value={limit} disabled={!useLimit}
+                onChange={(e) => setLimit(Math.max(1, Number(e.target.value) || 1))}
+                className="w-20 rounded border px-1 py-0.5 text-right" style={box} />
+              <span>Objekte</span>
+            </label>
+            {useLimit && <div className="text-muted-foreground">Reihenfolge: zuerst Texte, dann Flächen, dann Linien.</div>}
+            <div className="text-muted-foreground">Nicht gewählte Inhalte bleiben in der PDF-Unterlage sichtbar.</div>
+            <button type="button" className="cad-toolbar-btn w-full justify-center h-9 font-semibold" disabled={partialCount === 0}
+              onClick={() => runPrep(state.prep, { include: inc, maxObjects: useLimit ? limit : undefined })}>
+              {fmt(partialCount)} Objekte erzeugen
+            </button>
+            <button type="button" className="cad-toolbar-btn w-full justify-center h-8" onClick={() => setState({ ...state, partial: false })}>
+              Zurück
+            </button>
+          </>
+        )}
       </div>
     );
   }
