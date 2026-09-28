@@ -9,6 +9,7 @@ import { OverlayMode } from "@/cad/SheetManager";
 import { usePlanUi, formatLabel } from "./useExportApp";
 import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, FilePlus, Download, Check, Minus, GripVertical, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { getLocalCollapsed, setLocalCollapsed } from "@/lib/exportLocalState";
 
 /**
  * Linke Exportseiten-Leiste: zeigt ausschließlich Exportordner und
@@ -16,7 +17,7 @@ import { toast } from "@/hooks/use-toast";
  * `app.mutatePlans` → genau ein Verlaufsschritt. Die Exportauswahl ist
  * temporärer UI-Zustand und wird nie gespeichert.
  */
-export function ExportSidebar({ app }: { app: CadApp }) {
+export function ExportSidebar({ app, projectId }: { app: CadApp; projectId?: string }) {
   usePlanUi(app);
   const pm = app.planManager;
   const plans = pm.list();
@@ -28,6 +29,14 @@ export function ExportSidebar({ app }: { app: CadApp }) {
   );
   const activeId = app.activePlanId;
 
+  // Auf-/Zuklappen ist lokaler Bedienzustand pro Gerät (nie Projekt/Verlauf/Cloud).
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => getLocalCollapsed(projectId));
+  const toggleCollapsed = (id: string) => setCollapsed(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setLocalCollapsed(projectId, next);
+    return next;
+  });
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -130,10 +139,10 @@ export function ExportSidebar({ app }: { app: CadApp }) {
             <button
               type="button"
               className="h-6 w-5 grid place-items-center"
-              onClick={(e) => { e.stopPropagation(); app.mutatePlans(() => pm.setFolderCollapsed(f.id, !f.collapsed)); }}
-              aria-label={f.collapsed ? "Aufklappen" : "Zuklappen"}
+              onClick={(e) => { e.stopPropagation(); toggleCollapsed(f.id); }}
+              aria-label={collapsed.has(f.id) ? "Aufklappen" : "Zuklappen"}
             >
-              {f.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              {collapsed.has(f.id) ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
             </button>
             <Folder size={14} className="shrink-0" style={{ color: "hsl(var(--accent-gold))" }} />
             {renaming === key ? (
@@ -150,7 +159,7 @@ export function ExportSidebar({ app }: { app: CadApp }) {
               </button>
             )}
           </div>
-          {!f.collapsed && n.children.map(renderNode)}
+          {!collapsed.has(f.id) && n.children.map(renderNode)}
         </div>
       );
     }
