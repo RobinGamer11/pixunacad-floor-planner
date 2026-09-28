@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
+import { MeasureWorkflowPanel } from "@/components/cad/MeasureWorkflowPanel";
 import { RulerSettingsPanel } from "@/components/cad/RulerSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
 import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialog";
@@ -2533,6 +2534,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
           {/* Measure Settings */}
           <div ref={measureSettingsRef} className={`cad-settings-panel hidden`}>
+            {activeTool === ToolIds.MEASURE && (
+              <div className="mb-3"><MeasureWorkflowPanel app={appRef.current} /></div>
+            )}
             {/* Engine-Bindings ohne eigene Oberfläche */}
             <div className="hidden">
               <select ref={measureIdSelectRef} />
