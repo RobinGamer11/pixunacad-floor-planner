@@ -9,6 +9,8 @@
 - Seitenrand und Lochung sind Hilfslinien, werden nie gedruckt.
 - Freischaltung: bis Cloud-Objektsync + Zwei-Geräte-Test verborgen (`src/lib/exportFeature.ts`, `localStorage pixuna.exportPreview=1`).
 
+## Cloud
+- Seiten, Ordner und Transparenzpausen laufen als Strukturobjekte (`plans`, `planFolders`, `planOverlays` auf `__structure__`), Anmerkungs-Scenes als eigene Seiten `plan:<planId>` – einzeln, keine Gesamtstände.
+
 ## Offen
-- Cloud-Objektoperationen für Seiten, Ordner, Overlays, Referenzen und Anmerkungs-Scenes; Zwei-Geräte-Test.
-- `contentRevision` bei direkten Scene-Mutationen ohne Verlaufsschritt und bei Ebenen-Sichtbarkeit zentral erhöhen.
+- Echter Zwei-Geräte-Test, danach Freischaltung des Reiters.
