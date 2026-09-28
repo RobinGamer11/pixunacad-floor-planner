@@ -920,6 +920,7 @@ export class CadApp {
       scenesById: scenesObj,
       // Druckpläne
       plans: this.planManager.toJSON(),
+      planFolders: this.planManager.foldersToJSON(),
       activePlanId: this.activePlanId,
       planScenesById: (() => {
         const out: Record<string, any> = {};
@@ -976,7 +977,7 @@ export class CadApp {
     }
     // Druckpläne wiederherstellen.
     if (Array.isArray(data.plans)) {
-      this.planManager.restore(data.plans);
+      this.planManager.restore(data.plans, Array.isArray(data.planFolders) ? data.planFolders : null);
     } else {
       this.planManager.restore([]);
     }

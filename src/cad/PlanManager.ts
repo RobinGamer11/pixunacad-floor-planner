@@ -1,5 +1,6 @@
 import { clamp } from "./geometry";
 import { normalizeScaleDen } from "@/lib/scale";
+import type { PlanFolder } from "./planTree";
 
 /**
  * Druckpläne: Layout-Blätter mit Papierformat, auf denen Projektionen
@@ -54,6 +55,8 @@ export interface Projection {
   rotation: number;
   /** Clip-Rechteck im LOKALEN Plan-mm-Koordinatensystem der Projektion (relativ zum Mittelpunkt). */
   clip: { left: number; right: number; top: number; bottom: number };
+  /** "linked" = liest live aus dem CAD-Blatt (Standard), "frozen" = sceneSnapshot. */
+  mode?: "linked" | "frozen";
 }
 
 export interface Plan {
@@ -68,8 +71,18 @@ export interface Plan {
   freeHeight: number;
   /** Projektionen auf diesem Plan. */
   projections: Projection[];
-  /** Auswahl-Status für PDF-Sammelexport. */
+  /** @deprecated Altfeld der schwebenden Planliste; Export nutzt temporäre UI-Auswahl. */
   selected: boolean;
+  /** Seitenrand in mm (Hilfslinie, nicht gedruckt). */
+  marginsMm: number;
+  /** Lochung am linken Rand anzeigen. */
+  holePunch: boolean;
+  /** Seitenverbund-ID (gleiche ID = zusammengehörige Seiten). */
+  spreadId: string | null;
+  /** Ordner im Exportbaum (null = Wurzel). */
+  parentFolderId: string | null;
+  /** Reihenfolge innerhalb des Elternordners. */
+  order: number;
 }
 
 /** Liefert effektive Papiergröße in mm (berücksichtigt landscape und free). */
@@ -117,9 +130,11 @@ export class PlanManager {
     landscape?: boolean;
     freeWidth?: number;
     freeHeight?: number;
+    name?: string;
+    parentFolderId?: string | null;
   } = {}): Plan {
     const id = `plan-${Date.now()}-${this._counter++}`;
-    const name = `Plan ${this._counter - 1}`;
+    const name = (opts.name || "").trim() || `Plan ${this._counter - 1}`;
     const plan: Plan = {
       id,
       name,
@@ -133,6 +148,11 @@ export class PlanManager {
         : PlanDefaults.defaultFreeHeight,
       projections: [],
       selected: false,
+      marginsMm: 10,
+      holePunch: false,
+      spreadId: null,
+      parentFolderId: opts.parentFolderId ?? null,
+      order: this._nextOrder(opts.parentFolderId ?? null),
     };
     this.plans.unshift(plan);
     return plan;
@@ -161,6 +181,104 @@ export class PlanManager {
     if (typeof opts.freeHeight === "number" && opts.freeHeight > 0) p.freeHeight = opts.freeHeight;
     return p;
   }
+
+  // ---------- Exportbaum (Ordner) ----------
+  private folders: PlanFolder[] = [];
+
+  listFolders(): PlanFolder[] { return [...this.folders]; }
+  getFolder(id: string): PlanFolder | null { return this.folders.find(f => f.id === id) || null; }
+
+  private _nextOrder(parentId: string | null): number {
+    let max = -1;
+    for (const p of this.plans) if ((p.parentFolderId ?? null) === parentId) max = Math.max(max, p.order ?? 0);
+    for (const f of this.folders) if (f.parentId === parentId) max = Math.max(max, f.order);
+    return max + 1;
+  }
+
+  createFolder(name: string, parentId: string | null = null): PlanFolder {
+    const f: PlanFolder = {
+      id: `pfolder-${Date.now()}-${this._counter++}`,
+      name: (name || "").trim() || "Ordner",
+      parentId,
+      order: this._nextOrder(parentId),
+      collapsed: false,
+    };
+    this.folders.push(f);
+    return f;
+  }
+
+  renameFolder(id: string, name: string): boolean {
+    const f = this.getFolder(id); const clean = (name || "").trim();
+    if (!f || !clean) return false;
+    f.name = clean; return true;
+  }
+
+  setFolderCollapsed(id: string, collapsed: boolean) {
+    const f = this.getFolder(id); if (f) f.collapsed = collapsed;
+  }
+
+  /** Löscht einen Ordner; Inhalt rutscht in den Elternordner (nie stilles Löschen von Seiten). */
+  deleteFolder(id: string): boolean {
+    const f = this.getFolder(id); if (!f) return false;
+    for (const p of this.plans) if (p.parentFolderId === id) { p.parentFolderId = f.parentId; p.order = this._nextOrder(f.parentId); }
+    for (const c of this.folders) if (c.parentId === id) { c.parentId = f.parentId; c.order = this._nextOrder(f.parentId); }
+    this.folders = this.folders.filter(x => x.id !== id);
+    return true;
+  }
+
+  private _isDescendant(folderId: string, ancestorId: string): boolean {
+    let cur = this.getFolder(folderId);
+    const guard = new Set<string>();
+    while (cur && cur.parentId && !guard.has(cur.id)) {
+      if (cur.parentId === ancestorId) return true;
+      guard.add(cur.id);
+      cur = this.getFolder(cur.parentId);
+    }
+    return false;
+  }
+
+  /** Geschwister (Seiten+Ordner) eines Elternordners in Reihenfolge. */
+  private _siblings(parentId: string | null): { kind: "page" | "folder"; id: string; order: number }[] {
+    const out = [
+      ...this.plans.filter(p => (p.parentFolderId ?? null) === parentId).map(p => ({ kind: "page" as const, id: p.id, order: p.order ?? 0 })),
+      ...this.folders.filter(f => f.parentId === parentId).map(f => ({ kind: "folder" as const, id: f.id, order: f.order })),
+    ];
+    return out.sort((a, b) => a.order - b.order);
+  }
+
+  private _reinsert(kind: "page" | "folder", id: string, parentId: string | null, index: number) {
+    const sibs = this._siblings(parentId).filter(s => !(s.kind === kind && s.id === id));
+    const at = clamp(Math.round(index), 0, sibs.length);
+    sibs.splice(at, 0, { kind, id, order: 0 });
+    sibs.forEach((s, i) => {
+      if (s.kind === "page") { const p = this.getById(s.id); if (p) { p.parentFolderId = parentId; p.order = i; } }
+      else { const f = this.getFolder(s.id); if (f) { f.parentId = parentId; f.order = i; } }
+    });
+  }
+
+  movePage(pageId: string, parentId: string | null, index: number): boolean {
+    if (!this.getById(pageId)) return false;
+    if (parentId && !this.getFolder(parentId)) return false;
+    this._reinsert("page", pageId, parentId, index);
+    return true;
+  }
+
+  moveFolder(folderId: string, parentId: string | null, index: number): boolean {
+    if (!this.getFolder(folderId)) return false;
+    if (parentId && (parentId === folderId || this._isDescendant(parentId, folderId))) return false;
+    this._reinsert("folder", folderId, parentId, index);
+    return true;
+  }
+
+  setPageSettings(id: string, patch: Partial<Pick<Plan, "marginsMm" | "holePunch" | "spreadId">>): Plan | null {
+    const p = this.getById(id); if (!p) return null;
+    if (typeof patch.marginsMm === "number" && patch.marginsMm >= 0) p.marginsMm = patch.marginsMm;
+    if (typeof patch.holePunch === "boolean") p.holePunch = patch.holePunch;
+    if (patch.spreadId !== undefined) p.spreadId = patch.spreadId;
+    return p;
+  }
+
+  foldersToJSON(): PlanFolder[] { return this.folders.map(f => ({ ...f })); }
 
   deletePlan(id: string): boolean {
     const before = this.plans.length;
@@ -224,6 +342,11 @@ export class PlanManager {
       freeWidth: p.freeWidth,
       freeHeight: p.freeHeight,
       selected: !!p.selected,
+      marginsMm: p.marginsMm,
+      holePunch: !!p.holePunch,
+      spreadId: p.spreadId ?? null,
+      parentFolderId: p.parentFolderId ?? null,
+      order: p.order ?? 0,
       projections: p.projections.map(pr => ({
         id: pr.id,
         sourceSheetId: pr.sourceSheetId,
@@ -234,16 +357,25 @@ export class PlanManager {
         y: pr.y,
         rotation: pr.rotation,
         clip: { ...pr.clip },
+        mode: pr.mode === "linked" ? "linked" : "frozen",
       })),
     }));
   }
 
-  restore(data: Plan[]) {
+  restore(data: Plan[], folders?: PlanFolder[] | null) {
+    this.folders = Array.isArray(folders) ? folders.map((f, i) => ({
+      id: String(f.id),
+      name: String(f.name || "Ordner"),
+      parentId: typeof f.parentId === "string" ? f.parentId : null,
+      order: typeof f.order === "number" ? f.order : i,
+      collapsed: !!f.collapsed,
+    })) : [];
     if (!Array.isArray(data)) {
       this.plans = [];
       return;
     }
-    this.plans = data.map(p => ({
+    const folderIds = new Set(this.folders.map(f => f.id));
+    this.plans = data.map((p, idx) => ({
       id: String(p.id),
       name: String(p.name || "Plan"),
       formatKey: typeof p.formatKey === "string" ? p.formatKey : PlanDefaults.defaultFormatKey,
@@ -251,6 +383,11 @@ export class PlanManager {
       freeWidth: typeof p.freeWidth === "number" && p.freeWidth > 0 ? p.freeWidth : PlanDefaults.defaultFreeWidth,
       freeHeight: typeof p.freeHeight === "number" && p.freeHeight > 0 ? p.freeHeight : PlanDefaults.defaultFreeHeight,
       selected: !!p.selected,
+      marginsMm: typeof p.marginsMm === "number" && p.marginsMm >= 0 ? p.marginsMm : 10,
+      holePunch: !!p.holePunch,
+      spreadId: typeof p.spreadId === "string" ? p.spreadId : null,
+      parentFolderId: typeof p.parentFolderId === "string" && folderIds.has(p.parentFolderId) ? p.parentFolderId : null,
+      order: typeof p.order === "number" ? p.order : idx,
       projections: Array.isArray(p.projections) ? p.projections.map(pr => ({
         id: String(pr.id),
         sourceSheetId: String(pr.sourceSheetId),
@@ -269,6 +406,8 @@ export class PlanManager {
           top: Number(pr.clip.top) || 0,
           bottom: Number(pr.clip.bottom) || 0,
         } : { left: 0, right: 0, top: 0, bottom: 0 },
+        // Altdaten ohne mode sind eingefrorene Snapshots.
+        mode: (pr.mode === "linked" ? "linked" : "frozen") as "linked" | "frozen",
       })) : [],
     }));
   }
