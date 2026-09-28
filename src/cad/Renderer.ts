@@ -122,7 +122,7 @@ export class Renderer {
    * Papier wird mit Mittelpunkt am Welt-Ursprung (0,0) gezeichnet.
    * Wenn null → normaler Zeichnungsmodus (Grid + weißer Hintergrund).
    */
-  planMode: { widthMm: number; heightMm: number } | null = null;
+  planMode: { widthMm: number; heightMm: number; marginsMm?: number; holePunch?: boolean } | null = null;
 
   /** Hook: wird im Plan-Modus NACH dem Papier gezeichnet (Projektionen). */
   planOverlayDraw: ((ctx: CanvasRenderingContext2D) => void) | null = null;
@@ -527,6 +527,33 @@ export class Renderer {
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
     ctx.restore();
+
+    // Hilfslinien der Exportseite (nie gedruckt/exportiert)
+    if (isExportMode()) return;
+    const pxPerMm = w / this.planMode.widthMm;
+    const m = this.planMode.marginsMm ?? 0;
+    if (m > 0 && m * 2 < Math.min(this.planMode.widthMm, this.planMode.heightMm)) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(59,130,246,0.55)";
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + m * pxPerMm, y + m * pxPerMm, w - 2 * m * pxPerMm, h - 2 * m * pxPerMm);
+      ctx.restore();
+    }
+    if (this.planMode.holePunch) {
+      // Standard-Zweifachlochung: Ø 6 mm, 12 mm vom Rand, Abstand 80 mm, vertikal zentriert.
+      ctx.save();
+      ctx.strokeStyle = "rgba(0,0,0,0.35)";
+      ctx.lineWidth = 1;
+      const cx = x + 12 * pxPerMm;
+      const cy = y + h / 2;
+      for (const dy of [-40, 40]) {
+        ctx.beginPath();
+        ctx.arc(cx, cy + dy * pxPerMm, 3 * pxPerMm, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
 
   /** Rendert Overlay-Sheets in offscreen-Canvas, wendet Tint an und blittet mit Opacity. */

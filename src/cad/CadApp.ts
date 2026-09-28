@@ -3580,7 +3580,7 @@ export class CadApp {
       const plan = this.planManager.getById(this.activePlanId);
       if (plan) {
         const size = getPlanPaperSize(plan);
-        this.renderer.planMode = { widthMm: size.width, heightMm: size.height };
+        this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePunch: plan.holePunch };
         // Blattrand des Plans als Snap-Geometrie bereitstellen.
         this.topology.planFrame = { widthM: size.width / 1000, heightM: size.height / 1000 };
         // Annotation-Scene des Plans als aktive Scene swappen, damit Werkzeuge
