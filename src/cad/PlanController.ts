@@ -226,6 +226,15 @@ export class PlanController {
       const isSel = proj.id === this.selectedProjectionId;
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
+      if (this.isSourceMissing(proj)) {
+        const sc = this.app.camera.worldToScreen({ x: proj.x / 1000, y: proj.y / 1000 } as any);
+        ctx.save();
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(180,40,40,0.9)";
+        ctx.fillText("Quelle fehlt", sc.x, sc.y);
+        ctx.restore();
+      }
     }
     // Eckpunkte des Außenrahmens (klein, dezent) — nur für selektierte/hover Projektion.
     const drawCorners = (proj: Projection, hovered: number | null, selected: number | null) => {
