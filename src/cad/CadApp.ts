@@ -3768,12 +3768,48 @@ export class CadApp {
   }
 
   /** Sammel-PDF-Druck via pdf-lib (Multi-Page). */
+  /** Exportiert die angegebenen Exportseiten in genau dieser Reihenfolge als EINE PDF. */
+  async exportPlansByIds(ids: string[]) {
+    const plans = ids.map(id => this.planManager.getById(id)).filter((p): p is NonNullable<typeof p> => !!p);
+    if (plans.length === 0) return;
+    await this._exportPlansPdf(plans);
+  }
+
+  private async _renderPlanAnnotationPng(plan: { id: string }, widthMm: number, heightMm: number): Promise<Uint8Array | null> {
+    const sc = this.planScenesById.get(plan.id);
+    if (!sc) return null;
+    const json = this._serializeOneScene(sc);
+    const hasContent = Object.values(json || {}).some(v => Array.isArray(v) && v.length > 0);
+    if (!hasContent) return null;
+    const { renderSceneRegionToCanvas } = await import("./SceneRegionRenderer");
+    const pxPerMm = 200 / 25.4;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(widthMm * pxPerMm));
+    canvas.height = Math.max(1, Math.round(heightMm * pxPerMm));
+    const { setExportMode, isExportMode } = await import("@/lib/printExport");
+    const was = isExportMode();
+    setExportMode(true);
+    try {
+      renderSceneRegionToCanvas({
+        canvas, sceneJson: json, labelsJson: this.labelManager.list() as any,
+        paperWmm: widthMm, paperHmm: heightMm, scaleDen: 1, centerM: { x: 0, y: 0 },
+        background: "rgba(0,0,0,0)",
+      });
+    } finally { setExportMode(was); }
+    const blob: Blob | null = await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
+    return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+  }
+
   async printSelectedPlans() {
     const sel = this.planManager.getSelected();
     if (sel.length === 0) {
       alert("Bitte mindestens einen Plan auswählen (Häkchen rechts neben dem Plannamen).");
       return;
     }
+    await this._exportPlansPdf(sel);
+  }
+
+  private async _exportPlansPdf(sel: import("./PlanManager").Plan[]) {
     try {
       // Der Druckplan wird 1:1 in seiner Papiergröße exportiert. Jede
       // Projektion behält ihren eigenen Maßstab — der Export ist eine reine
@@ -3784,7 +3820,7 @@ export class CadApp {
         if (!sc) return null;
         return this._serializeOneScene(sc);
       };
-      const bytes = await exportPlansToPdf(sel, resolveSheet);
+      const bytes = await exportPlansToPdf(sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h));
 
       const ts = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
