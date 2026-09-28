@@ -13,6 +13,40 @@ Lücken:
 
 Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entsteht keine neue Engine.
 
+## Verbindliche Präzisierungen
+1. **Instanz:** Die Export-Route nutzt dieselben CAD-Komponenten und Datenquellen. Die JavaScript-Instanz darf nach einem Routenwechsel neu entstehen. Entscheidend ist:
+   - kein zweites Objektmodell, kein zweiter Renderer, keine zweiten Werkzeuge
+   - kein eigener Speicher für Werkzeug-Einstellungen oder Ebenen
+   - kein eigener Rückgängig-Verlauf
+2. **Begriffe:**
+   - CAD-Blatt = Zeichenquelle aus CAD
+   - Exportseite = erweiterter `Plan`
+   - CAD-Ausschnitt = `Projection`, also eine Referenz auf ein CAD-Blatt
+
+   Rechts oben erscheinen nur echte CAD-Blätter als Quellen, nie Exportseiten oder deren Anmerkungs-Scenes. Links stehen nur Exportordner und Exportseiten. Die beiden Listen werden nie vermischt.
+3. **Verknüpft als Standard:**
+   - Neue Ausschnitte sind `linked` und speichern keine Geometriekopie.
+   - Maßstab, Crop, Position und Rotation gehören zur Exportseite.
+   - „Einfrieren“ ist eine bewusste Zusatzaktion mit Erklärung.
+   - Beim Löschen eines CAD-Blatts mit verknüpften Ausschnitten erscheint eine Warnung mit der Wahl „Ausschnitte einfrieren“ oder „Als Platzhalter behalten“. Es wird nie stillschweigend gelöscht. Ein Platzhalter wird auf dem Papier als „Quelle fehlt“ gezeichnet.
+4. **Zuverlässige Aktualisierung:** Verknüpfte Ausschnitte werden über eine Revisionsnummer pro CAD-Blatt invalidiert, nicht über einen Render-Cache. Die Nummer steigt bei:
+   - Objektänderung (`commitHistorySnapshot`)
+   - Undo/Redo
+   - Import
+   - Löschen
+   - Ebenen-Sichtbarkeit
+   - Cloud-Anwendung (`applyOps`)
+5. **Auswahl vs. `includeInExport`:** `includeInExport` entfällt. Es gibt nur die temporäre Exportauswahl im UI, ohne Undo-Schritte und ohne gespeicherte Daten.
+6. **PDF-Regel:** Alle gewählten Seiten werden zu einer gemeinsamen mehrseitigen PDF. Die Reihenfolge folgt dem sichtbaren Baum, rekursiv durch alle Ordner. Keine Seite erscheint doppelt.
+7. **Cloud vollständig:** Diese Daten werden objektweise im bestehenden Operationsmodell übertragen:
+   - Ordner, Exportseiten und ihre Einstellungen
+   - Transparenzpause und Verbünde
+   - Ausschnitt-Referenzen
+   - Plan-Anmerkungs-Scenes
+
+   Der bestehende Weg (`sceneDiff`/`applyOps`/`opsRepo`, `__structure__`) wird vor der Umsetzung im Code geprüft und mit einem Zwei-Geräte-Test abgesichert.
+8. **Mappe unangetastet:** keine Migration, keine Umleitung, keine Löschung.
+
 ## Umsetzung
 
 ### 1. Navigation
@@ -78,6 +112,11 @@ Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entste
   - CAD-Blatt platzieren, in CAD ändern, Ausschnitt aktualisiert sich
   - Ordner mit zwei Seiten exportieren ergibt eine PDF mit zwei Seiten
   - Mappe weiterhin unverändert
+  - CAD-Änderung in CAD: der verknüpfte Ausschnitt folgt; Undo/Redo: der Ausschnitt folgt korrekt
+  - Werkzeug-Einstellung in CAD geändert: derselbe Wert erscheint im Export
+  - Ebenen-Sichtbarkeit in CAD: der Ausschnitt reagiert identisch
+  - Tablet-Ansicht: der Auswahlmodus ist per Finger vollständig bedienbar
+  - Zwei-Geräte-Test: Plan-Scenes und Ausschnitte kommen auf dem zweiten Gerät an
 - Typprüfung, Build, bestehende Tests.
 - Die Dokumentation der wiederverwendeten Bausteine kommt in `AGENTS.md`.
 
