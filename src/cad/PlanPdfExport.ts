@@ -234,6 +234,8 @@ function drawProjectionToPdf(
 export async function exportPlansToPdf(
   plans: Plan[],
   resolveSheetSnapshot: (sheetId: string) => unknown | null,
+  /** Optional: Anmerkungs-Scene der Exportseite als PNG (Papiergröße, transparent). */
+  renderAnnotationPng?: (plan: Plan, widthMm: number, heightMm: number) => Promise<Uint8Array | null>,
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle("PixunaCAD Druckpläne");
@@ -267,6 +269,18 @@ export async function exportPlansToPdf(
       }
     }
 
+    // Anmerkungen der Exportseite (mit CAD-Werkzeugen auf dem Papier gezeichnet).
+    if (renderAnnotationPng) {
+      try {
+        const png = await renderAnnotationPng(plan, size.width, size.height);
+        if (png) {
+          const img = await pdf.embedPng(png);
+          page.drawImage(img, { x: 0, y: 0, width: size.width * MM_TO_PT, height: size.height * MM_TO_PT });
+        }
+      } catch (err) {
+        console.warn("[PlanPdfExport] Anmerkungen fehlgeschlagen:", plan.id, err);
+      }
+    }
     // Keine automatische Plan-Beschriftung im PDF (Blatt bleibt sauber).
   }
 

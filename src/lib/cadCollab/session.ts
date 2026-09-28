@@ -751,7 +751,10 @@ export class CadCollabSession {
     } finally {
       this.applyingRemote = false;
     }
-    if (changed) this.opts.requestRender();
+    if (changed) {
+      (this.opts.app as any).bumpContentRevision?.();
+      this.opts.requestRender();
+    }
   }
 
   /* ------------------------------------------------------- Live-Vorschau */
@@ -828,6 +831,7 @@ export class CadCollabSession {
     this.applyingRemote = true;
     try {
       applyOpToScene(scene as never, msg.objectKind, msg.objectId, "update", msg.payload);
+      (this.opts.app as any).bumpContentRevision?.();
     } finally {
       this.applyingRemote = false;
     }

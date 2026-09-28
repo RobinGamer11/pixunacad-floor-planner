@@ -1,3 +1,4 @@
+import { isExportAreaEnabled } from "@/lib/exportFeature";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
@@ -32,7 +33,7 @@ import {
   Users,
   Play,
   FolderKanban,
-  Compass,
+  Compass, Printer,
   Trash2,
   Copy,
   Crosshair,
@@ -43,7 +44,7 @@ import {
   Wallet,
 } from "lucide-react";
 
-export type WorkspaceMode = "workspace" | "cad" | "finance" | "board";
+export type WorkspaceMode = "workspace" | "cad" | "export" | "finance" | "board";
 
 interface Props {
   projectId?: string;
@@ -113,6 +114,8 @@ export function WorkspaceHeader({
 
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
+  const goExport = () => projectId && navigate(`/project/${projectId}/cad?view=export`);
+  const showExportTab = isExportAreaEnabled() || mode === "export";
 
   return (
     <header
@@ -184,6 +187,17 @@ export function WorkspaceHeader({
             active={mode === "cad"}
             onClick={goCad}
           />
+          {showExportTab && (
+            <>
+              <ModeDivider />
+              <ModeButton
+                icon={<Printer size={13} />}
+                label="Export"
+                active={mode === "export"}
+                onClick={goExport}
+              />
+            </>
+          )}
           <ModeDivider />
           <ModeButton
             icon={<FolderKanban size={13} />}

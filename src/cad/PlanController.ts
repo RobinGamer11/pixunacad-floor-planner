@@ -71,6 +71,7 @@ export class PlanController {
 
   /** Liefert Items zur Projektion, mit Cache. */
   getItems(proj: Projection): ProjectionItem[] {
+    if (proj.mode === "linked") return this._linkedItems(proj);
     let items = this._itemsCache.get(proj.id);
     if (!items) {
       items = flattenSheetSnapshot(proj.sceneSnapshot);
@@ -82,6 +83,50 @@ export class PlanController {
   /** Cache leeren (bei History-Restore aufrufen). */
   invalidateCache() {
     this._itemsCache.clear();
+    this._linkedCache.clear();
+  }
+
+  /** Verknüpfte Ausschnitte: Cache je Quellblatt, gesteuert über CadApp.contentRevision. */
+  private _linkedCache = new Map<string, { rev: string; json: string; items: ProjectionItem[] }>();
+
+  /** true, wenn das Quellblatt eines verknüpften Ausschnitts fehlt (Platzhalter). */
+  isSourceMissing(proj: Projection): boolean {
+    return proj.mode === "linked" && !this.app.scenesById.get(proj.sourceSheetId);
+  }
+
+  private _linkedItems(proj: Projection): ProjectionItem[] {
+    const scene = this.app.scenesById.get(proj.sourceSheetId);
+    if (!scene) return [];
+    const hidden = this.app.labelManager.list().filter(g => g.visible === false).map(g => g.id).join(",");
+    const rev = `${this.app.contentRevision}|${hidden}`;
+    const cached = this._linkedCache.get(proj.sourceSheetId);
+    if (cached && cached.rev === rev) return cached.items;
+    const snap = (this.app as any)._serializeOneScene(scene);
+    const json = JSON.stringify(snap);
+    if (cached && cached.json === json && cached.rev.split("|")[1] === hidden) {
+      cached.rev = rev;
+      return cached.items;
+    }
+    const hiddenSet = new Set(hidden ? hidden.split(",") : []);
+    const filtered: any = {};
+    for (const [k, v] of Object.entries(snap || {})) {
+      filtered[k] = Array.isArray(v) ? v.filter((o: any) => !o || !hiddenSet.has(o.labelId)) : v;
+    }
+    const items = flattenSheetSnapshot(filtered);
+    this._linkedCache.set(proj.sourceSheetId, { rev, json, items });
+    return items;
+  }
+
+  /** Friert einen verknüpften Ausschnitt bewusst auf den aktuellen Stand ein. */
+  freezeProjection(planId: string, projectionId: string): boolean {
+    const plan = this.app.planManager.getById(planId);
+    const proj = plan?.projections.find(p => p.id === projectionId);
+    if (!proj) return false;
+    const scene = this.app.scenesById.get(proj.sourceSheetId);
+    const snap = scene ? (this.app as any)._serializeOneScene(scene) : null;
+    this.app.planManager.updateProjection(planId, projectionId, { mode: "frozen", sceneSnapshot: snap });
+    this._itemsCache.delete(projectionId);
+    return true;
   }
 
   /** Aktueller Plan oder null. */
@@ -122,7 +167,9 @@ export class PlanController {
     const proj: Projection = {
       id: `proj-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
       sourceSheetId: sheetId,
-      sceneSnapshot: snapshot,
+      // Standard: verknüpft – keine Geometriekopie in der Exportseite.
+      sceneSnapshot: null,
+      mode: "linked",
       scaleDen: chosenDen,
       scale: chosenDen,
       x: xMm,
@@ -134,7 +181,6 @@ export class PlanController {
     if (!isFinite(bb.minX) || bb.maxX === bb.minX) { /* nothing */ }
 
     this.app.planManager.addProjection(plan.id, proj);
-    this._itemsCache.set(proj.id, items);
     this.selectedProjectionId = proj.id;
     this._showHub();
     this.app.refreshPlanUI();
@@ -180,6 +226,15 @@ export class PlanController {
       const isSel = proj.id === this.selectedProjectionId;
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
+      if (this.isSourceMissing(proj)) {
+        const sc = this.app.camera.worldToScreen(proj.x / 1000, proj.y / 1000);
+        ctx.save();
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(180,40,40,0.9)";
+        ctx.fillText("Quelle fehlt", sc.x, sc.y);
+        ctx.restore();
+      }
     }
     // Eckpunkte des Außenrahmens (klein, dezent) — nur für selektierte/hover Projektion.
     const drawCorners = (proj: Projection, hovered: number | null, selected: number | null) => {

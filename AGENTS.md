@@ -301,3 +301,4 @@ jeweils nächsten sinnvollen Schritt.
 - CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`), Projektmetadaten als Mappen-Objekt `meta` – ohne sie fehlen Inhalte auf dem zweiten Gerät.
 - `cloud` (Cloudbasis, darf laden/sichern) und `shared` (mind. eine weitere berechtigte Person) sind getrennt in `ProjectAccess`; Realtime/Präsenz/Sperren nur bei weiteren Personen – verhindert Team-Anzeigen und Kosten bei Solo-Cloudprojekten.
 - Papierkorb von Cloudprojekten folgt `network_projects.deleted_at` über `src/lib/cloudTrash.ts` (offene lokale Aktionen haben Vorrang) – damit gelöschte Projekte nicht als Platzhalter zurückkehren.
+- Export ist dieselbe `CadApp` mit aktiver Exportseite (`?view=export`), Mutationen nur über `CadApp.mutatePlans` – ein Verlauf, keine zweite CAD-Welt (Details: `docs/export-architecture.md`).

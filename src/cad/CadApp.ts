@@ -920,6 +920,7 @@ export class CadApp {
       scenesById: scenesObj,
       // Druckpläne
       plans: this.planManager.toJSON(),
+      planFolders: this.planManager.foldersToJSON(),
       activePlanId: this.activePlanId,
       planScenesById: (() => {
         const out: Record<string, any> = {};
@@ -946,6 +947,7 @@ export class CadApp {
     // aktuelle Objektmodell gehoben (rein additiv, ohne sichtbare Änderung).
     const data = migrateCadSnapshot(JSON.parse(snapshot));
     this._isRestoring = true;
+    this.contentRevision++;
     // Rasterebenen zuerst (Kacheln laden asynchron nach).
     try {
       this._rasterLayersByKey.clear();
@@ -976,7 +978,7 @@ export class CadApp {
     }
     // Druckpläne wiederherstellen.
     if (Array.isArray(data.plans)) {
-      this.planManager.restore(data.plans);
+      this.planManager.restore(data.plans, Array.isArray(data.planFolders) ? data.planFolders : null);
     } else {
       this.planManager.restore([]);
     }
@@ -1077,8 +1079,17 @@ export class CadApp {
   }
 
   /** Zentraler Push: verwirft den Redo-Zweig, begrenzt auf 21 Zustände. */
+  /**
+   * Inhaltsrevision: steigt bei jeder erfassten Änderung (Aktion, Auto-Snapshot,
+   * Undo/Redo, Import, Cloud). Verknüpfte Ausschnitte vergleichen danach den
+   * echten Blattinhalt – nicht zufällige Renderzyklen.
+   */
+  contentRevision = 0;
+  bumpContentRevision() { this.contentRevision++; }
+
   private _pushHistory(snap: string) {
     if (snap === this._lastSnapshot) return;
+    this.contentRevision++;
     if (this._historyIndex < this._history.length - 1) {
       this._history = this._history.slice(0, this._historyIndex + 1);
     }
@@ -1137,6 +1148,7 @@ export class CadApp {
 
   private _emitHistoryChange() {
     this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
+    this._emitPlanUiChange?.();
     this.onSceneCommitted?.();
   }
 
@@ -3439,7 +3451,10 @@ export class CadApp {
           this._syncSheetSceneMap();
           this._syncOverlayScenes();
           this.refreshSheetUI();
+          this.bumpContentRevision();
+          this._emitPlanUiChange();
         },
+        beforeDeleteSheet: (sheetId: string) => this._confirmSheetDeleteWithProjections(sheetId),
       },
     );
     this.sheetPanel.render();
@@ -3487,6 +3502,65 @@ export class CadApp {
 
   refreshPlanUI() {
     this.planPanel?.render();
+    this._emitPlanUiChange();
+  }
+
+  // ---------- Exportbereich (React-Oberfläche über derselben Plan-Engine) ----------
+  private _planUiListeners = new Set<() => void>();
+  /** Zähler für React-Abonnenten des Exportbereichs. */
+  planUiVersion = 0;
+  onPlanUiChange(fn: () => void): () => void {
+    this._planUiListeners.add(fn);
+    return () => { this._planUiListeners.delete(fn); };
+  }
+  private _emitPlanUiChange() {
+    this.planUiVersion++;
+    for (const fn of this._planUiListeners) { try { fn(); } catch { /* noop */ } }
+  }
+
+  /**
+   * Einziger Mutationsweg des Exportbereichs: Änderung ausführen, Plan-Scenes/
+   * Renderer/Transparenzpause synchronisieren, genau EIN Verlaufsschritt.
+   */
+  mutatePlans(fn: () => void) {
+    fn();
+    this._syncPlanSceneMap();
+    if (this.activePlanId && !this.planManager.getById(this.activePlanId)) {
+      this.setActivePlanId(null);
+    } else if (this.activePlanId) {
+      this._applyPlanModeToRenderer();
+    }
+    this._syncPlanTracingLayers();
+    this.planController?.invalidateCache();
+    this.refreshPlanUI();
+    this.commitHistorySnapshot();
+  }
+
+  /** Verknüpften Ausschnitt eines CAD-Blatts auf der aktiven Exportseite platzieren (Canvas-Mitte). */
+  placeSheetOnActivePlan(sheetId: string) {
+    if (!this.activePlanId || !this.planController) return;
+    const r = this.canvas.getBoundingClientRect();
+    void this.planController.createProjectionFromSheet(sheetId, r.width / 2, r.height / 2).then(p => {
+      if (p) { this.refreshPlanUI(); }
+    });
+  }
+
+  private _confirmSheetDeleteWithProjections(sheetId: string): boolean {
+    const uses: { planId: string; projId: string }[] = [];
+    for (const plan of this.planManager.list()) {
+      for (const pr of plan.projections) {
+        if (pr.sourceSheetId === sheetId && pr.mode === "linked") uses.push({ planId: plan.id, projId: pr.id });
+      }
+    }
+    if (uses.length === 0) return true;
+    if (!window.confirm(`Dieses CAD-Blatt wird in ${uses.length} verknüpften Export-Ausschnitt(en) verwendet. Trotzdem löschen?`)) return false;
+    const freeze = window.confirm(
+      "Ausschnitte einfrieren?\n\nOK: Die Ausschnitte behalten den aktuellen Zeichenstand als feste Kopie.\nAbbrechen: Die Ausschnitte bleiben als Platzhalter „Quelle fehlt“ stehen.",
+    );
+    if (freeze) {
+      for (const u of uses) this.planController?.freezeProjection(u.planId, u.projId);
+    }
+    return true;
   }
 
   /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). */
@@ -3506,7 +3580,7 @@ export class CadApp {
       const plan = this.planManager.getById(this.activePlanId);
       if (plan) {
         const size = getPlanPaperSize(plan);
-        this.renderer.planMode = { widthMm: size.width, heightMm: size.height };
+        this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePunch: plan.holePunch };
         // Blattrand des Plans als Snap-Geometrie bereitstellen.
         this.topology.planFrame = { widthM: size.width / 1000, heightM: size.height / 1000 };
         // Annotation-Scene des Plans als aktive Scene swappen, damit Werkzeuge
@@ -3695,12 +3769,48 @@ export class CadApp {
   }
 
   /** Sammel-PDF-Druck via pdf-lib (Multi-Page). */
+  /** Exportiert die angegebenen Exportseiten in genau dieser Reihenfolge als EINE PDF. */
+  async exportPlansByIds(ids: string[]) {
+    const plans = ids.map(id => this.planManager.getById(id)).filter((p): p is NonNullable<typeof p> => !!p);
+    if (plans.length === 0) return;
+    await this._exportPlansPdf(plans);
+  }
+
+  private async _renderPlanAnnotationPng(plan: { id: string }, widthMm: number, heightMm: number): Promise<Uint8Array | null> {
+    const sc = this.planScenesById.get(plan.id);
+    if (!sc) return null;
+    const json = this._serializeOneScene(sc);
+    const hasContent = Object.values(json || {}).some(v => Array.isArray(v) && v.length > 0);
+    if (!hasContent) return null;
+    const { renderSceneRegionToCanvas } = await import("./SceneRegionRenderer");
+    const pxPerMm = 200 / 25.4;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(widthMm * pxPerMm));
+    canvas.height = Math.max(1, Math.round(heightMm * pxPerMm));
+    const { setExportMode, isExportMode } = await import("@/lib/printExport");
+    const was = isExportMode();
+    setExportMode(true);
+    try {
+      renderSceneRegionToCanvas({
+        canvas, sceneJson: json, labelsJson: this.labelManager.list() as any,
+        paperWmm: widthMm, paperHmm: heightMm, scaleDen: 1, centerM: { x: 0, y: 0 },
+        background: "rgba(0,0,0,0)",
+      });
+    } finally { setExportMode(was); }
+    const blob: Blob | null = await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
+    return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+  }
+
   async printSelectedPlans() {
     const sel = this.planManager.getSelected();
     if (sel.length === 0) {
       alert("Bitte mindestens einen Plan auswählen (Häkchen rechts neben dem Plannamen).");
       return;
     }
+    await this._exportPlansPdf(sel);
+  }
+
+  private async _exportPlansPdf(sel: import("./PlanManager").Plan[]) {
     try {
       // Der Druckplan wird 1:1 in seiner Papiergröße exportiert. Jede
       // Projektion behält ihren eigenen Maßstab — der Export ist eine reine
@@ -3711,7 +3821,7 @@ export class CadApp {
         if (!sc) return null;
         return this._serializeOneScene(sc);
       };
-      const bytes = await exportPlansToPdf(sel, resolveSheet);
+      const bytes = await exportPlansToPdf(sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h));
 
       const ts = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
