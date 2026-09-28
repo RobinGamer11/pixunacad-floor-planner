@@ -8,6 +8,9 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 import { Check, X } from "lucide-react";
 import { bytesToBase64, canvasRegionToPdfBytes, stashPendingSheetPdf } from "@/lib/sheetPdfExport";
 import { normalizeScaleDen } from "@/lib/scale";
+import type { CadApp } from "@/cad/CadApp";
+import { ExportSidebar } from "@/components/export/ExportSidebar";
+import { ExportPageSettings } from "@/components/export/ExportPageSettings";
 
 
 /** "1:100" → 100 (Welt-Einheiten pro Papier-Einheit). Fällt auf 100 zurück. */
@@ -28,6 +31,22 @@ const CadPage = () => {
   const [zoom, setZoom] = useState<number | undefined>(undefined);
   const [canPaste, setCanPaste] = useState(false);
   const [multiPaste, setMultiPaste] = useState(false);
+  const [cadApp, setCadApp] = useState<CadApp | null>(null);
+  // Export ist derselbe CAD-Bereich (dieselbe Engine/Verlauf) mit Exportseite aktiv.
+  const exportView = new URLSearchParams(location.search).get("view") === "export";
+  useEffect(() => {
+    if (!cadApp) return;
+    if (exportView) {
+      if (!cadApp.activePlanId) {
+        const first = cadApp.planManager.list()[0];
+        if (first) cadApp.setActivePlanId(first.id);
+      }
+    } else if (cadApp.activePlanId) {
+      cadApp.setActivePlanId(null);
+    }
+    const t = window.setTimeout(() => cadApp.resize(), 0);
+    return () => window.clearTimeout(t);
+  }, [cadApp, exportView]);
 
   const doCopy = () => {
     const ok = editorRef.current?.copySelection() ?? false;
@@ -285,7 +304,7 @@ const CadPage = () => {
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
-        mode="cad"
+        mode={exportView ? "export" : "cad"}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={() => editorRef.current?.undo()}
@@ -320,8 +339,12 @@ const CadPage = () => {
         onTouchEndCapture={frameArmed ? onFrameTouchEnd : undefined}
         onTouchCancelCapture={frameArmed ? onFrameTouchEnd : undefined}
       >
+        <div className="flex h-full w-full min-h-0">
+        {exportView && cadApp && !presenting && <ExportSidebar app={cadApp} />}
+        <div className="relative flex-1 min-w-0 h-full">
         <CadEditor
           ref={editorRef}
+          onAppReady={setCadApp}
           projectId={projectId}
           onHistoryChange={(u, r) => { setCanUndo(u); setCanRedo(r); }}
           onZoomChange={setZoom}
@@ -330,6 +353,18 @@ const CadPage = () => {
           presenting={presenting}
           helpOn={mappeHelpOn}
         />
+        </div>
+        {exportView && cadApp && !presenting && (
+          <ExportPageSettings
+            app={cadApp}
+            onOpenSourceSheet={(sheetId) => {
+              cadApp.setActivePlanId(null);
+              cadApp.setActiveSheetId(sheetId);
+              navigate(`/project/${projectId}/cad`);
+            }}
+          />
+        )}
+        </div>
         {presenting && (
           <button
             onClick={() => { setPresenting(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }}
