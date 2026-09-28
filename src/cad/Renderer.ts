@@ -1,3 +1,4 @@
+import { holePunchPointsMm, normalizeHolePunchSide, HOLE_RADIUS_MM, type HolePunchSide } from "./pageGuides";
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
