@@ -947,6 +947,7 @@ export class CadApp {
     // aktuelle Objektmodell gehoben (rein additiv, ohne sichtbare Änderung).
     const data = migrateCadSnapshot(JSON.parse(snapshot));
     this._isRestoring = true;
+    this.contentRevision++;
     // Rasterebenen zuerst (Kacheln laden asynchron nach).
     try {
       this._rasterLayersByKey.clear();
@@ -1078,8 +1079,17 @@ export class CadApp {
   }
 
   /** Zentraler Push: verwirft den Redo-Zweig, begrenzt auf 21 Zustände. */
+  /**
+   * Inhaltsrevision: steigt bei jeder erfassten Änderung (Aktion, Auto-Snapshot,
+   * Undo/Redo, Import, Cloud). Verknüpfte Ausschnitte vergleichen danach den
+   * echten Blattinhalt – nicht zufällige Renderzyklen.
+   */
+  contentRevision = 0;
+  bumpContentRevision() { this.contentRevision++; }
+
   private _pushHistory(snap: string) {
     if (snap === this._lastSnapshot) return;
+    this.contentRevision++;
     if (this._historyIndex < this._history.length - 1) {
       this._history = this._history.slice(0, this._historyIndex + 1);
     }
