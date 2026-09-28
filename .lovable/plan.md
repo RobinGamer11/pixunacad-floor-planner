@@ -29,14 +29,14 @@ Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entste
    - Maßstab, Crop, Position und Rotation gehören zur Exportseite.
    - „Einfrieren“ ist eine bewusste Zusatzaktion mit Erklärung.
    - Beim Löschen eines CAD-Blatts mit verknüpften Ausschnitten erscheint eine Warnung mit der Wahl „Ausschnitte einfrieren“ oder „Als Platzhalter behalten“. Es wird nie stillschweigend gelöscht. Ein Platzhalter wird auf dem Papier als „Quelle fehlt“ gezeichnet.
-4. **Zuverlässige Aktualisierung:** Verknüpfte Ausschnitte werden über eine Revisionsnummer pro CAD-Blatt invalidiert, nicht über einen Render-Cache. Die Nummer steigt bei:
-   - Objektänderung (`commitHistorySnapshot`)
+4. **Zuverlässige Aktualisierung:** Verknüpfte Ausschnitte werden über eine Revisionsnummer pro CAD-Blatt invalidiert, nicht über einen Render-Cache. Die Nummer hängt nicht allein an `commitHistorySnapshot()`, sondern am zentralen Scene-Änderungssignal. Sie steigt bei:
+   - jeder erfolgreichen Scene-Mutation und automatischem Snapshot
    - Undo/Redo
    - Import
    - Löschen
    - Ebenen-Sichtbarkeit
-   - Cloud-Anwendung (`applyOps`)
-5. **Auswahl vs. `includeInExport`:** `includeInExport` entfällt. Es gibt nur die temporäre Exportauswahl im UI, ohne Undo-Schritte und ohne gespeicherte Daten.
+   - Cloud-Operationen (`applyOps`) und Cloud-Neuladen
+5. **Auswahl vs. `includeInExport`:** `includeInExport` entfällt vollständig: nicht im Datenmodell, nicht in den Seiteneinstellungen, nicht in Serialisierung, Cloud oder PDF-Filter. Es gibt nur die temporäre Exportauswahl im UI, ohne Undo-Schritte und ohne gespeicherte Daten.
 6. **PDF-Regel:** Alle gewählten Seiten werden zu einer gemeinsamen mehrseitigen PDF. Die Reihenfolge folgt dem sichtbaren Baum, rekursiv durch alle Ordner. Keine Seite erscheint doppelt.
 7. **Cloud vollständig:** Diese Daten werden objektweise im bestehenden Operationsmodell übertragen:
    - Ordner, Exportseiten und ihre Einstellungen
@@ -53,7 +53,10 @@ Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entste
    - Ausschnitt-Referenzen
 
    Die bestehende Serialisierung `plans`/`planScenesById` wird dafür geprüft und um Ordner und Overlays ergänzt. Eine Änderung auf Seite A bleibt nach dem Wechsel zu Seite B oder zu CAD im Verlauf. Beim Rückgängigmachen wird der betroffene Bereich wieder aktiviert. Ein Test deckt die Abfolge A ändern, zu B wechseln, zu CAD wechseln, Undo ab.
-9. **Mappe unangetastet:** keine Migration, keine Umleitung, keine Löschung.
+9. **Transparenzpause projektweit:** Die Einstellungen aus `planOverlayStore` (Hintergrundseite, sichtbar, Deckkraft, Original/Einfärbung, Farbe) werden Teil des Planstands, der Serialisierung, des Verlaufs und der objektweisen Cloud-Übertragung. Ein zweites Gerät zeigt dieselbe Pause auf derselben Seite.
+10. **Bearbeitungsregel:** Die Werkzeuge bleiben dieselben. Was auf einer Exportseite gezeichnet wird, landet in der Anmerkungs-Scene dieser Seite; das CAD-Blatt wird nicht verändert. Ein verknüpfter Ausschnitt ist eine Referenz und nicht mit CAD-Werkzeugen editierbar. Die Aktion „CAD-Blatt bearbeiten“ wechselt bewusst in den CAD-Bereich zu diesem Blatt.
+11. **Veröffentlichung:** Commit A wird nicht allein veröffentlicht. Export ist erst sichtbar, wenn Commit B (Cloud für Anmerkungs-Scenes, Seitenstruktur, Transparenzpause, Ausschnitt-Referenzen) fertig ist und der Zwei-Geräte-Test bestanden ist. Bis dahin bleibt der Export-Tab hinter einem internen Schalter verborgen.
+12. **Mappe unangetastet:** keine Migration, keine Umleitung, keine Löschung.
 
 ## Umsetzung
 
@@ -64,7 +67,7 @@ Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entste
 
 ### 2. Datenmodell (Erweiterung von `Plan`, kein zweites Modell)
 - `Plan` erhält diese Felder:
-  - `marginsMm`, `holePunch`, `offset` (Position), `spreadId`/`spreadIndex`, `includeInExport`
+  - `marginsMm`, `holePunch`, `offset` (Position), `spreadId`/`spreadIndex`
   - `parentFolderId`, `order`
 - Neu `PlanFolder { id, name, parentId, order, collapsed }` in `PlanManager`, mit Methoden für Baum, Verschieben, Umbenennen und Löschen.
 - Die sichtbare Baum-Reihenfolge ergibt die Export-Reihenfolge (`flattenTreeOrder()`).
@@ -96,7 +99,7 @@ Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entste
 ### 5. Rechte Seite
 - Reiter „Seiteneinstellungen“ (neu):
   - oben die CAD-Blätter zum Ziehen oder per „Platzieren“ als verknüpften Ausschnitt einfügen; Einstellungen: Maßstab, Position, Crop, Drehung, Aktualisieren, Einfrieren
-  - darunter die Einstellungen der aktiven Seite (Titel, Format, Ausrichtung, freie Maße, Ränder, Lochung, Position, Verbund, beim Export berücksichtigen)
+  - darunter die Einstellungen der aktiven Seite (Titel, Format, Ausrichtung, freie Maße, Ränder, Lochung, Position, Verbund)
 - „Werkzeugeinstellungen“ und „Ebenen“ bleiben die bestehenden CAD-Reiter ohne Kopie.
 
 ### 6. PDF-Export
@@ -126,7 +129,7 @@ Export wird deshalb zu **CadApp im Plan-Modus mit neuer Oberfläche**. Es entste
   - Tablet-Ansicht: der Auswahlmodus ist per Finger vollständig bedienbar
   - Zwei-Geräte-Test: Plan-Scenes und Ausschnitte kommen auf dem zweiten Gerät an
 - Typprüfung, Build, bestehende Tests.
-- Die Dokumentation der wiederverwendeten Bausteine kommt in `AGENTS.md`.
+- Die Dokumentation kommt nach `docs/export-architecture.md`, nicht in `AGENTS.md`. Inhalt: Begriffe, verknüpft vs. eingefroren, Speicher-/Cloud-Modell, Baum und PDF-Reihenfolge, Trennung Modellraum/Papier-Anmerkungen.
 
 ## Umfang
 Die Aufgabe ist groß. Vorschlag: in einem Durchgang umsetzen, aber in zwei Commits:

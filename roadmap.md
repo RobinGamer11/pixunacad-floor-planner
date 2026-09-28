@@ -113,3 +113,4 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 
 - [ ] Export-Bereich auf CAD-Plan-Engine (Plan mit Präzisierungen, wartet auf Freigabe)
 - [ ] Export: Undo erfasst alle Exportseiten/Ordner/Overlays über Seiten- und Moduswechsel hinweg
+- [ ] Export: Transparenzpause cloudfähig, Bearbeitungsregel, Freischaltung erst nach Cloud-Commit, docs/export-architecture.md
