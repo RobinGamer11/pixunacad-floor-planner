@@ -1345,21 +1345,11 @@ export class SelectTool {
     const A = loop[edgeIndex];
     const B = loop[(edgeIndex + 1) % n];
     const click = this._lastHatchEdgeClickW || v((A.x + B.x) * 0.5, (A.y + B.y) * 0.5);
-    // Auf die Kante projizieren, damit die Kontur nicht verspringt.
-    const dx = B.x - A.x, dy = B.y - A.y;
-    const len2 = dx * dx + dy * dy || 1;
-    let t = ((click.x - A.x) * dx + (click.y - A.y) * dy) / len2;
-    t = Math.max(0.02, Math.min(0.98, t));
-    const np = v(A.x + dx * t, A.y + dy * t);
-    loop.splice(edgeIndex + 1, 0, np);
-    // Wölbungen mitziehen: bestehende Kanten-Wölbung auf beide Teilkanten aufteilen.
-    {
-      const arr = this._bulgeArray(hatch as any, holeIndex);
-      if (arr.length) {
-        const prevBulge = arr[edgeIndex] || 0;
-        arr.splice(edgeIndex, 1, prevBulge * 0.5, prevBulge * 0.5);
-      }
-    }
+    // Einziger Weg: bogenexakte Teilung in Scene (splitBulgedEdge).
+    const res = holeIndex == null
+      ? this.app.scene.insertPointIntoHatchEdge(hatch, edgeIndex, 0.5, click)
+      : this.app.scene.insertPointIntoHatchHoleEdge(hatch, holeIndex, edgeIndex, 0.5, click);
+    if (!res.didInsert) return;
     this.app.pointEditMenu.hide();
     this.app.setSelection({
       type: SelectionType.POINT, hatchId, pointIndex: edgeIndex + 1, holeIndex,

@@ -1615,34 +1615,48 @@ export class Scene {
     return true;
   }
 
-  insertPointIntoHatchEdge(hatch: Hatch, edgeIndex: number, t: number) {
-    if (!hatch || hatch.points.length < 2) {
-      return { didInsert: false, point: v(0, 0) as Vec2, pointIndex: -1 };
-    }
-    const n = hatch.points.length;
-    const a = hatch.points[edgeIndex];
-    const b = hatch.points[(edgeIndex + 1) % n];
-    t = clamp(t, 0, 1);
-    if (t <= Defaults.splitEpsT) return { didInsert: false, point: v(a.x, a.y), pointIndex: edgeIndex };
-    if (t >= 1 - Defaults.splitEpsT) return { didInsert: false, point: v(b.x, b.y), pointIndex: (edgeIndex + 1) % n };
-    const p = lerp(a, b, t);
-    hatch.points.splice(edgeIndex + 1, 0, v(p.x, p.y));
-    return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
-  }
-
-  /** Punkt-Insertion in einer Hole-Kante. */
-  insertPointIntoHatchHoleEdge(hatch: Hatch, holeIndex: number, edgeIndex: number, t: number) {
-    const loop = hatch?.holes?.[holeIndex];
+  /**
+   * Zentrale, bogenexakte Teilung einer Polygon-/Schraffurkante (außen oder
+   * Loch). Gewölbte Kanten werden über splitBulgedEdge in zwei Teilbögen
+   * derselben Kurve geteilt; gerade Kanten verhalten sich wie bisher.
+   */
+  private _splitHatchLoopEdge(loop: Vec2[], bulges: number[] | null, edgeIndex: number, t: number, target?: Vec2) {
     if (!loop || loop.length < 2) return { didInsert: false, point: v(0, 0) as Vec2, pointIndex: -1 };
     const n = loop.length;
     const a = loop[edgeIndex];
     const b = loop[(edgeIndex + 1) % n];
-    t = clamp(t, 0, 1);
-    if (t <= Defaults.splitEpsT) return { didInsert: false, point: v(a.x, a.y), pointIndex: edgeIndex };
-    if (t >= 1 - Defaults.splitEpsT) return { didInsert: false, point: v(b.x, b.y), pointIndex: (edgeIndex + 1) % n };
-    const p = lerp(a, b, t);
-    loop.splice(edgeIndex + 1, 0, v(p.x, p.y));
+    const bulge = bulges ? (bulges[edgeIndex] || 0) : 0;
+    const wanted = target ?? lerp(a, b, clamp(t, 0, 1));
+    const cut = splitBulgedEdge(a, b, bulge, wanted);
+    const tt = cut.t;
+    if (tt <= Defaults.splitEpsT) return { didInsert: false, point: v(a.x, a.y), pointIndex: edgeIndex };
+    if (tt >= 1 - Defaults.splitEpsT) return { didInsert: false, point: v(b.x, b.y), pointIndex: (edgeIndex + 1) % n };
+    const p = v(cut.point.x, cut.point.y);
+    loop.splice(edgeIndex + 1, 0, p);
+    if (bulges && (bulges.length > 0 || bulge)) {
+      while (bulges.length < edgeIndex) bulges.push(0);
+      bulges.splice(edgeIndex, 1, cut.bulgeA, cut.bulgeB);
+    }
     return { didInsert: true, point: p, pointIndex: edgeIndex + 1 };
+  }
+
+  insertPointIntoHatchEdge(hatch: Hatch, edgeIndex: number, t: number, target?: Vec2) {
+    if (!hatch || hatch.points.length < 2) {
+      return { didInsert: false, point: v(0, 0) as Vec2, pointIndex: -1 };
+    }
+    if (!Array.isArray(hatch.bulges)) hatch.bulges = [];
+    return this._splitHatchLoopEdge(hatch.points, hatch.bulges, edgeIndex, t, target);
+  }
+
+  /** Punkt-Insertion in einer Hole-Kante. */
+  insertPointIntoHatchHoleEdge(hatch: Hatch, holeIndex: number, edgeIndex: number, t: number, target?: Vec2) {
+    const loop = hatch?.holes?.[holeIndex];
+    if (!loop || loop.length < 2) return { didInsert: false, point: v(0, 0) as Vec2, pointIndex: -1 };
+    if (!Array.isArray(hatch.holeBulges)) hatch.holeBulges = [];
+    const hb = hatch.holeBulges[holeIndex];
+    const arr = Array.isArray(hb) ? hb : null;
+    const res = this._splitHatchLoopEdge(loop, arr ?? [], edgeIndex, t, target);
+    return res;
   }
 
   getHatchEdges(): { hatch: Hatch; edgeIndex: number; a: Vec2; b: Vec2; bulge: number }[] {

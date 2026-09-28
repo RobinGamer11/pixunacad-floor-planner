@@ -839,7 +839,7 @@ export class TopologyEngine {
       // dürfen sich an bestehende Linien anschließen, ohne diese aufzubrechen.
       // Hatch-Kanten benötigen weiterhin einen echten Polygon-Punkt zum Verbinden.
       if (snap.hatch && snap.edgeIndex != null && snap.t != null) {
-        const res = this.scene.insertPointIntoHatchEdge(snap.hatch, snap.edgeIndex, snap.t);
+        const res = this.scene.insertPointIntoHatchEdge(snap.hatch, snap.edgeIndex, snap.t, snap.world ? v(snap.world.x, snap.world.y) : undefined);
         return v(res.point.x, res.point.y);
       }
       return v(snap.world.x, snap.world.y);
