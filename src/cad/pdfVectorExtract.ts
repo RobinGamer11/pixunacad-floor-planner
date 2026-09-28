@@ -15,6 +15,8 @@ export interface DissolvedPdfResult {
   segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number }[];
   hatches: { points: { x: number; y: number }[]; fillColor: string; strokeColor: string }[];
   texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; text: string; color: string }[];
+  /** Anzahl nicht übertragbarer PDF-Spezialfüllungen/-konturen (Mesh-Verläufe, unbekannte Muster). Bleiben in der PDF-Unterlage sichtbar. */
+  skippedSpecial?: number;
 }
 
 interface Mat2x3 { a: number; b: number; c: number; d: number; e: number; f: number }
@@ -201,6 +203,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
 
   const emitStroke = () => {
     flushSubpath();
+    if (strokeSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
     for (const sub of currentPath) {
       for (let i = 1; i < sub.length; i++) {
         result.segments.push({
@@ -214,9 +217,13 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
 
   const emitFill = () => {
     flushSubpath();
+    // Verläufe/Muster ohne ermittelbare Farbe nicht als falsche Vollfläche ausgeben.
+    if (fillSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
     for (const sub of currentPath) {
       if (sub.length >= 3) {
-        result.hatches.push({ points: sub.slice(), fillColor, strokeColor });
+        // Reine Füllung: Rand in Füllfarbe (keine fremde Randfarbe); umrandete
+        // Flächen erhalten ihre Kontur zusätzlich als Linien in Konturfarbe.
+        result.hatches.push({ points: sub.slice(), fillColor, strokeColor: fillColor });
       }
     }
   };
@@ -350,27 +357,44 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   }
 
   // Texte via getTextContent (zuverlässiger als opList-Text-State).
-  // Farben: aus textOpFillColors zuordnen — 1:1 wenn Längen passen, sonst
-  // häufigste Farbe (oder einzige), sonst Default schwarz.
+  // Farben pro Textstelle: die Text-Items werden in Leserichtung den
+  // Show-Ops über ihren Inhalt zugeordnet; die Farbe der passenden Op gilt.
   let fallbackTextColor: string = "#000000";
-  if (textOpFillColors.length > 0) {
-    const counts = new Map<string, number>();
-    for (const c of textOpFillColors) counts.set(c, (counts.get(c) || 0) + 1);
-    let best = "#000000", n = 0;
-    counts.forEach((v, k) => { if (v > n) { n = v; best = k; } });
-    fallbackTextColor = best;
-  }
   try {
     const tc = await page.getTextContent();
     const items = (tc.items || []).filter((it: any) => it && typeof it.str === "string" && it.str.trim());
     const canMap1to1 = textOpFillColors.length === items.length;
+    const haveStrings = textOpStrings.some((x) => x.length > 0);
+    let opPtr = 0;
+    const colorForItem = (idx: number, str: string): string => {
+      if (!textOpFillColors.length) return fallbackTextColor;
+      if (haveStrings) {
+        const needle = str.replace(/\s+/g, "");
+        if (needle) {
+          // Vorwärts suchen (Items folgen i. d. R. der Op-Reihenfolge).
+          const limit = Math.min(textOpStrings.length, opPtr + 400);
+          for (let k = opPtr; k < limit; k++) {
+            const hay = textOpStrings[k];
+            if (!hay) continue;
+            if (hay.includes(needle) || needle.startsWith(hay) || needle.includes(hay)) {
+              opPtr = hay.endsWith(needle) || hay === needle ? k + 1 : k;
+              fallbackTextColor = textOpFillColors[k];
+              return textOpFillColors[k];
+            }
+          }
+        }
+      }
+      if (canMap1to1) return textOpFillColors[idx] || fallbackTextColor;
+      // Nächstliegende Op-Farbe statt pauschal häufigster Farbe.
+      return textOpFillColors[Math.min(opPtr, textOpFillColors.length - 1)] || fallbackTextColor;
+    };
     items.forEach((item: any, idx: number) => {
       const t = item.transform; // [a, b, c, d, e, f] — PDF user space
       if (!t) return;
       const fontSizePt = Math.hypot(t[2], t[3]) || Math.abs(t[3]) || 10;
       const widthPt = item.width || fontSizePt * Math.max(1, item.str.length) * 0.5;
       const heightPt = fontSizePt * 1.2;
-      const col = canMap1to1 ? (textOpFillColors[idx] || fallbackTextColor) : fallbackTextColor;
+      const col = colorForItem(idx, item.str);
       result.texts.push({
         x: t[4], y: t[5],
         widthM: widthPt * Defaults.documentMetersPerPdfPt,
