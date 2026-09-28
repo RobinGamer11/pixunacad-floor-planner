@@ -9,6 +9,8 @@ export interface SheetPanelCallbacks {
   setActiveSheetId: (id: string) => void;
   /** Wird nach JEDER Mutation aufgerufen, damit Caller (CadApp) reagieren kann. */
   onChange: () => void;
+  /** Vor dem Löschen eines Blatts; false bricht ab (z. B. verknüpfte Ausschnitte). */
+  beforeDeleteSheet?: (sheetId: string) => boolean;
 }
 
 export class SheetPanel {
@@ -241,6 +243,7 @@ export class SheetPanel {
       deleteBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         if (isLastSheet) return;
+        if (this.cb.beforeDeleteSheet && !this.cb.beforeDeleteSheet(sheet.id)) return;
         const wasActive = this.cb.getActiveSheetId() === sheet.id;
         if (!this.manager.deleteSheet(sheet.id)) return;
         this.overlayStore.delete(sheet.id);

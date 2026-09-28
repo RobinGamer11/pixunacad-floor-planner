@@ -3450,7 +3450,10 @@ export class CadApp {
           this._syncSheetSceneMap();
           this._syncOverlayScenes();
           this.refreshSheetUI();
+          this.bumpContentRevision();
+          this._emitPlanUiChange();
         },
+        beforeDeleteSheet: (sheetId: string) => this._confirmSheetDeleteWithProjections(sheetId),
       },
     );
     this.sheetPanel.render();
@@ -3498,6 +3501,65 @@ export class CadApp {
 
   refreshPlanUI() {
     this.planPanel?.render();
+    this._emitPlanUiChange();
+  }
+
+  // ---------- Exportbereich (React-Oberfläche über derselben Plan-Engine) ----------
+  private _planUiListeners = new Set<() => void>();
+  /** Zähler für React-Abonnenten des Exportbereichs. */
+  planUiVersion = 0;
+  onPlanUiChange(fn: () => void): () => void {
+    this._planUiListeners.add(fn);
+    return () => { this._planUiListeners.delete(fn); };
+  }
+  private _emitPlanUiChange() {
+    this.planUiVersion++;
+    for (const fn of this._planUiListeners) { try { fn(); } catch { /* noop */ } }
+  }
+
+  /**
+   * Einziger Mutationsweg des Exportbereichs: Änderung ausführen, Plan-Scenes/
+   * Renderer/Transparenzpause synchronisieren, genau EIN Verlaufsschritt.
+   */
+  mutatePlans(fn: () => void) {
+    fn();
+    this._syncPlanSceneMap();
+    if (this.activePlanId && !this.planManager.getById(this.activePlanId)) {
+      this.setActivePlanId(null);
+    } else if (this.activePlanId) {
+      this._applyPlanModeToRenderer();
+    }
+    this._syncPlanTracingLayers();
+    this.planController?.invalidateCache();
+    this.refreshPlanUI();
+    this.commitHistorySnapshot();
+  }
+
+  /** Verknüpften Ausschnitt eines CAD-Blatts auf der aktiven Exportseite platzieren (Canvas-Mitte). */
+  placeSheetOnActivePlan(sheetId: string) {
+    if (!this.activePlanId || !this.planController) return;
+    const r = this.canvas.getBoundingClientRect();
+    void this.planController.createProjectionFromSheet(sheetId, r.width / 2, r.height / 2).then(p => {
+      if (p) { this.refreshPlanUI(); }
+    });
+  }
+
+  private _confirmSheetDeleteWithProjections(sheetId: string): boolean {
+    const uses: { planId: string; projId: string }[] = [];
+    for (const plan of this.planManager.list()) {
+      for (const pr of plan.projections) {
+        if (pr.sourceSheetId === sheetId && pr.mode === "linked") uses.push({ planId: plan.id, projId: pr.id });
+      }
+    }
+    if (uses.length === 0) return true;
+    if (!window.confirm(`Dieses CAD-Blatt wird in ${uses.length} verknüpften Export-Ausschnitt(en) verwendet. Trotzdem löschen?`)) return false;
+    const freeze = window.confirm(
+      "Ausschnitte einfrieren?\n\nOK: Die Ausschnitte behalten den aktuellen Zeichenstand als feste Kopie.\nAbbrechen: Die Ausschnitte bleiben als Platzhalter „Quelle fehlt“ stehen.",
+    );
+    if (freeze) {
+      for (const u of uses) this.planController?.freezeProjection(u.planId, u.projId);
+    }
+    return true;
   }
 
   /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). */
