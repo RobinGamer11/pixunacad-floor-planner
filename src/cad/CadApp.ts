@@ -1,3 +1,4 @@
+import { pageGuideSnapGeometry } from "./pageGuides";
 import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
@@ -921,7 +922,6 @@ export class CadApp {
       // Druckpläne
       plans: this.planManager.toJSON(),
       planFolders: this.planManager.foldersToJSON(),
-      activePlanId: this.activePlanId,
       planScenesById: (() => {
         const out: Record<string, any> = {};
         for (const [id, sc] of this.planScenesById.entries()) {
