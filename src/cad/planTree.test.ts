@@ -3,8 +3,8 @@ import { buildTree, flattenPageOrder, folderCheckState, toggleFolder, togglePage
 import { PlanManager } from "./PlanManager";
 
 const folders: PlanFolder[] = [
-  { id: "f1", name: "EG", parentId: null, order: 1, collapsed: false },
-  { id: "f2", name: "Details", parentId: "f1", order: 2, collapsed: false },
+  { id: "f1", name: "EG", parentId: null, order: 1 },
+  { id: "f2", name: "Details", parentId: "f1", order: 2 },
 ];
 const pages: TreePage[] = [
   { id: "p0", parentFolderId: null, order: 0 },

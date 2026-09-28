@@ -316,7 +316,7 @@ export class PlanPanel {
       cbWrap.title = "Für PDF-Druck auswählen";
       const cb = document.createElement("input");
       cb.type = "checkbox";
-      cb.checked = !!plan.selected;
+      cb.checked = this.manager.isSelected(plan.id);
       cb.addEventListener("click", (e) => e.stopPropagation());
       cb.addEventListener("change", () => {
         this.manager.setSelected(plan.id, cb.checked);
