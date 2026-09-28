@@ -1321,7 +1321,7 @@ export class Scene {
     });
     box._stickerEditOwnerId = this._currentEditOwnerId;
     this.textBoxes.push(box);
-    this._rebuildTextIdMap();
+    this._textIdMap.set(box.id, box);
     return box;
   }
 
@@ -1410,7 +1410,7 @@ export class Scene {
     const seg = new Segment({ id: this._makeId(), a, b, color: style.color, thicknessM: style.thicknessM, labelId: style.labelId, isGuide: style.isGuide, midpointSnap: style.midpointSnap, divisionSnap: style.divisionSnap, arrowStart: style.arrowStart, arrowEnd: style.arrowEnd, arrowScale: style.arrowScale, bulge: style.bulge, strokePattern: style.strokePattern, roughen: style.roughen, appearanceSeed: style.appearanceSeed });
     seg._stickerEditOwnerId = this._currentEditOwnerId;
     this.segments.push(seg);
-    this._rebuildSegIdMap();
+    this._segIdMap.set(seg.id, seg);
     return seg;
   }
 
