@@ -1,4 +1,4 @@
-import { Vec2, v, sub, norm, dist } from "./geometry";
+import { Vec2, v, sub, norm, dist, splitBulgedEdge } from "./geometry";
 import type { Scene, Wall } from "./Scene";
 
 
@@ -115,6 +115,15 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
           v(hit.pos.x, hit.pos.y),
           ...host.corners.slice(hit.edgeIndex + 1),
         ];
+        // Wölbung der getroffenen Kante exakt in zwei Teilbögen überführen.
+        {
+          const hb: number[] = Array.isArray((host as any).bulges) ? (host as any).bulges : [];
+          if (hb.length > 0 || hit.bulgeA || hit.bulgeB) {
+            while (hb.length < hit.edgeIndex) hb.push(0);
+            hb.splice(hit.edgeIndex, 1, hit.bulgeA, hit.bulgeB);
+            (host as any).bulges = hb;
+          }
+        }
         if (host.cornerAnchors) {
           host.cornerAnchors = [
             ...host.cornerAnchors.slice(0, hit.edgeIndex + 1),
@@ -130,6 +139,13 @@ function runAutoSplit(scene: Scene, focusWalls?: Wall[]): boolean {
         if (dist(host.corners[hit.edgeIndex], host.corners[hit.edgeIndex + 1]) < MIN_SEG_LEN_M) {
           host.corners.splice(hit.edgeIndex + 1, 1);
           if (host.cornerAnchors) host.cornerAnchors.splice(hit.edgeIndex + 1, 1);
+          {
+            const hb: number[] | undefined = (host as any).bulges;
+            if (Array.isArray(hb) && hb.length > hit.edgeIndex) {
+              // Rückgängig: ursprüngliche Kante wiederherstellen (bulgeA+bulgeB → Original).
+              hb.splice(hit.edgeIndex, 2, hit.origBulge);
+            }
+          }
           host.hiddenCornerIndices = (host.hiddenCornerIndices || [])
             .filter(i => i !== hit.edgeIndex + 1)
             .map(i => i > hit.edgeIndex + 1 ? i - 1 : i);
@@ -174,6 +190,20 @@ function runAutoMerge(scene: Scene): boolean {
     if (!collinearAtJoin(a, b)) continue;
     // Verschmelzen: gerichtete Polylinien so verbinden, dass am Knoten der Übergang
     // sauber ist. Ergebnis-Reihenfolge: A's "freie" Seite → join → B's "freie" Seite.
+    // Gewölbte Wandenden am Knoten nie zu einer Geraden vereinfachen.
+    const bulgesOf = (w: Wall): number[] => {
+      const src: number[] = Array.isArray((w as any).bulges) ? (w as any).bulges : [];
+      const out: number[] = [];
+      for (let i = 0; i < w.corners.length - 1; i++) out.push(Number.isFinite(src[i]) ? src[i] : 0);
+      return out;
+    };
+    const bAraw = bulgesOf(a.wall), bBraw = bulgesOf(b.wall);
+    const joinBulgeA = a.atStart ? bAraw[0] : bAraw[bAraw.length - 1];
+    const joinBulgeB = b.atStart ? bBraw[0] : bBraw[bBraw.length - 1];
+    if (Math.abs(joinBulgeA || 0) > 1e-6 || Math.abs(joinBulgeB || 0) > 1e-6) continue;
+    // Beim Umdrehen: Reihenfolge umkehren und Vorzeichen negieren (gleiche Bogenrichtung).
+    const bulgesA = a.atStart ? bAraw.slice().reverse().map(x => -x) : bAraw;
+    const bulgesB = b.atStart ? bBraw : bBraw.slice().reverse().map(x => -x);
     const cornersA = a.atStart ? [...a.wall.corners].reverse() : [...a.wall.corners];
     const cornersB = b.atStart ? [...b.wall.corners] : [...b.wall.corners].reverse();
     // cornersA endet am Knoten, cornersB beginnt am Knoten — ersten Punkt von B
@@ -182,6 +212,10 @@ function runAutoMerge(scene: Scene): boolean {
     if (merged.length < 2) continue;
     // Ursprungs-Wand A behält id und Eigenschaften, B wird entfernt.
     a.wall.corners = merged;
+    {
+      const mb = bulgesA.concat(bulgesB);
+      if (mb.some(x => Math.abs(x) > 1e-9) || Array.isArray((a.wall as any).bulges)) (a.wall as any).bulges = mb;
+    }
     a.wall.hiddenCornerIndices = [];
     scene.removeWall(b.wall);
     return true; // Nach Mutation neu starten (Cluster-Indizes sind ungültig).
@@ -189,24 +223,27 @@ function runAutoMerge(scene: Scene): boolean {
   return false;
 }
 
-function findInteriorHit(w: Wall, p: Vec2, tol: number): { edgeIndex: number; t: number; pos: Vec2; cumStart: number; total: number } | null {
+function findInteriorHit(w: Wall, p: Vec2, tol: number): { edgeIndex: number; t: number; pos: Vec2; cumStart: number; total: number; bulgeA: number; bulgeB: number; origBulge: number } | null {
   const segLens: number[] = [];
   let total = 0;
   for (let i = 0; i < w.corners.length - 1; i++) {
     const L = dist(w.corners[i], w.corners[i + 1]);
     segLens.push(L); total += L;
   }
-  let best: { edgeIndex: number; t: number; pos: Vec2; cumStart: number; total: number; d: number } | null = null;
+  const bulges: number[] = Array.isArray((w as any).bulges) ? (w as any).bulges : [];
+  let best: { edgeIndex: number; t: number; pos: Vec2; cumStart: number; total: number; bulgeA: number; bulgeB: number; origBulge: number; d: number } | null = null;
   let cum = 0;
   for (let i = 0; i < w.corners.length - 1; i++) {
     const a = w.corners[i], b = w.corners[i + 1];
-    const ab = sub(b, a);
-    const ab2 = ab.x * ab.x + ab.y * ab.y || 1e-12;
-    let t = ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2;
+    const bulge = Number.isFinite(bulges[i]) ? bulges[i] : 0;
+    // Bogenexakt: auf die (ggf. gewölbte) Kante projizieren.
+    const cut = splitBulgedEdge(a, b, bulge, p);
+    const t = cut.t;
     if (t > 0.02 && t < 0.98) {
-      const q = { x: a.x + ab.x * t, y: a.y + ab.y * t };
-      const d = Math.hypot(q.x - p.x, q.y - p.y);
-      if (d <= tol && (!best || d < best.d)) best = { edgeIndex: i, t, pos: v(q.x, q.y), cumStart: cum, total, d };
+      const d = Math.hypot(cut.point.x - p.x, cut.point.y - p.y);
+      if (d <= tol && (!best || d < best.d)) {
+        best = { edgeIndex: i, t, pos: v(cut.point.x, cut.point.y), cumStart: cum, total, bulgeA: cut.bulgeA, bulgeB: cut.bulgeB, origBulge: bulge, d };
+      }
     }
     cum += segLens[i];
   }
