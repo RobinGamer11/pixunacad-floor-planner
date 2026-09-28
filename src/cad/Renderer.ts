@@ -1430,8 +1430,51 @@ export class Renderer {
     ctx.restore();
   }
 
+  /* ---------- Sichtbereichs-Culling ---------- */
+  /** Sichtbarer Weltbereich (mit großzügigem Rand); nur zum Überspringen
+   *  vollständig unsichtbarer Objekte — sichtbare Objekte bleiben unverändert. */
+  private _viewRect(): { minX: number; minY: number; maxX: number; maxY: number } | null {
+    const w = this.vw || 0, h = this.vh || 0;
+    if (!(w > 0 && h > 0)) return null;
+    const m = 200; // Bildschirm-Pixel Rand (Strichstärken, Pfeile, Beschriftungen)
+    const cs = [
+      this.camera.screenToWorld(-m, -m), this.camera.screenToWorld(w + m, -m),
+      this.camera.screenToWorld(w + m, h + m), this.camera.screenToWorld(-m, h + m),
+    ];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const c of cs) {
+      if (!Number.isFinite(c.x) || !Number.isFinite(c.y)) return null;
+      minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x);
+      minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y);
+    }
+    return { minX, minY, maxX, maxY };
+  }
+  private _segInView(seg: any, r: { minX: number; minY: number; maxX: number; maxY: number } | null): boolean {
+    if (!r || !seg?.a || !seg?.b) return true;
+    let pad = Math.max(0, seg.thicknessM || 0);
+    if (seg.bulge) pad += Math.hypot(seg.b.x - seg.a.x, seg.b.y - seg.a.y) * Math.abs(seg.bulge);
+    return !(Math.max(seg.a.x, seg.b.x) + pad < r.minX || Math.min(seg.a.x, seg.b.x) - pad > r.maxX
+      || Math.max(seg.a.y, seg.b.y) + pad < r.minY || Math.min(seg.a.y, seg.b.y) - pad > r.maxY);
+  }
+  private _hatchInView(h: any, r: { minX: number; minY: number; maxX: number; maxY: number } | null): boolean {
+    if (!r || !Array.isArray(h?.points) || h.points.length === 0) return true;
+    if (Array.isArray(h.bulges) && h.bulges.some((b: number) => b)) return true;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of h.points) {
+      if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    }
+    return !(maxX < r.minX || minX > r.maxX || maxY < r.minY || minY > r.maxY);
+  }
+  private _textInView(t: any, r: { minX: number; minY: number; maxX: number; maxY: number } | null): boolean {
+    if (!r || !t?.center) return true;
+    const rad = Math.hypot(t.widthM || 0, t.heightM || 0);
+    return !(t.center.x + rad < r.minX || t.center.x - rad > r.maxX || t.center.y + rad < r.minY || t.center.y - rad > r.maxY);
+  }
+
   private _drawSegments() {
-    const list = this._segmentsBackToFront();
+    const r = this._viewRect();
+    const list = this._segmentsBackToFront().filter(s => this._segInView(s, r));
     for (const seg of list) this._drawSingleSegment(seg);
     this._drawSegmentJoints(list as any[]);
   }
@@ -1439,8 +1482,10 @@ export class Renderer {
   private _drawSegmentsForLabel(labelId: string) {
     const hideGuides = isExportMode();
     const list: any[] = [];
+    const r = this._viewRect();
     for (const seg of this.scene.segments) {
       if (seg.labelId !== labelId) continue;
+      if (!this._segInView(seg, r)) continue;
       if (!this.labels.isVisible(seg.labelId)) continue;
       if (hideGuides && seg.isGuide) continue;
       this._drawSingleSegment(seg);
@@ -1948,12 +1993,15 @@ export class Renderer {
   showWallHelpers = false;
 
   private _drawHatches() {
-    for (const hatch of this._hatchesBackToFront()) this._drawSingleHatch(hatch);
+    const r = this._viewRect();
+    for (const hatch of this._hatchesBackToFront()) if (this._hatchInView(hatch, r)) this._drawSingleHatch(hatch);
   }
 
   private _drawHatchesForLabel(labelId: string) {
+    const r = this._viewRect();
     for (const hatch of this.scene.hatches) {
       if (hatch.labelId !== labelId) continue;
+      if (!this._hatchInView(hatch, r)) continue;
       if (!this.labels.isVisible(hatch.labelId)) continue;
       this._drawSingleHatch(hatch);
     }
@@ -2841,13 +2889,16 @@ export class Renderer {
   }
 
   private _drawTextBoxes() {
-    for (const box of this._textBoxesBackToFront()) this._drawSingleTextBox(box);
+    const r = this._viewRect();
+    for (const box of this._textBoxesBackToFront()) if (this._textInView(box, r)) this._drawSingleTextBox(box);
     this._drawTextBoxHoverOutline();
   }
 
   private _drawTextBoxesForLabel(labelId: string) {
+    const r = this._viewRect();
     for (const box of this.scene.textBoxes) {
       if (box.labelId !== labelId) continue;
+      if (!this._textInView(box, r)) continue;
       if (!this.labels.isVisible(box.labelId)) continue;
       this._drawSingleTextBox(box);
     }

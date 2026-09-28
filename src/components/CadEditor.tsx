@@ -3332,22 +3332,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground">
                       PDF auflösen
                     </div>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const app = appRef.current; if (!app) return;
-                        if (!window.confirm(`PDF "${docSelected.name}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden in eine neue Ebene "PDF-Import — ${docSelected.name}" extrahiert; radierte Bereiche bleiben ausgespart.`)) return;
-                        const res = await app.documentTool.dissolvePdf(docSelected.id);
-                        if (res) {
-                          window.alert(`Auflösen erfolgreich:\n${res.segments} Linien · ${res.hatches} Schraffuren · ${res.texts} Texte`);
-                        }
-                      }}
-                      className="cad-toolbar-btn w-full justify-start px-2 h-9"
-                      title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren (inkl. Radier-Änderungen)"
-                    >
-                      <FileText className="h-4 w-4" />
-                      <span className="text-xs">Auflösen → CAD-Objekte</span>
-                    </button>
+                    <PdfDissolveControl app={appRef.current} docId={docSelected.id} docName={docSelected.name} />
                   </div>
                 )}
 
@@ -3488,3 +3473,99 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 CadEditor.displayName = "CadEditor";
 
 export default CadEditor;
+
+
+/** Große Auflösungen ab dieser Objektzahl erst nach ausdrücklicher Bestätigung. */
+const PDF_DISSOLVE_WARN_AT = 3000;
+
+/**
+ * „PDF auflösen → CAD-Objekte“: analysiert zuerst, warnt bei vielen Objekten
+ * (Vollständig auflösen / Als PDF behalten) und erzeugt dann in Blöcken mit
+ * Fortschritt und sicherem Abbruch. Keine automatische Vereinfachung.
+ */
+function PdfDissolveControl({ app, docId, docName }: { app: any; docId: string; docName: string }) {
+  const [state, setState] = useState<
+    | { phase: "idle" }
+    | { phase: "analyzing" }
+    | { phase: "confirm"; prep: any }
+    | { phase: "running"; done: number; total: number }
+  >({ phase: "idle" });
+  const abortRef = useRef<{ aborted: boolean }>({ aborted: false });
+  useEffect(() => { setState({ phase: "idle" }); }, [docId]);
+  const fmt = (n: number) => n.toLocaleString("de-DE");
+
+  const runPrep = async (prep: any) => {
+    abortRef.current = { aborted: false };
+    setState({ phase: "running", done: 0, total: prep.counts.total });
+    const res = await prep.run({
+      signal: abortRef.current,
+      onProgress: (done: number, total: number) => setState({ phase: "running", done, total }),
+    });
+    setState({ phase: "idle" });
+    if (res) {
+      const extra = prep.counts.skippedSpecial
+        ? `\n\n${fmt(prep.counts.skippedSpecial)} PDF-Spezialfüllungen (Verläufe/Muster) sind nicht als CAD-Objekt übertragbar und bleiben in der PDF-Unterlage sichtbar.`
+        : "";
+      window.alert(`Auflösen erfolgreich:\n${fmt(res.segments)} Linien · ${fmt(res.hatches)} Schraffuren · ${fmt(res.texts)} Texte${extra}`);
+    }
+  };
+
+  const start = async () => {
+    if (!app) return;
+    if (!window.confirm(`PDF "${docName}" in CAD-Objekte auflösen?\n\nLinien, Schraffuren und Texte werden in eine neue Ebene "PDF-Import — ${docName}" extrahiert; radierte Bereiche bleiben ausgespart.`)) return;
+    setState({ phase: "analyzing" });
+    const prep = await app.documentTool.prepareDissolvePdf(docId);
+    if (!prep) { setState({ phase: "idle" }); return; }
+    if (prep.counts.total >= PDF_DISSOLVE_WARN_AT) { setState({ phase: "confirm", prep }); return; }
+    await runPrep(prep);
+  };
+
+  const box = { borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" } as const;
+
+  if (state.phase === "confirm") {
+    const c = state.prep.counts;
+    return (
+      <div className="rounded-md border p-2 space-y-2 text-[11px]" style={box}>
+        <div className="font-medium">
+          Diese PDF erzeugt voraussichtlich {fmt(c.total)} bearbeitbare CAD-Objekte. Das kann auf Tablets die Bearbeitung verlangsamen.
+        </div>
+        <div className="text-muted-foreground">{fmt(c.segments)} Linien · {fmt(c.hatches)} Flächen · {fmt(c.texts)} Texte</div>
+        <button type="button" className="cad-toolbar-btn w-full justify-center h-9" onClick={() => runPrep(state.prep)}>
+          Vollständig auflösen
+        </button>
+        <button type="button" className="cad-toolbar-btn w-full justify-center h-9" onClick={() => setState({ phase: "idle" })}>
+          Als PDF behalten
+        </button>
+      </div>
+    );
+  }
+  if (state.phase === "running" || state.phase === "analyzing") {
+    const pct = state.phase === "running" && state.total > 0 ? Math.round((state.done / state.total) * 100) : 0;
+    return (
+      <div className="rounded-md border p-2 space-y-2 text-[11px]" style={box}>
+        <div>{state.phase === "analyzing" ? "PDF wird analysiert …" : `Objekte werden erzeugt … ${pct} %`}</div>
+        {state.phase === "running" && (
+          <>
+            <div className="h-1.5 w-full rounded" style={{ background: "hsl(var(--hairline))" }}>
+              <div className="h-1.5 rounded" style={{ width: `${pct}%`, background: "hsl(var(--cad-accent))" }} />
+            </div>
+            <button type="button" className="cad-toolbar-btn w-full justify-center h-8" onClick={() => { abortRef.current.aborted = true; }}>
+              Abbrechen
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={start}
+      className="cad-toolbar-btn w-full justify-start px-2 h-9"
+      title="PDF-Vektoren extrahieren und in Linien/Schraffuren/Texte konvertieren (inkl. Radier-Änderungen)"
+    >
+      <FileText className="h-4 w-4" />
+      <span className="text-xs">Auflösen → CAD-Objekte</span>
+    </button>
+  );
+}

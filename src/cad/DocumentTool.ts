@@ -703,7 +703,26 @@ export class DocumentTool {
    * und erzeugt daraus CAD-Objekte (Segments, Hatches, TextBoxes) in einer
    * neuen Layer-Gruppe. Anschließend wird das Original-Dokument gelöscht.
    */
+  /** true, solange eine PDF-Auflösung läuft (unterdrückt Zwischen-Undo-Schritte). */
+  dissolving = false;
+
+  /** Kompatibler Einzelaufruf: analysiert und löst vollständig auf. */
   async dissolvePdf(docId: string): Promise<{ segments: number; hatches: number; texts: number } | null> {
+    const prep = await this.prepareDissolvePdf(docId);
+    if (!prep) return null;
+    return prep.run();
+  }
+
+  /**
+   * Analysiert ein PDF-Dokument ohne etwas zu erzeugen. Liefert die erwartete
+   * Objektanzahl und eine run()-Funktion, die die Objekte in Blöcken erzeugt
+   * (Browser bleibt reaktionsfähig, Fortschritt + sicherer Abbruch, ein Undo-Schritt).
+   */
+  async prepareDissolvePdf(docId: string): Promise<{
+    counts: { segments: number; hatches: number; texts: number; skippedSpecial: number; total: number };
+    run: (opts?: { onProgress?: (done: number, total: number) => void; signal?: { aborted: boolean } }) =>
+      Promise<{ segments: number; hatches: number; texts: number } | null>;
+  } | null> {
     const doc = this.app.scene.getDocumentById(docId);
     if (!doc) return null;
     if (!doc.pdfSourceB64) {
@@ -729,7 +748,6 @@ export class DocumentTool {
       window.alert("Auflösen fehlgeschlagen: " + (e?.message || e));
       return null;
     }
-    // PDF-Punkt-Abmessungen via pdfjs erneut holen (cached).
     let pdfWidthPt = 0, pdfHeightPt = 0;
     try {
       const pdf = await loadPdfDocFromB64(doc.pdfSourceB64);
@@ -739,65 +757,100 @@ export class DocumentTool {
       pdfHeightPt = vp.height;
     } catch { return null; }
 
-    const layer = this.app.labelManager.ensureGroupNamed(`PDF-Import — ${doc.name}`.slice(0, 60));
-    const labelId = layer.id;
+    const res = result;
+    const counts = {
+      segments: res.segments.length, hatches: res.hatches.length, texts: res.texts.length,
+      skippedSpecial: res.skippedSpecial || 0,
+      total: res.segments.length + res.hatches.length + res.texts.length,
+    };
 
-    let nSeg = 0, nH = 0, nT = 0;
-    const toWorld = (x: number, y: number) =>
-      pdfPointToWorld(x, y, pdfWidthPt, pdfHeightPt, { position: doc.position, widthM: doc.widthM, heightM: doc.heightM, rotationRad: doc.rotationRad });
-    /** PDF-Punkt (y nach oben) → UV im Dokument (y nach unten). */
-    const erasedAt = (x: number, y: number) =>
-      !!isErased && isErased(x / (pdfWidthPt || 1), 1 - y / (pdfHeightPt || 1));
-
-    for (const s of result.segments) {
-      const a = toWorld(s.a.x, s.a.y);
-      const b = toWorld(s.b.x, s.b.y);
-      const len = Math.hypot(b.x - a.x, b.y - a.y);
-      if (len < 1e-5) continue;
-      // Wegradierte Abschnitte überspringen (Mitte + beide Enden prüfen).
-      if (erasedAt(s.a.x, s.a.y) && erasedAt(s.b.x, s.b.y)) continue;
-      if (erasedAt((s.a.x + s.b.x) / 2, (s.a.y + s.b.y) / 2)
-        && (erasedAt(s.a.x, s.a.y) || erasedAt(s.b.x, s.b.y))) continue;
-      // Strichstärke skalieren (PDF-Punkte → Welt-Meter mit Dokument-Skalierungsfaktor).
+    const run = async (opts: { onProgress?: (done: number, total: number) => void; signal?: { aborted: boolean } } = {}) => {
+      if (this.dissolving) return null;
+      const scene = this.app.scene;
+      if (!scene.getDocumentById(docId)) return null;
+      const layer = this.app.labelManager.ensureGroupNamed(`PDF-Import — ${doc.name}`.slice(0, 60));
+      const labelId = layer.id;
+      const toWorld = (x: number, y: number) =>
+        pdfPointToWorld(x, y, pdfWidthPt, pdfHeightPt, { position: doc.position, widthM: doc.widthM, heightM: doc.heightM, rotationRad: doc.rotationRad });
+      const erasedAt = (x: number, y: number) =>
+        !!isErased && isErased(x / (pdfWidthPt || 1), 1 - y / (pdfHeightPt || 1));
       const sxFactor = doc.widthM / pdfWidthPt;
-      this.app.scene.createSegment(a, b, { color: s.color, thicknessM: Math.max(0.0005, s.thicknessM * sxFactor * 72 / 0.0254), labelId });
-      nSeg++;
-    }
-    for (const h of result.hatches) {
-      const pts = h.points.map(p => toWorld(p.x, p.y));
-      if (pts.length < 3) continue;
-      // Vollständig wegradierte Flächen nicht wiederherstellen.
-      if (isErased && h.points.every(p => erasedAt(p.x, p.y))) continue;
-      this.app.scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, labelId, areaLabel: { show: false } });
-      nH++;
-    }
-    for (const t of result.texts) {
-      // t.x/t.y sind PDF-Punkte (bottom-left); t.widthM/heightM in Paper-Meter.
       const PT_PER_M = 72 / 0.0254;
-      const widthPt = t.widthM * PT_PER_M;
-      const heightPt = t.heightM * PT_PER_M;
-      if (erasedAt(t.x + widthPt / 2, t.y + heightPt / 2)) continue;
-      const center = toWorld(t.x + widthPt / 2, t.y + heightPt / 2);
-      const sxFactor = doc.widthM / pdfWidthPt;
-      const widthWorld = Math.max(0.005, widthPt * sxFactor);
-      const heightWorld = Math.max(0.005, heightPt * sxFactor);
-      this.app.scene.createTextBox(
-        center,
-        widthWorld,
-        heightWorld,
-        { fontSizePx: t.fontSizePx, textColor: t.color, labelId, autoSize: true, bgAlphaPct: 0 },
-        t.text,
-        doc.rotationRad,
-      );
-      nT++;
-    }
 
+      const segIds: string[] = [], hatchIds: string[] = [], textIds: string[] = [];
+      const total = counts.total;
+      let done = 0;
+      const BATCH = 400;
+      const yieldFrame = () => new Promise<void>((r) => setTimeout(r, 0));
+      this.dissolving = true;
+      try {
+        const step = async () => {
+          done++;
+          if (done % BATCH === 0) {
+            opts.onProgress?.(done, total);
+            this.app.renderer.render();
+            await yieldFrame();
+            if (opts.signal?.aborted) throw new Error("__aborted__");
+          }
+        };
+        for (const s of res.segments) {
+          await step();
+          const a = toWorld(s.a.x, s.a.y);
+          const b = toWorld(s.b.x, s.b.y);
+          if (Math.hypot(b.x - a.x, b.y - a.y) < 1e-5) continue;
+          if (erasedAt(s.a.x, s.a.y) && erasedAt(s.b.x, s.b.y)) continue;
+          if (erasedAt((s.a.x + s.b.x) / 2, (s.a.y + s.b.y) / 2)
+            && (erasedAt(s.a.x, s.a.y) || erasedAt(s.b.x, s.b.y))) continue;
+          const seg: any = scene.createSegment(a, b, { color: s.color, thicknessM: Math.max(0.0005, s.thicknessM * sxFactor * PT_PER_M), labelId });
+          if (seg?.id) segIds.push(seg.id);
+        }
+        for (const h of res.hatches) {
+          await step();
+          if (h.points.length < 3) continue;
+          if (isErased && h.points.every(p => erasedAt(p.x, p.y))) continue;
+          const pts = h.points.map(p => toWorld(p.x, p.y));
+          const hh: any = scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, labelId, areaLabel: { show: false } });
+          if (hh?.id) hatchIds.push(hh.id);
+        }
+        for (const t of res.texts) {
+          await step();
+          const widthPt = t.widthM * PT_PER_M;
+          const heightPt = t.heightM * PT_PER_M;
+          if (erasedAt(t.x + widthPt / 2, t.y + heightPt / 2)) continue;
+          const center = toWorld(t.x + widthPt / 2, t.y + heightPt / 2);
+          const tb: any = scene.createTextBox(
+            center,
+            Math.max(0.005, widthPt * sxFactor),
+            Math.max(0.005, heightPt * sxFactor),
+            { fontSizePx: t.fontSizePx, textColor: t.color, labelId, autoSize: true, bgAlphaPct: 0 },
+            t.text,
+            doc.rotationRad,
+          );
+          if (tb?.id) textIds.push(tb.id);
+        }
+      } catch (e: any) {
+        // Abbruch/Fehler: alle bereits erzeugten Objekte sauber entfernen.
+        scene.removeSegmentsByIds(segIds);
+        scene.removeHatchesByIds(hatchIds);
+        scene.removeTextBoxesByIds(textIds);
+        this.dissolving = false;
+        this.app.refreshLabelUI();
+        this.app.renderer.render();
+        if (e?.message !== "__aborted__") window.alert("Auflösen fehlgeschlagen: " + (e?.message || e));
+        return null;
+      }
+      this.dissolving = false;
+      opts.onProgress?.(total, total);
+      // Original-PDF bleibt als Unterlage erhalten. Genau ein Undo-Schritt.
+      this.app.clearSelection();
+      this.app.refreshLabelUI();
+      try { (this.app as any).commitHistorySnapshot?.(); } catch {}
+      this.app.renderer.render();
+      return { segments: segIds.length, hatches: hatchIds.length, texts: textIds.length };
+    };
 
-    // Original-PDF als Kopie unter den neuen Objekten liegen lassen (nicht löschen).
-    // Dokumente werden ohnehin im Hintergrund (vor Segments/Hatches/Texts) gezeichnet.
-    this.app.clearSelection();
-    this.app.refreshLabelUI();
-    return { segments: nSeg, hatches: nH, texts: nT };
+    return { counts, run };
   }
+
 }
 
