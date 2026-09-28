@@ -122,7 +122,7 @@ export class Renderer {
    * Papier wird mit Mittelpunkt am Welt-Ursprung (0,0) gezeichnet.
    * Wenn null → normaler Zeichnungsmodus (Grid + weißer Hintergrund).
    */
-  planMode: { widthMm: number; heightMm: number; marginsMm?: number; holePunch?: boolean } | null = null;
+  planMode: { widthMm: number; heightMm: number; marginsMm?: number; holePunch?: boolean; holePunchSide?: HolePunchSide } | null = null;
 
   /** Hook: wird im Plan-Modus NACH dem Papier gezeichnet (Projektionen). */
   planOverlayDraw: ((ctx: CanvasRenderingContext2D) => void) | null = null;
@@ -541,15 +541,14 @@ export class Renderer {
       ctx.restore();
     }
     if (this.planMode.holePunch) {
-      // Standard-Zweifachlochung: Ø 6 mm, 12 mm vom Rand, Abstand 80 mm, vertikal zentriert.
+      // Standard-Zweifachlochung: Ø 6 mm, 12 mm vom Rand, Abstand 80 mm, an der gewählten Seite.
       ctx.save();
       ctx.strokeStyle = "rgba(0,0,0,0.35)";
       ctx.lineWidth = 1;
-      const cx = x + 12 * pxPerMm;
-      const cy = y + h / 2;
-      for (const dy of [-40, 40]) {
+      const hp = holePunchPointsMm(this.planMode.widthMm, this.planMode.heightMm, normalizeHolePunchSide(this.planMode.holePunchSide));
+      for (const hole of hp.holes) {
         ctx.beginPath();
-        ctx.arc(cx, cy + dy * pxPerMm, 3 * pxPerMm, 0, Math.PI * 2);
+        ctx.arc(x + hole.x * pxPerMm, y + hole.y * pxPerMm, HOLE_RADIUS_MM * pxPerMm, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.restore();
