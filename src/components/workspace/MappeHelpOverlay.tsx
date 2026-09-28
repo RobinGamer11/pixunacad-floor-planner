@@ -293,7 +293,7 @@ export function MappeHelpOverlay({
         )}
         {tableActive && (
           <HelpGroup title="Tabelle" bordered>
-            <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Doppelklick" description="Zelle bearbeiten" />
+            <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="Doppelklick" description="Felder bearbeiten" />
             <HelpItem icon={<MouseGlyph highlight="left" />} shortcut="L-Klick andere Zelle" description="Eingabe speichern" />
             <div className="flex min-w-[210px] flex-col justify-end px-1.5 py-1 text-left">
               <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">Formeln</div>

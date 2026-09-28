@@ -120,7 +120,8 @@ export class LineHub {
         span.style.height = "22px";
         span.style.border = "1px solid hsl(var(--border, 220 13% 91%))";
         span.style.borderRadius = "4px";
-        span.style.background = "white";
+        span.style.background = "hsl(var(--surface-muted))";
+        span.style.color = "hsl(var(--ink))";
         span.style.fontSize = "12px";
         span.style.marginRight = "4px";
         span.style.userSelect = "none";
