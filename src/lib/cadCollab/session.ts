@@ -46,6 +46,8 @@ import {
 import {
   isLibraryKind,
   isStructureKind,
+  CAD_STRUCTURE_KINDS,
+  type CadStructureKind,
   presenceColor,
   type CadLibraryKind,
   type CadObjectKind,
@@ -81,7 +83,9 @@ export interface CollabCadApp {
   libraryFolders?: unknown[];
   onLibraryChange?: () => void;
   /** Übernimmt Blatt- bzw. Ebenenliste aus der Cloud (ohne Undo-Schritt). */
-  applyCollabStructure?(kind: "sheets" | "labels", list: Record<string, unknown>[]): void;
+  applyCollabStructure?(kind: CadStructureKind, list: Record<string, unknown>[]): void;
+  /** Scene zu einer synchronisierten „Seite“ (auch Anmerkungs-Scenes `plan:<id>`). */
+  resolveCollabScene?(sheetId: string): unknown | null;
   /** Serialisierungsstand der gesamten Zeichnung (bestehende Methode). */
   serializeForCollab(): string | null;
 }
@@ -673,16 +677,26 @@ export class CadCollabSession {
   /* --------------------------------------------------- Fremde Änderungen */
 
   /** Blatt- und Ebenenliste aus Einzeloperationen neu zusammensetzen. */
+  private sceneFor(sheetId: string): unknown | null {
+    const app = this.opts.app;
+    return app.resolveCollabScene ? app.resolveCollabScene(sheetId) : app.scenesById.get(sheetId) ?? null;
+  }
+
   private applyStructureOps(ops: CadObjectOp[]): boolean {
     const app = this.opts.app;
     if (!app.applyCollabStructure || ops.length === 0) return false;
     let data: Record<string, unknown> = {};
     try { data = JSON.parse(app.serializeForCollab() ?? "{}") as Record<string, unknown>; } catch { /* leer */ }
     let changed = false;
-    for (const kind of ["sheets", "labels"] as const) {
+    for (const kind of CAD_STRUCTURE_KINDS) {
       const mine = ops.filter((op) => op.objectKind === kind);
       if (mine.length === 0) continue;
-      const current = (Array.isArray(data[kind]) ? data[kind] : []) as Record<string, unknown>[];
+      const raw = data[kind];
+      const current = (Array.isArray(raw)
+        ? raw
+        : raw && typeof raw === "object"
+          ? Object.entries(raw as Record<string, Record<string, unknown>>).map(([id, st]) => ({ ...st, id }))
+          : []) as Record<string, unknown>[];
       const byId = new Map<string, Record<string, unknown> & { __order?: number }>();
       current.forEach((item, i) => { if (typeof item?.id === "string") byId.set(item.id, { ...item, __order: i }); });
       for (const op of mine) {
@@ -738,7 +752,7 @@ export class CadCollabSession {
           continue;
         }
 
-        const scene = this.opts.app.scenesById.get(op.sheetId);
+        const scene = this.sceneFor(op.sheetId);
         if (!scene) continue;
         changed = applyOpToScene(
           scene as never,
@@ -821,7 +835,7 @@ export class CadCollabSession {
   }
 
   private applyPreview(msg: CadPreviewMessage) {
-    const scene = this.opts.app.scenesById.get(msg.sheetId);
+    const scene = this.sceneFor(msg.sheetId);
     if (!scene) return;
     if (!msg.payload) {
       // Abbruch (Escape): bestätigten Stand dieses Objekts wieder herstellen.
