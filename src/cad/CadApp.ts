@@ -1178,8 +1178,35 @@ export class CadApp {
    * Übernimmt Blatt- bzw. Ebenenliste aus der Cloud – ohne Undo-Schritt und
    * ohne Werkzeug, Kamera oder Auswahl zu verändern.
    */
-  applyCollabStructure(kind: "sheets" | "labels", list: Record<string, unknown>[]) {
+  resolveCollabScene(sheetId: string): Scene | null {
+    if (sheetId.startsWith("plan:")) {
+      const planId = sheetId.slice(5);
+      if (!this.planManager.getById(planId)) return null;
+      return this._ensurePlanScene(planId);
+    }
+    return this.scenesById.get(sheetId) ?? null;
+  }
+
+  applyCollabStructure(kind: "sheets" | "labels" | "plans" | "planFolders" | "planOverlays", list: Record<string, unknown>[]) {
     if (this._destroyed) return;
+    if (kind === "plans" || kind === "planFolders" || kind === "planOverlays") {
+      if (kind === "plans") this.planManager.restore(list as any, this.planManager.listFolders());
+      else if (kind === "planFolders") this.planManager.restore(this.planManager.toJSON(), list as any);
+      else {
+        const rec: Record<string, any> = {};
+        for (const { id, ...st } of list as any[]) rec[id] = st;
+        this.planOverlayStore.restore(rec);
+      }
+      this._syncPlanSceneMap();
+      if (this.activePlanId && !this.planManager.getById(this.activePlanId)) this.setActivePlanId(null);
+      else if (this.activePlanId) this._applyPlanModeToRenderer();
+      this._syncPlanTracingLayers();
+      this.planController?.invalidateCache();
+      this.bumpContentRevision();
+      this.refreshPlanUI();
+      this.renderer?.render?.();
+      return;
+    }
     if (kind === "sheets") {
       if (!list.length) return;
       this.sheetManager.restore(list as any);
@@ -1187,6 +1214,7 @@ export class CadApp {
     } else {
       this.labelManager.restore(list as any);
     }
+    this.bumpContentRevision();
     this.renderer?.render?.();
   }
 
@@ -3565,6 +3593,8 @@ export class CadApp {
 
   /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). */
   setActivePlanId(id: string | null) {
+    // Beim Betreten/Verlassen einer Exportseite verknüpfte Ausschnitte frisch lesen.
+    this.bumpContentRevision();
     if (id != null && !this.planManager.getById(id)) return;
     if (id === this.activePlanId) { this.refreshPlanUI(); return; }
     // Aktuellen Camera-State sichern (für Sheet bzw. den vorherigen Plan).

@@ -117,6 +117,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 
 ## Export – Stand
 - [x] Seiten/Ordner-Baum, Drag&Drop, Exportauswahl, PDF inkl. Anmerkungen, Seiteneinstellungen, Transparenzpause, verknüpfte Ausschnitte
-- [ ] Cloud-Objektsync für Exportstrukturen + Zwei-Geräte-Test (danach Reiter freischalten)
-- [ ] contentRevision für direkte Scene-Mutationen/Ebenensichtbarkeit
+- [x] Cloud-Objektsync für Exportstrukturen (simulierter Zwei-Geräte-Test)
+- [ ] Echter Zwei-Geräte-Test (Nutzer), danach Reiter freischalten
+- [x] contentRevision für direkte Scene-Mutationen/Ebenensichtbarkeit
 - [ ] Browser-Abnahme mit Anmeldung

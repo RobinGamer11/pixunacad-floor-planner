@@ -12,6 +12,7 @@ import {
   CAD_OBJECT_KINDS,
   CAD_STRUCTURE_KINDS,
   CAD_STRUCTURE_SHEET_ID,
+  PLAN_SCENE_PREFIX,
   type CadObjectKind,
   type LocalCadOp,
 } from "./types";
@@ -55,6 +56,13 @@ export function indexSnapshot(snapshot: string | null | undefined): SceneIndex {
     // Altstand ohne `scenesById`: nur die aktive Seite.
     index.set(data.activeSheetId, indexOneScene(data as Record<string, unknown>));
   }
+  // Anmerkungs-Scenes der Exportseiten.
+  const planScenes = data.planScenesById as Record<string, Record<string, unknown>> | undefined;
+  if (planScenes && typeof planScenes === "object") {
+    for (const planId of Object.keys(planScenes)) {
+      index.set(PLAN_SCENE_PREFIX + planId, indexOneScene(planScenes[planId]));
+    }
+  }
   // Bibliotheksdefinitionen und Ordner gehören zum Projekt, nicht zu einem
   // Blatt – sie laufen über eine eigene, feste „Seite".
   const lib = new Map<CadObjectKind, Map<string, string>>();
@@ -77,7 +85,11 @@ export function indexSnapshot(snapshot: string | null | undefined): SceneIndex {
   const structure = new Map<CadObjectKind, Map<string, string>>();
   let hasStructure = false;
   for (const kind of CAD_STRUCTURE_KINDS) {
-    const list = data[kind];
+    let list = data[kind];
+    // Transparenzpausen liegen als Record planId → Zustand vor.
+    if (kind === "planOverlays" && list && typeof list === "object" && !Array.isArray(list)) {
+      list = Object.entries(list as Record<string, Record<string, unknown>>).map(([id, st]) => ({ ...st, id }));
+    }
     const byId = new Map<string, string>();
     if (Array.isArray(list)) {
       hasStructure = true;

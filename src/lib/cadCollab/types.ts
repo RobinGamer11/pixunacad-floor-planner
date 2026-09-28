@@ -45,11 +45,20 @@ export function isLibraryKind(kind: string): kind is CadLibraryKind {
  * weiteren Blättern auf einem zweiten Gerät verloren.
  */
 export const CAD_STRUCTURE_SHEET_ID = "__structure__";
-export const CAD_STRUCTURE_KINDS = ["sheets", "labels"] as const;
+export const CAD_STRUCTURE_KINDS = ["sheets", "labels", "plans", "planFolders", "planOverlays"] as const;
 export type CadStructureKind = (typeof CAD_STRUCTURE_KINDS)[number];
 
 export function isStructureKind(kind: string): kind is CadStructureKind {
-  return kind === "sheets" || kind === "labels";
+  return (CAD_STRUCTURE_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * Anmerkungs-Scenes der Exportseiten laufen als eigene „Seiten" mit diesem
+ * Präfix (`plan:<planId>`), damit sie wie Blattobjekte einzeln synchronisiert werden.
+ */
+export const PLAN_SCENE_PREFIX = "plan:";
+export function isPlanSceneId(sheetId: string): boolean {
+  return sheetId.startsWith(PLAN_SCENE_PREFIX);
 }
 
 /** Alle synchronisierten Arten (Szene + Bibliothek + Struktur). */
