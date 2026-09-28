@@ -33,7 +33,7 @@ const CadPage = () => {
   const [multiPaste, setMultiPaste] = useState(false);
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
   // Export ist derselbe CAD-Bereich (dieselbe Engine/Verlauf) mit Exportseite aktiv.
-  const exportView = new URLSearchParams(location.search).get("view") === "export";
+  const exportView = location.pathname.endsWith("/export") || new URLSearchParams(location.search).get("view") === "export";
   useEffect(() => {
     if (!cadApp) return;
     if (exportView) {

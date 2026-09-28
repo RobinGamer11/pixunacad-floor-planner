@@ -114,7 +114,7 @@ export function WorkspaceHeader({
 
   const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
-  const goExport = () => projectId && navigate(`/project/${projectId}/cad?view=export`);
+  const goExport = () => projectId && navigate(`/project/${projectId}/export`);
   const showExportTab = isExportAreaEnabled() || mode === "export";
 
   return (
