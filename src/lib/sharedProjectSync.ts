@@ -45,19 +45,24 @@ function isPlausibleProject(value: unknown): value is Project {
 export async function hydrateSharedProject(projectId: string): Promise<boolean> {
   const access = projectAccessStore.accessFor(projectId);
   if (!access.cloud || access.role === null) return false;
+  // Gelöschte Projekte werden nie hydratisiert (lokal, cloudweit oder ausstehend).
+  const pendingOp = loadPendingTrash()[projectId]?.op;
+  if (pendingOp === "purge" || pendingOp === "delete") return false;
+  const cloudDeletedAt = projectAccessStore.getState().deletedAtByProject.get(projectId);
+  const localProject = projectStore.getState().projects.find((p) => p.id === projectId);
+  if (localProject?.deletedAt) return false;
   // Projekt fehlt auf diesem Gerät (auf einem anderen Gerät angelegt):
   // leeren Platzhalter anlegen, Inhalte folgen objektweise beim Öffnen.
   if (!projectStore.getState().projects.some((p) => p.id === projectId)) {
     // Auf diesem Gerät bereits endgültig gelöscht (wartet auf die Cloud): nicht zurückholen.
     // Ausstehende Lösch-/Papierkorbaktion dieses Geräts: nie als aktiven Platzhalter zurückholen.
-    const pendingOp = loadPendingTrash()[projectId]?.op;
-    if (pendingOp === "purge" || pendingOp === "delete") return false;
     const name = projectAccessStore.getState().namesByProject.get(projectId) ?? "Projekt";
     const deletedAt = projectAccessStore.getState().deletedAtByProject.get(projectId);
     projectStore.ensureCloudStub(projectId, name);
     // Im cloudweiten Papierkorb → im selben Schritt nur im Papierkorb anzeigen.
     if (deletedAt) projectStore.applyCloudTrash(projectId, deletedAt);
   }
+  if (cloudDeletedAt) return false;
   if (hasBaseline(baselineKey("mappe", projectId)) || hasBaseline(baselineKey("cad", projectId))) return false;
   try {
     const doc = await loadProjectDocument(projectId);
@@ -86,7 +91,7 @@ export function resetSharedSyncState(_projectId?: string) {
 export function sharedProjectIds(): Set<string> {
   const ids = new Set<string>();
   projectAccessStore.getState().byProject.forEach((access, id) => {
-    if (access.cloud && access.role !== null) ids.add(id);
+    if (access.cloud && access.role !== null && !projectAccessStore.getState().deletedAtByProject.get(id)) ids.add(id);
   });
   return ids;
 }
