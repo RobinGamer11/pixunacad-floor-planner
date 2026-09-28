@@ -445,13 +445,13 @@ export class TextBox {
       textAlphaPct: clamp(s.textAlphaPct ?? Defaults.textAlphaPct, 0, 100),
       fontSizePt: clamp(
         s.fontSizePt ?? ((s.fontSizePx ?? Defaults.textFontSizePx) * 72 / 96),
-        1,
+        0.01,
         400,
       ),
       // Nur als lesbarer Legacy-Spiegel behalten. Neue Logik verwendet fontSizePt.
       fontSizePx: clamp(
         (s.fontSizePt ?? ((s.fontSizePx ?? Defaults.textFontSizePx) * 72 / 96)) * 96 / 72,
-        96 / 72,
+        0.01 * 96 / 72,
         400 * 96 / 72,
       ),
       bgColor: s.bgColor || Defaults.textBgColor,

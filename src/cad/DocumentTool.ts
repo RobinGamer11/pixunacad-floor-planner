@@ -1,3 +1,4 @@
+import { pdfFontPtToCadPt } from "./textTypography";
 import { Defaults, SelectionType, SnapType } from "./constants";
 import { v, Vec2, dist, orthoSnapFromA } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -23,6 +24,15 @@ type Phase =
  *  P2 → P3 entlang der Richtung P1→P2 (Soll-Länge ab P1; Distanz im Hub eingebbar)
  *  Skalierungsfaktor = |P1 P3| / |P1 P2|
  */
+export interface DissolveRunOptions {
+  onProgress?: (done: number, total: number) => void;
+  signal?: { aborted: boolean };
+  /** Teilweise auflösen: welche Inhalte zu CAD-Objekten werden (Standard: alle). */
+  include?: { segments?: boolean; hatches?: boolean; texts?: boolean };
+  /** Optionale Obergrenze der erzeugten Objekte (Texte → Flächen → Linien). */
+  maxObjects?: number;
+}
+
 export class DocumentTool {
   app: CadApp;
   id = "document";
@@ -149,6 +159,8 @@ export class DocumentTool {
     if (!doc) return;
     (doc as any).warpCorners = null;
     this.app.renderer.render();
+    (this.app as any)._changeDirty = true;
+    try { (this.app as any).commitHistorySnapshot?.(); } catch {}
   }
 
   /** Spiegelt ein Dokument (Achse: "x" = links/rechts, "y" = oben/unten). */
@@ -158,6 +170,8 @@ export class DocumentTool {
     (doc as any).flipX = !!flipX;
     (doc as any).flipY = !!flipY;
     this.app.renderer.render();
+    (this.app as any)._changeDirty = true;
+    try { (this.app as any).commitHistorySnapshot?.(); } catch {}
   }
 
   /** Welt-Position einer Warp-Ecke (berücksichtigt Rotation + Doc-Box). */
@@ -720,7 +734,7 @@ export class DocumentTool {
    */
   async prepareDissolvePdf(docId: string): Promise<{
     counts: { segments: number; hatches: number; texts: number; skippedSpecial: number; total: number };
-    run: (opts?: { onProgress?: (done: number, total: number) => void; signal?: { aborted: boolean } }) =>
+    run: (opts?: DissolveRunOptions) =>
       Promise<{ segments: number; hatches: number; texts: number } | null>;
   } | null> {
     const doc = this.app.scene.getDocumentById(docId);
@@ -764,7 +778,7 @@ export class DocumentTool {
       total: res.segments.length + res.hatches.length + res.texts.length,
     };
 
-    const run = async (opts: { onProgress?: (done: number, total: number) => void; signal?: { aborted: boolean } } = {}) => {
+    const run = async (opts: DissolveRunOptions = {}) => {
       if (this.dissolving) return null;
       const scene = this.app.scene;
       if (!scene.getDocumentById(docId)) return null;
@@ -778,11 +792,24 @@ export class DocumentTool {
       const PT_PER_M = 72 / 0.0254;
 
       const segIds: string[] = [], hatchIds: string[] = [], textIds: string[] = [];
-      const total = counts.total;
+      const inc = { segments: true, hatches: true, texts: true, ...(opts.include || {}) };
+      // Reihenfolge bei Obergrenze: Texte → Flächen → Linien (keine Vereinfachung,
+      // nicht übernommene Inhalte bleiben in der PDF-Unterlage sichtbar).
+      let budget = opts.maxObjects && opts.maxObjects > 0 ? Math.floor(opts.maxObjects) : Infinity;
+      const takeTexts = inc.texts ? res.texts.slice(0, Math.min(res.texts.length, budget)) : [];
+      budget -= takeTexts.length;
+      const takeHatches = inc.hatches ? res.hatches.slice(0, Math.max(0, Math.min(res.hatches.length, budget))) : [];
+      budget -= takeHatches.length;
+      const takeSegments = inc.segments ? res.segments.slice(0, Math.max(0, Math.min(res.segments.length, budget))) : [];
+      const total = takeTexts.length + takeHatches.length + takeSegments.length;
+      const renderer: any = this.app.renderer;
+      const refPxPerM = renderer?.referencePxPerM || 80;
+      const textPtScale = renderer?.textPtScale || 1;
       let done = 0;
       const BATCH = 400;
       const yieldFrame = () => new Promise<void>((r) => setTimeout(r, 0));
       this.dissolving = true;
+      (this.app as any).beginAction?.();
       try {
         const step = async () => {
           done++;
@@ -793,7 +820,7 @@ export class DocumentTool {
             if (opts.signal?.aborted) throw new Error("__aborted__");
           }
         };
-        for (const s of res.segments) {
+        for (const s of takeSegments) {
           await step();
           const a = toWorld(s.a.x, s.a.y);
           const b = toWorld(s.b.x, s.b.y);
@@ -804,7 +831,7 @@ export class DocumentTool {
           const seg: any = scene.createSegment(a, b, { color: s.color, thicknessM: Math.max(0.0005, s.thicknessM * sxFactor * PT_PER_M), labelId });
           if (seg?.id) segIds.push(seg.id);
         }
-        for (const h of res.hatches) {
+        for (const h of takeHatches) {
           await step();
           if (h.points.length < 3) continue;
           if (isErased && h.points.every(p => erasedAt(p.x, p.y))) continue;
@@ -812,7 +839,7 @@ export class DocumentTool {
           const hh: any = scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, labelId, areaLabel: { show: false } });
           if (hh?.id) hatchIds.push(hh.id);
         }
-        for (const t of res.texts) {
+        for (const t of takeTexts) {
           await step();
           const widthPt = t.widthM * PT_PER_M;
           const heightPt = t.heightM * PT_PER_M;
@@ -822,7 +849,11 @@ export class DocumentTool {
             center,
             Math.max(0.005, widthPt * sxFactor),
             Math.max(0.005, heightPt * sxFactor),
-            { fontSizePx: t.fontSizePx, textColor: t.color, labelId, autoSize: true, bgAlphaPct: 0 },
+            {
+              // Gleiche Skalierungsgrundlage wie Linien/Flächen (sxFactor = m je PDF-pt).
+              fontSizePt: pdfFontPtToCadPt(t.fontSizePdfPt ?? t.fontSizePx, sxFactor, refPxPerM, textPtScale),
+              textColor: t.color, labelId, autoSize: false, bgAlphaPct: 0,
+            } as any,
             t.text,
             doc.rotationRad,
           );
@@ -833,6 +864,7 @@ export class DocumentTool {
         scene.removeSegmentsByIds(segIds);
         scene.removeHatchesByIds(hatchIds);
         scene.removeTextBoxesByIds(textIds);
+        (this.app as any).cancelAction?.();
         this.dissolving = false;
         this.app.refreshLabelUI();
         this.app.renderer.render();
@@ -844,7 +876,7 @@ export class DocumentTool {
       // Original-PDF bleibt als Unterlage erhalten. Genau ein Undo-Schritt.
       this.app.clearSelection();
       this.app.refreshLabelUI();
-      try { (this.app as any).commitHistorySnapshot?.(); } catch {}
+      try { (this.app as any).commitAction?.(); } catch {}
       this.app.renderer.render();
       return { segments: segIds.length, hatches: hatchIds.length, texts: textIds.length };
     };
