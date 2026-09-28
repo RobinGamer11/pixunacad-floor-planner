@@ -1214,6 +1214,7 @@ export class CadApp {
     } else {
       this.labelManager.restore(list as any);
     }
+    this.bumpContentRevision();
     this.renderer?.render?.();
   }
 
@@ -3592,6 +3593,8 @@ export class CadApp {
 
   /** Setzt aktiven Plan (null = zurück zur Zeichnungsoberfläche). */
   setActivePlanId(id: string | null) {
+    // Beim Betreten/Verlassen einer Exportseite verknüpfte Ausschnitte frisch lesen.
+    this.bumpContentRevision();
     if (id != null && !this.planManager.getById(id)) return;
     if (id === this.activePlanId) { this.refreshPlanUI(); return; }
     // Aktuellen Camera-State sichern (für Sheet bzw. den vorherigen Plan).
