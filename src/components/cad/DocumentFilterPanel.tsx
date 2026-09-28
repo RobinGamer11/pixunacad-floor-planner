@@ -196,8 +196,8 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
           label="Erweiterte Bildbearbeitung"
           active={editOpen}
           onClick={() => setEditOpen((v) => !v)}
-          onLabel="Offen"
-          offLabel="Zu"
+          onLabel="An"
+          offLabel="Aus"
         />
 
         {editOpen && (

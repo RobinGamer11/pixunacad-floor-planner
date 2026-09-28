@@ -1936,7 +1936,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     onChange={(e) => setDocHubScale(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") applyScale(); else if (e.key === "Escape") closeHub(); }}
                     className="text-[11px] w-[64px] px-1.5 py-1 rounded border tabular-nums"
-                    style={{ borderColor: "hsl(var(--border))" }}
+                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}
                     title="Skalierungsfaktor (× um Zentrum)" placeholder="×"
                   />
                   <span className="text-[10px] opacity-60">×</span>
@@ -2102,6 +2102,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             hatchActive={activeTool === ToolIds.HATCH}
             textActive={activeTool === ToolIds.TEXT}
             measureActive={activeTool === ToolIds.MEASURE}
+            tableActive={activeTool === ToolIds.TABLE || tableTool}
             multiSelectActive={multiSelectActive}
           />
         )}
