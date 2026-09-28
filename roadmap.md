@@ -110,3 +110,5 @@ Die Pipette überträgt nie Geometrie, Position, Größe, Drehung, Inhalt oder I
 und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 
 - [x] Kontoübergreifende Projektspeicherung inkl. cloud/shared-Trennung, Mappen-CAD-Ausschnitte aus Cloud, cloudweiter Papierkorb (offen: SQL-Migrationen, Abnahme auf zwei echten Geräten)
+
+- [ ] Export-Bereich auf CAD-Plan-Engine (Plan mit Präzisierungen, wartet auf Freigabe)
