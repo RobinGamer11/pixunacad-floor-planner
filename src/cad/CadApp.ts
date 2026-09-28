@@ -1148,6 +1148,7 @@ export class CadApp {
 
   private _emitHistoryChange() {
     this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
+    this._emitPlanUiChange?.();
     this.onSceneCommitted?.();
   }
 
