@@ -71,7 +71,12 @@ export class TopologyEngine {
   librarySnaps: import("./library/librarySnapSource").LibrarySnapSource | null = null;
   /** Papierrahmen im Plan-(Druck-)Modus in Metern. Ecken, Kantenmitten,
    * Mittelpunkt und Kanten des Blattrands werden zusätzlich gefangen. */
-  planFrame: { widthM: number; heightM: number } | null = null;
+  planFrame: {
+    widthM: number;
+    heightM: number;
+    /** Seitenrand-/Lochungs-Fanggeometrie (Welt-Meter), nur Exportseiten. */
+    guides?: { points: { x: number; y: number }[]; lines: [{ x: number; y: number }, { x: number; y: number }][] } | null;
+  } | null = null;
   /** Globale Hilfslinien (Rechtsklick-Anker), werkzeugübergreifend. */
   guides: import("./globalGuides").GlobalGuides | null = null;
   /** Wand-ID mit Snap-Vorrang (z. B. aktuell selektierte Wand) — deren Eckpunkte gewinnen Ties. */
@@ -638,6 +643,12 @@ export class TopologyEngine {
         const a = corners[i], b = corners[(i + 1) % 4];
         considerPoint(v((a.x + b.x) / 2, (a.y + b.y) / 2), null, null, -1);
         considerLine(a, b, null, null);
+      }
+      // Nicht druckbare Hilfsgeometrie der Exportseite (Seitenrand, Lochung).
+      const g = this.planFrame.guides;
+      if (g) {
+        for (const p of g.points) considerPoint(v(p.x, p.y), null, null, -1);
+        for (const [a, b] of g.lines) considerLine(v(a.x, a.y), v(b.x, b.y), null, null);
       }
     }
 
