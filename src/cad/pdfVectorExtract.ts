@@ -33,51 +33,124 @@ function tx(m: Mat2x3, x: number, y: number): { x: number; y: number } {
   return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f };
 }
 
-function colorArrayToHex(arr: any): string {
-  if (!arr) return "#000000";
-  if (typeof arr === "string") return arr;
-  if (Array.isArray(arr)) {
-    if (arr.length >= 3) {
-      const [r, g, b] = arr;
-      const h = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
-      return `#${h(r)}${h(g)}${h(b)}`;
-    }
-    if (arr.length === 1) {
-      const v = Math.max(0, Math.min(255, Math.round(arr[0])));
-      const h = v.toString(16).padStart(2, "0");
-      return `#${h}${h}${h}`;
-    }
-  }
-  return "#000000";
+const hx = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+
+/** Normalisiert CSS-/Hex-Strings von PDF.js ("#rgb", "#rrggbb", "rgb(...)") → "#rrggbb" oder null. */
+function cssColorToHex(str: string): string | null {
+  const t = str.trim().toLowerCase();
+  let m = /^#([0-9a-f]{6})([0-9a-f]{2})?$/.exec(t);
+  if (m) return `#${m[1]}`;
+  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(t);
+  if (m) return `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}`;
+  m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(t);
+  if (m) return `#${hx(+m[1])}${hx(+m[2])}${hx(+m[3])}`;
+  return null;
 }
 
-/** Grauwert (0..1) → Hex. */
-function grayToHex(v: any): string {
-  const g = Math.max(0, Math.min(255, Math.round((typeof v === "number" ? v : 0) * 255)));
-  const h = g.toString(16).padStart(2, "0");
-  return `#${h}${h}${h}`;
+/** Liefert reine Zahlen aus Array/TypedArray, sonst null. */
+function numsOf(arr: any): number[] | null {
+  if (!arr) return null;
+  if (ArrayBuffer.isView(arr)) return Array.from(arr as any as ArrayLike<number>);
+  if (Array.isArray(arr)) {
+    const n = arr.filter((v) => typeof v === "number" && Number.isFinite(v));
+    return n.length === arr.length ? n : null;
+  }
+  return null;
+}
+
+/**
+ * RGB-Operator-Args → Hex. PDF.js liefert je nach Version einen Hex-String
+ * (["#rrggbb"] / "#rrggbb"), ein Uint8ClampedArray (0..255) oder Zahlen 0..1.
+ */
+function rgbArgsToHex(a: any): string | null {
+  if (a == null) return null;
+  if (typeof a === "string") return cssColorToHex(a);
+  if (Array.isArray(a) && a.length >= 1 && typeof a[0] === "string") return cssColorToHex(a[0]);
+  const n = numsOf(a);
+  if (!n || n.length < 3) return null;
+  const isTyped = ArrayBuffer.isView(a);
+  const scale = !isTyped && n.slice(0, 3).every((v) => v <= 1) ? 255 : 1;
+  return `#${hx(n[0] * scale)}${hx(n[1] * scale)}${hx(n[2] * scale)}`;
+}
+
+/** Grauwert (0..1, bzw. 0..255) → Hex. */
+function grayToHex(v: any): string | null {
+  if (typeof v === "string") return cssColorToHex(v);
+  if (typeof v !== "number" || !Number.isFinite(v)) return null;
+  const g = v <= 1 ? v * 255 : v;
+  return `#${hx(g)}${hx(g)}${hx(g)}`;
 }
 
 /** CMYK (0..1) → Hex. */
-function cmykToHex(c: any, m: any, y: any, k: any): string {
-  const f = (v: any) => (typeof v === "number" ? Math.max(0, Math.min(1, v)) : 0);
-  const cc = f(c), mm = f(m), yy = f(y), kk = f(k);
-  const h = (v: number) => Math.max(0, Math.min(255, Math.round(255 * (1 - v) * (1 - kk)))).toString(16).padStart(2, "0");
-  return `#${h(cc)}${h(mm)}${h(yy)}`;
+function cmykToHex(c: any, m: any, y: any, k: any): string | null {
+  if (typeof c === "string") return cssColorToHex(c);
+  if (![c, m, y, k].every((v) => typeof v === "number" && Number.isFinite(v))) return null;
+  const f = (v: number) => Math.max(0, Math.min(1, v > 1 ? v / 100 : v));
+  const kk = f(k);
+  const ch = (v: number) => hx(255 * (1 - f(v)) * (1 - kk));
+  return `#${ch(c)}${ch(m)}${ch(y)}`;
 }
 
-/** Generische Farb-Args (setFillColor/setFillColorN) → Hex, sonst null. */
-function genericColorToHex(a: any[]): string | null {
-  if (!a) return null;
-  const nums = a.filter((v) => typeof v === "number");
-  if (nums.length === 1) return grayToHex(nums[0]);
-  if (nums.length === 3) {
-    // 0..1 oder 0..255 heuristisch unterscheiden.
-    const scale = nums.every((v) => v <= 1) ? 255 : 1;
-    return colorArrayToHex(nums.map((v) => v * scale));
+/** Ergebnis einer Farbzuweisung: solide Farbe oder nicht übertragbare Spezialfüllung. */
+type PaintColor = { hex: string; special: boolean };
+
+/**
+ * Generische Farb-Args (setFillColor/setFillColorN, inkl. Muster/Verläufe).
+ * - Zahlen: Grau (1), RGB (3), CMYK (4).
+ * - Axial/Radial-Verlauf: mittlere Verlaufsfarbe als Näherung.
+ * - Kachelmuster mit Farbe: diese Farbe.
+ * - Sonst (Mesh, unbekannt): Spezialfüllung → null-Farbe.
+ */
+function genericColorToPaint(a: any): PaintColor | null {
+  if (a == null) return null;
+  if (typeof a === "string") { const h = cssColorToHex(a); return h ? { hex: h, special: false } : null; }
+  if (!Array.isArray(a) && !ArrayBuffer.isView(a)) return null;
+  const arr: any[] = Array.from(a as any);
+  if (typeof arr[0] === "string") {
+    const kind = arr[0];
+    const direct = cssColorToHex(kind);
+    if (direct) return { hex: direct, special: false };
+    // Verlauf: ["RadialAxial", type, bbox, colorStops, ...]
+    if (kind === "RadialAxial" || kind === "Shading") {
+      const stops = arr.find((x) => Array.isArray(x) && x.length > 0 && Array.isArray(x[0]) && typeof x[0][1] === "string");
+      if (stops) {
+        const cols = stops.map((s: any) => cssColorToHex(s[1])).filter(Boolean) as string[];
+        if (cols.length) return { hex: averageHex(cols), special: true };
+      }
+      return { hex: "", special: true };
+    }
+    if (kind === "TilingPattern") {
+      const col = arr[1];
+      const h = col ? rgbArgsToHex(col) : null;
+      return h ? { hex: h, special: false } : { hex: "", special: true };
+    }
+    return { hex: "", special: true };
   }
-  if (nums.length === 4) return cmykToHex(nums[0], nums[1], nums[2], nums[3]);
-  return null;
+  const nums = numsOf(arr);
+  if (!nums) return null;
+  let h: string | null = null;
+  if (nums.length === 1) h = grayToHex(nums[0]);
+  else if (nums.length === 3) h = rgbArgsToHex(nums);
+  else if (nums.length === 4) h = cmykToHex(nums[0], nums[1], nums[2], nums[3]);
+  return h ? { hex: h, special: false } : null;
+}
+
+function averageHex(cols: string[]): string {
+  let r = 0, g = 0, b = 0;
+  for (const c of cols) { r += parseInt(c.slice(1, 3), 16); g += parseInt(c.slice(3, 5), 16); b += parseInt(c.slice(5, 7), 16); }
+  const n = cols.length || 1;
+  return `#${hx(r / n)}${hx(g / n)}${hx(b / n)}`;
+}
+
+/** Unicode-Text einer Text-Show-Op (Glyph-Array) für die Zuordnung zu Textinhalten. */
+function glyphText(a: any): string {
+  const g = Array.isArray(a) ? (Array.isArray(a[0]) ? a[0] : a) : [];
+  let out = "";
+  for (const x of g) {
+    if (x && typeof x === "object") out += x.unicode ?? x.fontChar ?? "";
+    else if (typeof x === "string") out += x;
+  }
+  return out.replace(/\s+/g, "");
 }
 
 /**
@@ -100,14 +173,19 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
 
   let ctm: Mat2x3 = { ...ID };
   const ctmStack: Mat2x3[] = [];
-  const colorStack: { fill: string; stroke: string; lw: number }[] = [];
+  const colorStack: { fill: string; stroke: string; lw: number; fs: boolean; ss: boolean }[] = [];
   let currentPath: { x: number; y: number }[][] = []; // Subpaths (transformed to PDF user space)
   let currentSub: { x: number; y: number }[] = [];
   let fillColor = "#000000";
   let strokeColor = "#000000";
+  /** true, wenn die aktuelle Füllung/Kontur eine nicht exakt übertragbare Spezialfarbe ist. */
+  let fillSpecial = false;
+  let strokeSpecial = false;
   let lineWidth = 1; // in user units
   /** fillColor zum Zeitpunkt jeder Text-Show-Op (Reihenfolge wie in der opList). */
   const textOpFillColors: string[] = [];
+  /** Text pro Show-Op (ohne Leerzeichen) für die positionsgenaue Farbzuordnung. */
+  const textOpStrings: string[] = [];
 
   const addPathPoint = (xLocal: number, yLocal: number) => {
     const p = tx(ctm, xLocal, yLocal);
@@ -216,11 +294,11 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   for (let k = 0; k < fns.length; k++) {
     const fn = fns[k];
     const a = args[k] || [];
-    if (fn === OPS.save) { ctmStack.push({ ...ctm }); colorStack.push({ fill: fillColor, stroke: strokeColor, lw: lineWidth }); }
+    if (fn === OPS.save) { ctmStack.push({ ...ctm }); colorStack.push({ fill: fillColor, stroke: strokeColor, lw: lineWidth, fs: fillSpecial, ss: strokeSpecial }); }
     else if (fn === OPS.restore) {
       if (ctmStack.length) ctm = ctmStack.pop()!;
       const c = colorStack.pop();
-      if (c) { fillColor = c.fill; strokeColor = c.stroke; lineWidth = c.lw; }
+      if (c) { fillColor = c.fill; strokeColor = c.stroke; lineWidth = c.lw; fillSpecial = c.fs; strokeSpecial = c.ss; }
     }
     else if (fn === OPS.transform) {
       const [aa, bb, cc, dd, ee, ff] = a;
@@ -245,14 +323,20 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
       emitFill(); emitStroke(); clearPath();
     }
     else if (fn === OPS.endPath) clearPath();
-    else if (fn === OPS.setFillRGBColor) fillColor = colorArrayToHex(a);
-    else if (fn === OPS.setStrokeRGBColor) strokeColor = colorArrayToHex(a);
-    else if (fn === OPS.setFillGray) fillColor = grayToHex(a[0]);
-    else if (fn === OPS.setStrokeGray) strokeColor = grayToHex(a[0]);
-    else if (fn === OPS.setFillCMYKColor) fillColor = cmykToHex(a[0], a[1], a[2], a[3]);
-    else if (fn === OPS.setStrokeCMYKColor) strokeColor = cmykToHex(a[0], a[1], a[2], a[3]);
-    else if (fn === OPS.setFillColor || fn === OPS.setFillColorN) { const c = genericColorToHex(a); if (c) fillColor = c; }
-    else if (fn === OPS.setStrokeColor || fn === OPS.setStrokeColorN) { const c = genericColorToHex(a); if (c) strokeColor = c; }
+    else if (fn === OPS.setFillRGBColor) { const c = rgbArgsToHex(a); if (c) { fillColor = c; fillSpecial = false; } }
+    else if (fn === OPS.setStrokeRGBColor) { const c = rgbArgsToHex(a); if (c) { strokeColor = c; strokeSpecial = false; } }
+    else if (fn === OPS.setFillGray) { const c = grayToHex(a?.[0]); if (c) { fillColor = c; fillSpecial = false; } }
+    else if (fn === OPS.setStrokeGray) { const c = grayToHex(a?.[0]); if (c) { strokeColor = c; strokeSpecial = false; } }
+    else if (fn === OPS.setFillCMYKColor) { const c = cmykToHex(a?.[0], a?.[1], a?.[2], a?.[3]); if (c) { fillColor = c; fillSpecial = false; } }
+    else if (fn === OPS.setStrokeCMYKColor) { const c = cmykToHex(a?.[0], a?.[1], a?.[2], a?.[3]); if (c) { strokeColor = c; strokeSpecial = false; } }
+    else if (fn === OPS.setFillColor || fn === OPS.setFillColorN || fn === (OPS as any).setFillTransparent) {
+      const p = genericColorToPaint(a);
+      if (p) { if (p.hex) fillColor = p.hex; fillSpecial = p.special && !p.hex; }
+    }
+    else if (fn === OPS.setStrokeColor || fn === OPS.setStrokeColorN || fn === (OPS as any).setStrokeTransparent) {
+      const p = genericColorToPaint(a);
+      if (p) { if (p.hex) strokeColor = p.hex; strokeSpecial = p.special && !p.hex; }
+    }
     else if (fn === OPS.setLineWidth) lineWidth = typeof a[0] === "number" ? a[0] : lineWidth;
     else if (
       fn === OPS.showText ||
@@ -261,6 +345,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
       fn === OPS.nextLineSetSpacingShowText
     ) {
       textOpFillColors.push(fillColor);
+      textOpStrings.push(glyphText(fn === OPS.nextLineSetSpacingShowText ? a?.[2] : a?.[0]));
     }
   }
 
