@@ -173,8 +173,10 @@ interface CadEditorProps {
   presenting?: boolean;
   /** Hilfe-Modus (Kopfzeilen-Button) — steuert Hilfe-Overlay + Ebenen-Hinweis. */
   helpOn?: boolean;
+  /** Liefert die CAD-Engine an übergeordnete Bereiche (z. B. Export) – dieselbe Instanz, kein Duplikat. */
+  onAppReady?: (app: CadApp | null) => void;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true, onAppReady }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -330,6 +332,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
+  const onAppReadyRef = useRef(onAppReady);
+  onAppReadyRef.current = onAppReady;
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
   // Objektbasierte Live-Zusammenarbeit (nur bei geteilten Projekten aktiv).
   const collab = useCadCollab(cadApp, projectId);
@@ -1074,6 +1078,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
     appRef.current = app;
     setCadApp(app);
+    onAppReadyRef.current?.(app);
 
     const onResize = () => app.resize();
     window.addEventListener("resize", onResize);
@@ -1085,6 +1090,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       app.destroy();
       appRef.current = null;
       setCadApp(null);
+      onAppReadyRef.current?.(null);
     };
   }, []);
 
