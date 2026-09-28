@@ -32,11 +32,21 @@ function isTabletDrawGate(e: PointerEvent): boolean {
   // Drehen/…) gaten — sonst bleiben Objekte direkt antippbar.
   if (tool === "select") {
     return !!(window as any).__pixunaSkipFirstDraw
+      || !!(window as any).__pixunaSelectionTransformActive
       || !!(window as any).__pixunaDocumentTransformActive;
   }
   // Alle Zeichenwerkzeuge: Stift bewegt nur den Cursor, gesetzt wird per
   // LMB im Hilfsrad, abgeschlossen per ENTER.
   return true;
+}
+
+/**
+ * Aktive Fangpunkt-Transformation im Auswahlwerkzeug (Verschieben/Drehen/…).
+ * Unabhängig vom Point-Edit-Menü; nur SelectTool setzt/löscht den Status.
+ */
+export function setSelectionTransformActive(on: boolean) {
+  if (typeof window === "undefined") return;
+  (window as any).__pixunaSelectionTransformActive = !!on;
 }
 
 /**

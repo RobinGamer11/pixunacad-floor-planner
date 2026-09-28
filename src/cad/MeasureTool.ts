@@ -8,6 +8,7 @@ import type { DimensionStyle } from "./Scene";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { computeHealedWallLines } from "./wallHeal";
 import { bulgeFromPoint } from "./geometry";
+import { doorGeometry } from "./doorGeom";
 
 /**
  * Ermittelt die Wölbung zwischen zwei Punkten auf einer bereits tessellierten
@@ -574,6 +575,31 @@ export class MeasureTool {
         ctx.fill();
         ctx.stroke();
       }
+    }
+    // Wand-Eck-/Knickpunkte sowie Tür-/Fenster-Endpunkte und -Mitte
+    // (gleiche Geometriequellen wie die vorhandene Fanglogik).
+    const dot = (p: Vec2) => {
+      const s = cam.worldToScreen(p.x, p.y);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    };
+    const walls: any[] = (this.app.scene as any).walls || [];
+    for (const w of walls) {
+      if (!this.app.labelManager.isVisible(w.labelId)) continue;
+      const hidden: number[] = w.hiddenCornerIndices || [];
+      (w.corners || []).forEach((c: Vec2, i: number) => { if (!hidden.includes(i)) dot(c); });
+    }
+    for (const d of ((this.app.scene as any).doors || []) as any[]) {
+      if (!this.app.labelManager.isVisible(d.labelId)) continue;
+      const wall = this.app.scene.getWallById(d.wallId);
+      if (!wall || !this.app.labelManager.isVisible((wall as any).labelId)) continue;
+      const g: any = doorGeometry(wall, d);
+      if (!g) continue;
+      if (g.leftEnd) dot(g.leftEnd);
+      if (g.rightEnd) dot(g.rightEnd);
+      if (g.center) dot(g.center);
     }
     ctx.restore();
 

@@ -1,3 +1,4 @@
+import { setSelectionTransformActive } from "./Input";
 import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
 import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, hatchOuterRing, hatchHoleRings, polygonCentroid, bulgeFromPoint, splitBulgedEdge, tessellateWithBulges, projectPointToInfiniteLine, projectPointToCurvedEdge, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
@@ -118,6 +119,8 @@ export class SelectTool {
   // Während der Bewegung wird die Wand NICHT mutiert — erst beim Commit-Klick.
   wallPreviewPoint: Vec2 | null = null;
   wallPreviewDelta: Vec2 | null = null;
+  /** Wand-Drehen: nur Vorschauwinkel, Geometrie bleibt bis Haken/Enter unverändert. */
+  wallPreviewAngleDeg: number | null = null;
 
   // Wall-Edge offset state (analog hatchEdge*)
   wallEdgeAOriginal: Vec2 | null = null;
@@ -1825,16 +1828,23 @@ export class SelectTool {
     const radiusDefault = dist(this.fixedPoint, this.otherPointOriginal!);
     const baseAng = angleDeg(this.fixedPoint, this.otherPointOriginal!);
     const nextAng = vals.angleDeg != null ? vals.angleDeg : baseAng;
-    const dRad = ((nextAng - baseAng) * Math.PI) / 180;
-    const c = Math.cos(dRad), s = Math.sin(dRad);
-    for (let i = 0; i < wall.corners.length; i++) {
-      const o = this.wallPointsOriginal[i];
-      const dx = o.x - this.fixedPoint.x;
-      const dy = o.y - this.fixedPoint.y;
-      wall.corners[i] = v(this.fixedPoint.x + dx * c - dy * s, this.fixedPoint.y + dx * s + dy * c);
-    }
+    // Nur Vorschau: echte Wand erst bei Haken/Enter drehen.
+    this.wallPreviewAngleDeg = nextAng;
     this.app.hub.setValues(radiusDefault, nextAng);
     this.app.hub.updateDisplay(radiusDefault, nextAng);
+  }
+
+  /** Wandpunkte aus dem Original um den Pivot auf den Zielwinkel gedreht. */
+  private _wallRotatedCorners(targetAngDeg: number): Vec2[] | null {
+    if (!this.wallPointsOriginal || !this.fixedPoint || !this.otherPointOriginal) return null;
+    const baseAng = angleDeg(this.fixedPoint, this.otherPointOriginal);
+    const dRad = ((targetAngDeg - baseAng) * Math.PI) / 180;
+    const c = Math.cos(dRad), s = Math.sin(dRad);
+    const f = this.fixedPoint;
+    return this.wallPointsOriginal.map(o => {
+      const dx = o.x - f.x, dy = o.y - f.y;
+      return v(f.x + dx * c - dy * s, f.y + dx * s + dy * c);
+    });
   }
 
   /** Parallele Verschiebung einer Wand-Achs-Edge entlang ihrer Normale. Nachbar-Eckpunkte gleiten an angrenzender Edge. */
@@ -2463,6 +2473,8 @@ export class SelectTool {
     this.freeStrokePointsOriginal = null;
     this.wallPreviewPoint = null;
     this.wallPreviewDelta = null;
+    this.wallPreviewAngleDeg = null;
+    setSelectionTransformActive(false);
 
     this.wallEdgeAOriginal = null;
     this.wallEdgeBOriginal = null;
@@ -3654,6 +3666,10 @@ export class SelectTool {
       this.tabletArmPending = false;
     }
 
+    // Aktionsgebundener Tablet-Schutz: bleibt bestehen, auch wenn das
+    // Point-Edit-Menü ausgeblendet wird; endet mit Bestätigen/Abbrechen.
+    setSelectionTransformActive(this.isEditing());
+
     if (this.isEditing()) {
       // Tablet-Hilfsrad: Nach dem Aktivieren einer Funktion (Verschieben/Drehen/…)
       // muss der Fangpunkt ERNEUT angetippt werden, bevor das Objekt dem Stift
@@ -3745,8 +3761,15 @@ export class SelectTool {
         }
 
         if (editCommit) {
-          const finalDelta = this._commitTranslateDelta(input);
-          this._applyTranslateDelta(finalDelta);
+          if (isWallTranslatePreview) {
+            // Verbindlich ist die zuletzt sichtbare Vorschau — kein erneutes
+            // Auswerten des Eingabepunkts (Haken/Hilfsrad wäre sonst Ziel).
+            const d = this.wallPreviewDelta;
+            if (d) this._applyTranslateDelta(v(d.x, d.y));
+          } else {
+            const finalDelta = this._commitTranslateDelta(input);
+            this._applyTranslateDelta(finalDelta);
+          }
           this._clearEditState();
           this.app.hub.hide();
           this.app.commitHistorySnapshot();
@@ -3765,7 +3788,7 @@ export class SelectTool {
 
         if (document.activeElement !== this.app.hub.lenInputEl && document.activeElement !== this.app.hub.angInputEl) {
           if (this.editTarget?.kind === "wall") {
-            this._applyWallRotateHubValues({ lengthM: null, angleDeg: ang });
+            this.wallPreviewAngleDeg = ang;
           } else if ((this.editTarget as any)?.kind === "freeStroke") {
             this._applyFreeStrokeRotate(ang);
           } else if (this._applyLibraryRotate(ang)) {
@@ -3780,6 +3803,15 @@ export class SelectTool {
         }
 
         if (editCommit) {
+          if (this.editTarget?.kind === "wall" && this.wallPreviewAngleDeg != null) {
+            // Einmalig den sichtbaren Vorschauwinkel anwenden; Trim/Topologie
+            // folgen in _clearEditState, danach genau ein Undo-Schritt.
+            const wall = this.app.scene.getWallById(this.editTarget.wallId);
+            const pts = this._wallRotatedCorners(this.wallPreviewAngleDeg);
+            if (wall && pts && pts.length === wall.corners.length) {
+              for (let i = 0; i < pts.length; i++) wall.corners[i] = pts[i];
+            }
+          }
           this._clearEditState();
           this.app.hub.hide();
           this.app.renderer.setHoverSegmentId(null);
@@ -4719,6 +4751,12 @@ export class SelectTool {
           ) {
             const d = this.wallPreviewDelta;
             previewCorners = this.wallPointsOriginal.map(p => v(p.x + d.x, p.y + d.y));
+          } else if (
+            this.activeEditAction === PointEditAction.ROTATE &&
+            this.editTarget?.kind === "wall" &&
+            this.wallPreviewAngleDeg != null
+          ) {
+            previewCorners = this._wallRotatedCorners(this.wallPreviewAngleDeg);
           }
           if (previewCorners && previewCorners.length >= 2) {
             const lines = computeWallLines(previewCorners, wall.thicknessM, wall.referenceSide);
