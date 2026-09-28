@@ -71,6 +71,7 @@ const App = () => (
               <Route path="/project/:projectId" element={<ProjectWorkspace />} />
               <Route path="/project/:projectId/cad" element={<CadPage />} />
               <Route path="/project/:projectId/cad/:sheetId" element={<CadPage />} />
+              <Route path="/project/:projectId/export" element={<CadPage />} />
               <Route path="/project/:projectId/board" element={<BoardPage />} />
               <Route path="/project/:projectId/finance" element={<FinanceRedirect />} />
               <Route path="/cad" element={<CadPage />} />
