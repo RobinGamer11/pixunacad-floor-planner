@@ -27,6 +27,15 @@ CAD-Modus bleibt optisch und funktional unverändert (`Seiten | Werkzeug | Ebene
 ## 5. Ordner-Aufklappzustand lokal
 - `collapsed` wird aus Serialisierung, Verlauf und Cloud-Struktur entfernt und pro Gerät lokal gespeichert (localStorage je Projekt). Alte Daten mit `collapsed` werden beim Lesen ignoriert.
 
+## 6. Aktive Exportseite lokal
+- Die zuletzt geöffnete Exportseite wird derzeit mit dem Projektstand gespeichert (`activePlanId` beim Wiederherstellen). Das entfällt: nicht mehr in Snapshots, Verlauf oder Cloud.
+- Stattdessen lokal je Projekt und Gerät merken; beim Wechsel CAD -> Export öffnet sich die zuletzt genutzte Seite (sonst die erste). Eintreffende Cloud-Änderungen schalten die Seite nie um; wird die aktive Seite anderswo gelöscht, fällt die Ansicht auf die erste Seite zurück.
+- Undo darf die Seite weiterhin aktivieren, deren Änderung zurückgenommen wird (nur lokal, kein gespeicherter Zustand).
+
+## 7. Altes Feld `Plan.selected` trennen
+- `selected` wird nur noch vom alten Druckplan-Panel im CAD-Modus genutzt (Häkchen, „Ausgewählte drucken“). Es wird aus dem gemeinsamen Planmodell, der Serialisierung, dem Verlauf und dem Cloud-Abgleich entfernt und als lokaler Zustand des alten Druckplan-Panels geführt. Alte Daten mit `selected` werden beim Lesen ignoriert.
+- Die PDF-Auswahl im Export bleibt ausschließlich temporärer Zustand der Export-Seitenleiste.
+
 ## Prüfung
 - Typprüfung, Build, bestehende Tests; Unit-Tests für Fangpunkte (Rand/Lochung je Seite) und dafür, dass `collapsed` nicht serialisiert wird.
 - Browser-Test nur ohne Anmeldung möglich (bekannte Einschränkung), sonst Sichtprüfung durch dich: CAD unverändert, Export-Reihenfolge links, genau eine rechte Leiste, keine Druckpläne im Export, Randfang funktioniert und fehlt in der PDF.
