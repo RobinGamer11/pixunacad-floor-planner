@@ -1057,6 +1057,7 @@ export class CadApp {
     // damit Undo den gesamten Edit als einen Schritt zurücknimmt.
     if (this.selectTool && this.selectTool.isEditing()) return;
     if ((this.documentTool as any)?.warpPending) return;
+    if ((this.documentTool as any)?.dissolving) return;
 
     const snap = this._serializeScene();
     if (snap === this._lastSnapshot) return;
