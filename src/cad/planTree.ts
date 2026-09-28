@@ -12,7 +12,6 @@ export interface PlanFolder {
   name: string;
   parentId: string | null;
   order: number;
-  collapsed: boolean;
 }
 
 export interface TreePage {

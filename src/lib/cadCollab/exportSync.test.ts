@@ -43,3 +43,23 @@ describe("Export-Strukturen in der objektweisen Synchronisierung", () => {
     expect(indexSnapshot(JSON.stringify(b)).has("plan:p1")).toBe(true);
   });
 });
+
+describe("Lokaler Export-Bedienzustand geht nie in die Cloud", () => {
+  it("Wechsel der geöffneten Seite (activePlanId) erzeugt keine Operation", () => {
+    const a = { ...base, plans: [{ id: "p1" }, { id: "p2" }], activePlanId: "p1" };
+    const b = { ...a, activePlanId: "p2" };
+    expect(diffSnapshots(JSON.stringify(a), JSON.stringify(b))).toHaveLength(0);
+  });
+
+  it("PlanManager-Serialisierung enthält weder selected noch collapsed", async () => {
+    const { PlanManager } = await import("@/cad/PlanManager");
+    const pm = new PlanManager();
+    const p = pm.createPlan({ name: "A" });
+    pm.createFolder("F");
+    const before = { ...base, plans: pm.toJSON(), planFolders: pm.foldersToJSON() };
+    pm.setSelected(p.id, true);
+    const after = { ...base, plans: pm.toJSON(), planFolders: pm.foldersToJSON() };
+    expect(diffSnapshots(JSON.stringify(before), JSON.stringify(after))).toHaveLength(0);
+    expect(JSON.stringify(after)).not.toMatch(/selected|collapsed/);
+  });
+});

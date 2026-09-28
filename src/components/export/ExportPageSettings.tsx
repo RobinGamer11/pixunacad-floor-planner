@@ -2,6 +2,7 @@ import React from "react";
 import type { CadApp } from "@/cad/CadApp";
 import { PaperFormats } from "@/cad/PlanManager";
 import { usePlanUi } from "./useExportApp";
+import { HOLE_PUNCH_SIDES } from "@/cad/pageGuides";
 import { Link2, Snowflake, Pencil, Plus, AlertTriangle } from "lucide-react";
 
 /**
@@ -20,10 +21,9 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
 
   if (!plan) {
     return (
-      <aside className="export-settings shrink-0 w-[260px] h-full border-l p-4 text-xs text-muted-foreground"
-        style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+      <div className="export-settings p-4 text-xs text-muted-foreground">
         Wähle links eine Exportseite aus oder lege eine neue an.
-      </aside>
+      </div>
     );
   }
 
@@ -33,23 +33,45 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
   const plansInOrder = pm.list();
   const idx = plansInOrder.findIndex(p => p.id === plan.id);
   const prev = idx >= 0 ? plansInOrder[idx + 1] ?? null : null; // Liste ist neueste-zuerst
+  const next = idx > 0 ? plansInOrder[idx - 1] ?? null : null;
+  const linkSpread = (other: typeof plan | null) => {
+    if (!other) return;
+    const sid = other.spreadId || plan.spreadId || `spread-${other.id}`;
+    pm.setPageSettings(other.id, { spreadId: sid });
+    pm.setPageSettings(plan.id, { spreadId: sid });
+  };
+  const linkedPrev = !!prev && !!plan.spreadId && prev.spreadId === plan.spreadId;
+  const linkedNext = !!next && !!plan.spreadId && next.spreadId === plan.spreadId;
 
   const field = "w-full h-8 px-2 rounded border bg-transparent text-xs";
   const border = { borderColor: "hsl(var(--hairline))" };
   const set = (fn: () => void) => app.mutatePlans(fn);
 
   return (
-    <aside className="export-settings shrink-0 w-[260px] h-full border-l overflow-y-auto p-3 space-y-4 text-xs"
-      style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-      <Section title="Seite">
+    <div className="export-settings p-3 space-y-4 text-xs">
+      <Section title="CAD-Blätter">
+        <div className="text-[11px] text-muted-foreground leading-snug">
+          Antippen platziert das Blatt auf dieser Seite. Ausschnitte bleiben verknüpft und aktualisieren sich automatisch.
+        </div>
+        <div className="space-y-1">
+          {sheets.map(s => (
+            <button key={s.id} type="button" className="w-full h-9 px-2 rounded border flex items-center gap-2 text-left" style={border}
+              onClick={() => app.placeSheetOnActivePlan(s.id)}>
+              <Plus size={13} /> <span className="truncate">{s.name}</span>
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title="Seiteneinstellungen">
         <label className="block space-y-1">
           <span>Titel</span>
           <input key={plan.id + plan.name} defaultValue={plan.name} className={field} style={border}
             onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== plan.name) set(() => pm.renamePlan(plan.id, v)); }}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); e.stopPropagation(); }} />
         </label>
-        <div className="grid grid-cols-4 gap-1">
-          {[...PaperFormats.map(f => ({ key: f.key, label: f.label })), { key: "free", label: "Frei" }].map(f => (
+        <div className="grid grid-cols-3 gap-1">
+          {[...PaperFormats.filter(f => ["a5", "a4", "a3", "a2"].includes(f.key)).map(f => ({ key: f.key, label: f.label })), { key: "free", label: "Freies Format" }].map(f => (
             <button key={f.key} type="button" className="h-8 rounded border"
               style={{ borderColor: plan.formatKey === f.key ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))", background: plan.formatKey === f.key ? "hsl(var(--accent-gold-soft))" : undefined }}
               onClick={() => set(() => pm.setFormat(plan.id, { formatKey: f.key }))}>{f.label}</button>
@@ -78,34 +100,32 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
         </label>
         <label className="flex items-center gap-2 min-h-8 cursor-pointer">
           <input type="checkbox" checked={plan.holePunch} onChange={(e) => set(() => pm.setPageSettings(plan.id, { holePunch: e.target.checked }))} className="h-4 w-4" />
-          <span>Lochung anzeigen (Hilfslinie)</span>
+          <span>Lochung (Hilfslinie, fangbar)</span>
+        </label>
+        {plan.holePunch && (
+          <div className="space-y-1">
+            <span>Lochungsposition</span>
+            <div className="grid grid-cols-4 gap-1">
+              {HOLE_PUNCH_SIDES.map(o => (
+                <button key={o.key} type="button" className="h-8 rounded border"
+                  style={{ borderColor: plan.holePunchSide === o.key ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))", background: plan.holePunchSide === o.key ? "hsl(var(--accent-gold-soft))" : undefined }}
+                  onClick={() => set(() => pm.setPageSettings(plan.id, { holePunchSide: o.key }))}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        <label className="flex items-center gap-2 min-h-8 cursor-pointer">
+          <input type="checkbox" disabled={!prev} checked={linkedPrev}
+            onChange={(e) => set(() => { if (e.target.checked) linkSpread(prev); else pm.setPageSettings(plan.id, { spreadId: linkedNext ? plan.spreadId : null }); })} className="h-4 w-4" />
+          <span>Verbund mit vorheriger Seite{prev ? ` („${prev.name}“)` : ""}</span>
         </label>
         <label className="flex items-center gap-2 min-h-8 cursor-pointer">
-          <input type="checkbox" disabled={!prev && !plan.spreadId} checked={!!plan.spreadId}
-            onChange={(e) => set(() => {
-              if (!e.target.checked) { pm.setPageSettings(plan.id, { spreadId: null }); return; }
-              if (!prev) return;
-              const sid = prev.spreadId || `spread-${prev.id}`;
-              pm.setPageSettings(prev.id, { spreadId: sid });
-              pm.setPageSettings(plan.id, { spreadId: sid });
-            })} className="h-4 w-4" />
-          <span>Seitenverbund mit vorheriger Seite{prev ? ` („${prev.name}“)` : ""}</span>
+          <input type="checkbox" disabled={!next} checked={linkedNext}
+            onChange={(e) => set(() => { if (e.target.checked) linkSpread(next); else if (next) pm.setPageSettings(next.id, { spreadId: null }); })} className="h-4 w-4" />
+          <span>Verbund mit nächster Seite{next ? ` („${next.name}“)` : ""}</span>
         </label>
       </Section>
 
-      <Section title="CAD-Blatt platzieren">
-        <div className="text-[11px] text-muted-foreground leading-snug">
-          Ausschnitte bleiben mit dem CAD-Blatt verknüpft und aktualisieren sich automatisch.
-        </div>
-        <div className="space-y-1">
-          {sheets.map(s => (
-            <button key={s.id} type="button" className="w-full h-9 px-2 rounded border flex items-center gap-2 text-left" style={border}
-              onClick={() => app.placeSheetOnActivePlan(s.id)}>
-              <Plus size={13} /> <span className="truncate">{s.name}</span>
-            </button>
-          ))}
-        </div>
-      </Section>
 
       {selProj && (
         <Section title="Ausgewählter Ausschnitt">
@@ -140,7 +160,7 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
       <div className="text-[10px] text-muted-foreground leading-snug">
         Mit den CAD-Werkzeugen zeichnest du hier nur Anmerkungen auf diese Exportseite. Die Zeichnung selbst änderst du über „CAD-Blatt bearbeiten“.
       </div>
-    </aside>
+    </div>
   );
 }
 

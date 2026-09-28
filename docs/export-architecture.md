@@ -14,3 +14,10 @@
 
 ## Offen
 - Echter Zwei-Geräte-Test, danach Freischaltung des Reiters.
+
+## Lokaler Bedienzustand (nie Projekt/Verlauf/Cloud)
+- Geöffnete Exportseite: `localStorage pixuna.export.activePage.<projektId>` (`src/lib/exportLocalState.ts`). Undo/Redo und Cloud schalten die Seite nie um.
+- Ordner auf-/zugeklappt: `pixuna.export.collapsed.<projektId>`.
+- Häkchen der alten CAD-Druckplanliste: nur im Speicher von `PlanManager` (`isSelected`), nicht im Planmodell.
+- Layout: Werkzeugleiste | Export-Seitenleiste | Papier | eine rechte Leiste (`Seiteneinstellungen | Werkzeug | Ebenen`), gesteuert über `CadEditor mode="export"`.
+- Seitenrand und Lochung (`src/cad/pageGuides.ts`) sind nicht druckbare Fanggeometrie über `topology.planFrame.guides`.

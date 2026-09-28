@@ -1,6 +1,7 @@
 import { clamp } from "./geometry";
 import { normalizeScaleDen } from "@/lib/scale";
 import type { PlanFolder } from "./planTree";
+import { normalizeHolePunchSide, type HolePunchSide } from "./pageGuides";
 
 /**
  * Druckpläne: Layout-Blätter mit Papierformat, auf denen Projektionen
@@ -71,12 +72,12 @@ export interface Plan {
   freeHeight: number;
   /** Projektionen auf diesem Plan. */
   projections: Projection[];
-  /** @deprecated Altfeld der schwebenden Planliste; Export nutzt temporäre UI-Auswahl. */
-  selected: boolean;
   /** Seitenrand in mm (Hilfslinie, nicht gedruckt). */
   marginsMm: number;
   /** Lochung am linken Rand anzeigen. */
   holePunch: boolean;
+  /** Seite der Lochung (Standard links). */
+  holePunchSide: HolePunchSide;
   /** Seitenverbund-ID (gleiche ID = zusammengehörige Seiten). */
   spreadId: string | null;
   /** Ordner im Exportbaum (null = Wurzel). */
@@ -147,9 +148,9 @@ export class PlanManager {
         ? opts.freeHeight
         : PlanDefaults.defaultFreeHeight,
       projections: [],
-      selected: false,
       marginsMm: 10,
       holePunch: false,
+      holePunchSide: "left",
       spreadId: null,
       parentFolderId: opts.parentFolderId ?? null,
       order: this._nextOrder(opts.parentFolderId ?? null),
@@ -201,7 +202,6 @@ export class PlanManager {
       name: (name || "").trim() || "Ordner",
       parentId,
       order: this._nextOrder(parentId),
-      collapsed: false,
     };
     this.folders.push(f);
     return f;
@@ -211,10 +211,6 @@ export class PlanManager {
     const f = this.getFolder(id); const clean = (name || "").trim();
     if (!f || !clean) return false;
     f.name = clean; return true;
-  }
-
-  setFolderCollapsed(id: string, collapsed: boolean) {
-    const f = this.getFolder(id); if (f) f.collapsed = collapsed;
   }
 
   /** Löscht einen Ordner; Inhalt rutscht in den Elternordner (nie stilles Löschen von Seiten). */
@@ -270,15 +266,18 @@ export class PlanManager {
     return true;
   }
 
-  setPageSettings(id: string, patch: Partial<Pick<Plan, "marginsMm" | "holePunch" | "spreadId">>): Plan | null {
+  setPageSettings(id: string, patch: Partial<Pick<Plan, "marginsMm" | "holePunch" | "holePunchSide" | "spreadId">>): Plan | null {
     const p = this.getById(id); if (!p) return null;
     if (typeof patch.marginsMm === "number" && patch.marginsMm >= 0) p.marginsMm = patch.marginsMm;
     if (typeof patch.holePunch === "boolean") p.holePunch = patch.holePunch;
+    if (patch.holePunchSide !== undefined) p.holePunchSide = normalizeHolePunchSide(patch.holePunchSide);
     if (patch.spreadId !== undefined) p.spreadId = patch.spreadId;
     return p;
   }
 
-  foldersToJSON(): PlanFolder[] { return this.folders.map(f => ({ ...f })); }
+  foldersToJSON(): PlanFolder[] {
+    return this.folders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId, order: f.order }));
+  }
 
   deletePlan(id: string): boolean {
     const before = this.plans.length;
@@ -296,15 +295,20 @@ export class PlanManager {
     return true;
   }
 
+  /** Häkchen der alten CAD-Druckplanliste: rein lokaler UI-Zustand, nie
+   * Teil von Planmodell, Serialisierung, Verlauf oder Cloud. */
+  private _legacyPrintSelection = new Set<string>();
+
   setSelected(id: string, selected: boolean): boolean {
-    const p = this.getById(id);
-    if (!p) return false;
-    p.selected = !!selected;
+    if (!this.getById(id)) return false;
+    if (selected) this._legacyPrintSelection.add(id); else this._legacyPrintSelection.delete(id);
     return true;
   }
 
+  isSelected(id: string): boolean { return this._legacyPrintSelection.has(id); }
+
   getSelected(): Plan[] {
-    return this.plans.filter(p => p.selected);
+    return this.plans.filter(p => this._legacyPrintSelection.has(p.id));
   }
 
   /** Fügt eine Projektion an. Daten werden 1:1 übernommen (Caller liefert sceneSnapshot). */
@@ -341,9 +345,9 @@ export class PlanManager {
       landscape: !!p.landscape,
       freeWidth: p.freeWidth,
       freeHeight: p.freeHeight,
-      selected: !!p.selected,
       marginsMm: p.marginsMm,
       holePunch: !!p.holePunch,
+      holePunchSide: normalizeHolePunchSide(p.holePunchSide),
       spreadId: p.spreadId ?? null,
       parentFolderId: p.parentFolderId ?? null,
       order: p.order ?? 0,
@@ -368,7 +372,6 @@ export class PlanManager {
       name: String(f.name || "Ordner"),
       parentId: typeof f.parentId === "string" ? f.parentId : null,
       order: typeof f.order === "number" ? f.order : i,
-      collapsed: !!f.collapsed,
     })) : [];
     if (!Array.isArray(data)) {
       this.plans = [];
@@ -382,9 +385,9 @@ export class PlanManager {
       landscape: !!p.landscape,
       freeWidth: typeof p.freeWidth === "number" && p.freeWidth > 0 ? p.freeWidth : PlanDefaults.defaultFreeWidth,
       freeHeight: typeof p.freeHeight === "number" && p.freeHeight > 0 ? p.freeHeight : PlanDefaults.defaultFreeHeight,
-      selected: !!p.selected,
       marginsMm: typeof p.marginsMm === "number" && p.marginsMm >= 0 ? p.marginsMm : 10,
       holePunch: !!p.holePunch,
+      holePunchSide: normalizeHolePunchSide((p as any).holePunchSide),
       spreadId: typeof p.spreadId === "string" ? p.spreadId : null,
       parentFolderId: typeof p.parentFolderId === "string" && folderIds.has(p.parentFolderId) ? p.parentFolderId : null,
       order: typeof p.order === "number" ? p.order : idx,

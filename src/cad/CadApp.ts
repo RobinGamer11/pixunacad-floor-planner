@@ -1,3 +1,4 @@
+import { pageGuideSnapGeometry } from "./pageGuides";
 import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
@@ -921,7 +922,6 @@ export class CadApp {
       // Druckpläne
       plans: this.planManager.toJSON(),
       planFolders: this.planManager.foldersToJSON(),
-      activePlanId: this.activePlanId,
       planScenesById: (() => {
         const out: Record<string, any> = {};
         for (const [id, sc] of this.planScenesById.entries()) {
@@ -1037,10 +1037,10 @@ export class CadApp {
     this._syncOverlayScenes();
     this.refreshLabelUI();
     this.refreshSheetUI();
-    // Aktiven Plan wiederherstellen (löst auch Plan-Modus-Renderer-Sync aus).
-    const restoredPlanId = (typeof data.activePlanId === "string" && this.planManager.getById(data.activePlanId))
-      ? data.activePlanId : null;
-    this.activePlanId = restoredPlanId;
+    // Die geöffnete Exportseite ist lokaler Bedienzustand (nie aus Snapshot/Verlauf/Cloud):
+    // sie bleibt, solange die Seite existiert – Undo/Redo schaltet nie um.
+    const keptPlanId = (this.activePlanId && this.planManager.getById(this.activePlanId)) ? this.activePlanId : null;
+    this.activePlanId = keptPlanId;
     this._applyPlanModeToRenderer();
     this.refreshPlanUI();
     this._lastSnapshot = this._serializeScene();
@@ -3610,9 +3610,13 @@ export class CadApp {
       const plan = this.planManager.getById(this.activePlanId);
       if (plan) {
         const size = getPlanPaperSize(plan);
-        this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePunch: plan.holePunch };
-        // Blattrand des Plans als Snap-Geometrie bereitstellen.
-        this.topology.planFrame = { widthM: size.width / 1000, heightM: size.height / 1000 };
+        this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePunch: plan.holePunch, holePunchSide: plan.holePunchSide };
+        // Blattrand + Seitenrand/Lochung als nicht druckbare Snap-Geometrie bereitstellen.
+        this.topology.planFrame = {
+          widthM: size.width / 1000,
+          heightM: size.height / 1000,
+          guides: pageGuideSnapGeometry({ widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePunch: plan.holePunch, holePunchSide: plan.holePunchSide }),
+        };
         // Annotation-Scene des Plans als aktive Scene swappen, damit Werkzeuge
         // direkt auf dem Plan zeichnen können.
         const planScene = this._ensurePlanScene(this.activePlanId);

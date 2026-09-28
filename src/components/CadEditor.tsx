@@ -57,6 +57,8 @@ import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector
 import { CanvasFabBar, LayerFab, LayersHelpCard, LayersPanelTitle } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
+import { ExportSidebar } from "@/components/export/ExportSidebar";
+import { ExportPageSettings } from "@/components/export/ExportPageSettings";
 
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
@@ -175,8 +177,13 @@ interface CadEditorProps {
   helpOn?: boolean;
   /** Liefert die CAD-Engine an übergeordnete Bereiche (z. B. Export) – dieselbe Instanz, kein Duplikat. */
   onAppReady?: (app: CadApp | null) => void;
+  /** "export": Export-Seitenleiste links + Reiter „Seiteneinstellungen“ statt „Seiten“. */
+  mode?: "cad" | "export";
+  /** Export: „CAD-Blatt bearbeiten“ wechselt bewusst in den CAD-Bereich. */
+  onOpenSourceSheet?: (sheetId: string) => void;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true, onAppReady }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true, onAppReady, mode = "cad", onOpenSourceSheet }, ref) => {
+  const exportMode = mode === "export";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hubRef = useRef<HTMLDivElement>(null);
@@ -332,6 +339,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
+  const exportModeRef = useRef(exportMode);
+  exportModeRef.current = exportMode;
   const onAppReadyRef = useRef(onAppReady);
   onAppReadyRef.current = onAppReady;
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
@@ -345,6 +354,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     openExportPanel: () => {
       setRightOpen(true);
       setRightTab("sheets");
+      if (exportModeRef.current) return; // Export: keine Druckpläne
       // Kleines Delay, damit der Sheets-Tab gerendert ist bevor wir hineinscrollen.
       setTimeout(() => {
         // Sicherstellen, dass die Druckpläne-Sektion ausgeklappt ist.
@@ -1620,6 +1630,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
       </aside>
 
+      {/* Export: Seitenleiste direkt nach der CAD-Werkzeugleiste (gleiches Layout). */}
+      {exportMode && cadApp && !presenting && <ExportSidebar app={cadApp} projectId={projectId} />}
+
       {/* Canvas Area */}
       <div ref={containerRef} className="relative flex-1 min-w-0 h-full overflow-hidden">
 
@@ -2120,7 +2133,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       <aside className="cad-settings-sidebar shrink-0 w-[280px] h-full flex-col border-l flex" style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         <div className="grid grid-cols-[1fr_1fr_1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
           {([
-            { id: "sheets" as const, label: "Seiten", Icon: SettingsIcon },
+            { id: "sheets" as const, label: exportMode ? "Seiteneinstellungen" : "Seiten", Icon: SettingsIcon },
             { id: "settings" as const, label: "Werkzeug", Icon: SettingsIcon },
             { id: "layers" as const, label: "Ebenen", Icon: LayersIcon },
           ]).map(t => (
@@ -3399,7 +3412,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
         </div>
         </DragScrollDiv>
-        <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
+        <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "sheets" && !exportMode ? "block" : "none" }}>
           {/* Zeichnungs-ID Panel (Blätter + Transparentpause) */}
           <div ref={sheetPanelRef} className="cad-id-panel cad-sheet-panel w-full">
             <div className="cad-sheet-tab-head">
@@ -3441,6 +3454,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
         </DragScrollDiv>
+        {exportMode && cadApp && (
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" style={{ display: rightTab === "sheets" ? "block" : "none" }}>
+            <ExportPageSettings app={cadApp} onOpenSourceSheet={(id) => onOpenSourceSheet?.(id)} />
+          </div>
+        )}
         <DragScrollDiv axis="both" className="flex-1 min-h-0 overflow-auto p-2 space-y-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "layers" ? "block" : "none" }}>
           <div ref={idPanelRef} className="cad-id-panel cad-layer-panel w-full">
             <LayersPanelTitle />
