@@ -14,7 +14,7 @@ import { loadPdfDocFromB64, loadPdfJs } from "./documentImport";
 export interface DissolvedPdfResult {
   segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number }[];
   hatches: { points: { x: number; y: number }[]; fillColor: string; strokeColor: string }[];
-  texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; text: string; color: string }[];
+  texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; /** Schriftgröße in PDF-Punkten der Seite (ohne Mindestwert). */ fontSizePdfPt: number; text: string; color: string }[];
   /** Anzahl nicht übertragbarer PDF-Spezialfüllungen/-konturen (Mesh-Verläufe, unbekannte Muster). Bleiben in der PDF-Unterlage sichtbar. */
   skippedSpecial?: number;
 }
@@ -399,7 +399,8 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
         x: t[4], y: t[5],
         widthM: widthPt * Defaults.documentMetersPerPdfPt,
         heightM: heightPt * Defaults.documentMetersPerPdfPt,
-        fontSizePx: Math.max(6, fontSizePt),
+        fontSizePx: fontSizePt,
+        fontSizePdfPt: fontSizePt,
         text: item.str,
         color: col,
       });

@@ -33,3 +33,22 @@ export const CSS_PX_PER_MM = 96 / 25.4;
  * (ptToCssPx(pt) * cam.scale / referencePxPerM).
  */
 export const ANNOTATION_M_PER_MM = CSS_PX_PER_MM / 80;
+
+/**
+ * PDF-Schriftgröße (PDF-Punkte der Seite) → CAD-fontSizePt, sodass die Schrift
+ * im Modellraum exakt dieselbe Höhe hat wie im platzierten PDF.
+ * Renderer: Bildschirmhöhe = ptToCssPx(pt) * textPtScale * cam.scale / referencePxPerM
+ * ⇒ Welt-Höhe = ptToCssPx(pt) * textPtScale / referencePxPerM.
+ * Soll: Welt-Höhe = pdfFontPt * worldMPerPdfPt (gleiche Skalierung wie Linien/Flächen).
+ */
+export function pdfFontPtToCadPt(
+  pdfFontPt: number,
+  worldMPerPdfPt: number,
+  referencePxPerM: number,
+  textPtScale = 1,
+): number {
+  const ref = Number.isFinite(referencePxPerM) && referencePxPerM > 0 ? referencePxPerM : 80;
+  const tps = Number.isFinite(textPtScale) && textPtScale > 0 ? textPtScale : 1;
+  const worldH = Math.max(0, pdfFontPt) * Math.max(0, worldMPerPdfPt);
+  return (worldH * ref) / (CSS_PX_PER_PT * tps);
+}
