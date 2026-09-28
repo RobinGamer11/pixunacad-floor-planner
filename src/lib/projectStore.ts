@@ -1016,7 +1016,13 @@ export const projectStore = {
         const exists = s.projects.some((p) => p.id === incoming.id);
         return {
           projects: exists
-            ? s.projects.map((p) => (p.id === incoming.id ? migrateProject(incoming) : p))
+            ? s.projects.map((p) => {
+                if (p.id !== incoming.id) return p;
+                const next = migrateProject(incoming);
+                // Papierkorbstatus nie durch einen Cloud-Stand aufheben –
+                // nur applyCloudTrash(id, null) nach bewusster Wiederherstellung.
+                return p.deletedAt ? { ...next, deletedAt: p.deletedAt } : next;
+              })
             : [migrateProject(incoming), ...s.projects],
         };
       });

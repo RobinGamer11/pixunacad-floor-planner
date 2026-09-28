@@ -20,7 +20,7 @@ import {
   sharedProjectIds,
 } from "@/lib/sharedProjectSync";
 import { setSharedProjectIdsProvider } from "@/lib/workspaceStorage";
-import { flushPendingTrash, reconcileCloudTrash, recordTrashOp } from "@/lib/cloudTrash";
+import { flushPendingTrash, loadPendingTrash, reconcileCloudTrash, recordTrashOp } from "@/lib/cloudTrash";
 import { toast } from "@/hooks/use-toast";
 
 export function ProjectAccessProvider({ children }: { children: ReactNode }) {
@@ -72,13 +72,38 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
 
     // Geteilte Projekte laden, sobald die Rollen bekannt sind.
     const hydrated = new Set<string>();
+    // Login-Reihenfolge: Zugriff laden → ausstehende Löschungen übertragen →
+    // Zugriff neu laden → Papierkorb abgleichen → erst dann aktive Projekte hydratisieren.
+    let trashSettled = false;
+    let settling = false;
     const hydrateAll = () => {
-      if (!projectAccessStore.getState().ready) return;
+      const st = projectAccessStore.getState();
+      if (!st.ready) return;
+      if (!trashSettled) {
+        if (settling) return;
+        settling = true;
+        void (async () => {
+          try {
+            await flushPendingTrash();
+            await projectAccessStore.reload();
+            reconcileCloudTrash();
+          } finally {
+            trashSettled = true;
+            settling = false;
+            hydrateAll();
+          }
+        })();
+        return;
+      }
+      const pending = loadPendingTrash();
       sharedProjectIds().forEach((id) => {
         if (hydrated.has(id)) return;
+        if (st.deletedAtByProject.get(id)) return;
+        const op = pending[id]?.op;
+        if (op === "delete" || op === "purge") return;
+        if (projectStore.getState().projects.find((p) => p.id === id)?.deletedAt) return;
         hydrated.add(id);
-        // Erst Papierkorbstatus abgleichen, danach hydratisieren.
-        void flushPendingTrash().then(() => { reconcileCloudTrash(); return hydrateSharedProject(id); });
+        void hydrateSharedProject(id);
       });
     };
     const offAccess = projectAccessStore.subscribe(hydrateAll);

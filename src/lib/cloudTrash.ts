@@ -76,14 +76,21 @@ async function push(projectId: string, op: TrashOp): Promise<boolean> {
   if (!client) return false;
   try {
     if (op === "purge") {
-      const { error } = await client.from("network_projects").delete().eq("id", projectId);
-      return !error;
+      const { error } = await client.from("network_projects").delete().eq("id", projectId).select("id");
+      if (error) return false;
+      // Erfolg nur, wenn die Projektzeile nachweislich nicht mehr existiert.
+      const check = await client.from("network_projects").select("id").eq("id", projectId).maybeSingle();
+      return !check.error && !check.data;
     }
-    const { error } = await client
+    const { data, error } = await client
       .from("network_projects")
       .update({ deleted_at: op === "delete" ? new Date().toISOString() : null })
-      .eq("id", projectId);
-    return !error;
+      .eq("id", projectId)
+      .select("id, deleted_at");
+    if (error || !Array.isArray(data)) return false;
+    const row = data.find((r) => (r as { id?: string }).id === projectId) as { deleted_at?: string | null } | undefined;
+    if (!row) return false; // keine Zeile geändert (RLS/nicht gefunden) → offen lassen
+    return op === "delete" ? !!row.deleted_at : row.deleted_at == null;
   } catch { return false; }
 }
 
