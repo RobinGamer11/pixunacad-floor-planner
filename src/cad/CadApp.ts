@@ -473,9 +473,14 @@ export class CadApp {
   // History (Undo/Redo)
   private _history: string[] = [];
   private _historyIndex = -1;
-  private _historyMax = 100;
+  /** 20 rückgängig machbare Handlungen + aktueller Ausgangsstand = 21 Zustände. */
+  private _historyMax = 21;
   /** Solange true, werden keine automatischen History-Snapshots erzeugt (z. B. während Regler-Drag). */
   suspendHistory = false;
+  /** Offene zentrale Aktion (beginAction … commitAction/cancelAction). */
+  private _actionDepth = 0;
+  private _actionStartSnapshot: string | null = null;
+  private _actionPrevSuspend = false;
   private _lastSnapshot = "";
   private _snapshotTimer: number | null = null;
   private _isRestoring = false;
@@ -1075,17 +1080,69 @@ export class CadApp {
   /** Erzwingt einen History-Push der aktuellen Scene (für Plan-Operationen). */
   commitHistorySnapshot() {
     if (this._isRestoring || this._destroyed) return;
-    const snap = this._serializeScene();
+    // Innerhalb einer offenen Aktion entsteht der Schritt erst bei commitAction().
+    if (this._actionDepth > 0) return;
+    this._pushHistory(this._serializeScene());
+  }
+
+  /** Zentraler Push: verwirft den Redo-Zweig, begrenzt auf 21 Zustände. */
+  private _pushHistory(snap: string) {
     if (snap === this._lastSnapshot) return;
     if (this._historyIndex < this._history.length - 1) {
       this._history = this._history.slice(0, this._historyIndex + 1);
     }
     this._history.push(snap);
-    if (this._history.length > this._historyMax) this._history.shift();
+    while (this._history.length > this._historyMax) this._history.shift();
     this._historyIndex = this._history.length - 1;
     this._lastSnapshot = snap;
     this._emitHistoryChange();
   }
+
+  /**
+   * Zentrale Aktionsschnittstelle: beginAction() → Änderung → commitAction()
+   * erzeugt genau EINEN Undo-Schritt (egal wie viele Objekte). cancelAction()
+   * stellt den Ausgangsstand wieder her, ohne Verlaufsschritt. Verschachtelt
+   * aufrufbar; nur die äußerste Aktion zählt.
+   */
+  beginAction() {
+    if (this._destroyed) return;
+    if (this._actionDepth === 0) {
+      // Noch nicht erfasste Vorher-Änderungen zuerst als eigenen Schritt sichern.
+      if (!this._isRestoring) {
+        const pre = this._serializeScene();
+        this._pushHistory(pre);
+      }
+      this._actionStartSnapshot = this._lastSnapshot;
+      this._actionPrevSuspend = this.suspendHistory;
+      this.suspendHistory = true;
+    }
+    this._actionDepth++;
+  }
+
+  commitAction() {
+    if (this._actionDepth <= 0) return;
+    this._actionDepth--;
+    if (this._actionDepth > 0) return;
+    this.suspendHistory = this._actionPrevSuspend;
+    this._actionStartSnapshot = null;
+    if (this._isRestoring || this._destroyed) return;
+    (this as any)._changeDirty = true;
+    this._pushHistory(this._serializeScene());
+  }
+
+  cancelAction() {
+    if (this._actionDepth <= 0) return;
+    this._actionDepth = 0;
+    this.suspendHistory = this._actionPrevSuspend;
+    const start = this._actionStartSnapshot;
+    this._actionStartSnapshot = null;
+    if (start && !this._destroyed && start !== this._serializeScene()) {
+      this._restoreScene(start);
+      this._lastSnapshot = start;
+    }
+  }
+
+  isActionOpen() { return this._actionDepth > 0; }
 
   private _emitHistoryChange() {
     this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
@@ -1095,14 +1152,17 @@ export class CadApp {
   /**
    * Übernimmt eine von außen eingespielte Änderung (Zusammenarbeit) in den
    * Vergleichsstand, damit sie KEINEN eigenen Verlaufsschritt erzeugt.
+   * Der lokale Verlauf beginnt danach neu, damit Undo nie fremde Änderungen
+   * zurücknimmt.
    */
   markExternalChange() {
     if (this._destroyed) return;
     const snap = this._serializeScene();
+    if (snap === this._lastSnapshot) return;
     this._lastSnapshot = snap;
-    if (this._historyIndex >= 0 && this._historyIndex < this._history.length) {
-      this._history[this._historyIndex] = snap;
-    }
+    this._history = [snap];
+    this._historyIndex = 0;
+    this.onHistoryChange?.(false, false);
   }
 
   /** Serialisierungsstand für die Zusammenarbeit (schreibgeschützt). */
