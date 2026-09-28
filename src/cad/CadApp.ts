@@ -1064,17 +1064,8 @@ export class CadApp {
     if ((this.documentTool as any)?.warpPending) return;
     if ((this.documentTool as any)?.dissolving) return;
 
-    const snap = this._serializeScene();
-    if (snap === this._lastSnapshot) return;
-    // Drop redo branch
-    if (this._historyIndex < this._history.length - 1) {
-      this._history = this._history.slice(0, this._historyIndex + 1);
-    }
-    this._history.push(snap);
-    if (this._history.length > this._historyMax) this._history.shift();
-    this._historyIndex = this._history.length - 1;
-    this._lastSnapshot = snap;
-    this._emitHistoryChange();
+    if (this._actionDepth > 0) return;
+    this._pushHistory(this._serializeScene());
   }
 
   /** Erzwingt einen History-Push der aktuellen Scene (für Plan-Operationen). */
@@ -1188,6 +1179,7 @@ export class CadApp {
   }
 
   undo() {
+    if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
     this._maybeSnapshot();
     if (this._historyIndex <= 0) return;
     this._historyIndex--;

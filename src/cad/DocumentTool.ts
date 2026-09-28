@@ -149,6 +149,8 @@ export class DocumentTool {
     if (!doc) return;
     (doc as any).warpCorners = null;
     this.app.renderer.render();
+    (this.app as any)._changeDirty = true;
+    try { (this.app as any).commitHistorySnapshot?.(); } catch {}
   }
 
   /** Spiegelt ein Dokument (Achse: "x" = links/rechts, "y" = oben/unten). */
@@ -158,6 +160,8 @@ export class DocumentTool {
     (doc as any).flipX = !!flipX;
     (doc as any).flipY = !!flipY;
     this.app.renderer.render();
+    (this.app as any)._changeDirty = true;
+    try { (this.app as any).commitHistorySnapshot?.(); } catch {}
   }
 
   /** Welt-Position einer Warp-Ecke (berücksichtigt Rotation + Doc-Box). */
