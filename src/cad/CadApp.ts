@@ -1,4 +1,4 @@
-import { pageGuideSnapGeometry } from "./pageGuides";
+import { pageGuideSnapGeometry, paperMmToWorld } from "./pageGuides";
 import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
