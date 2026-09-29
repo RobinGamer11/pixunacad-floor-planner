@@ -3937,14 +3937,18 @@ export class CadApp {
   private _syncPlanTracingLayers() {
     if (!this.activePlanId) {
       this.renderer.planTracingLayers = [];
+      this.topology.tracingSnapScenes = [];
       return;
     }
     const layers: Renderer["planTracingLayers"] = [];
+    const snapScenes: Scene[] = [];
     for (const plan of this.planManager.list()) {
       if (plan.id === this.activePlanId) continue;
       const state = this.planOverlayStore.get(plan.id);
       if (!state || state.mode === "none") continue;
       const annotationScene = this._ensurePlanScene(plan.id);
+      // Schreibgeschützte Fangquelle: nur solange diese Seite sichtbar eingeblendet ist.
+      snapScenes.push(annotationScene);
       // Projektionen via PlanController-Hilfen + Annotation-Scene via Renderer-Pfad.
       const drawCb = (offCtx: CanvasRenderingContext2D) => {
         // 1) Projektionen dieses Plans zeichnen
