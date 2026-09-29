@@ -121,3 +121,5 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Echter Zwei-Geräte-Test (Nutzer), danach Reiter freischalten
 - [x] contentRevision für direkte Scene-Mutationen/Ebenensichtbarkeit
 - [ ] Browser-Abnahme mit Anmeldung
+- [x] Export: Seiteneinstellungen im Mappen-Stil, Lochungsmuster, echter Seitenverbund (spreadLayouts cloudfähig), letzte Seite geschützt, CAD-Startansicht
+- [ ] Browser-/Tablet-Abnahme Verbund-Ziehen und Verbund-PDF (Nutzer)

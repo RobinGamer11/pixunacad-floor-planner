@@ -21,3 +21,8 @@
 - Häkchen der alten CAD-Druckplanliste: nur im Speicher von `PlanManager` (`isSelected`), nicht im Planmodell.
 - Layout: Werkzeugleiste | Export-Seitenleiste | Papier | eine rechte Leiste (`Seiteneinstellungen | Werkzeug | Ebenen`), gesteuert über `CadEditor mode="export"`.
 - Seitenrand und Lochung (`src/cad/pageGuides.ts`) sind nicht druckbare Fanggeometrie über `topology.planFrame.guides`.
+
+## Lochungsmuster, Seitenverbund, Mindestseite
+- `Plan.holePattern` ("none" | "din2" | "four" | "a5ring6") ersetzt `holePunch`; Altdaten `true` → `din2`. Renderer und Fangpunkte nutzen `holePunchPointsMm` – nie in der PDF.
+- Verbund: je Seite `spreadOffset`, je Verbund `spreadLayouts[spreadId].layoutMode` (eigenes Strukturobjekt im Cloud-Abgleich). Nur die aktive Seite ist bearbeitbar; Nachbarn werden angezeigt und über Griffe verschoben (ein Verlaufsschritt beim Loslassen). PDF: ein Verbund = eine Seite.
+- `deletePlan()` lehnt die letzte Seite ab.
