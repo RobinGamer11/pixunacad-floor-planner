@@ -678,6 +678,14 @@ export class TopologyEngine {
       }
     }
 
+    // Sichtbare CAD-Ausschnitte der Transparenzpause: rein temporäre Fangquelle.
+    for (const geo of this.tracingSnapGeometry) {
+      if (!geo) continue;
+      for (const pt of geo.points) considerPoint(pt, null, null, -1);
+      for (const [a, b] of geo.lines) considerLine(a, b, null, null);
+    }
+
+
     // Bibliotheksinstanzen — schreibgeschützte Weltgeometrie der Container.
     for (const ls of this._libraryScenes(exclusions?.libraryInstanceIds)) {
       this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
