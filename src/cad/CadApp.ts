@@ -3619,16 +3619,8 @@ export class CadApp {
         const size = getPlanPaperSize(plan);
         const spreadNeighbors = this._spreadNeighborsOf(plan.id);
         this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePattern: plan.holePattern, holePunchSide: plan.holePunchSide, spreadNeighbors };
-        // Blattrand + Seitenrand/Lochung als nicht druckbare Snap-Geometrie bereitstellen.
-        const guides = pageGuideSnapGeometry({ widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePattern: plan.holePattern, holePunchSide: plan.holePunchSide });
-        // Kanten der Nachbarseiten im Verbund zusätzlich fangbar (zusammenhängende Papierfläche).
-        for (const nb of spreadNeighbors) {
-          const c = [
-            { x: nb.dxMm, y: nb.dyMm }, { x: nb.dxMm + nb.widthMm, y: nb.dyMm },
-            { x: nb.dxMm + nb.widthMm, y: nb.dyMm + nb.heightMm }, { x: nb.dxMm, y: nb.dyMm + nb.heightMm },
-          ].map(pt => paperMmToWorld(pt, size.width, size.height));
-          for (let i = 0; i < 4; i++) { guides.points.push(c[i]); guides.lines.push([c[i], c[(i + 1) % 4]]); }
-        }
+        this.renderer.planNeighborDraw = (ctx, nb) => this._drawSpreadNeighborContent(ctx, nb.id, nb.dxMm, nb.dyMm);
+        const guides = this._spreadGuideGeometry(size.width, size.height, plan, spreadNeighbors);
         this.topology.planFrame = {
           widthM: size.width / 1000,
           heightM: size.height / 1000,
