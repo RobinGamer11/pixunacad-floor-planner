@@ -444,6 +444,12 @@ export class CadApp {
   planPanel: PlanPanel | null = null;
   /** Aktiver Plan (null = Zeichnungsmodus, kein Plan-Hintergrund). */
   activePlanId: string | null = null;
+  /**
+   * Rein flüchtiger Bedienzustand „Seitenanordnung bearbeiten“ (freie Anordnung).
+   * Nicht Cloud, nicht Undo/Redo, nicht Snapshot, nicht localStorage — nach
+   * Seitenwechsel oder Neuladen startet die Ansicht immer fixiert.
+   */
+  spreadLayoutEditing = false;
   /** Plan-Modus Controller (Drop / Selektion / Drag / HUB). */
   planController: PlanController | null = null;
   /** Map: planId → eigene Annotation-Scene (Werkzeuge zeichnen darauf im Plan-Modus). */
@@ -3604,6 +3610,8 @@ export class CadApp {
     this.bumpContentRevision();
     if (id != null && !this.planManager.getById(id)) return;
     if (id === this.activePlanId) { this.refreshPlanUI(); return; }
+    // Anordnungsmodus ist rein flüchtig: jeder Seitenwechsel startet fixiert.
+    this.spreadLayoutEditing = false;
     // Aktuellen Camera-State sichern (für Sheet bzw. den vorherigen Plan).
     this._saveCurrentCameraState();
     this.activePlanId = id;
@@ -3937,14 +3945,18 @@ export class CadApp {
   private _syncPlanTracingLayers() {
     if (!this.activePlanId) {
       this.renderer.planTracingLayers = [];
+      this.topology.tracingSnapScenes = [];
       return;
     }
     const layers: Renderer["planTracingLayers"] = [];
+    const snapScenes: Scene[] = [];
     for (const plan of this.planManager.list()) {
       if (plan.id === this.activePlanId) continue;
       const state = this.planOverlayStore.get(plan.id);
       if (!state || state.mode === "none") continue;
       const annotationScene = this._ensurePlanScene(plan.id);
+      // Schreibgeschützte Fangquelle: nur solange diese Seite sichtbar eingeblendet ist.
+      snapScenes.push(annotationScene);
       // Projektionen via PlanController-Hilfen + Annotation-Scene via Renderer-Pfad.
       const drawCb = (offCtx: CanvasRenderingContext2D) => {
         // 1) Projektionen dieses Plans zeichnen
@@ -3976,6 +3988,7 @@ export class CadApp {
       });
     }
     this.renderer.planTracingLayers = layers;
+    this.topology.tracingSnapScenes = snapScenes;
   }
 
   /** Cached leere Scene als Anzeige-Backing im Plan-Modus (legacy, ungenutzt). */

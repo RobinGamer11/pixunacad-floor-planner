@@ -32,3 +32,12 @@
 - Freie Anordnung: Eckpunkte an jeder Verbundseite (auch der aktiven); Vorschau über `CadApp.previewSpreadPage` (Gesamt-Layout, aktive Seite wandert mit), Fixieren über `commitSpreadPage` (ein Verlaufsschritt, nur der Versatz der bewegten Seite).
 - Neue Seiten heißen „Seite N“ (`PlanManager.nextDefaultName`, aus vorhandenen Namen bestimmt).
 - Ausschnittkanten: „Einschneiden / Kante verschieben“ folgt dem Zeiger, Setzen per Klick/Häkchen/Enter, Esc stellt zurück; Clip nie kleiner 0 (volle Größe). Freier Maßstab direkt im Hub (`applyProjectionScale`, Clip proportional).
+
+## Seitenanordnung, Hub-Symbole, Transparenzpause (gezielte Korrektur)
+- Verschiebe-Eckpunkte gibt es nur an der **aktiven** Exportseite und nur im flüchtigen Modus `CadApp.spreadLayoutEditing` (kein Cloud, kein Undo/Redo, kein Snapshot, kein localStorage – Seitenwechsel und Neuladen starten fixiert). Umschalter in `ExportPageSettings`; nach „✓ Fixieren“ endet der Modus.
+- Eckpunkt antippen startet direkt den Verschiebe-Modus. Anheben von Finger/Stift beendet nur die Zeigerbewegung, die Vorschau bleibt; gespeichert wird allein über „✓ Fixieren“ oder Enter (ein Verlaufsschritt), Abbrechen/Esc stellt die Ausgangslage her.
+- Nachbarseiten werden nur mit dem Auswahlwerkzeug per Tap aktiv (`SpreadHandles`: Werkzeug bei pointerdown und pointerup muss `selectTool` sein).
+- Eckpunkte in der Optik der CAD-Fangpunkte (`--cad-snap-point`), 28-px-Touchfläche, kein Gold, keine Textbuttons.
+- Ausschnitt-Hub rein symbolisch (`PlanController._icon`, 24er-Vektorraster wie IdPanel/SheetPanel); Text nur in `title`/`aria-label`, Maßstabswert als kleiner Wert neben dem Symbol (`.plan-hub-value`).
+- Zeigerform der Ausschnitt-Bedienung läuft über `PlanController._setCursor`; `null` gibt nur den selbst gesetzten Zeiger frei (zurück auf `default`) und lässt andere CAD-Werkzeuge unberührt.
+- Transparenzpause im Export: `TopologyEngine.tracingSnapScenes` ist eine klar getrennte, schreibgeschützte Fangquelle (Linien, Schraffuren, Wände, Texte, Maße, Dokumente, Freihand). Gefüllt in `CadApp._syncPlanTracingLayers`, nur solange die Hintergrundseite sichtbar eingeblendet ist. Keine Kopie in die aktive Scene, nicht auswählbar, nicht editierbar, nie in der PDF.

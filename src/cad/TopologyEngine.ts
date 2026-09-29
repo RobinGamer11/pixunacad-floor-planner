@@ -67,6 +67,12 @@ export class TopologyEngine {
   labels: LabelManager;
   /** Read-only Snap-Quellen aus anderen Blättern (Transparentpause). */
   overlayScenes: Scene[] = [];
+  /**
+   * Klar getrennte, schreibgeschützte Fangquelle der sichtbaren Hintergrundseiten
+   * im Export (Transparenzpause). Liefert nur Fangpunkte und Linien — die Objekte
+   * bleiben nicht auswählbar, nicht editierbar und werden nie kopiert oder gedruckt.
+   */
+  tracingSnapScenes: Scene[] = [];
   /** Schreibgeschützte Fangquelle platzierter Bibliotheksinstanzen. */
   librarySnaps: import("./library/librarySnapSource").LibrarySnapSource | null = null;
   /** Papierrahmen im Plan-(Druck-)Modus in Metern. Ecken, Kantenmitten,
@@ -613,6 +619,56 @@ export class TopologyEngine {
       for (const edge of ovScene.getHatchEdges()) {
         if (!this.labels.isVisible(edge.hatch.labelId)) continue;
         considerLine(edge.a, edge.b, null, null);
+      }
+    }
+
+    // Transparenzpause im Export: sichtbare Hintergrundseiten liefern Fangpunkte
+    // und Linien, bleiben aber vollständig schreibgeschützt (segment/hatch = null).
+    for (const trScene of this.tracingSnapScenes) {
+      if (!trScene) continue;
+      for (const seg of trScene.segments) {
+        if (!this.labels.isVisible(seg.labelId)) continue;
+        considerPoint(seg.a, null, null, -1);
+        considerPoint(seg.b, null, null, -1);
+        considerLine(seg.a, seg.b, null, null);
+      }
+      for (const hatch of trScene.hatches) {
+        if (!this.labels.isVisible(hatch.labelId)) continue;
+        for (const p of hatch.points) considerPoint(p, null, null, -1);
+      }
+      for (const edge of trScene.getHatchEdges()) {
+        if (!this.labels.isVisible(edge.hatch.labelId)) continue;
+        considerLine(edge.a, edge.b, null, null);
+      }
+      for (const wall of trScene.walls) {
+        if (!this.labels.isVisible(wall.labelId)) continue;
+        const ref = wall.corners;
+        for (let i = 0; i < ref.length; i++) {
+          considerPoint(ref[i], null, null, -1);
+          if (i < ref.length - 1) considerLine(ref[i], ref[i + 1], null, null);
+        }
+      }
+      for (const box of trScene.textBoxes) {
+        if (!this.labels.isVisible(box.labelId)) continue;
+        for (const c of boxCornersWorld(box)) considerPoint(c, null, null, -1);
+      }
+      for (const dim of trScene.dimensions) {
+        if (!this.labels.isVisible(dim.labelId)) continue;
+        considerPoint(dim.p1, null, null, -1);
+        considerPoint(dim.p2, null, null, -1);
+      }
+      for (const doc of trScene.documents) {
+        if (!this.labels.isVisible(doc.labelId)) continue;
+        for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
+        for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
+        for (const a of documentAnchorsWorld(doc)) considerPoint(a, null, null, -1);
+      }
+      for (const st of trScene.freeStrokes) {
+        if (!this.labels.isVisible(st.labelId)) continue;
+        const pts = (st as any).points as { x: number; y: number }[] | undefined;
+        if (!pts?.length) continue;
+        considerPoint(pts[0], null, null, -1);
+        considerPoint(pts[pts.length - 1], null, null, -1);
       }
     }
 

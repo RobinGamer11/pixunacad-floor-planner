@@ -303,3 +303,5 @@ jeweils nächsten sinnvollen Schritt.
 - Papierkorb von Cloudprojekten folgt `network_projects.deleted_at` über `src/lib/cloudTrash.ts` (offene lokale Aktionen haben Vorrang) – damit gelöschte Projekte nicht als Platzhalter zurückkehren.
 - Export ist dieselbe `CadApp` mit aktiver Exportseite (`?view=export`), Mutationen nur über `CadApp.mutatePlans` – ein Verlauf, keine zweite CAD-Welt (Details: `docs/export-architecture.md`).
 - Verbund-Layout liegt einmal je Verbund in `spreadLayouts` (Strukturobjekt), nicht an Seiten – verhindert widersprüchliche Modi zwischen Geräten.
+- Bedienzustände im Export (aktive Seite, eingeklappte Ordner, `spreadLayoutEditing`) sind rein lokal und flüchtig – sie dürfen nie in Cloud, Undo/Redo, Snapshot oder localStorage landen, damit Geräte sich nicht gegenseitig die Bedienung umstellen.
+- Sichtbare Hintergrundseiten liefern Fangpunkte ausschließlich über die getrennte, schreibgeschützte Quelle `TopologyEngine.tracingSnapScenes` – so entstehen keine Kopien, keine auswählbaren Objekte und keine PDF-Inhalte.

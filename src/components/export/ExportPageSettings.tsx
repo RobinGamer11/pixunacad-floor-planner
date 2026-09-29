@@ -5,7 +5,7 @@ import { usePlanUi } from "./useExportApp";
 import { HOLE_PATTERN_OPTIONS, type HolePunchSide } from "@/cad/pageGuides";
 import type { SpreadLayoutMode } from "@/cad/PlanManager";
 import { SettingsSection, SettingsRow, SettingsSelect, OrientationButtons, MarginsField, SettingsButton, settingsFieldClass, settingsBorder } from "@/components/pageSettings/PageSettingsParts";
-import { Link2, Link2Off, RotateCcw, Snowflake, Pencil, Plus, AlertTriangle } from "lucide-react";
+import { Link2, Link2Off, RotateCcw, Snowflake, Pencil, Plus, AlertTriangle, Check, Move as MoveIcon } from "lucide-react";
 
 /**
  * Rechte Einstellungsleiste einer Exportseite. Alle Änderungen laufen über
@@ -124,7 +124,16 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
                 onChange={(v) => set(() => pm.setSpreadLayoutMode(plan.spreadId!, v))} />
             </SettingsRow>
             {pm.getSpreadLayoutMode(plan.spreadId) === "free" && (
-              <div className="text-[10px] text-muted-foreground">Nachbarseiten am runden Griff über der Seite verschieben; sie rasten an den Kanten ein.</div>
+              <>
+                <SettingsButton onClick={() => { app.spreadLayoutEditing = !app.spreadLayoutEditing; app.refreshPlanUI(); }}>
+                  {app.spreadLayoutEditing ? <><Check size={12} /> Anordnung fixieren</> : <><MoveIcon size={12} /> Seitenanordnung bearbeiten</>}
+                </SettingsButton>
+                <div className="text-[10px] text-muted-foreground">
+                  {app.spreadLayoutEditing
+                    ? "Eckpunkt der aktiven Seite antippen und verschieben; „✓ Fixieren“ oder Enter übernimmt die Lage."
+                    : "Verschiebbar ist immer nur die aktive Seite. Nachbarseite antippen wählt sie aus."}
+                </div>
+              </>
             )}
             {next && !next.spreadId && (
               <SettingsButton onClick={() => set(() => pm.linkSpread(plan.id, next.id))}><Link2 size={12} /> Nächste Seite anfügen</SettingsButton>
