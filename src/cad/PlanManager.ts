@@ -130,6 +130,16 @@ export class PlanManager {
     return this.plans.find(p => p.id === id) || null;
   }
 
+  /** Nächster freier Standardname „Seite N“ (aus den vorhandenen Seiten bestimmt, stabil nach Laden/Cloud). */
+  nextDefaultName(): string {
+    let max = 0;
+    for (const p of this.plans) {
+      const m = /^Seite\s+(\d+)$/.exec((p.name || "").trim());
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+    return `Seite ${max + 1}`;
+  }
+
   getIndex(id: string): number {
     return this.plans.findIndex(p => p.id === id);
   }
@@ -143,7 +153,7 @@ export class PlanManager {
     parentFolderId?: string | null;
   } = {}): Plan {
     const id = `plan-${Date.now()}-${this._counter++}`;
-    const name = (opts.name || "").trim() || `Plan ${this._counter - 1}`;
+    const name = (opts.name || "").trim() || this.nextDefaultName();
     const plan: Plan = {
       id,
       name,
@@ -349,10 +359,11 @@ export class PlanManager {
   setSpreadOffset(id: string, xMm: number, yMm: number): boolean {
     const p = this.getById(id); if (!p || !p.spreadId) return false;
     if (!Number.isFinite(xMm) || !Number.isFinite(yMm)) return false;
-    // Beim ersten freien Verschieben die aktuelle Anordnung fixieren, damit nichts springt.
+    // Aktuelle (normierte) Anordnung aller Mitglieder fixieren – die übergebene
+    // Position bezieht sich auf genau diese normierten Koordinaten, sonst springen Seiten.
     for (const r of this.spreadRects(p.spreadId)) {
       const m = this.getById(r.id);
-      if (m && !m.spreadOffset) m.spreadOffset = { xMm: r.x, yMm: r.y };
+      if (m) m.spreadOffset = { xMm: r.x, yMm: r.y };
     }
     p.spreadOffset = { xMm, yMm };
     return true;
