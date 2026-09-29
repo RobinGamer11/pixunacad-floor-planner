@@ -941,7 +941,7 @@ export class PlanController {
     ) {
       html = `
         <button data-act="cut" title="Einschneiden / Kante verschieben" aria-label="Einschneiden, Kante verschieben">${ic.scissors}</button>
-        <button data-act="free-scale" title="Freier Maßstab (aktuell ${scaleLabel})" aria-label="Freier Maßstab, aktuell ${scaleLabel}">${ic.scaling}<span ${val}>${scaleLabel}</span></button>
+        <button data-act="free-scale" class="plan-hub-value" title="Freier Maßstab (aktuell ${scaleLabel})" aria-label="Freier Maßstab, aktuell ${scaleLabel}">${ic.scaling}<span ${val}>${scaleLabel}</span></button>
         <button data-act="scale" title="Feste Maßstäbe" aria-label="Feste Maßstäbe">${ic.chevron}</button>
         <button data-act="reset-clip" title="Ausschnitt zurücksetzen" aria-label="Ausschnitt zurücksetzen">${ic.reset}</button>
         <button data-act="delete" title="Ausschnitt löschen" aria-label="Ausschnitt löschen">${ic.trash}</button>
@@ -950,7 +950,7 @@ export class PlanController {
       html = `
         <button data-act="translate" title="Ausschnitt verschieben" aria-label="Ausschnitt verschieben">${ic.move}</button>
         <button data-act="rotate" title="Ausschnitt drehen" aria-label="Ausschnitt drehen">${ic.rotate}</button>
-        <button data-act="free-scale" title="Freier Maßstab (aktuell ${scaleLabel})" aria-label="Freier Maßstab, aktuell ${scaleLabel}">${ic.scaling}<span ${val}>${scaleLabel}</span></button>
+        <button data-act="free-scale" class="plan-hub-value" title="Freier Maßstab (aktuell ${scaleLabel})" aria-label="Freier Maßstab, aktuell ${scaleLabel}">${ic.scaling}<span ${val}>${scaleLabel}</span></button>
         <button data-act="scale" title="Feste Maßstäbe" aria-label="Feste Maßstäbe">${ic.chevron}</button>
         <button data-act="reset-clip" title="Ausschnitt zurücksetzen" aria-label="Ausschnitt zurücksetzen">${ic.reset}</button>
         <button data-act="delete" title="Ausschnitt löschen" aria-label="Ausschnitt löschen">${ic.trash}</button>

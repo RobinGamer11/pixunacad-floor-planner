@@ -1350,6 +1350,12 @@
   line-height: 1;
 }
 .plan-projection-hub button:hover { background: hsl(var(--accent)); }
+/* Kompakte Symbol-Schaltfläche mit kleinem Wert daneben (z. B. Maßstab 1:100). */
+.plan-projection-hub button.plan-hub-value {
+  width: auto;
+  padding: 0 6px;
+  gap: 4px;
+}
 .plan-projection-hub .plan-hub-danger:hover {
   background: hsl(var(--destructive) / 0.15);
   border-color: hsl(var(--destructive));
