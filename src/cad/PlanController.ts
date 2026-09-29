@@ -886,7 +886,7 @@ export class PlanController {
       const den = Math.round(projectionScaleDen(curProj) * 100) / 100;
       html = `
         <span style="font-size:12px;padding:0 4px;align-self:center">1&nbsp;:</span>
-        <input data-scale-input type="number" min="1" step="any" value="${den}" inputmode="decimal"
+        <input data-scale-input type="text" value="${den}" inputmode="decimal"
           style="width:72px;height:32px;font-size:13px;padding:0 6px;border:1px solid hsl(var(--hairline));border-radius:6px;background:hsl(var(--surface-card));color:hsl(var(--ink))" />
         <button data-act="apply-scale" title="Maßstab übernehmen" ${txt}>✓</button>
         <button data-act="cancel-scale" title="Abbrechen" ${txt}>✕</button>

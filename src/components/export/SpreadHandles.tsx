@@ -152,7 +152,7 @@ export function SpreadHandles({ app }: { app: CadApp }) {
             style={{ ...btn, left: pos.left + 16, top: Math.max(4, pos.top - 52) }}>
             <button type="button" className="h-9 px-3 rounded-md border text-xs flex items-center gap-1" style={btn}
               onClick={() => startMove(armedPage.id)}><Move size={14} /> Verschieben</button>
-            <button type="button" aria-label="Fixieren" className="h-9 w-9 rounded-md border grid place-items-center" style={btn} onClick={cancel}><Check size={16} /></button>
+            <button type="button" aria-label="Schließen" className="h-9 w-9 rounded-md border grid place-items-center" style={btn} onClick={() => setArmed(null)}><X size={16} /></button>
           </div>
         );
       })()}
