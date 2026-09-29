@@ -30,7 +30,7 @@ describe("Export: lokaler Bedienzustand wird nie gespeichert", () => {
 
 describe("Export: Rand- und Lochungsfangpunkte", () => {
   it("Seitenrand liefert 4 Ecken + 4 Mitten und 4 Linien", () => {
-    const g = pageGuideSnapGeometry({ widthMm: 420, heightMm: 297, marginsMm: 10, holePunch: false, holePunchSide: "left" });
+    const g = pageGuideSnapGeometry({ widthMm: 420, heightMm: 297, marginsMm: 10, holePattern: "none", holePunchSide: "left" });
     expect(g.points).toHaveLength(8);
     expect(g.lines).toHaveLength(4);
     expect(g.points[0].x).toBeCloseTo(-0.2);
@@ -43,7 +43,7 @@ describe("Export: Rand- und Lochungsfangpunkte", () => {
     const top = holePunchPointsMm(210, 297, "top");
     expect(top.holes.map(h => h.y)).toEqual([12, 12]);
     expect(top.center).toEqual({ x: 105, y: 12 });
-    const g = pageGuideSnapGeometry({ widthMm: 210, heightMm: 297, marginsMm: 0, holePunch: true, holePunchSide: "right" });
+    const g = pageGuideSnapGeometry({ widthMm: 210, heightMm: 297, marginsMm: 0, holePattern: "din2", holePunchSide: "right" });
     expect(g.points).toHaveLength(3);
     expect(g.lines).toHaveLength(0);
   });

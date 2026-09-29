@@ -201,10 +201,12 @@ export function ExportSidebar({ app, projectId }: { app: CadApp; projectId?: str
             </div>
           </div>
           {!selecting && (
-            <button type="button" className="h-6 w-6 grid place-items-center opacity-50 hover:opacity-100"
-              title="Seite löschen"
+            <button type="button" className="h-6 w-6 grid place-items-center opacity-50 hover:opacity-100 disabled:opacity-20"
+              title={pm.canDeletePlan(p.id) ? "Seite löschen" : "Die letzte Exportseite kann nicht gelöscht werden"}
+              disabled={!pm.canDeletePlan(p.id)}
               onClick={(e) => {
                 e.stopPropagation();
+                if (!pm.canDeletePlan(p.id)) return;
                 if (!window.confirm(`Exportseite „${p.name}“ löschen?`)) return;
                 app.mutatePlans(() => pm.deletePlan(p.id));
               }}>

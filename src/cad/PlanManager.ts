@@ -1,7 +1,7 @@
 import { clamp } from "./geometry";
 import { normalizeScaleDen } from "@/lib/scale";
 import type { PlanFolder } from "./planTree";
-import { normalizeHolePunchSide, type HolePunchSide } from "./pageGuides";
+import { normalizeHolePunchSide, normalizeHolePattern, type HolePunchSide, type HolePattern } from "./pageGuides";
 
 /**
  * Druckpläne: Layout-Blätter mit Papierformat, auf denen Projektionen
@@ -60,6 +60,12 @@ export interface Projection {
   mode?: "linked" | "frozen";
 }
 
+export type SpreadLayoutMode = "grid" | "free";
+export interface SpreadLayout { layoutMode: SpreadLayoutMode }
+
+/** Rechteck einer Seite innerhalb ihres Verbunds (mm, oben links). */
+export interface SpreadRect { id: string; x: number; y: number; width: number; height: number }
+
 export interface Plan {
   id: string;
   name: string;
@@ -74,12 +80,14 @@ export interface Plan {
   projections: Projection[];
   /** Seitenrand in mm (Hilfslinie, nicht gedruckt). */
   marginsMm: number;
-  /** Lochung am linken Rand anzeigen. */
-  holePunch: boolean;
+  /** Lochungsmuster (Hilfsanzeige, nie in der PDF). */
+  holePattern: HolePattern;
   /** Seite der Lochung (Standard links). */
   holePunchSide: HolePunchSide;
   /** Seitenverbund-ID (gleiche ID = zusammengehörige Seiten). */
   spreadId: string | null;
+  /** Position (oben links, mm) innerhalb des Verbunds bei freier Anordnung; null = automatisch. */
+  spreadOffset: { xMm: number; yMm: number } | null;
   /** Ordner im Exportbaum (null = Wurzel). */
   parentFolderId: string | null;
   /** Reihenfolge innerhalb des Elternordners. */
@@ -149,9 +157,10 @@ export class PlanManager {
         : PlanDefaults.defaultFreeHeight,
       projections: [],
       marginsMm: 10,
-      holePunch: false,
+      holePattern: "none",
       holePunchSide: "left",
       spreadId: null,
+      spreadOffset: null,
       parentFolderId: opts.parentFolderId ?? null,
       order: this._nextOrder(opts.parentFolderId ?? null),
     };
@@ -266,23 +275,147 @@ export class PlanManager {
     return true;
   }
 
-  setPageSettings(id: string, patch: Partial<Pick<Plan, "marginsMm" | "holePunch" | "holePunchSide" | "spreadId">>): Plan | null {
+  setPageSettings(id: string, patch: Partial<Pick<Plan, "marginsMm" | "holePattern" | "holePunchSide">>): Plan | null {
     const p = this.getById(id); if (!p) return null;
     if (typeof patch.marginsMm === "number" && patch.marginsMm >= 0) p.marginsMm = patch.marginsMm;
-    if (typeof patch.holePunch === "boolean") p.holePunch = patch.holePunch;
+    if (patch.holePattern !== undefined) p.holePattern = normalizeHolePattern(patch.holePattern);
     if (patch.holePunchSide !== undefined) p.holePunchSide = normalizeHolePunchSide(patch.holePunchSide);
-    if (patch.spreadId !== undefined) p.spreadId = patch.spreadId;
     return p;
+  }
+
+  // ---------- Seitenverbund ----------
+  /** Verbund-Layout je spreadId (einmal pro Verbund, nicht je Seite). */
+  private spreadLayouts = new Map<string, SpreadLayout>();
+
+  /** Alle Seiten in sichtbarer Baumreihenfolge (Tiefensuche nach `order`). */
+  flatOrder(): Plan[] {
+    const out: Plan[] = [];
+    const walk = (parentId: string | null) => {
+      for (const s of this._siblings(parentId)) {
+        if (s.kind === "page") { const p = this.getById(s.id); if (p) out.push(p); }
+        else walk(s.id);
+      }
+    };
+    walk(null);
+    // Seiten mit ungültigem Elternordner nicht verlieren.
+    for (const p of this.plans) if (!out.includes(p)) out.push(p);
+    return out;
+  }
+
+  spreadMembers(spreadId: string | null): Plan[] {
+    if (!spreadId) return [];
+    return this.flatOrder().filter(p => p.spreadId === spreadId);
+  }
+
+  getSpreadLayoutMode(spreadId: string | null): SpreadLayoutMode {
+    return (spreadId && this.spreadLayouts.get(spreadId)?.layoutMode) || "grid";
+  }
+
+  setSpreadLayoutMode(spreadId: string, mode: SpreadLayoutMode): boolean {
+    if (this.spreadMembers(spreadId).length < 2) return false;
+    this.spreadLayouts.set(spreadId, { layoutMode: mode === "free" ? "free" : "grid" });
+    return true;
+  }
+
+  /** Verbindet zwei Seiten (oder hängt eine Seite an einen bestehenden Verbund an). */
+  linkSpread(aId: string, bId: string): string | null {
+    const a = this.getById(aId), b = this.getById(bId);
+    if (!a || !b || a === b) return null;
+    if (a.spreadId && b.spreadId && a.spreadId !== b.spreadId) return null;
+    const sid = a.spreadId || b.spreadId || `spread-${Date.now()}-${this._counter++}`;
+    a.spreadId = sid; b.spreadId = sid;
+    if (!this.spreadLayouts.has(sid)) this.spreadLayouts.set(sid, { layoutMode: "grid" });
+    return sid;
+  }
+
+  /** Löst eine Seite aus ihrem Verbund; ein Rest-Verbund mit nur einer Seite wird aufgelöst. */
+  unlinkFromSpread(id: string): boolean {
+    const p = this.getById(id); if (!p || !p.spreadId) return false;
+    const sid = p.spreadId;
+    p.spreadId = null; p.spreadOffset = null;
+    this._cleanupSpread(sid);
+    return true;
+  }
+
+  /** Setzt die Anordnung auf „nebeneinander" zurück (Versätze verworfen). */
+  resetSpreadLayout(spreadId: string): boolean {
+    const members = this.spreadMembers(spreadId);
+    if (members.length < 2) return false;
+    for (const m of members) m.spreadOffset = null;
+    this.spreadLayouts.set(spreadId, { layoutMode: "grid" });
+    return true;
+  }
+
+  setSpreadOffset(id: string, xMm: number, yMm: number): boolean {
+    const p = this.getById(id); if (!p || !p.spreadId) return false;
+    if (!Number.isFinite(xMm) || !Number.isFinite(yMm)) return false;
+    // Beim ersten freien Verschieben die aktuelle Anordnung fixieren, damit nichts springt.
+    for (const r of this.spreadRects(p.spreadId)) {
+      const m = this.getById(r.id);
+      if (m && !m.spreadOffset) m.spreadOffset = { xMm: r.x, yMm: r.y };
+    }
+    p.spreadOffset = { xMm, yMm };
+    return true;
+  }
+
+  /** Rechtecke aller Verbundseiten; normiert, sodass die Box bei (0,0) beginnt. */
+  spreadRects(spreadId: string | null): SpreadRect[] {
+    const members = this.spreadMembers(spreadId);
+    if (members.length === 0) return [];
+    const free = this.getSpreadLayoutMode(spreadId) === "free";
+    let cx = 0;
+    const rects = members.map(m => {
+      const s = getPlanPaperSize(m);
+      const grid = { x: cx, y: 0 };
+      cx += s.width;
+      const pos = free && m.spreadOffset ? { x: m.spreadOffset.xMm, y: m.spreadOffset.yMm } : grid;
+      return { id: m.id, x: pos.x, y: pos.y, width: s.width, height: s.height };
+    });
+    const minX = Math.min(...rects.map(r => r.x));
+    const minY = Math.min(...rects.map(r => r.y));
+    return rects.map(r => ({ ...r, x: r.x - minX, y: r.y - minY }));
+  }
+
+  private _cleanupSpread(spreadId: string) {
+    const rest = this.plans.filter(p => p.spreadId === spreadId);
+    if (rest.length < 2) {
+      for (const r of rest) { r.spreadId = null; r.spreadOffset = null; }
+      this.spreadLayouts.delete(spreadId);
+    }
+  }
+
+  spreadLayoutsToJSON(): Record<string, SpreadLayout> {
+    const out: Record<string, SpreadLayout> = {};
+    const used = new Set(this.plans.map(p => p.spreadId).filter(Boolean) as string[]);
+    for (const [id, l] of this.spreadLayouts) if (used.has(id)) out[id] = { layoutMode: l.layoutMode };
+    return out;
+  }
+
+  restoreSpreadLayouts(data: unknown) {
+    this.spreadLayouts.clear();
+    if (!data || typeof data !== "object") return;
+    for (const [id, l] of Object.entries(data as Record<string, any>)) {
+      if (!id) continue;
+      this.spreadLayouts.set(id, { layoutMode: l?.layoutMode === "free" ? "free" : "grid" });
+    }
   }
 
   foldersToJSON(): PlanFolder[] {
     return this.folders.map(f => ({ id: f.id, name: f.name, parentId: f.parentId, order: f.order }));
   }
 
+  /** Löscht eine Seite. Die letzte verbleibende Seite ist nie löschbar. */
+  canDeletePlan(id: string): boolean {
+    return !!this.getById(id) && this.plans.length > 1;
+  }
+
   deletePlan(id: string): boolean {
-    const before = this.plans.length;
+    if (!this.canDeletePlan(id)) return false;
+    const sid = this.getById(id)?.spreadId ?? null;
     this.plans = this.plans.filter(p => p.id !== id);
-    return this.plans.length !== before;
+    this._legacyPrintSelection.delete(id);
+    if (sid) this._cleanupSpread(sid);
+    return true;
   }
 
   moveToIndex(id: string, targetIndex: number): boolean {
@@ -346,9 +479,10 @@ export class PlanManager {
       freeWidth: p.freeWidth,
       freeHeight: p.freeHeight,
       marginsMm: p.marginsMm,
-      holePunch: !!p.holePunch,
+      holePattern: normalizeHolePattern(p.holePattern),
       holePunchSide: normalizeHolePunchSide(p.holePunchSide),
       spreadId: p.spreadId ?? null,
+      spreadOffset: p.spreadOffset ? { xMm: p.spreadOffset.xMm, yMm: p.spreadOffset.yMm } : null,
       parentFolderId: p.parentFolderId ?? null,
       order: p.order ?? 0,
       projections: p.projections.map(pr => ({
@@ -386,9 +520,13 @@ export class PlanManager {
       freeWidth: typeof p.freeWidth === "number" && p.freeWidth > 0 ? p.freeWidth : PlanDefaults.defaultFreeWidth,
       freeHeight: typeof p.freeHeight === "number" && p.freeHeight > 0 ? p.freeHeight : PlanDefaults.defaultFreeHeight,
       marginsMm: typeof p.marginsMm === "number" && p.marginsMm >= 0 ? p.marginsMm : 10,
-      holePunch: !!p.holePunch,
+      holePattern: normalizeHolePattern((p as any).holePattern, (p as any).holePunch),
       holePunchSide: normalizeHolePunchSide((p as any).holePunchSide),
       spreadId: typeof p.spreadId === "string" ? p.spreadId : null,
+      spreadOffset: (() => {
+        const o = (p as any).spreadOffset;
+        return o && Number.isFinite(o.xMm) && Number.isFinite(o.yMm) ? { xMm: Number(o.xMm), yMm: Number(o.yMm) } : null;
+      })(),
       parentFolderId: typeof p.parentFolderId === "string" && folderIds.has(p.parentFolderId) ? p.parentFolderId : null,
       order: typeof p.order === "number" ? p.order : idx,
       projections: Array.isArray(p.projections) ? p.projections.map(pr => ({

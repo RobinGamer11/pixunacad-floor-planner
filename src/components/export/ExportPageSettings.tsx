@@ -2,8 +2,10 @@ import React from "react";
 import type { CadApp } from "@/cad/CadApp";
 import { PaperFormats } from "@/cad/PlanManager";
 import { usePlanUi } from "./useExportApp";
-import { HOLE_PUNCH_SIDES } from "@/cad/pageGuides";
-import { Link2, Snowflake, Pencil, Plus, AlertTriangle } from "lucide-react";
+import { HOLE_PATTERN_OPTIONS, type HolePunchSide } from "@/cad/pageGuides";
+import type { SpreadLayoutMode } from "@/cad/PlanManager";
+import { SettingsSection, SettingsRow, SettingsSelect, OrientationButtons, MarginsField, SettingsButton, settingsFieldClass, settingsBorder } from "@/components/pageSettings/PageSettingsParts";
+import { Link2, Link2Off, RotateCcw, Snowflake, Pencil, Plus, AlertTriangle } from "lucide-react";
 
 /**
  * Rechte Einstellungsleiste einer Exportseite. Alle Änderungen laufen über
@@ -30,25 +32,19 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
   const ctl = app.planController;
   const selProj = ctl?.selectedProjectionId ? plan.projections.find(p => p.id === ctl.selectedProjectionId) ?? null : null;
   const selSheet = selProj ? sheets.find(s => s.id === selProj.sourceSheetId) ?? null : null;
-  const plansInOrder = pm.list();
+  const plansInOrder = pm.flatOrder();
   const idx = plansInOrder.findIndex(p => p.id === plan.id);
-  const prev = idx >= 0 ? plansInOrder[idx + 1] ?? null : null; // Liste ist neueste-zuerst
-  const next = idx > 0 ? plansInOrder[idx - 1] ?? null : null;
-  const linkSpread = (other: typeof plan | null) => {
-    if (!other) return;
-    const sid = other.spreadId || plan.spreadId || `spread-${other.id}`;
-    pm.setPageSettings(other.id, { spreadId: sid });
-    pm.setPageSettings(plan.id, { spreadId: sid });
-  };
-  const linkedPrev = !!prev && !!plan.spreadId && prev.spreadId === plan.spreadId;
-  const linkedNext = !!next && !!plan.spreadId && next.spreadId === plan.spreadId;
+  const prev = idx > 0 ? plansInOrder[idx - 1] : null;
+  const next = idx >= 0 ? plansInOrder[idx + 1] ?? null : null;
+  const members = pm.spreadMembers(plan.spreadId);
+  const inSpread = members.length >= 2;
 
   const field = "w-full h-8 px-2 rounded border bg-transparent text-xs";
   const border = { borderColor: "hsl(var(--hairline))" };
   const set = (fn: () => void) => app.mutatePlans(fn);
 
   return (
-    <div className="export-settings p-3 space-y-4 text-xs">
+    <div className="export-settings p-3 space-y-5 text-xs">
       <Section title="CAD-Blätter">
         <div className="text-[11px] text-muted-foreground leading-snug">
           Antippen platziert das Blatt auf dieser Seite. Ausschnitte bleiben verknüpft und aktualisieren sich automatisch.
@@ -63,69 +59,81 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
         </div>
       </Section>
 
-      <Section title="Seiteneinstellungen">
-        <label className="block space-y-1">
-          <span>Titel</span>
-          <input key={plan.id + plan.name} defaultValue={plan.name} className={field} style={border}
+      <SettingsSection title="SEITENEINSTELLUNGEN">
+        <SettingsRow label="Seitentitel">
+          <input key={plan.id + plan.name} defaultValue={plan.name} className={settingsFieldClass} style={settingsBorder}
             onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== plan.name) set(() => pm.renamePlan(plan.id, v)); }}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); e.stopPropagation(); }} />
-        </label>
-        <div className="grid grid-cols-3 gap-1">
-          {[...PaperFormats.filter(f => ["a5", "a4", "a3", "a2"].includes(f.key)).map(f => ({ key: f.key, label: f.label })), { key: "free", label: "Freies Format" }].map(f => (
-            <button key={f.key} type="button" className="h-8 rounded border"
-              style={{ borderColor: plan.formatKey === f.key ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))", background: plan.formatKey === f.key ? "hsl(var(--accent-gold-soft))" : undefined }}
-              onClick={() => set(() => pm.setFormat(plan.id, { formatKey: f.key }))}>{f.label}</button>
-          ))}
-        </div>
+        </SettingsRow>
+        <SettingsRow label="Format">
+          <SettingsSelect value={plan.formatKey}
+            options={[...PaperFormats.filter(f => ["a5", "a4", "a3", "a2"].includes(f.key)).map(f => ({ value: f.key, label: `${f.label} (${f.width} × ${f.height} mm)` })), { value: "free", label: "Freies Format" }]}
+            onChange={(v) => set(() => pm.setFormat(plan.id, { formatKey: v }))} />
+        </SettingsRow>
         {plan.formatKey === "free" ? (
-          <div className="grid grid-cols-2 gap-2">
-            <label>Breite (mm)<input type="number" min={10} key={"w" + plan.freeWidth} defaultValue={plan.freeWidth} className={field} style={border}
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <label>Breite (mm)<input type="number" min={10} key={"w" + plan.freeWidth} defaultValue={plan.freeWidth} className={settingsFieldClass} style={settingsBorder}
               onBlur={(e) => set(() => pm.setFormat(plan.id, { freeWidth: Number(e.target.value) }))} /></label>
-            <label>Höhe (mm)<input type="number" min={10} key={"h" + plan.freeHeight} defaultValue={plan.freeHeight} className={field} style={border}
+            <label>Höhe (mm)<input type="number" min={10} key={"h" + plan.freeHeight} defaultValue={plan.freeHeight} className={settingsFieldClass} style={settingsBorder}
               onBlur={(e) => set(() => pm.setFormat(plan.id, { freeHeight: Number(e.target.value) }))} /></label>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-1">
-            {[{ v: false, l: "Hochformat" }, { v: true, l: "Querformat" }].map(o => (
-              <button key={o.l} type="button" className="h-8 rounded border"
-                style={{ borderColor: plan.landscape === o.v ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))", background: plan.landscape === o.v ? "hsl(var(--accent-gold-soft))" : undefined }}
-                onClick={() => set(() => pm.setFormat(plan.id, { landscape: o.v }))}>{o.l}</button>
-            ))}
-          </div>
+          <SettingsRow label="Ausrichtung">
+            <OrientationButtons landscape={plan.landscape} onChange={(v) => set(() => pm.setFormat(plan.id, { landscape: v }))} />
+          </SettingsRow>
         )}
-        <label className="flex items-center gap-2">
-          <span className="flex-1">Seitenrand (mm, Hilfslinie)</span>
-          <input type="number" min={0} max={50} key={"m" + plan.marginsMm} defaultValue={plan.marginsMm} className="w-16 h-8 px-2 rounded border bg-transparent" style={border}
-            onBlur={(e) => set(() => pm.setPageSettings(plan.id, { marginsMm: Math.max(0, Number(e.target.value) || 0) }))} />
-        </label>
-        <label className="flex items-center gap-2 min-h-8 cursor-pointer">
-          <input type="checkbox" checked={plan.holePunch} onChange={(e) => set(() => pm.setPageSettings(plan.id, { holePunch: e.target.checked }))} className="h-4 w-4" />
-          <span>Lochung (Hilfslinie, fangbar)</span>
-        </label>
-        {plan.holePunch && (
-          <div className="space-y-1">
-            <span>Lochungsposition</span>
-            <div className="grid grid-cols-4 gap-1">
-              {HOLE_PUNCH_SIDES.map(o => (
-                <button key={o.key} type="button" className="h-8 rounded border"
-                  style={{ borderColor: plan.holePunchSide === o.key ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))", background: plan.holePunchSide === o.key ? "hsl(var(--accent-gold-soft))" : undefined }}
-                  onClick={() => set(() => pm.setPageSettings(plan.id, { holePunchSide: o.key }))}>{o.label}</button>
-              ))}
-            </div>
-          </div>
-        )}
-        <label className="flex items-center gap-2 min-h-8 cursor-pointer">
-          <input type="checkbox" disabled={!prev} checked={linkedPrev}
-            onChange={(e) => set(() => { if (e.target.checked) linkSpread(prev); else pm.setPageSettings(plan.id, { spreadId: linkedNext ? plan.spreadId : null }); })} className="h-4 w-4" />
-          <span>Verbund mit vorheriger Seite{prev ? ` („${prev.name}“)` : ""}</span>
-        </label>
-        <label className="flex items-center gap-2 min-h-8 cursor-pointer">
-          <input type="checkbox" disabled={!next} checked={linkedNext}
-            onChange={(e) => set(() => { if (e.target.checked) linkSpread(next); else if (next) pm.setPageSettings(next.id, { spreadId: null }); })} className="h-4 w-4" />
-          <span>Verbund mit nächster Seite{next ? ` („${next.name}“)` : ""}</span>
-        </label>
-      </Section>
+        <SettingsRow label="Ränder">
+          <MarginsField value={plan.marginsMm} onChange={(v) => set(() => pm.setPageSettings(plan.id, { marginsMm: v }))} />
+        </SettingsRow>
+      </SettingsSection>
 
+      <SettingsSection title="ABHEFTUNG">
+        <SettingsRow label="Lochung">
+          <SettingsSelect value={plan.holePattern} options={HOLE_PATTERN_OPTIONS.map(o => ({ value: o.key, label: o.label }))}
+            onChange={(v) => set(() => pm.setPageSettings(plan.id, { holePattern: v }))} />
+        </SettingsRow>
+        <SettingsRow label="Position">
+          <SettingsSelect value={plan.holePunchSide} disabled={plan.holePattern === "none"}
+            options={[{ value: "left", label: "Links" }, { value: "right", label: "Rechts" }, { value: "top", label: "Oben" }, { value: "bottom", label: "Unten" }] as { value: HolePunchSide; label: string }[]}
+            onChange={(v) => set(() => pm.setPageSettings(plan.id, { holePunchSide: v }))} />
+        </SettingsRow>
+        <div className="text-[10px] text-muted-foreground">Nur Hilfsanzeige mit Fangpunkten – erscheint nie in der PDF.</div>
+      </SettingsSection>
+
+      <SettingsSection title="SEITENANSICHT (VERBUND)">
+        {!inSpread ? (
+          <>
+            <div className="text-[11px] text-muted-foreground">Einzelseite. Mit einer benachbarten Seite verbinden, um eine zusammenhängende Seitenansicht zu erhalten.</div>
+            <div className="flex gap-2">
+              <SettingsButton disabled={!prev || (!!prev.spreadId && !!plan.spreadId)} onClick={() => prev && set(() => pm.linkSpread(prev.id, plan.id))}>
+                <Link2 size={12} /> {prev?.spreadId ? "an vorherigen Verbund" : "vorherige"}
+              </SettingsButton>
+              <SettingsButton disabled={!next} onClick={() => next && set(() => pm.linkSpread(plan.id, next.id))}>
+                <Link2 size={12} /> {next?.spreadId ? "an nächsten Verbund" : "nächste"}
+              </SettingsButton>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-[11px] text-muted-foreground">
+              Teil eines Verbunds aus <strong>{members.length}</strong> Seiten (Position {members.findIndex(m => m.id === plan.id) + 1}). In der PDF wird der Verbund zu einer gemeinsamen Seite.
+            </div>
+            <SettingsRow label="Layout">
+              <SettingsSelect value={pm.getSpreadLayoutMode(plan.spreadId)}
+                options={[{ value: "grid", label: "Nebeneinander" }, { value: "free", label: "Freie Anordnung" }] as { value: SpreadLayoutMode; label: string }[]}
+                onChange={(v) => set(() => pm.setSpreadLayoutMode(plan.spreadId!, v))} />
+            </SettingsRow>
+            {pm.getSpreadLayoutMode(plan.spreadId) === "free" && (
+              <div className="text-[10px] text-muted-foreground">Nachbarseiten am runden Griff über der Seite verschieben; sie rasten an den Kanten ein.</div>
+            )}
+            {next && !next.spreadId && (
+              <SettingsButton onClick={() => set(() => pm.linkSpread(plan.id, next.id))}><Link2 size={12} /> Nächste Seite anfügen</SettingsButton>
+            )}
+            <SettingsButton onClick={() => set(() => pm.resetSpreadLayout(plan.spreadId!))}><RotateCcw size={12} /> Anordnung zurücksetzen</SettingsButton>
+            <SettingsButton onClick={() => set(() => pm.unlinkFromSpread(plan.id))}><Link2Off size={12} /> Aus Verbund lösen</SettingsButton>
+          </>
+        )}
+      </SettingsSection>
 
       {selProj && (
         <Section title="Ausgewählter Ausschnitt">

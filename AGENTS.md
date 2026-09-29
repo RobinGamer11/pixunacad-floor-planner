@@ -302,3 +302,4 @@ jeweils nächsten sinnvollen Schritt.
 - `cloud` (Cloudbasis, darf laden/sichern) und `shared` (mind. eine weitere berechtigte Person) sind getrennt in `ProjectAccess`; Realtime/Präsenz/Sperren nur bei weiteren Personen – verhindert Team-Anzeigen und Kosten bei Solo-Cloudprojekten.
 - Papierkorb von Cloudprojekten folgt `network_projects.deleted_at` über `src/lib/cloudTrash.ts` (offene lokale Aktionen haben Vorrang) – damit gelöschte Projekte nicht als Platzhalter zurückkehren.
 - Export ist dieselbe `CadApp` mit aktiver Exportseite (`?view=export`), Mutationen nur über `CadApp.mutatePlans` – ein Verlauf, keine zweite CAD-Welt (Details: `docs/export-architecture.md`).
+- Verbund-Layout liegt einmal je Verbund in `spreadLayouts` (Strukturobjekt), nicht an Seiten – verhindert widersprüchliche Modi zwischen Geräten.

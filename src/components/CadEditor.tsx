@@ -59,6 +59,7 @@ import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
 import { ExportSidebar } from "@/components/export/ExportSidebar";
 import { ExportPageSettings } from "@/components/export/ExportPageSettings";
+import { SpreadHandles } from "@/components/export/SpreadHandles";
 
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
@@ -2088,6 +2089,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
+        {exportMode && cadApp && !presenting && <SpreadHandles app={cadApp} />}
 
         {/* Tabellen-Objekte (DOM-Overlay über dem Canvas) */}
         <CadTableLayer

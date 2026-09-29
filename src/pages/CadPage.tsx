@@ -41,13 +41,21 @@ const CadPage = () => {
       if (cadApp.activePlanId) { setLocalActivePage(projectId, cadApp.activePlanId); return; }
       const stored = getLocalActivePage(projectId);
       const pick = (stored && cadApp.planManager.getById(stored)) ? stored : cadApp.planManager.list()[0]?.id;
-      if (pick) cadApp.setActivePlanId(pick);
+      if (pick) { cadApp.setActivePlanId(pick); return; }
+      // Keine Exportseite vorhanden: nach kurzer Wartezeit (Cloud-Stand) eine A4-Seite anlegen.
+      if (!createTimer) createTimer = window.setTimeout(() => {
+        if (cadApp.planManager.list().length > 0) { ensurePage(); return; }
+        let id = "";
+        cadApp.mutatePlans(() => { id = cadApp.planManager.createPlan({ formatKey: "a4", name: "Seite 1" }).id; });
+        if (id) cadApp.setActivePlanId(id);
+      }, 1500);
     };
+    let createTimer = 0;
     if (exportView) ensurePage();
     else if (cadApp.activePlanId) cadApp.setActivePlanId(null);
     const off = cadApp.onPlanUiChange(ensurePage);
     const t = window.setTimeout(() => cadApp.resize(), 0);
-    return () => { off(); window.clearTimeout(t); };
+    return () => { off(); window.clearTimeout(t); if (createTimer) window.clearTimeout(createTimer); };
   }, [cadApp, exportView, projectId]);
 
   const doCopy = () => {
