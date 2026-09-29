@@ -433,6 +433,21 @@ export class PlanController {
    * Returns true, wenn der Controller die Eingabe verbraucht hat
    * (Werkzeuge sollen dann diesen Frame nicht laufen).
    */
+  /** Merkt, ob der aktuelle Canvas-Zeiger von dieser Bedienung gesetzt wurde. */
+  private _cursorOwned = false;
+
+  /**
+   * Setzt den Canvas-Zeiger für die Ausschnitt-Bedienung. `null` gibt ihn wieder
+   * frei (zurück auf „default“) — aber nur, wenn er zuvor hier gesetzt wurde,
+   * damit die Zeigerlogik anderer CAD-Werkzeuge unberührt bleibt.
+   */
+  _setCursor(cursor: string | null) {
+    if (cursor) { this.app.canvas.style.cursor = cursor; this._cursorOwned = true; return; }
+    if (!this._cursorOwned) return;
+    this.app.canvas.style.cursor = "default";
+    this._cursorOwned = false;
+  }
+
   update(): boolean {
     const plan = this._activePlan();
     if (!plan) {
