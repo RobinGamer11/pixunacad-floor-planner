@@ -123,3 +123,4 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Browser-Abnahme mit Anmeldung
 - [x] Export: Seiteneinstellungen im Mappen-Stil, Lochungsmuster, echter Seitenverbund (spreadLayouts cloudfähig), letzte Seite geschützt, CAD-Startansicht
 - [ ] Browser-/Tablet-Abnahme Verbund-Ziehen und Verbund-PDF (Nutzer)
+- [x] Export: nur aktive Seite verschiebbar, flüchtiger Modus „Seitenanordnung bearbeiten“, blaue Eckpunkte, symbolischer Ausschnitt-Hub, Cursor-Reset, Transparenzpause als schreibgeschützte Fangquelle
