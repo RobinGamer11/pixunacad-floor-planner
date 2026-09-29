@@ -198,7 +198,17 @@ export class PlanController {
     if (!proj) return;
     const oldDen = projectionScaleDen(proj);
     const next = await askProjectionScale(oldDen, { title: "Maßstab der Ansicht ändern" });
-    if (next == null || Math.abs(next - oldDen) < 1e-9) return;
+    if (next == null) return;
+    this.applyProjectionScale(proj, next);
+  }
+
+  /**
+   * Individueller Maßstab für genau diesen Ausschnitt. Position (Mittelpunkt) und
+   * Drehung bleiben, der Clip wird proportional mitgeführt. Ein Verlaufsschritt.
+   */
+  applyProjectionScale(proj: Projection, next: number): boolean {
+    const oldDen = projectionScaleDen(proj);
+    if (!Number.isFinite(next) || next <= 0 || Math.abs(next - oldDen) < 1e-9) return false;
     // Mittelpunkt bleibt erhalten; der Clip-Ausschnitt skaliert inhaltlich mit.
     const f = oldDen / next;
     proj.clip = {
@@ -213,6 +223,8 @@ export class PlanController {
     this.invalidateCache();
     this.app.refreshPlanUI();
     this._renderHubButtons();
+    this.app.commitHistorySnapshot();
+    return true;
     this._positionHub();
     this.app.commitHistorySnapshot();
   }
@@ -425,11 +437,8 @@ export class PlanController {
     if (this._drag) {
       this._continueDrag(sx, sy);
       // Move/Rotate werden durch Mausklick beendet; Edge-Drag durch Maus loslassen.
-      if (this._drag.kind === "move" || this._drag.kind === "rotate") {
-        if (input.clicked) this._endDrag();
-      } else {
-        if (!input.mouse.left) this._endDrag();
-      }
+      // Verschieben/Drehen/Kante: Zeiger folgt, Klick bzw. Antippen setzt.
+      if (input.clicked) this._endDrag();
       return true;
     }
 
