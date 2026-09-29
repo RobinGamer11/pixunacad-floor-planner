@@ -11,7 +11,7 @@
 - `pageGuides.ts` liefert für jedes Muster und jede Position die Lochmittelpunkte und die gemeinsame Mitte. Renderer und Fangpunkte verwenden genau diese Funktion. In der PDF erscheint keine Lochung (unverändert nur im Exportmodus).
 
 ## 3. Echter Seitenverbund
-- Neue Felder: je Seite `spreadOffset {xMm, yMm}`, je Verbund `spreadLayoutMode: "grid" | "free"` (am Verbund gespeichert, synchronisiert wie die übrigen Planfelder).
+- Neue Felder: je Seite `spreadOffset {xMm, yMm}`. Der Modus steht einmal pro Verbund in einer serialisierten Map `spreadLayouts: { [spreadId]: { layoutMode: "grid" | "free" } }`, nicht an den einzelnen Seiten. So können Geräte keine widersprüchlichen Modi speichern. Die Map wird in Cloud und Verlauf wie die übrigen Planfelder behandelt. Löst sich ein Verbund auf, wird sein Eintrag entfernt.
 - `grid`: Die Seiten werden automatisch bündig nebeneinander gelegt. `free`: Die Versätze sind frei verschiebbar.
 - Auf der Exportfläche wird die aktive Seite gemeinsam mit ihren Verbundseiten als zusammenhängende Papierfläche gezeichnet. Nur die aktive Seite ist bearbeitbar; ein Antippen einer Nachbarseite macht sie zur aktiven Seite. So gehören Anmerkungen, Ausschnitte, Fangpunkte und Werkzeuge immer eindeutig zu einer Seite.
 - Im Modus `free` hat jede Verbundseite einen Griff: Ziehen mit Finger oder Stift, flüssige Vorschau, Einrasten an Nachbarkanten, Speichern erst beim Loslassen (genau ein Verlaufsschritt), kein Sprung beim ersten Berühren.
@@ -20,12 +20,19 @@
 - Es wird kein Verbund-Code aus der alten Mappe übernommen; nur die Feldnamen dienen als Vorlage.
 
 ## 4. Mindestens eine Exportseite
-- `PlanManager.deletePlan()` lehnt das Löschen der letzten Seite ab (auch beim Löschen eines Ordners, der die letzte Seite enthält). In der linken Leiste ist die Löschaktion dann ausgegraut.
+- Der Schutz sitzt nur in `PlanManager.deletePlan()`: Die letzte Seite wird nicht gelöscht, und in der linken Leiste ist die Löschaktion dann ausgegraut. Beim Löschen eines Ordners bleiben die Seiten ohnehin erhalten und werden nur aus dem Ordner herausgelöst, daher braucht es dort keine Sonderregel.
 - Gibt es im Export noch keine Seite, wird automatisch eine A4-Seite angelegt.
 
 ## 5. CAD-Startansicht
 - Neue bzw. noch nie geöffnete Blätter starten mit einer festen, weiter herausgezoomten Ansicht (etwa 40 m Bildbreite, auf den Ursprung zentriert).
 - Eine gespeicherte Blattansicht bleibt erhalten. Beim Rückwechsel von Export nach CAD wird die gespeicherte Ansicht des Blatts wiederhergestellt, nicht die Kamera der Exportseite.
+
+## Unverändert gültig: lokale Bedienzustände
+- Welche Ordner auf- oder zugeklappt sind, merkt sich jedes Gerät selbst. Das wird nicht serialisiert.
+- Die aktive Exportseite bleibt lokal pro Gerät und gehört weder zur Cloud noch zu Rückgängig/Wiederholen.
+- Die PDF-Auswahl ist nur ein vorübergehender Zustand der Export-Seitenleiste.
+- Das alte `Plan.selected` bleibt vom Export getrennt und wird nicht in die Cloud übertragen.
+- Auch die neuen Felder (Lochungsmuster, Versätze, spreadLayouts) ändern daran nichts. Ein Test stellt sicher, dass diese Zustände weiterhin nicht serialisiert werden.
 
 ## Prüfung
 - Unit-Tests: Lochungsgeometrie (3 Muster × 4 Positionen), Übernahme alter Daten, Verbund-Anordnung (grid und Rücksetzen), letzte Seite nicht löschbar, Kamera-Startansicht.
