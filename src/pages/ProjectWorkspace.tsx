@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef, useEffect, useLayoutEffect } from "react";
+import { SettingsRow } from "@/components/pageSettings/PageSettingsParts";
 import { CommentLayer } from "@/components/comments/CommentLayer";
 import { useMappeCollab } from "@/lib/mappeCollab/useMappeCollab";
 import { MappeCollabPageLayer } from "@/components/mappe/MappeCollabLayer";
@@ -6292,14 +6293,8 @@ function TabButton({
 }
 
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[80px_minmax(0,1fr)] items-center gap-2 text-[11px]">
-      <span className="text-muted-foreground truncate">{label}</span>
-      <div className="min-w-0">{children}</div>
-    </div>
-  );
-}
+/** Gemeinsamer Baustein (auch im Export genutzt). */
+const Row = SettingsRow;
 
 function FreeDimInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
   const [text, setText] = React.useState(String(value));
