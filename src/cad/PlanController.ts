@@ -212,13 +212,7 @@ export class PlanController {
     const oldDen = projectionScaleDen(proj);
     if (!Number.isFinite(next) || next <= 0 || Math.abs(next - oldDen) < 1e-9) return false;
     // Mittelpunkt bleibt erhalten; der Clip-Ausschnitt skaliert inhaltlich mit.
-    const f = oldDen / next;
-    proj.clip = {
-      left: (proj.clip?.left || 0) * f,
-      right: (proj.clip?.right || 0) * f,
-      top: (proj.clip?.top || 0) * f,
-      bottom: (proj.clip?.bottom || 0) * f,
-    };
+    proj.clip = scaleProjectionClip(proj.clip, oldDen / next);
     proj.scaleDen = next;
     proj.scale = next;
     this._lastUsedScaleDen = next;
@@ -725,24 +719,11 @@ export class PlanController {
       const sinA = Math.sin(-proj.rotation);
       const ldxMm = dxMm * cosA - dyMm * sinA;
       const ldyMm = dxMm * sinA + dyMm * cosA;
-      const next = { ...this._drag.origClip };
       const items = this.getItems(proj);
       const layout = computeProjectionLayout(items, { ...proj, clip: this._drag.origClip });
       const bboxW = layout.bboxLocalMm.right - layout.bboxLocalMm.left;
       const bboxH = layout.bboxLocalMm.bottom - layout.bboxLocalMm.top;
-      const maxW = bboxW - 5;
-      const maxH = bboxH - 5;
-
-      if (this._drag.kind === "edge-left") {
-        next.left = clampN(this._drag.origClip.left + ldxMm, 0, maxW - this._drag.origClip.right);
-      } else if (this._drag.kind === "edge-right") {
-        next.right = clampN(this._drag.origClip.right - ldxMm, 0, maxW - this._drag.origClip.left);
-      } else if (this._drag.kind === "edge-top") {
-        next.top = clampN(this._drag.origClip.top + ldyMm, 0, maxH - this._drag.origClip.bottom);
-      } else if (this._drag.kind === "edge-bottom") {
-        next.bottom = clampN(this._drag.origClip.bottom - ldyMm, 0, maxH - this._drag.origClip.top);
-      }
-      proj.clip = next;
+      proj.clip = clipAfterEdgeDrag(this._drag.origClip, this._drag.kind, ldxMm, ldyMm, bboxW, bboxH);
     }
   }
 
