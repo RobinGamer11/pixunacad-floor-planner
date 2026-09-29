@@ -41,4 +41,5 @@
 
 ## Technische Details
 - Geändert: `PlanManager.ts` (Felder, Übernahme alter Daten, deletePlan-Regel, Verbundfunktionen), `pageGuides.ts`, `Renderer.ts` (Nachbarseiten im Verbund, Muster), `CadApp.ts` (Fangpunkte, Kamera je Blatt, Verbund-Ziehen), `PlanPdfExport.ts` (Verbund als eine Seite), `ExportPageSettings.tsx`, `ExportSidebar.tsx`, neue gemeinsame Bausteine unter `src/components/pageSettings/`, `ProjectWorkspace.tsx` (nutzt dieselben Bausteine, sichtbar unverändert).
-- Cloud: Die neuen Felder laufen über die bestehende Planstruktur-Synchronisierung. Kein neues Tabellenschema.
+- Zusätzlich geändert: `src/lib/cadCollab/types.ts`, `sceneDiff.ts` und die Stelle, an der eingehende Collaboration-Operationen angewendet werden. So wird `spreadLayouts` als eigene Projektstruktur objektweise in die Cloud übertragen und wiederhergestellt; ein Zwei-Geräte-Simulationstest deckt das ab.
+- Die Felder an den einzelnen Seiten (Lochungsmuster, Versatz) laufen über die bestehende Plan-Synchronisierung. Ein neues Tabellenschema ist nicht nötig.
