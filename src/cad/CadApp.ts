@@ -3933,7 +3933,10 @@ export class CadApp {
         if (!sc) return null;
         return this._serializeOneScene(sc);
       };
-      const bytes = await exportPlansToPdf(sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h));
+      const bytes = await exportPlansToPdf(
+        sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h),
+        (p) => p.spreadId ? { key: p.spreadId, rects: this.planManager.spreadRects(p.spreadId) } : null,
+      );
 
       const ts = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");

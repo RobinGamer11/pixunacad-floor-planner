@@ -10,7 +10,7 @@
  */
 import { PDFDocument, PDFPage, rgb } from "pdf-lib";
 import type { Plan } from "./PlanManager";
-import { getPlanPaperSize } from "./PlanManager";
+import { getPlanPaperSize, type SpreadRect } from "./PlanManager";
 import {
   flattenSheetSnapshot,
   computeProjectionLayout,
@@ -125,6 +125,8 @@ function drawProjectionToPdf(
   paperHeightMm: number,
   items: ProjectionItem[],
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: ClipRect },
+  /** Lage der Seite auf der PDF-Seite (Verbund): Versatz oben links und Gesamthöhe in mm. */
+  place: { offXMm: number; offYMm: number; pageHeightMm: number } = { offXMm: 0, offYMm: 0, pageHeightMm: paperHeightMm },
 ) {
   const layout = computeProjectionLayout(items, proj);
   const factor = layout.factor; // sheet-m → plan-m
@@ -148,9 +150,9 @@ function drawProjectionToPdf(
   // PDF Y zeigt nach OBEN → Y invertieren beim finalen Schritt.
   const localToPdf = (lx: number, ly: number): { x: number; y: number } => {
     const rotated = rot({ x: lx, y: ly }, rotation);
-    const mmX = paperCenterMmX + proj.x + rotated.x;
-    const mmY = paperCenterMmY + proj.y + rotated.y;
-    return { x: mmX * MM_TO_PT, y: (paperHeightMm - mmY) * MM_TO_PT };
+    const mmX = place.offXMm + paperCenterMmX + proj.x + rotated.x;
+    const mmY = place.offYMm + paperCenterMmY + proj.y + rotated.y;
+    return { x: mmX * MM_TO_PT, y: (place.pageHeightMm - mmY) * MM_TO_PT };
   };
 
   for (const it of items) {
@@ -236,52 +238,78 @@ export async function exportPlansToPdf(
   resolveSheetSnapshot: (sheetId: string) => unknown | null,
   /** Optional: Anmerkungs-Scene der Exportseite als PNG (Papiergröße, transparent). */
   renderAnnotationPng?: (plan: Plan, widthMm: number, heightMm: number) => Promise<Uint8Array | null>,
+  /** Optional: Verbund einer Seite (Schlüssel + Seitenrechtecke in mm). */
+  spreadOf?: (plan: Plan) => { key: string; rects: SpreadRect[] } | null,
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle("PixunaCAD Druckpläne");
   pdf.setCreator("PixunaCAD");
 
+  // Seiten gruppieren: ein Verbund wird zu EINER PDF-Seite (nur ausgewählte Mitglieder).
+  const selectedIds = new Set(plans.map(p => p.id));
+  const seenSpread = new Set<string>();
+  const groups: { rects: SpreadRect[]; members: Plan[] }[] = [];
   for (const plan of plans) {
-    const size = getPlanPaperSize(plan);
-    const page = pdf.addPage([size.width * MM_TO_PT, size.height * MM_TO_PT]);
-
-    // Optionaler Papier-Rahmen (sehr dezent)
-    page.drawRectangle({
-      x: 0, y: 0,
-      width: size.width * MM_TO_PT,
-      height: size.height * MM_TO_PT,
-      borderColor: rgb(0.85, 0.85, 0.85),
-      borderWidth: 0.5,
-    });
-
-    for (const proj of plan.projections) {
-      // Bevorzugt: bereits eingefrorener Snapshot zur Drop-Zeit.
-      const snap = proj.sceneSnapshot ?? resolveSheetSnapshot(proj.sourceSheetId);
-      if (!snap) continue;
-      const items = flattenSheetSnapshot(snap);
-      if (items.length === 0) continue;
-      try {
-        drawProjectionToPdf(page, size.width, size.height, items, {
-          x: proj.x, y: proj.y, rotation: proj.rotation, scale: proj.scale, clip: proj.clip,
-        });
-      } catch (err) {
-        console.warn("[PlanPdfExport] Projektion fehlgeschlagen:", proj.id, err);
-      }
+    const sp = plan.spreadId && spreadOf ? spreadOf(plan) : null;
+    if (sp && sp.rects.filter(r => selectedIds.has(r.id)).length >= 2) {
+      if (seenSpread.has(sp.key)) continue;
+      seenSpread.add(sp.key);
+      const rects = sp.rects.filter(r => selectedIds.has(r.id));
+      const minX = Math.min(...rects.map(r => r.x)), minY = Math.min(...rects.map(r => r.y));
+      const norm = rects.map(r => ({ ...r, x: r.x - minX, y: r.y - minY }));
+      groups.push({ rects: norm, members: norm.map(r => plans.find(p => p.id === r.id)!).filter(Boolean) });
+    } else {
+      const size = getPlanPaperSize(plan);
+      groups.push({ rects: [{ id: plan.id, x: 0, y: 0, width: size.width, height: size.height }], members: [plan] });
     }
+  }
 
-    // Anmerkungen der Exportseite (mit CAD-Werkzeugen auf dem Papier gezeichnet).
-    if (renderAnnotationPng) {
-      try {
-        const png = await renderAnnotationPng(plan, size.width, size.height);
-        if (png) {
-          const img = await pdf.embedPng(png);
-          page.drawImage(img, { x: 0, y: 0, width: size.width * MM_TO_PT, height: size.height * MM_TO_PT });
+  for (const group of groups) {
+    const pageW = Math.max(...group.rects.map(r => r.x + r.width));
+    const pageH = Math.max(...group.rects.map(r => r.y + r.height));
+    const page = pdf.addPage([pageW * MM_TO_PT, pageH * MM_TO_PT]);
+    for (const plan of group.members) {
+      const r = group.rects.find(x => x.id === plan.id)!;
+      const size = { width: r.width, height: r.height };
+      const place = { offXMm: r.x, offYMm: r.y, pageHeightMm: pageH };
+
+      // Optionaler Papier-Rahmen (sehr dezent)
+      page.drawRectangle({
+        x: r.x * MM_TO_PT, y: (pageH - r.y - r.height) * MM_TO_PT,
+        width: size.width * MM_TO_PT,
+        height: size.height * MM_TO_PT,
+        borderColor: rgb(0.85, 0.85, 0.85),
+        borderWidth: 0.5,
+      });
+
+      for (const proj of plan.projections) {
+        const snap = proj.sceneSnapshot ?? resolveSheetSnapshot(proj.sourceSheetId);
+        if (!snap) continue;
+        const items = flattenSheetSnapshot(snap);
+        if (items.length === 0) continue;
+        try {
+          drawProjectionToPdf(page, size.width, size.height, items, {
+            x: proj.x, y: proj.y, rotation: proj.rotation, scale: proj.scale, clip: proj.clip,
+          }, place);
+        } catch (err) {
+          console.warn("[PlanPdfExport] Projektion fehlgeschlagen:", proj.id, err);
         }
-      } catch (err) {
-        console.warn("[PlanPdfExport] Anmerkungen fehlgeschlagen:", plan.id, err);
+      }
+
+      // Anmerkungen der Exportseite (mit CAD-Werkzeugen auf dem Papier gezeichnet).
+      if (renderAnnotationPng) {
+        try {
+          const png = await renderAnnotationPng(plan, size.width, size.height);
+          if (png) {
+            const img = await pdf.embedPng(png);
+            page.drawImage(img, { x: r.x * MM_TO_PT, y: (pageH - r.y - r.height) * MM_TO_PT, width: size.width * MM_TO_PT, height: size.height * MM_TO_PT });
+          }
+        } catch (err) {
+          console.warn("[PlanPdfExport] Anmerkungen fehlgeschlagen:", plan.id, err);
+        }
       }
     }
-    // Keine automatische Plan-Beschriftung im PDF (Blatt bleibt sauber).
+    // Keine automatische Plan-Beschriftung und nie Lochung/Seitenrand im PDF.
   }
 
   return await pdf.save();
