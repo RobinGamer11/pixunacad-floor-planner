@@ -5,7 +5,7 @@ import { computeProjectionLayout, type ProjectionItem } from "./PlanProjections"
 
 function sceneWithLine(): Scene {
   const sc = new Scene();
-  sc.addSegment({ x: 0, y: 0 }, { x: 2, y: 0 });
+  sc.createSegment({ x: 0, y: 0 }, { x: 2, y: 0 });
   return sc;
 }
 
@@ -49,7 +49,7 @@ describe("Transparenzpause: schreibgeschützte Fangquelle der CAD-Ausschnitte", 
     const d = Math.hypot(geo.points[1].x - geo.points[0].x, geo.points[1].y - geo.points[0].y);
     expect(d).toBeCloseTo(0.02, 6);
     // Ausschnitt liegt um die Projektionsposition herum.
-    expect(Math.abs(geo.points[0].x - proj.x)).toBeLessThan(0.1);
+    expect(Math.abs(geo.points[0].x - proj.x / 1000)).toBeLessThan(0.1);
   });
 
   it("schneidet weggeschnittene Teile vollständig weg", () => {
