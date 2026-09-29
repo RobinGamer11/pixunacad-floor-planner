@@ -18,6 +18,8 @@ export function SpreadHandles({ app }: { app: CadApp }) {
   const lastKey = React.useRef("");
   const [moving, setMoving] = React.useState<string | null>(null);
   const mv = React.useRef<{ id: string; refX: number | null; refY: number | null; dx: number; dy: number; base: Page[] } | null>(null);
+  /** Namensschild-Tap: nur gültig, wenn beim Drücken das Auswahlwerkzeug aktiv war. */
+  const nameDown = React.useRef<{ id: string; ok: boolean } | null>(null);
 
   React.useEffect(() => {
     let raf = 0;
