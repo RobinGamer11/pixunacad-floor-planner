@@ -922,6 +922,7 @@ export class CadApp {
       // Druckpläne
       plans: this.planManager.toJSON(),
       planFolders: this.planManager.foldersToJSON(),
+      spreadLayouts: this.planManager.spreadLayoutsToJSON(),
       planScenesById: (() => {
         const out: Record<string, any> = {};
         for (const [id, sc] of this.planScenesById.entries()) {
@@ -982,6 +983,7 @@ export class CadApp {
     } else {
       this.planManager.restore([]);
     }
+    this.planManager.restoreSpreadLayouts(data.spreadLayouts);
     // PlanController-Cache invalidieren (Snapshot-Items neu flatten).
     this.planController?.invalidateCache();
     // Plan-Annotation-Scenes wiederherstellen.
@@ -1187,11 +1189,16 @@ export class CadApp {
     return this.scenesById.get(sheetId) ?? null;
   }
 
-  applyCollabStructure(kind: "sheets" | "labels" | "plans" | "planFolders" | "planOverlays", list: Record<string, unknown>[]) {
+  applyCollabStructure(kind: "sheets" | "labels" | "plans" | "planFolders" | "planOverlays" | "spreadLayouts", list: Record<string, unknown>[]) {
     if (this._destroyed) return;
-    if (kind === "plans" || kind === "planFolders" || kind === "planOverlays") {
+    if (kind === "plans" || kind === "planFolders" || kind === "planOverlays" || kind === "spreadLayouts") {
       if (kind === "plans") this.planManager.restore(list as any, this.planManager.listFolders());
       else if (kind === "planFolders") this.planManager.restore(this.planManager.toJSON(), list as any);
+      else if (kind === "spreadLayouts") {
+        const rec: Record<string, any> = {};
+        for (const { id, ...st } of list as any[]) rec[id] = st;
+        this.planManager.restoreSpreadLayouts(rec);
+      }
       else {
         const rec: Record<string, any> = {};
         for (const { id, ...st } of list as any[]) rec[id] = st;
@@ -3610,12 +3617,22 @@ export class CadApp {
       const plan = this.planManager.getById(this.activePlanId);
       if (plan) {
         const size = getPlanPaperSize(plan);
-        this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePunch: plan.holePunch, holePunchSide: plan.holePunchSide };
+        const spreadNeighbors = this._spreadNeighborsOf(plan.id);
+        this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePattern: plan.holePattern, holePunchSide: plan.holePunchSide, spreadNeighbors };
         // Blattrand + Seitenrand/Lochung als nicht druckbare Snap-Geometrie bereitstellen.
+        const guides = pageGuideSnapGeometry({ widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePattern: plan.holePattern, holePunchSide: plan.holePunchSide });
+        // Kanten der Nachbarseiten im Verbund zusätzlich fangbar (zusammenhängende Papierfläche).
+        for (const nb of spreadNeighbors) {
+          const c = [
+            { x: nb.dxMm, y: nb.dyMm }, { x: nb.dxMm + nb.widthMm, y: nb.dyMm },
+            { x: nb.dxMm + nb.widthMm, y: nb.dyMm + nb.heightMm }, { x: nb.dxMm, y: nb.dyMm + nb.heightMm },
+          ].map(pt => paperMmToWorld(pt, size.width, size.height));
+          for (let i = 0; i < 4; i++) { guides.points.push(c[i]); guides.lines.push([c[i], c[(i + 1) % 4]]); }
+        }
         this.topology.planFrame = {
           widthM: size.width / 1000,
           heightM: size.height / 1000,
-          guides: pageGuideSnapGeometry({ widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePunch: plan.holePunch, holePunchSide: plan.holePunchSide }),
+          guides,
         };
         // Annotation-Scene des Plans als aktive Scene swappen, damit Werkzeuge
         // direkt auf dem Plan zeichnen können.
@@ -3676,6 +3693,15 @@ export class CadApp {
       this.renderer.planMode = null;
       this.topology.planFrame = null;
       this.renderer.planTracingLayers = [];
+      // Kamera des Zeichenblatts wiederherstellen (nicht die der Exportseite übernehmen).
+      const sheetCam = this._camStateBySheetId.get(this.activeSheetId);
+      if (sheetCam) {
+        this.camera.scale = sheetCam.scale;
+        this.camera.offsetX = sheetCam.offsetX;
+        this.camera.offsetY = sheetCam.offsetY;
+      } else {
+        this.applyDefaultSheetView();
+      }
       // Referenz-Skalierung zurück auf Sheet-Default.
       this.renderer.referencePxPerM = Defaults.strokeWidthBaseScale;
       // Aktive Sheet-Scene wiederherstellen.
@@ -3713,6 +3739,55 @@ export class CadApp {
     const sx = (rect.width - marginPx * 2) / wM;
     const sy = (rect.height - marginPx * 2) / hM;
     return Math.max(1, Math.min(sx, sy));
+  }
+
+  /** Nachbarseiten der Seite im Verbund, relativ zur oberen linken Ecke dieser Seite (mm). */
+  private _spreadNeighborsOf(planId: string): { id: string; name: string; dxMm: number; dyMm: number; widthMm: number; heightMm: number }[] {
+    const plan = this.planManager.getById(planId);
+    if (!plan?.spreadId) return [];
+    const rects = this.planManager.spreadRects(plan.spreadId);
+    const self = rects.find(r => r.id === planId);
+    if (!self || rects.length < 2) return [];
+    return rects.filter(r => r.id !== planId).map(r => ({
+      id: r.id,
+      name: this.planManager.getById(r.id)?.name ?? "",
+      dxMm: r.x - self.x,
+      dyMm: r.y - self.y,
+      widthMm: r.width,
+      heightMm: r.height,
+    }));
+  }
+
+  /** Öffentlich für die Verbund-Griffe: Nachbarseiten der aktiven Exportseite. */
+  activeSpreadNeighbors() {
+    return this.activePlanId ? this._spreadNeighborsOf(this.activePlanId) : [];
+  }
+
+  /** Live-Vorschau beim Ziehen einer Nachbarseite (kein Verlaufsschritt). */
+  previewSpreadNeighbor(id: string, dxMm: number, dyMm: number) {
+    const pm = this.renderer.planMode;
+    if (!pm?.spreadNeighbors) return;
+    pm.spreadNeighbors = pm.spreadNeighbors.map(n => n.id === id ? { ...n, dxMm, dyMm } : n);
+    this.renderer.render?.();
+  }
+
+  /** Bestätigt die neue Lage einer Nachbarseite (genau ein Verlaufsschritt). */
+  commitSpreadNeighbor(id: string, dxMm: number, dyMm: number) {
+    const active = this.activePlanId ? this.planManager.getById(this.activePlanId) : null;
+    if (!active?.spreadId) return;
+    const self = this.planManager.spreadRects(active.spreadId).find(r => r.id === active.id);
+    if (!self) return;
+    this.mutatePlans(() => this.planManager.setSpreadOffset(id, self.x + dxMm, self.y + dyMm));
+  }
+
+  /** Startansicht für neue Zeichenblätter: etwa 40 m Bildbreite, auf den Ursprung zentriert. */
+  applyDefaultSheetView() {
+    const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const scale = Math.max(this.camera.minScale ?? 1, rect.width / 40);
+    this.camera.scale = scale;
+    this.camera.offsetX = rect.width / 2;
+    this.camera.offsetY = rect.height / 2;
   }
 
   /** Speichert den aktuellen Camera-State für die zuletzt aktive Ansicht. */
@@ -3962,6 +4037,9 @@ export class CadApp {
       this.camera.scale = cached.scale;
       this.camera.offsetX = cached.offsetX;
       this.camera.offsetY = cached.offsetY;
+    } else {
+      // Noch nie geöffnetes Blatt: weiter herausgezoomte Startansicht.
+      this.applyDefaultSheetView();
     }
     // History-Snapshot triggern, damit Sheetwechsel nicht als "keine Änderung" gewertet wird.
     this._lastSnapshot = this._serializeScene();
