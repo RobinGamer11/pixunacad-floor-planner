@@ -3610,6 +3610,8 @@ export class CadApp {
     this.bumpContentRevision();
     if (id != null && !this.planManager.getById(id)) return;
     if (id === this.activePlanId) { this.refreshPlanUI(); return; }
+    // Anordnungsmodus ist rein flüchtig: jeder Seitenwechsel startet fixiert.
+    this.spreadLayoutEditing = false;
     // Aktuellen Camera-State sichern (für Sheet bzw. den vorherigen Plan).
     this._saveCurrentCameraState();
     this.activePlanId = id;
