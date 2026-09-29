@@ -3947,6 +3947,7 @@ export class CadApp {
     if (!this.activePlanId) {
       this.renderer.planTracingLayers = [];
       this.topology.tracingSnapScenes = [];
+      this.topology.tracingSnapGeometry = [];
       return;
     }
     const layers: Renderer["planTracingLayers"] = [];
