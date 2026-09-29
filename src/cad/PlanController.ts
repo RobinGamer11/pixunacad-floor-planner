@@ -17,6 +17,8 @@ import {
   computeProjectionLayout,
   itemsBoundsM,
   projectionScaleDen,
+  clipAfterEdgeDrag,
+  scaleProjectionClip,
 } from "./PlanProjections";
 import { formatScaleLabel } from "@/lib/scale";
 import { askProjectionScale } from "./ScaleSelectDialog";
@@ -40,6 +42,8 @@ interface DragState {
   rotatePivotPlanM?: { x: number; y: number };
   /** Startwinkel zwischen Pivot und Maus (rad). */
   rotateStartAngle?: number;
+  /** Kante: Referenzpunkt wird erst beim ersten Zeigerwechsel gesetzt. */
+  refPending?: boolean;
 }
 
 export class PlanController {
@@ -198,24 +202,57 @@ export class PlanController {
     if (!proj) return;
     const oldDen = projectionScaleDen(proj);
     const next = await askProjectionScale(oldDen, { title: "Maßstab der Ansicht ändern" });
-    if (next == null || Math.abs(next - oldDen) < 1e-9) return;
+    if (next == null) return;
+    this.applyProjectionScale(proj, next);
+  }
+
+  /**
+   * Individueller Maßstab für genau diesen Ausschnitt. Position (Mittelpunkt) und
+   * Drehung bleiben, der Clip wird proportional mitgeführt. Ein Verlaufsschritt.
+   */
+  applyProjectionScale(proj: Projection, next: number): boolean {
+    const oldDen = projectionScaleDen(proj);
+    if (!Number.isFinite(next) || next <= 0 || Math.abs(next - oldDen) < 1e-9) return false;
     // Mittelpunkt bleibt erhalten; der Clip-Ausschnitt skaliert inhaltlich mit.
-    const f = oldDen / next;
-    proj.clip = {
-      left: (proj.clip?.left || 0) * f,
-      right: (proj.clip?.right || 0) * f,
-      top: (proj.clip?.top || 0) * f,
-      bottom: (proj.clip?.bottom || 0) * f,
-    };
+    proj.clip = scaleProjectionClip(proj.clip, oldDen / next);
     proj.scaleDen = next;
     proj.scale = next;
     this._lastUsedScaleDen = next;
     this.invalidateCache();
     this.app.refreshPlanUI();
     this._renderHubButtons();
-    this._positionHub();
     this.app.commitHistorySnapshot();
+    this._positionHub();
+    return true;
   }
+
+  /** Bricht eine laufende Kanten-/Verschiebe-Vorschau ab (Ausgangslage wiederherstellen). */
+  cancelDrag(): boolean {
+    const d = this._drag;
+    if (!d) { if (this._scaleEditing) { this._scaleEditing = false; this._renderHubButtons(); return true; } return false; }
+    const proj = this._currentProjById(d.projectionId);
+    if (proj) { proj.x = d.origX; proj.y = d.origY; proj.rotation = d.origRotation; proj.clip = { ...d.origClip }; }
+    this._drag = null;
+    this._activeSnapMarker = null;
+    try { this.app.hub.bindCommit(null); this.app.hub.hide(); } catch { /* noop */ }
+    this.app.canvas.style.cursor = "";
+    if (this.selectedProjectionId) this._showHub(this._hubAnchorScreen ?? undefined);
+    return true;
+  }
+
+  /** Bestätigt die laufende Vorschau (Häkchen/Enter). */
+  confirmDrag(): boolean {
+    if (!this._drag) return false;
+    this._endDrag();
+    return true;
+  }
+
+  private _currentProjById(id: string): Projection | null {
+    return this._activePlan()?.projections.find(p => p.id === id) ?? null;
+  }
+
+  /** Zeigt im Hub die Direkteingabe für den freien Maßstab. */
+  private _scaleEditing = false;
 
   /** Zeichne alle Projektionen des aktiven Plans. */
   drawAll(ctx: CanvasRenderingContext2D) {
@@ -425,11 +462,8 @@ export class PlanController {
     if (this._drag) {
       this._continueDrag(sx, sy);
       // Move/Rotate werden durch Mausklick beendet; Edge-Drag durch Maus loslassen.
-      if (this._drag.kind === "move" || this._drag.kind === "rotate") {
-        if (input.clicked) this._endDrag();
-      } else {
-        if (!input.mouse.left) this._endDrag();
-      }
+      // Verschieben/Drehen/Kante: Zeiger folgt, Klick bzw. Antippen setzt.
+      if (input.clicked) this._endDrag();
       return true;
     }
 
@@ -673,7 +707,12 @@ export class PlanController {
       const degTotal = (proj.rotation * 180) / Math.PI;
       try { this.app.hub.updateDisplay(0, degTotal); } catch { /* noop */ }
     } else {
-      // Kanten ziehen: bestehende Logik.
+      // Kanten ziehen: Referenz erst beim ersten echten Zeigerwechsel setzen → kein Sprung.
+      if (this._drag.refPending) {
+        if (sx === this._drag.startSx && sy === this._drag.startSy) return;
+        this._drag.startSx = sx; this._drag.startSy = sy; this._drag.refPending = false;
+        return;
+      }
       const dxPx = sx - this._drag.startSx;
       const dyPx = sy - this._drag.startSy;
       const dxMm = (dxPx / cam.scale) * 1000;
@@ -682,24 +721,11 @@ export class PlanController {
       const sinA = Math.sin(-proj.rotation);
       const ldxMm = dxMm * cosA - dyMm * sinA;
       const ldyMm = dxMm * sinA + dyMm * cosA;
-      const next = { ...this._drag.origClip };
       const items = this.getItems(proj);
       const layout = computeProjectionLayout(items, { ...proj, clip: this._drag.origClip });
       const bboxW = layout.bboxLocalMm.right - layout.bboxLocalMm.left;
       const bboxH = layout.bboxLocalMm.bottom - layout.bboxLocalMm.top;
-      const maxW = bboxW - 5;
-      const maxH = bboxH - 5;
-
-      if (this._drag.kind === "edge-left") {
-        next.left = clampN(this._drag.origClip.left + ldxMm, 0, maxW - this._drag.origClip.right);
-      } else if (this._drag.kind === "edge-right") {
-        next.right = clampN(this._drag.origClip.right - ldxMm, 0, maxW - this._drag.origClip.left);
-      } else if (this._drag.kind === "edge-top") {
-        next.top = clampN(this._drag.origClip.top + ldyMm, 0, maxH - this._drag.origClip.bottom);
-      } else if (this._drag.kind === "edge-bottom") {
-        next.bottom = clampN(this._drag.origClip.bottom - ldyMm, 0, maxH - this._drag.origClip.top);
-      }
-      proj.clip = next;
+      proj.clip = clipAfterEdgeDrag(this._drag.origClip, this._drag.kind, ldxMm, ldyMm, bboxW, bboxH);
     }
   }
 
@@ -782,6 +808,8 @@ export class PlanController {
         void this.changeSelectedScale();
       } else if (act === "reset-clip") {
         proj.clip = { left: 0, right: 0, top: 0, bottom: 0 };
+        this.invalidateCache();
+        this.app.refreshPlanUI();
         this.app.commitHistorySnapshot();
       } else if (act === "cut") {
         if (
@@ -790,8 +818,26 @@ export class PlanController {
           this.selectedHandle === "edge-top" ||
           this.selectedHandle === "edge-bottom"
         ) {
-          this._armedDrag = { kind: this.selectedHandle, projectionId: proj.id };
+          // Kante folgt sofort dem Zeiger; Klick/Antippen, Häkchen oder Enter setzt.
+          this._beginDrag(this.selectedHandle, proj, this.app.input.mouse.sx, this.app.input.mouse.sy);
+          if (this._drag) this._drag.refPending = true;
+          this.app.canvas.style.cursor = (this.selectedHandle === "edge-left" || this.selectedHandle === "edge-right") ? "ew-resize" : "ns-resize";
+          this._renderHubButtons();
         }
+      } else if (act === "confirm-drag") {
+        this.confirmDrag();
+      } else if (act === "cancel-drag") {
+        this.cancelDrag();
+      } else if (act === "free-scale") {
+        this._scaleEditing = true;
+        this._renderHubButtons();
+        const inp = this._hubEl?.querySelector<HTMLInputElement>("input[data-scale-input]");
+        inp?.focus(); inp?.select();
+      } else if (act === "apply-scale") {
+        this._applyScaleInput();
+      } else if (act === "cancel-scale") {
+        this._scaleEditing = false;
+        this._renderHubButtons();
       } else if (act === "delete") {
         const plan = this._activePlan();
         if (plan) this.app.planManager.removeProjection(plan.id, proj.id);
@@ -803,6 +849,20 @@ export class PlanController {
       }
     });
 
+    el.addEventListener("keydown", (e) => {
+      const t = e.target as HTMLElement;
+      if (!t.matches("input[data-scale-input]")) return;
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); this._applyScaleInput(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); this._scaleEditing = false; this._renderHubButtons(); }
+    });
+    // Enter/Escape während einer Kanten-/Verschiebe-Vorschau.
+    window.addEventListener("keydown", (e) => {
+      if (!this._drag || this._drag.kind === "rotate") return;
+      if ((e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable]")) return;
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); this.confirmDrag(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); this.cancelDrag(); }
+    }, true);
+
     this._hubEl = el;
     return el;
   }
@@ -813,6 +873,27 @@ export class PlanController {
     const curProj = this._currentProj();
     const scaleLabel = formatScaleLabel(projectionScaleDen(curProj));
     let html = "";
+    const txt = `style="width:auto;padding:0 10px;font-size:12px;white-space:nowrap"`;
+    if (this._drag && this._drag.kind !== "rotate") {
+      html = `
+        <button data-act="confirm-drag" title="Setzen (Enter)" ${txt}>✓ Setzen</button>
+        <button data-act="cancel-drag" title="Abbrechen (Esc)" ${txt}>✕ Abbrechen</button>
+      `;
+      this._hubEl.innerHTML = html;
+      return;
+    }
+    if (this._scaleEditing) {
+      const den = Math.round(projectionScaleDen(curProj) * 100) / 100;
+      html = `
+        <span style="font-size:12px;padding:0 4px;align-self:center">1&nbsp;:</span>
+        <input data-scale-input type="number" min="1" step="any" value="${den}" inputmode="decimal"
+          style="width:72px;height:32px;font-size:13px;padding:0 6px;border:1px solid hsl(var(--hairline));border-radius:6px;background:hsl(var(--surface-card));color:hsl(var(--ink))" />
+        <button data-act="apply-scale" title="Maßstab übernehmen" ${txt}>✓</button>
+        <button data-act="cancel-scale" title="Abbrechen" ${txt}>✕</button>
+      `;
+      this._hubEl.innerHTML = html;
+      return;
+    }
     if (handle === "corner") {
       // Eckpunkt: nur Verschieben + Löschen.
       html = `
@@ -827,22 +908,34 @@ export class PlanController {
       handle === "edge-bottom"
     ) {
       html = `
-        <button data-act="cut" title="Einschneiden">✂</button>
-        <button data-act="scale" title="Maßstab ändern">${scaleLabel}</button>
-        <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
-        <button data-act="delete" title="Löschen">🗑</button>
+        <button data-act="cut" title="Einschneiden / Kante verschieben" ${txt}>✂ Einschneiden / Kante verschieben</button>
+        <button data-act="free-scale" title="Freier Maßstab" ${txt}>Freier Maßstab (${scaleLabel})</button>
+        <button data-act="scale" title="Feste Maßstäbe">▾</button>
+        <button data-act="reset-clip" title="Clip zurücksetzen" ${txt}>⤢ Clip zurücksetzen</button>
+        <button data-act="delete" title="Löschen" ${txt}>🗑 Löschen</button>
       `;
     } else {
       // Body / Innenpunkt: Verschieben + Drehen + Reset + Delete.
       html = `
         <button data-act="translate" title="Verschieben">✥</button>
         <button data-act="rotate" title="Drehen">⟳</button>
-        <button data-act="scale" title="Maßstab ändern">${scaleLabel}</button>
+        <button data-act="free-scale" title="Freier Maßstab" ${txt}>${scaleLabel}</button>
+        <button data-act="scale" title="Feste Maßstäbe">▾</button>
         <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
         <button data-act="delete" title="Löschen">🗑</button>
       `;
     }
     this._hubEl.innerHTML = html;
+  }
+
+  private _applyScaleInput() {
+    const inp = this._hubEl?.querySelector<HTMLInputElement>("input[data-scale-input]");
+    const raw = (inp?.value ?? "").replace(",", ".").replace(/^\s*1\s*:\s*/, "");
+    const den = parseFloat(raw);
+    const proj = this._currentProj();
+    this._scaleEditing = false;
+    if (proj && Number.isFinite(den) && den > 0) this.applyProjectionScale(proj, den);
+    this._renderHubButtons();
   }
 
   private _currentProj(): Projection | null {
@@ -857,6 +950,7 @@ export class PlanController {
     this._hubAnchorScreen = anchorScreen || null;
     // Bei jeder neuen Selektion vom User-Move-Flag befreien.
     resetHubUserMoved(el);
+    this._scaleEditing = false;
     this._renderHubButtons();
     this._positionHub();
   }

@@ -24,7 +24,7 @@ import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
 import { migrateCadSnapshot } from "@/lib/persistence";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
-import { Renderer, Selection } from "./Renderer";
+import { Renderer, Selection, type SpreadNeighborInfo } from "./Renderer";
 import { LineHub } from "./LineHub";
 import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
@@ -3619,16 +3619,8 @@ export class CadApp {
         const size = getPlanPaperSize(plan);
         const spreadNeighbors = this._spreadNeighborsOf(plan.id);
         this.renderer.planMode = { widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePattern: plan.holePattern, holePunchSide: plan.holePunchSide, spreadNeighbors };
-        // Blattrand + Seitenrand/Lochung als nicht druckbare Snap-Geometrie bereitstellen.
-        const guides = pageGuideSnapGeometry({ widthMm: size.width, heightMm: size.height, marginsMm: plan.marginsMm, holePattern: plan.holePattern, holePunchSide: plan.holePunchSide });
-        // Kanten der Nachbarseiten im Verbund zusätzlich fangbar (zusammenhängende Papierfläche).
-        for (const nb of spreadNeighbors) {
-          const c = [
-            { x: nb.dxMm, y: nb.dyMm }, { x: nb.dxMm + nb.widthMm, y: nb.dyMm },
-            { x: nb.dxMm + nb.widthMm, y: nb.dyMm + nb.heightMm }, { x: nb.dxMm, y: nb.dyMm + nb.heightMm },
-          ].map(pt => paperMmToWorld(pt, size.width, size.height));
-          for (let i = 0; i < 4; i++) { guides.points.push(c[i]); guides.lines.push([c[i], c[(i + 1) % 4]]); }
-        }
+        this.renderer.planNeighborDraw = (ctx, nb) => this._drawSpreadNeighborContent(ctx, nb.id, nb.dxMm, nb.dyMm);
+        const guides = this._spreadGuideGeometry(size.width, size.height, plan, spreadNeighbors);
         this.topology.planFrame = {
           widthM: size.width / 1000,
           heightM: size.height / 1000,
@@ -3745,42 +3737,165 @@ export class CadApp {
   }
 
   /** Nachbarseiten der Seite im Verbund, relativ zur oberen linken Ecke dieser Seite (mm). */
-  private _spreadNeighborsOf(planId: string): { id: string; name: string; dxMm: number; dyMm: number; widthMm: number; heightMm: number }[] {
+  private _spreadNeighborsOf(planId: string): SpreadNeighborInfo[] {
     const plan = this.planManager.getById(planId);
     if (!plan?.spreadId) return [];
     const rects = this.planManager.spreadRects(plan.spreadId);
     const self = rects.find(r => r.id === planId);
     if (!self || rects.length < 2) return [];
-    return rects.filter(r => r.id !== planId).map(r => ({
-      id: r.id,
-      name: this.planManager.getById(r.id)?.name ?? "",
-      dxMm: r.x - self.x,
-      dyMm: r.y - self.y,
-      widthMm: r.width,
-      heightMm: r.height,
-    }));
+    return rects.filter(r => r.id !== planId).map(r => {
+      const p = this.planManager.getById(r.id);
+      return {
+        id: r.id,
+        name: p?.name ?? "",
+        dxMm: r.x - self.x,
+        dyMm: r.y - self.y,
+        widthMm: r.width,
+        heightMm: r.height,
+        marginsMm: p?.marginsMm ?? 0,
+        holePattern: p?.holePattern ?? "none",
+        holePunchSide: p?.holePunchSide ?? "left",
+      };
+    });
   }
 
-  /** Öffentlich für die Verbund-Griffe: Nachbarseiten der aktiven Exportseite. */
+  /**
+   * Nicht druckbare Fanggeometrie der aktiven Seite plus Papierkanten, Ränder und
+   * Lochung sichtbarer Nachbarseiten. Objekte der Nachbarseiten liefern keine Fangpunkte.
+   */
+  private _spreadGuideGeometry(wMm: number, hMm: number, plan: { marginsMm: number; holePattern: any; holePunchSide: any }, neighbors: SpreadNeighborInfo[]) {
+    const guides = pageGuideSnapGeometry({ widthMm: wMm, heightMm: hMm, marginsMm: plan.marginsMm, holePattern: plan.holePattern, holePunchSide: plan.holePunchSide });
+    for (const nb of neighbors) {
+      const c = [
+        { x: nb.dxMm, y: nb.dyMm }, { x: nb.dxMm + nb.widthMm, y: nb.dyMm },
+        { x: nb.dxMm + nb.widthMm, y: nb.dyMm + nb.heightMm }, { x: nb.dxMm, y: nb.dyMm + nb.heightMm },
+      ].map(pt => paperMmToWorld(pt, wMm, hMm));
+      for (let i = 0; i < 4; i++) { guides.points.push(c[i]); guides.lines.push([c[i], c[(i + 1) % 4]]); }
+      // Rand/Lochung der Nachbarseite: eigene Geometrie, um den Mittelpunkt der Nachbarseite verschoben.
+      const own = pageGuideSnapGeometry({ widthMm: nb.widthMm, heightMm: nb.heightMm, marginsMm: nb.marginsMm, holePattern: nb.holePattern, holePunchSide: nb.holePunchSide });
+      const ctr = paperMmToWorld({ x: nb.dxMm + nb.widthMm / 2, y: nb.dyMm + nb.heightMm / 2 }, wMm, hMm);
+      const sh = (p: { x: number; y: number }) => ({ x: p.x + ctr.x, y: p.y + ctr.y });
+      for (const p of own.points) guides.points.push(sh(p));
+      for (const [a, b] of own.lines) guides.lines.push([sh(a), sh(b)]);
+    }
+    return guides;
+  }
+
+  /** Schreibgeschützte Vorschau einer Nachbarseite: Ausschnitte + Anmerkungs-Scene, um dx/dy versetzt. */
+  private _drawSpreadNeighborContent(ctx: CanvasRenderingContext2D, planId: string, dxMm: number, dyMm: number) {
+    const nbPlan = this.planManager.getById(planId);
+    const active = this.activePlanId ? this.planManager.getById(this.activePlanId) : null;
+    if (!nbPlan || !active) return;
+    const a = getPlanPaperSize(active), n = getPlanPaperSize(nbPlan);
+    // Mittelpunkt der Nachbarseite in Welt-m (aktive Seite ist am Ursprung zentriert).
+    const cx = (dxMm + n.width / 2 - a.width / 2) / 1000;
+    const cy = (dyMm + n.height / 2 - a.height / 2) / 1000;
+    const cam = this.camera;
+    const ox = cam.offsetX, oy = cam.offsetY;
+    const r = this.renderer as any;
+    const realScene = r.scene, realCtx = r.ctx;
+    try {
+      cam.offsetX = ox + cx * cam.scale;
+      cam.offsetY = oy + cy * cam.scale;
+      for (const proj of nbPlan.projections) {
+        try { drawPlanProjection(ctx, cam, this.planController?.getItems(proj) ?? [], proj, false, false); } catch { /* noop */ }
+      }
+      const sc = this.planScenesById.get(planId);
+      if (sc) {
+        r.scene = sc; r.ctx = ctx;
+        r._drawByLabelOrder?.();
+      }
+    } finally {
+      r.scene = realScene; r.ctx = realCtx;
+      cam.offsetX = ox; cam.offsetY = oy;
+    }
+  }
+
+  /** Öffentlich für die Verbund-Bedienung: Nachbarseiten der aktiven Exportseite. */
   activeSpreadNeighbors() {
     return this.activePlanId ? this._spreadNeighborsOf(this.activePlanId) : [];
   }
 
-  /** Live-Vorschau beim Ziehen einer Nachbarseite (kein Verlaufsschritt). */
-  previewSpreadNeighbor(id: string, dxMm: number, dyMm: number) {
+  /** Macht die Nachbarseite unter dem Bildschirmpunkt aktiv (Antippen der Papierfläche). */
+  activateSpreadPageAt(sx: number, sy: number): boolean {
     const pm = this.renderer.planMode;
-    if (!pm?.spreadNeighbors) return;
-    pm.spreadNeighbors = pm.spreadNeighbors.map(n => n.id === id ? { ...n, dxMm, dyMm } : n);
+    if (!pm?.spreadNeighbors?.length) return false;
+    const w = this.camera.screenToWorld(sx, sy);
+    const mx = w.x * 1000 + pm.widthMm / 2, my = w.y * 1000 + pm.heightMm / 2;
+    if (mx >= 0 && my >= 0 && mx <= pm.widthMm && my <= pm.heightMm) return false;
+    const hit = [...pm.spreadNeighbors].reverse().find(n => mx >= n.dxMm && mx <= n.dxMm + n.widthMm && my >= n.dyMm && my <= n.dyMm + n.heightMm);
+    if (!hit) return false;
+    this.setActivePlanId(hit.id);
+    return true;
+  }
+
+  /** Kamera-Stand zu Beginn einer Vorschau der aktiven Seite (für Abbrechen). */
+  private _spreadPreviewBase: { offsetX: number; offsetY: number; neighbors: SpreadNeighborInfo[] } | null = null;
+
+  /**
+   * Temporäre Gesamt-Layoutvorschau: verschiebt eine Verbundseite (aktive oder Nachbar)
+   * um dx/dy mm gegenüber ihrer Ausgangslage. Kein Verlaufsschritt.
+   * Bei der aktiven Seite wandert die Seite sichtbar mit, die übrigen bleiben stehen.
+   */
+  previewSpreadPage(id: string, dxMm: number, dyMm: number) {
+    const pm = this.renderer.planMode;
+    if (!pm || !this.activePlanId) return;
+    if (!this._spreadPreviewBase) {
+      this._spreadPreviewBase = { offsetX: this.camera.offsetX, offsetY: this.camera.offsetY, neighbors: this._spreadNeighborsOf(this.activePlanId) };
+    }
+    const base = this._spreadPreviewBase;
+    const k = this.camera.scale / 1000;
+    if (id === this.activePlanId) {
+      this.camera.offsetX = base.offsetX + dxMm * k;
+      this.camera.offsetY = base.offsetY + dyMm * k;
+      pm.spreadNeighbors = base.neighbors.map(n => ({ ...n, dxMm: n.dxMm - dxMm, dyMm: n.dyMm - dyMm }));
+    } else {
+      this.camera.offsetX = base.offsetX;
+      this.camera.offsetY = base.offsetY;
+      pm.spreadNeighbors = base.neighbors.map(n => n.id === id ? { ...n, dxMm: n.dxMm + dxMm, dyMm: n.dyMm + dyMm } : n);
+    }
     this.renderer.render?.();
   }
 
-  /** Bestätigt die neue Lage einer Nachbarseite (genau ein Verlaufsschritt). */
-  commitSpreadNeighbor(id: string, dxMm: number, dyMm: number) {
+  /** Bricht die Vorschau ab: Ausgangslage und Kamera wiederherstellen. */
+  cancelSpreadPreview() {
+    const base = this._spreadPreviewBase;
+    this._spreadPreviewBase = null;
+    if (!base) return;
+    this.camera.offsetX = base.offsetX;
+    this.camera.offsetY = base.offsetY;
+    if (this.renderer.planMode) this.renderer.planMode.spreadNeighbors = base.neighbors;
+    this.renderer.render?.();
+  }
+
+  /** Fixiert die Verschiebung einer Verbundseite (genau ein Verlaufsschritt). */
+  commitSpreadPage(id: string, dxMm: number, dyMm: number) {
+    const base = this._spreadPreviewBase;
+    this._spreadPreviewBase = null;
     const active = this.activePlanId ? this.planManager.getById(this.activePlanId) : null;
     if (!active?.spreadId) return;
-    const self = this.planManager.spreadRects(active.spreadId).find(r => r.id === active.id);
-    if (!self) return;
-    this.mutatePlans(() => this.planManager.setSpreadOffset(id, self.x + dxMm, self.y + dyMm));
+    const rects = this.planManager.spreadRects(active.spreadId);
+    const r = rects.find(x => x.id === id);
+    if (!r) return;
+    if (base && id !== active.id) { this.camera.offsetX = base.offsetX; this.camera.offsetY = base.offsetY; }
+    // Bei der aktiven Seite bleibt die verschobene Kamera: die Seite steht dort, wo sie losgelassen wurde.
+    const cam = { scale: this.camera.scale, offsetX: this.camera.offsetX, offsetY: this.camera.offsetY };
+    this.mutatePlans(() => this.planManager.setSpreadOffset(id, r.x + dxMm, r.y + dyMm));
+    // Neuaufbau des Plan-Modus darf die Ansicht nicht zurückspringen lassen.
+    this.camera.scale = cam.scale; this.camera.offsetX = cam.offsetX; this.camera.offsetY = cam.offsetY;
+    this._camStateByPlanId.set(active.id, cam);
+  }
+
+  /** Kompatibilität: Nachbarseite live verschieben (absolute Lage relativ zur aktiven Seite). */
+  previewSpreadNeighbor(id: string, dxMm: number, dyMm: number) {
+    const nb = (this._spreadPreviewBase?.neighbors ?? this.activeSpreadNeighbors()).find(n => n.id === id);
+    if (nb) this.previewSpreadPage(id, dxMm - nb.dxMm, dyMm - nb.dyMm);
+  }
+
+  /** Kompatibilität: Nachbarseite fixieren (absolute Lage relativ zur aktiven Seite). */
+  commitSpreadNeighbor(id: string, dxMm: number, dyMm: number) {
+    const nb = (this._spreadPreviewBase?.neighbors ?? this.activeSpreadNeighbors()).find(n => n.id === id);
+    if (nb) this.commitSpreadPage(id, dxMm - nb.dxMm, dyMm - nb.dyMm);
   }
 
   /** Startansicht für neue Zeichenblätter: etwa 40 m Bildbreite, auf den Ursprung zentriert. */
