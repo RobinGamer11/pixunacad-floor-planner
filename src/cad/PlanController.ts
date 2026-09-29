@@ -40,6 +40,8 @@ interface DragState {
   rotatePivotPlanM?: { x: number; y: number };
   /** Startwinkel zwischen Pivot und Maus (rad). */
   rotateStartAngle?: number;
+  /** Kante: Referenzpunkt wird erst beim ersten Zeigerwechsel gesetzt. */
+  refPending?: boolean;
 }
 
 export class PlanController {
