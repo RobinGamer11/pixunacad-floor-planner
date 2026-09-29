@@ -461,8 +461,7 @@ export class PlanController {
 
     // Armed Drag (nur für edge-cut): warte auf Maus-Down im Canvas, dann starte Edge-Drag.
     if (this._armedDrag) {
-      this.app.canvas.style.cursor =
-        (this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize" : "ns-resize";
+      this._setCursor((this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize" : "ns-resize");
       if (input.mouse.left) {
         const proj = plan.projections.find(p => p.id === this._armedDrag!.projectionId);
         if (proj) {
@@ -799,7 +798,7 @@ export class PlanController {
         }
         this._beginDrag("body", proj, sx0, sy0, anchor);
         this._hideHub();
-        this.app.canvas.style.cursor = "move";
+        this._setCursor("move");
       } else if (act === "rotate") {
         const sx0 = this.app.input.mouse.sx;
         const sy0 = this.app.input.mouse.sy;
@@ -820,7 +819,7 @@ export class PlanController {
           this.app.hub.setValues(0, deg);
         } catch { /* noop */ }
         this._hideHub();
-        this.app.canvas.style.cursor = "crosshair";
+        this._setCursor("crosshair");
       } else if (act === "scale") {
         void this.changeSelectedScale();
       } else if (act === "reset-clip") {
@@ -838,7 +837,7 @@ export class PlanController {
           // Kante folgt sofort dem Zeiger; Klick/Antippen, Häkchen oder Enter setzt.
           this._beginDrag(this.selectedHandle, proj, this.app.input.mouse.sx, this.app.input.mouse.sy);
           if (this._drag) this._drag.refPending = true;
-          this.app.canvas.style.cursor = (this.selectedHandle === "edge-left" || this.selectedHandle === "edge-right") ? "ew-resize" : "ns-resize";
+          this._setCursor((this.selectedHandle === "edge-left" || this.selectedHandle === "edge-right") ? "ew-resize" : "ns-resize");
           this._renderHubButtons();
         }
       } else if (act === "confirm-drag") {
