@@ -505,11 +505,13 @@ export class PlanController {
     this._innerHover = innerSnap;
 
     let consumed = false;
-    if (hoverHandle === "corner") { this.app.canvas.style.cursor = "pointer"; consumed = true; }
-    else if (innerSnap) { this.app.canvas.style.cursor = "pointer"; consumed = true; }
-    else if (hoverHandle === "body") { this.app.canvas.style.cursor = "pointer"; consumed = true; }
-    else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") { this.app.canvas.style.cursor = "ew-resize"; consumed = true; }
-    else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") { this.app.canvas.style.cursor = "ns-resize"; consumed = true; }
+    if (hoverHandle === "corner") { this._setCursor("pointer"); consumed = true; }
+    else if (innerSnap) { this._setCursor("pointer"); consumed = true; }
+    else if (hoverHandle === "body") { this._setCursor("pointer"); consumed = true; }
+    else if (hoverHandle === "edge-left" || hoverHandle === "edge-right") { this._setCursor("ew-resize"); consumed = true; }
+    else if (hoverHandle === "edge-top" || hoverHandle === "edge-bottom") { this._setCursor("ns-resize"); consumed = true; }
+    // Freie Papierfläche: den zuvor von hier gesetzten Zeiger wieder freigeben.
+    else this._setCursor(null);
 
     if (input.clicked) {
       if (hoverId && hoverHandle === "corner") {
