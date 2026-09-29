@@ -26,3 +26,9 @@
 - `Plan.holePattern` ("none" | "din2" | "four" | "a5ring6") ersetzt `holePunch`; Altdaten `true` → `din2`. Renderer und Fangpunkte nutzen `holePunchPointsMm` – nie in der PDF.
 - Verbund: je Seite `spreadOffset`, je Verbund `spreadLayouts[spreadId].layoutMode` (eigenes Strukturobjekt im Cloud-Abgleich). Nur die aktive Seite ist bearbeitbar; Nachbarn werden angezeigt und über Griffe verschoben (ein Verlaufsschritt beim Loslassen). PDF: ein Verbund = eine Seite.
 - `deletePlan()` lehnt die letzte Seite ab.
+
+## Verbund-Bedienung und Ausschnitte (Restkorrektur)
+- Nachbarseiten zeigen schreibgeschützt ihre Ausschnitte und Anmerkungs-Scene (`CadApp.planScenesById`) über `Renderer.planNeighborDraw`; der Renderer greift nicht auf die App zu. Nur Papierkanten, Rand und Lochung der Nachbarn sind fangbar.
+- Freie Anordnung: Eckpunkte an jeder Verbundseite (auch der aktiven); Vorschau über `CadApp.previewSpreadPage` (Gesamt-Layout, aktive Seite wandert mit), Fixieren über `commitSpreadPage` (ein Verlaufsschritt, nur der Versatz der bewegten Seite).
+- Neue Seiten heißen „Seite N“ (`PlanManager.nextDefaultName`, aus vorhandenen Namen bestimmt).
+- Ausschnittkanten: „Einschneiden / Kante verschieben“ folgt dem Zeiger, Setzen per Klick/Häkchen/Enter, Esc stellt zurück; Clip nie kleiner 0 (volle Größe). Freier Maßstab direkt im Hub (`applyProjectionScale`, Clip proportional).
