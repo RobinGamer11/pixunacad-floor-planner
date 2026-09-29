@@ -444,6 +444,12 @@ export class CadApp {
   planPanel: PlanPanel | null = null;
   /** Aktiver Plan (null = Zeichnungsmodus, kein Plan-Hintergrund). */
   activePlanId: string | null = null;
+  /**
+   * Rein flüchtiger Bedienzustand „Seitenanordnung bearbeiten“ (freie Anordnung).
+   * Nicht Cloud, nicht Undo/Redo, nicht Snapshot, nicht localStorage — nach
+   * Seitenwechsel oder Neuladen startet die Ansicht immer fixiert.
+   */
+  spreadLayoutEditing = false;
   /** Plan-Modus Controller (Drop / Selektion / Drag / HUB). */
   planController: PlanController | null = null;
   /** Map: planId → eigene Annotation-Scene (Werkzeuge zeichnen darauf im Plan-Modus). */
@@ -3980,6 +3986,7 @@ export class CadApp {
       });
     }
     this.renderer.planTracingLayers = layers;
+    this.topology.tracingSnapScenes = snapScenes;
   }
 
   /** Cached leere Scene als Anzeige-Backing im Plan-Modus (legacy, ungenutzt). */
