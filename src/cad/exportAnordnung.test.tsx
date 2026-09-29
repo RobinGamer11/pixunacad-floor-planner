@@ -123,3 +123,55 @@ describe("Export: Transparenzpause als schreibgeschützte Fangquelle", () => {
     expect(topo.findBestSnap(camera.worldToScreen(1, 1), { x: 1, y: 1 })).toBeNull();
   });
 });
+
+describe("Export: Namensschild einer Nachbarseite", () => {
+  function setupName(drawing: boolean) {
+    const { app, b } = makeApp(false);
+    const opened: string[] = [];
+    app.setActivePlanId = (id: string) => opened.push(id);
+    if (drawing) app.activeTool = {}; // beliebiges Zeichenwerkzeug
+    render(<SpreadHandles app={app} />);
+    const tag = screen.getByText(app.planManager.getById(b.id)!.name);
+    return { tag, opened, b };
+  }
+
+  it("wechselt mit dem Auswahlwerkzeug zur Nachbarseite", () => {
+    const { tag, opened, b } = setupName(false);
+    fireEvent.pointerDown(tag);
+    fireEvent.pointerUp(tag);
+    fireEvent.click(tag);
+    expect(opened).toEqual([b.id]);
+  });
+
+  it("wechselt mit einem Zeichenwerkzeug nicht", () => {
+    const { tag, opened } = setupName(true);
+    fireEvent.pointerDown(tag);
+    fireEvent.pointerUp(tag);
+    fireEvent.click(tag);
+    expect(opened).toEqual([]);
+  });
+});
+
+describe("Export: Fangquelle sichtbarer CAD-Ausschnitte", () => {
+  it("fängt an transformierten Ausschnittpunkten, ohne Objekte anzubieten", () => {
+    const scene = new Scene();
+    const camera = new Camera();
+    camera.scale = 2000; camera.offsetX = 500; camera.offsetY = 500;
+    const topo = new TopologyEngine(scene, camera, new LabelManager());
+    topo.tracingSnapGeometry = [{ points: [v(0.5, 0.5)], lines: [[v(0.5, 0.5), v(0.52, 0.5)]] }];
+    const snap = topo.findBestSnap(camera.worldToScreen(0.5, 0.5), { x: 0.5, y: 0.5 });
+    expect(snap).toBeTruthy();
+    expect(snap!.segment).toBeNull();
+    expect(snap!.hatch).toBeNull();
+    expect(scene.segments).toHaveLength(0);
+  });
+
+  it("ohne Fanggeometrie gibt es keine Fangpunkte", () => {
+    const scene = new Scene();
+    const camera = new Camera();
+    camera.scale = 2000; camera.offsetX = 500; camera.offsetY = 500;
+    const topo = new TopologyEngine(scene, camera, new LabelManager());
+    topo.tracingSnapGeometry = [];
+    expect(topo.findBestSnap(camera.worldToScreen(0.5, 0.5), { x: 0.5, y: 0.5 })).toBeNull();
+  });
+});
