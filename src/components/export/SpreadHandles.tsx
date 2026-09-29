@@ -18,6 +18,8 @@ export function SpreadHandles({ app }: { app: CadApp }) {
   const lastKey = React.useRef("");
   const [moving, setMoving] = React.useState<string | null>(null);
   const mv = React.useRef<{ id: string; refX: number | null; refY: number | null; dx: number; dy: number; base: Page[] } | null>(null);
+  /** Namensschild-Tap: nur gültig, wenn beim Drücken das Auswahlwerkzeug aktiv war. */
+  const nameDown = React.useRef<{ id: string; ok: boolean } | null>(null);
 
   React.useEffect(() => {
     let raf = 0;
@@ -124,12 +126,22 @@ export function SpreadHandles({ app }: { app: CadApp }) {
 
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 5 }}>
-      {/* Namen der Nachbarseiten (Antippen öffnet die Seite). */}
+      {/* Namen der Nachbarseiten: Antippen öffnet die Seite — aber nur, wenn
+          beim Drücken und Loslassen das Auswahlwerkzeug aktiv war. */}
       {!moving && neighbors.map(n => (
         <button key={`name-${n.id}`} type="button"
           className="absolute h-8 px-3 rounded-full border text-xs shadow-sm max-w-[200px] truncate pointer-events-auto"
           style={{ ...btn, left: tl.x + (n.dxMm + n.widthMm / 2) * pxPerMm, top: Math.max(4, tl.y + n.dyMm * pxPerMm - 38), transform: "translateX(-50%)" }}
-          title="Diese Seite öffnen" onClick={() => app.setActivePlanId(n.id)}>
+          title="Diese Seite öffnen (nur mit dem Auswahlwerkzeug)"
+          onPointerDown={(e) => { nameDown.current = { id: n.id, ok: app.activeTool === app.selectTool }; e.stopPropagation(); }}
+          onPointerUp={(e) => { e.stopPropagation(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            const d = nameDown.current; nameDown.current = null;
+            if (!d || d.id !== n.id || !d.ok) return;
+            if (app.activeTool !== app.selectTool) return;
+            app.setActivePlanId(n.id);
+          }}>
           {n.name || "Seite"}
         </button>
       ))}

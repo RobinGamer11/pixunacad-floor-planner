@@ -54,7 +54,8 @@ import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
 import { PlanManager, getPlanPaperSize } from "./PlanManager";
 import { PlanPanel } from "./PlanPanel";
 import { PlanController } from "./PlanController";
-import { drawProjection as drawPlanProjection } from "./PlanProjections";
+import { drawProjection as drawPlanProjection, computeProjectionLayout } from "./PlanProjections";
+import { collectSceneSnapGeometry, transformSnapGeometryToPlan, type TracingSnapGeometry } from "./tracingSnapGeometry";
 import { SheetPanel } from "./SheetPanel";
 import { mirrorProxy } from "./multiEdit";
 import { setStrokeAutoShape } from "./freeAutoShape";
@@ -3946,17 +3947,27 @@ export class CadApp {
     if (!this.activePlanId) {
       this.renderer.planTracingLayers = [];
       this.topology.tracingSnapScenes = [];
+      this.topology.tracingSnapGeometry = [];
       return;
     }
     const layers: Renderer["planTracingLayers"] = [];
     const snapScenes: Scene[] = [];
+    const snapGeometry: TracingSnapGeometry[] = [];
     for (const plan of this.planManager.list()) {
       if (plan.id === this.activePlanId) continue;
       const state = this.planOverlayStore.get(plan.id);
       if (!state || state.mode === "none") continue;
       const annotationScene = this._ensurePlanScene(plan.id);
-      // Schreibgeschützte Fangquelle: nur solange diese Seite sichtbar eingeblendet ist.
-      snapScenes.push(annotationScene);
+      // Schreibgeschützte Fangquelle: nur solange diese Seite wirklich sichtbar ist
+      // (Transparenzpause aktiv und Deckkraft größer als 0).
+      const visible = (state.opacity ?? 0) > 0;
+      if (visible) {
+        snapScenes.push(annotationScene);
+        for (const proj of plan.projections) {
+          const geo = this._projectionSnapGeometry(proj);
+          if (geo) snapGeometry.push(geo);
+        }
+      }
       // Projektionen via PlanController-Hilfen + Annotation-Scene via Renderer-Pfad.
       const drawCb = (offCtx: CanvasRenderingContext2D) => {
         // 1) Projektionen dieses Plans zeichnen
@@ -3989,6 +4000,55 @@ export class CadApp {
     }
     this.renderer.planTracingLayers = layers;
     this.topology.tracingSnapScenes = snapScenes;
+    this.topology.tracingSnapGeometry = snapGeometry;
+  }
+
+  /**
+   * Temporäre Fanggeometrie eines sichtbaren CAD-Ausschnitts (Transparenzpause).
+   * Wird bei Änderung von Inhalt, Sichtbarkeit, Position, Maßstab, Drehung oder
+   * Clip neu berechnet und nie gespeichert.
+   */
+  private _tracingGeoCache = new Map<string, { sig: string; geo: TracingSnapGeometry }>();
+  private _tracingFrozenScenes = new Map<string, { json: string; scene: Scene }>();
+
+  private _projectionSnapGeometry(proj: any): TracingSnapGeometry | null {
+    const hidden = this.labelManager.list().filter(g => g.visible === false).map(g => g.id).join(",");
+    const clip = proj.clip || { left: 0, right: 0, top: 0, bottom: 0 };
+    const sig = [
+      this.contentRevision, hidden, proj.mode, proj.sourceSheetId,
+      proj.x, proj.y, proj.rotation, proj.scaleDen ?? proj.scale,
+      clip.left, clip.right, clip.top, clip.bottom,
+    ].join("|");
+    const hit = this._tracingGeoCache.get(proj.id);
+    if (hit && hit.sig === sig) return hit.geo;
+
+    let source: Scene | null = null;
+    if (proj.mode === "linked") {
+      source = this.scenesById.get(proj.sourceSheetId) || null;
+    } else if (proj.sceneSnapshot) {
+      const json = JSON.stringify(proj.sceneSnapshot);
+      const cached = this._tracingFrozenScenes.get(proj.id);
+      if (cached && cached.json === json) source = cached.scene;
+      else {
+        const sc = new Scene();
+        try { restoreOneScene(sc, proj.sceneSnapshot); } catch { /* defensiv */ }
+        this._tracingFrozenScenes.set(proj.id, { json, scene: sc });
+        source = sc;
+      }
+    }
+    if (!source) return null;
+
+    const libScenes = this.librarySnapSource
+      ? this.librarySnapSource
+          .scenesFor(source, (id) => this.labelManager.isVisible(id))
+          .map(ls => ls.scene)
+      : [];
+    const raw = collectSceneSnapGeometry(source, (id) => this.labelManager.isVisible(id), libScenes);
+    const items = this.planController?.getItems(proj) ?? [];
+    const layout = computeProjectionLayout(items, proj);
+    const geo = transformSnapGeometryToPlan(raw, layout, proj.rotation || 0);
+    this._tracingGeoCache.set(proj.id, { sig, geo });
+    return geo;
   }
 
   /** Cached leere Scene als Anzeige-Backing im Plan-Modus (legacy, ungenutzt). */

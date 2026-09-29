@@ -73,6 +73,12 @@ export class TopologyEngine {
    * bleiben nicht auswählbar, nicht editierbar und werden nie kopiert oder gedruckt.
    */
   tracingSnapScenes: Scene[] = [];
+  /**
+   * Zusätzliche schreibgeschützte Fanggeometrie der sichtbaren Hintergrundseiten
+   * (CAD-Ausschnitte, bereits mit Maßstab/Rotation/Position/Clip in Plan-Weltmeter
+   * transformiert). Rein temporär — keine Objekte, keine Auswahl, keine Ausgabe.
+   */
+  tracingSnapGeometry: import("./tracingSnapGeometry").TracingSnapGeometry[] = [];
   /** Schreibgeschützte Fangquelle platzierter Bibliotheksinstanzen. */
   librarySnaps: import("./library/librarySnapSource").LibrarySnapSource | null = null;
   /** Papierrahmen im Plan-(Druck-)Modus in Metern. Ecken, Kantenmitten,
@@ -671,6 +677,14 @@ export class TopologyEngine {
         considerPoint(pts[pts.length - 1], null, null, -1);
       }
     }
+
+    // Sichtbare CAD-Ausschnitte der Transparenzpause: rein temporäre Fangquelle.
+    for (const geo of this.tracingSnapGeometry) {
+      if (!geo) continue;
+      for (const pt of geo.points) considerPoint(pt, null, null, -1);
+      for (const [a, b] of geo.lines) considerLine(a, b, null, null);
+    }
+
 
     // Bibliotheksinstanzen — schreibgeschützte Weltgeometrie der Container.
     for (const ls of this._libraryScenes(exclusions?.libraryInstanceIds)) {
