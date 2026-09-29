@@ -883,17 +883,34 @@ export class PlanController {
     return el;
   }
 
+  /** Kompakte Vektor-Symbole im Stil der übrigen CAD-Leisten (24er-Raster, currentColor). */
+  private static _icon(paths: string, size = 15) {
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+  }
+
   private _renderHubButtons() {
     if (!this._hubEl) return;
     const handle = this.selectedHandle;
     const curProj = this._currentProj();
     const scaleLabel = formatScaleLabel(projectionScaleDen(curProj));
+    const I = PlanController._icon;
+    const ic = {
+      move: I(`<path d="M5 9l-3 3 3 3"/><path d="M9 5l3-3 3 3"/><path d="M15 19l-3 3-3-3"/><path d="M19 9l3 3-3 3"/><path d="M2 12h20"/><path d="M12 2v20"/>`),
+      rotate: I(`<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>`),
+      scissors: I(`<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88"/><path d="M14.47 14.48 20 20"/><path d="M8.12 8.12 12 12"/>`),
+      scaling: I(`<path d="M21 3 9 15"/><path d="M12 3H3v18h18v-9"/><path d="M16 3h5v5"/><path d="M14 15H9v-5"/>`),
+      chevron: I(`<path d="m6 9 6 6 6-6"/>`, 14),
+      reset: I(`<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>`),
+      trash: I(`<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>`),
+      check: I(`<path d="M20 6 9 17l-5-5"/>`),
+      close: I(`<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`),
+    };
+    const val = `style="font-size:11px;padding:0 2px;align-self:center;opacity:.8"`;
     let html = "";
-    const txt = `style="width:auto;padding:0 10px;font-size:12px;white-space:nowrap"`;
     if (this._drag && this._drag.kind !== "rotate") {
       html = `
-        <button data-act="confirm-drag" title="Setzen (Enter)" ${txt}>✓ Setzen</button>
-        <button data-act="cancel-drag" title="Abbrechen (Esc)" ${txt}>✕ Abbrechen</button>
+        <button data-act="confirm-drag" title="Setzen (Enter)" aria-label="Setzen">${ic.check}</button>
+        <button data-act="cancel-drag" title="Abbrechen (Esc)" aria-label="Abbrechen">${ic.close}</button>
       `;
       this._hubEl.innerHTML = html;
       return;
@@ -902,20 +919,19 @@ export class PlanController {
       const den = Math.round(projectionScaleDen(curProj) * 100) / 100;
       html = `
         <span style="font-size:12px;padding:0 4px;align-self:center">1&nbsp;:</span>
-        <input data-scale-input type="text" value="${den}" inputmode="decimal"
+        <input data-scale-input type="text" value="${den}" inputmode="decimal" aria-label="Maßstab, Nenner"
           style="width:72px;height:32px;font-size:13px;padding:0 6px;border:1px solid hsl(var(--hairline));border-radius:6px;background:hsl(var(--surface-card));color:hsl(var(--ink))" />
-        <button data-act="apply-scale" title="Maßstab übernehmen" ${txt}>✓</button>
-        <button data-act="cancel-scale" title="Abbrechen" ${txt}>✕</button>
+        <button data-act="apply-scale" title="Maßstab übernehmen" aria-label="Maßstab übernehmen">${ic.check}</button>
+        <button data-act="cancel-scale" title="Abbrechen" aria-label="Abbrechen">${ic.close}</button>
       `;
       this._hubEl.innerHTML = html;
       return;
     }
     if (handle === "corner") {
-      // Eckpunkt: nur Verschieben + Löschen.
       html = `
-        <button data-act="translate" title="Verschieben">✥</button>
-        <button data-act="scale" title="Maßstab ändern">${scaleLabel}</button>
-        <button data-act="delete" title="Zeichnungsblatt löschen">🗑</button>
+        <button data-act="translate" title="Ausschnitt verschieben" aria-label="Ausschnitt verschieben">${ic.move}</button>
+        <button data-act="scale" title="Maßstab ändern (aktuell ${scaleLabel})" aria-label="Maßstab ändern, aktuell ${scaleLabel}">${ic.scaling}</button>
+        <button data-act="delete" title="Ausschnitt löschen" aria-label="Ausschnitt löschen">${ic.trash}</button>
       `;
     } else if (
       handle === "edge-left" ||
@@ -924,21 +940,20 @@ export class PlanController {
       handle === "edge-bottom"
     ) {
       html = `
-        <button data-act="cut" title="Einschneiden / Kante verschieben" ${txt}>✂ Einschneiden / Kante verschieben</button>
-        <button data-act="free-scale" title="Freier Maßstab" ${txt}>Freier Maßstab (${scaleLabel})</button>
-        <button data-act="scale" title="Feste Maßstäbe">▾</button>
-        <button data-act="reset-clip" title="Clip zurücksetzen" ${txt}>⤢ Clip zurücksetzen</button>
-        <button data-act="delete" title="Löschen" ${txt}>🗑 Löschen</button>
+        <button data-act="cut" title="Einschneiden / Kante verschieben" aria-label="Einschneiden, Kante verschieben">${ic.scissors}</button>
+        <button data-act="free-scale" title="Freier Maßstab (aktuell ${scaleLabel})" aria-label="Freier Maßstab, aktuell ${scaleLabel}">${ic.scaling}<span ${val}>${scaleLabel}</span></button>
+        <button data-act="scale" title="Feste Maßstäbe" aria-label="Feste Maßstäbe">${ic.chevron}</button>
+        <button data-act="reset-clip" title="Ausschnitt zurücksetzen" aria-label="Ausschnitt zurücksetzen">${ic.reset}</button>
+        <button data-act="delete" title="Ausschnitt löschen" aria-label="Ausschnitt löschen">${ic.trash}</button>
       `;
     } else {
-      // Body / Innenpunkt: Verschieben + Drehen + Reset + Delete.
       html = `
-        <button data-act="translate" title="Verschieben">✥</button>
-        <button data-act="rotate" title="Drehen">⟳</button>
-        <button data-act="free-scale" title="Freier Maßstab" ${txt}>${scaleLabel}</button>
-        <button data-act="scale" title="Feste Maßstäbe">▾</button>
-        <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
-        <button data-act="delete" title="Löschen">🗑</button>
+        <button data-act="translate" title="Ausschnitt verschieben" aria-label="Ausschnitt verschieben">${ic.move}</button>
+        <button data-act="rotate" title="Ausschnitt drehen" aria-label="Ausschnitt drehen">${ic.rotate}</button>
+        <button data-act="free-scale" title="Freier Maßstab (aktuell ${scaleLabel})" aria-label="Freier Maßstab, aktuell ${scaleLabel}">${ic.scaling}<span ${val}>${scaleLabel}</span></button>
+        <button data-act="scale" title="Feste Maßstäbe" aria-label="Feste Maßstäbe">${ic.chevron}</button>
+        <button data-act="reset-clip" title="Ausschnitt zurücksetzen" aria-label="Ausschnitt zurücksetzen">${ic.reset}</button>
+        <button data-act="delete" title="Ausschnitt löschen" aria-label="Ausschnitt löschen">${ic.trash}</button>
       `;
     }
     this._hubEl.innerHTML = html;
