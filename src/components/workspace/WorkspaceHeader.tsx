@@ -284,22 +284,41 @@ export function WorkspaceHeader({
 
 
 
-        <button
-          onClick={onPresent}
-          className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-xs font-medium"
-          style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
-          title="Präsentieren"
-        >
-          <Play size={13} /> Präsentieren
-        </button>
-        <button
-          onClick={onExport}
-          className="h-8 px-3 rounded-md text-xs font-medium"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-          title="Exportieren"
-        >
-          Exportieren
-        </button>
+        {/* Im Export-Bereich ist der Reiter „Export“ die Exportfunktion — dort
+            rückt „Präsentieren“ als heller Button an die rechte Position. */}
+        {mode === "export" ? (
+          <button
+            onClick={onPresent}
+            className="h-8 px-3 rounded-md border flex items-center gap-1.5 text-xs font-medium"
+            style={{
+              background: "hsl(var(--surface))",
+              color: "hsl(var(--ink))",
+              borderColor: "hsl(var(--hairline))",
+            }}
+            title="Präsentieren"
+          >
+            <Play size={13} /> Präsentieren
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={onPresent}
+              className="h-8 px-2.5 rounded-md flex items-center gap-1.5 text-xs font-medium"
+              style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
+              title="Präsentieren"
+            >
+              <Play size={13} /> Präsentieren
+            </button>
+            <button
+              onClick={onExport}
+              className="h-8 px-3 rounded-md text-xs font-medium"
+              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
+              title="Exportieren"
+            >
+              Exportieren
+            </button>
+          </>
+        )}
       </div>
     </header>
   );
