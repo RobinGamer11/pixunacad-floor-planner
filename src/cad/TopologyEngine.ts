@@ -73,6 +73,12 @@ export class TopologyEngine {
    * bleiben nicht auswählbar, nicht editierbar und werden nie kopiert oder gedruckt.
    */
   tracingSnapScenes: Scene[] = [];
+  /**
+   * Zusätzliche schreibgeschützte Fanggeometrie der sichtbaren Hintergrundseiten
+   * (CAD-Ausschnitte, bereits mit Maßstab/Rotation/Position/Clip in Plan-Weltmeter
+   * transformiert). Rein temporär — keine Objekte, keine Auswahl, keine Ausgabe.
+   */
+  tracingSnapGeometry: import("./tracingSnapGeometry").TracingSnapGeometry[] = [];
   /** Schreibgeschützte Fangquelle platzierter Bibliotheksinstanzen. */
   librarySnaps: import("./library/librarySnapSource").LibrarySnapSource | null = null;
   /** Papierrahmen im Plan-(Druck-)Modus in Metern. Ecken, Kantenmitten,
