@@ -3690,12 +3690,15 @@ export class CadApp {
         this.measureSettings.tickLengthM = Defaults.measureTickLengthM * planScale;
       }
     } else {
+      const leavingPlan = this.renderer.planMode != null;
       this.renderer.planMode = null;
       this.topology.planFrame = null;
       this.renderer.planTracingLayers = [];
-      // Kamera des Zeichenblatts wiederherstellen (nicht die der Exportseite übernehmen).
-      const sheetCam = this._camStateBySheetId.get(this.activeSheetId);
-      if (sheetCam) {
+      // Nur beim Verlassen einer Exportseite: Kamera des Zeichenblatts wiederherstellen
+      // (nicht die der Exportseite übernehmen). Undo/Restore im CAD bewegt die Kamera nie.
+      const sheetCam = leavingPlan ? this._camStateBySheetId.get(this.activeSheetId) : undefined;
+      if (!leavingPlan) { /* Kamera unverändert */ }
+      else if (sheetCam) {
         this.camera.scale = sheetCam.scale;
         this.camera.offsetX = sheetCam.offsetX;
         this.camera.offsetY = sheetCam.offsetY;
