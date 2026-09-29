@@ -402,3 +402,28 @@ export function hitTestProjection(
   if (lx >= L && lx <= R && ly >= T && ly <= B) return "body";
   return null;
 }
+
+/** Clip nach Kanten-Verschiebung: nach innen beschneiden, nach außen bis zur vollen Größe (0) erweitern. */
+export function clipAfterEdgeDrag(
+  orig: { left: number; right: number; top: number; bottom: number },
+  kind: string, ldxMm: number, ldyMm: number, bboxW: number, bboxH: number,
+): { left: number; right: number; top: number; bottom: number } {
+  const c = (v: number, max: number) => Math.max(0, Math.min(Math.max(0, max), v));
+  const next = { ...orig };
+  const maxW = bboxW - 5, maxH = bboxH - 5;
+  if (kind === "edge-left") next.left = c(orig.left + ldxMm, maxW - orig.right);
+  else if (kind === "edge-right") next.right = c(orig.right - ldxMm, maxW - orig.left);
+  else if (kind === "edge-top") next.top = c(orig.top + ldyMm, maxH - orig.bottom);
+  else if (kind === "edge-bottom") next.bottom = c(orig.bottom - ldyMm, maxH - orig.top);
+  return next;
+}
+
+/** Clip proportional zum Maßstabswechsel (f = alter Nenner / neuer Nenner). */
+export function scaleProjectionClip(clip: { left: number; right: number; top: number; bottom: number } | undefined, f: number) {
+  return {
+    left: (clip?.left || 0) * f,
+    right: (clip?.right || 0) * f,
+    top: (clip?.top || 0) * f,
+    bottom: (clip?.bottom || 0) * f,
+  };
+}
