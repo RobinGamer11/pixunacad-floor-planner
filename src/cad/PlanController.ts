@@ -17,6 +17,8 @@ import {
   computeProjectionLayout,
   itemsBoundsM,
   projectionScaleDen,
+  clipAfterEdgeDrag,
+  scaleProjectionClip,
 } from "./PlanProjections";
 import { formatScaleLabel } from "@/lib/scale";
 import { askProjectionScale } from "./ScaleSelectDialog";
