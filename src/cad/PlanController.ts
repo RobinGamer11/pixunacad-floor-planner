@@ -709,7 +709,12 @@ export class PlanController {
       const degTotal = (proj.rotation * 180) / Math.PI;
       try { this.app.hub.updateDisplay(0, degTotal); } catch { /* noop */ }
     } else {
-      // Kanten ziehen: bestehende Logik.
+      // Kanten ziehen: Referenz erst beim ersten echten Zeigerwechsel setzen → kein Sprung.
+      if (this._drag.refPending) {
+        if (sx === this._drag.startSx && sy === this._drag.startSy) return;
+        this._drag.startSx = sx; this._drag.startSy = sy; this._drag.refPending = false;
+        return;
+      }
       const dxPx = sx - this._drag.startSx;
       const dyPx = sy - this._drag.startSy;
       const dxMm = (dxPx / cam.scale) * 1000;
@@ -830,6 +835,7 @@ export class PlanController {
         ) {
           // Kante folgt sofort dem Zeiger; Klick/Antippen, Häkchen oder Enter setzt.
           this._beginDrag(this.selectedHandle, proj, this.app.input.mouse.sx, this.app.input.mouse.sy);
+          if (this._drag) this._drag.refPending = true;
           this.app.canvas.style.cursor = (this.selectedHandle === "edge-left" || this.selectedHandle === "edge-right") ? "ew-resize" : "ns-resize";
           this._renderHubButtons();
         }
@@ -928,7 +934,8 @@ export class PlanController {
       html = `
         <button data-act="translate" title="Verschieben">✥</button>
         <button data-act="rotate" title="Drehen">⟳</button>
-        <button data-act="scale" title="Maßstab ändern">${scaleLabel}</button>
+        <button data-act="free-scale" title="Freier Maßstab" ${txt}>${scaleLabel}</button>
+        <button data-act="scale" title="Feste Maßstäbe">▾</button>
         <button data-act="reset-clip" title="Clip zurücksetzen">⤢</button>
         <button data-act="delete" title="Löschen">🗑</button>
       `;
