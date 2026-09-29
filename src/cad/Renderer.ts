@@ -71,6 +71,12 @@ export interface AreaLabelLayout {
   boxH: number;
 }
 
+/** Nachbarseite im Exportverbund, relativ zur oberen linken Ecke der aktiven Seite (mm). */
+export interface SpreadNeighborInfo {
+  id: string; name: string; dxMm: number; dyMm: number; widthMm: number; heightMm: number;
+  marginsMm?: number; holePattern?: HolePattern; holePunchSide?: HolePunchSide;
+}
+
 export class Renderer {
   ctx: CanvasRenderingContext2D;
   camera: Camera;
@@ -126,8 +132,11 @@ export class Renderer {
   planMode: {
     widthMm: number; heightMm: number; marginsMm?: number; holePattern?: HolePattern; holePunchSide?: HolePunchSide;
     /** Nachbarseiten im Verbund, relativ zur oberen linken Ecke der aktiven Seite (mm). */
-    spreadNeighbors?: { id: string; name: string; dxMm: number; dyMm: number; widthMm: number; heightMm: number }[];
+    spreadNeighbors?: SpreadNeighborInfo[];
   } | null = null;
+
+  /** Zeichnet den Inhalt (Ausschnitte + Anmerkungen) einer Nachbarseite im Verbund; von CadApp gesetzt. */
+  planNeighborDraw: ((ctx: CanvasRenderingContext2D, nb: SpreadNeighborInfo) => void) | null = null;
 
   /** Hook: wird im Plan-Modus NACH dem Papier gezeichnet (Projektionen). */
   planOverlayDraw: ((ctx: CanvasRenderingContext2D) => void) | null = null;
@@ -518,7 +527,7 @@ export class Renderer {
     const w = Math.abs(br.x - tl.x);
     const h = Math.abs(br.y - tl.y);
 
-    // Verbund: Nachbarseiten als zusammenhängende Papierfläche (nur Anzeige).
+    // Verbund: Nachbarseiten als zusammenhängende Papierfläche mit echtem Inhalt (schreibgeschützt).
     const neighbors = this.planMode.spreadNeighbors ?? [];
     if (neighbors.length > 0) {
       const pxMm = w / this.planMode.widthMm;
@@ -529,20 +538,21 @@ export class Renderer {
         ctx.shadowColor = "rgba(0,0,0,0.25)";
         ctx.shadowBlur = 14;
         ctx.shadowOffsetY = 5;
-        ctx.fillStyle = "#fbfbfa";
+        ctx.fillStyle = "#ffffff";
         ctx.fillRect(nx, ny, nw, nh);
         ctx.restore();
+        if (this.planNeighborDraw) {
+          ctx.save();
+          ctx.beginPath(); ctx.rect(nx, ny, nw, nh); ctx.clip();
+          try { this.planNeighborDraw(ctx, nb); } catch (e) { console.error("spread neighbor draw:", e); }
+          ctx.restore();
+        }
         ctx.save();
         ctx.strokeStyle = "rgba(0,0,0,0.3)";
         ctx.lineWidth = 1;
         ctx.strokeRect(nx + 0.5, ny + 0.5, nw - 1, nh - 1);
-        if (!isExportMode() && nb.name) {
-          ctx.fillStyle = "rgba(0,0,0,0.4)";
-          ctx.font = "12px system-ui, sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(nb.name, nx + nw / 2, ny + nh / 2);
-        }
         ctx.restore();
+        if (!isExportMode()) this._drawPageGuides(nx, ny, nw, nh, nb.widthMm, nb.heightMm, nb.marginsMm ?? 0, nb.holePattern, nb.holePunchSide);
       }
     }
 
@@ -563,9 +573,14 @@ export class Renderer {
 
     // Hilfslinien der Exportseite (nie gedruckt/exportiert)
     if (isExportMode()) return;
-    const pxPerMm = w / this.planMode.widthMm;
-    const m = this.planMode.marginsMm ?? 0;
-    if (m > 0 && m * 2 < Math.min(this.planMode.widthMm, this.planMode.heightMm)) {
+    this._drawPageGuides(x, y, w, h, this.planMode.widthMm, this.planMode.heightMm, this.planMode.marginsMm ?? 0, this.planMode.holePattern, this.planMode.holePunchSide);
+  }
+
+  /** Seitenrand + Lochung einer Seite (Bildschirm-Rechteck), nie gedruckt. */
+  private _drawPageGuides(x: number, y: number, w: number, h: number, widthMm: number, heightMm: number, m: number, holePattern?: HolePattern, holePunchSide?: HolePunchSide) {
+    const ctx = this.ctx;
+    const pxPerMm = w / widthMm;
+    if (m > 0 && m * 2 < Math.min(widthMm, heightMm)) {
       ctx.save();
       ctx.strokeStyle = "rgba(59,130,246,0.55)";
       ctx.setLineDash([4, 4]);
@@ -573,13 +588,12 @@ export class Renderer {
       ctx.strokeRect(x + m * pxPerMm, y + m * pxPerMm, w - 2 * m * pxPerMm, h - 2 * m * pxPerMm);
       ctx.restore();
     }
-    const pattern = normalizeHolePattern(this.planMode.holePattern);
+    const pattern = normalizeHolePattern(holePattern);
     if (pattern !== "none") {
-      // Lochungsmuster (gleiche Punkte wie die Fanggeometrie), an der gewählten Seite.
       ctx.save();
       ctx.strokeStyle = "rgba(0,0,0,0.35)";
       ctx.lineWidth = 1;
-      const hp = holePunchPointsMm(this.planMode.widthMm, this.planMode.heightMm, normalizeHolePunchSide(this.planMode.holePunchSide), pattern);
+      const hp = holePunchPointsMm(widthMm, heightMm, normalizeHolePunchSide(holePunchSide), pattern);
       for (const hole of hp.holes) {
         ctx.beginPath();
         ctx.arc(x + hole.x * pxPerMm, y + hole.y * pxPerMm, hp.radiusMm * pxPerMm, 0, Math.PI * 2);

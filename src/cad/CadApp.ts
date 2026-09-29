@@ -24,7 +24,7 @@ import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
 import { migrateCadSnapshot } from "@/lib/persistence";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
-import { Renderer, Selection } from "./Renderer";
+import { Renderer, Selection, type SpreadNeighborInfo } from "./Renderer";
 import { LineHub } from "./LineHub";
 import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
@@ -3879,7 +3879,11 @@ export class CadApp {
     if (!r) return;
     if (base && id !== active.id) { this.camera.offsetX = base.offsetX; this.camera.offsetY = base.offsetY; }
     // Bei der aktiven Seite bleibt die verschobene Kamera: die Seite steht dort, wo sie losgelassen wurde.
+    const cam = { scale: this.camera.scale, offsetX: this.camera.offsetX, offsetY: this.camera.offsetY };
     this.mutatePlans(() => this.planManager.setSpreadOffset(id, r.x + dxMm, r.y + dyMm));
+    // Neuaufbau des Plan-Modus darf die Ansicht nicht zurückspringen lassen.
+    this.camera.scale = cam.scale; this.camera.offsetX = cam.offsetX; this.camera.offsetY = cam.offsetY;
+    this._camStateByPlanId.set(active.id, cam);
   }
 
   /** Kompatibilität: Nachbarseite live verschieben (absolute Lage relativ zur aktiven Seite). */
