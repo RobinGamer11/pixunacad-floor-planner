@@ -1,4 +1,4 @@
-import { holePunchPointsMm, normalizeHolePunchSide, HOLE_RADIUS_MM, type HolePunchSide } from "./pageGuides";
+import { holePunchPointsMm, normalizeHolePunchSide, normalizeHolePattern, type HolePunchSide, type HolePattern } from "./pageGuides";
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
@@ -123,7 +123,11 @@ export class Renderer {
    * Papier wird mit Mittelpunkt am Welt-Ursprung (0,0) gezeichnet.
    * Wenn null → normaler Zeichnungsmodus (Grid + weißer Hintergrund).
    */
-  planMode: { widthMm: number; heightMm: number; marginsMm?: number; holePunch?: boolean; holePunchSide?: HolePunchSide } | null = null;
+  planMode: {
+    widthMm: number; heightMm: number; marginsMm?: number; holePattern?: HolePattern; holePunchSide?: HolePunchSide;
+    /** Nachbarseiten im Verbund, relativ zur oberen linken Ecke der aktiven Seite (mm). */
+    spreadNeighbors?: { id: string; name: string; dxMm: number; dyMm: number; widthMm: number; heightMm: number }[];
+  } | null = null;
 
   /** Hook: wird im Plan-Modus NACH dem Papier gezeichnet (Projektionen). */
   planOverlayDraw: ((ctx: CanvasRenderingContext2D) => void) | null = null;
@@ -514,6 +518,34 @@ export class Renderer {
     const w = Math.abs(br.x - tl.x);
     const h = Math.abs(br.y - tl.y);
 
+    // Verbund: Nachbarseiten als zusammenhängende Papierfläche (nur Anzeige).
+    const neighbors = this.planMode.spreadNeighbors ?? [];
+    if (neighbors.length > 0) {
+      const pxMm = w / this.planMode.widthMm;
+      for (const nb of neighbors) {
+        const nx = x + nb.dxMm * pxMm, ny = y + nb.dyMm * pxMm;
+        const nw = nb.widthMm * pxMm, nh = nb.heightMm * pxMm;
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.25)";
+        ctx.shadowBlur = 14;
+        ctx.shadowOffsetY = 5;
+        ctx.fillStyle = "#fbfbfa";
+        ctx.fillRect(nx, ny, nw, nh);
+        ctx.restore();
+        ctx.save();
+        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(nx + 0.5, ny + 0.5, nw - 1, nh - 1);
+        if (!isExportMode() && nb.name) {
+          ctx.fillStyle = "rgba(0,0,0,0.4)";
+          ctx.font = "12px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText(nb.name, nx + nw / 2, ny + nh / 2);
+        }
+        ctx.restore();
+      }
+    }
+
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.35)";
     ctx.shadowBlur = 18;
@@ -541,15 +573,16 @@ export class Renderer {
       ctx.strokeRect(x + m * pxPerMm, y + m * pxPerMm, w - 2 * m * pxPerMm, h - 2 * m * pxPerMm);
       ctx.restore();
     }
-    if (this.planMode.holePunch) {
-      // Standard-Zweifachlochung: Ø 6 mm, 12 mm vom Rand, Abstand 80 mm, an der gewählten Seite.
+    const pattern = normalizeHolePattern(this.planMode.holePattern);
+    if (pattern !== "none") {
+      // Lochungsmuster (gleiche Punkte wie die Fanggeometrie), an der gewählten Seite.
       ctx.save();
       ctx.strokeStyle = "rgba(0,0,0,0.35)";
       ctx.lineWidth = 1;
-      const hp = holePunchPointsMm(this.planMode.widthMm, this.planMode.heightMm, normalizeHolePunchSide(this.planMode.holePunchSide));
+      const hp = holePunchPointsMm(this.planMode.widthMm, this.planMode.heightMm, normalizeHolePunchSide(this.planMode.holePunchSide), pattern);
       for (const hole of hp.holes) {
         ctx.beginPath();
-        ctx.arc(x + hole.x * pxPerMm, y + hole.y * pxPerMm, HOLE_RADIUS_MM * pxPerMm, 0, Math.PI * 2);
+        ctx.arc(x + hole.x * pxPerMm, y + hole.y * pxPerMm, hp.radiusMm * pxPerMm, 0, Math.PI * 2);
         ctx.stroke();
       }
       ctx.restore();
