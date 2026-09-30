@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { CadApp } from "./CadApp";
 import {
   ensureBgRemoval,
   bgRemovalApplied,
@@ -103,5 +104,66 @@ describe("Hintergrund entfernen: enabled vs. hasMaskEdits", () => {
     expect(rd.bgRemoval.hasMaskEdits).toBe(true);
     expect(rd.bgRemoval.fgMaskDataUrl).toBe("data:image/png;base64,MASK");
     expect(bgRemovalApplied(rd)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("Maßkette auf dem Tablet verschieben", () => {
+  function moveApp() {
+    const dim: any = { id: "dim-1", placementPoint: { x: 1, y: 1 } };
+    const commit = vi.fn();
+    const renderer: any = { dimensionMovePreview: null, render: vi.fn() };
+    const app = Object.assign(Object.create(CadApp.prototype), {
+      scene: { getDimensionById: (id: string) => (id === "dim-1" ? dim : null) },
+      renderer,
+      dimensionHubMode: "none",
+      commitHistorySnapshot: commit,
+      refreshLabelUI: vi.fn(),
+    }) as any;
+    return { app, dim, commit, renderer };
+  }
+
+  it("Scharfstellen ändert die Maßkette nicht", () => {
+    const { app, dim, commit } = moveApp();
+    app.startDimensionMove("dim-1");
+    expect(app.dimensionMoveActive).toBe(true);
+    expect(app.dimensionMoveArmed).toBe(true);
+    expect(dim.placementPoint).toEqual({ x: 1, y: 1 });
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("Vorschau verändert das echte Objekt nicht", () => {
+    const { app, dim, renderer, commit } = moveApp();
+    app.startDimensionMove("dim-1");
+    app.dimensionMoveArmed = false;
+    app.dimensionMovePreviewPlacement = { x: 5, y: 7 };
+    app._syncDimensionMovePreview();
+    expect(dim.placementPoint).toEqual({ x: 1, y: 1 });
+    expect(renderer.dimensionMovePreview).toEqual({ dimensionId: "dim-1", placementPoint: { x: 5, y: 7 } });
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("Fixieren speichert genau einen Verlaufsschritt", () => {
+    const { app, dim, commit, renderer } = moveApp();
+    app.startDimensionMove("dim-1");
+    app.dimensionMoveArmed = false;
+    app.dimensionMovePreviewPlacement = { x: 5, y: 7 };
+    app.commitDimensionMove();
+    expect(dim.placementPoint).toEqual({ x: 5, y: 7 });
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(app.dimensionMoveActive).toBe(false);
+    expect(renderer.dimensionMovePreview).toBe(null);
+  });
+
+  it("Abbrechen stellt die Ausgangslage wieder her", () => {
+    const { app, dim, commit, renderer } = moveApp();
+    app.startDimensionMove("dim-1");
+    app.dimensionMoveArmed = false;
+    app.dimensionMovePreviewPlacement = { x: 9, y: 9 };
+    app.cancelDimensionMove();
+    expect(dim.placementPoint).toEqual({ x: 1, y: 1 });
+    expect(commit).not.toHaveBeenCalled();
+    expect(renderer.dimensionMovePreview).toBe(null);
   });
 });
