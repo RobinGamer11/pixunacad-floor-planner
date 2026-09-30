@@ -147,23 +147,36 @@ export function getOrCreateBgMask(doc: DocumentObject, onLoaded?: () => void): H
   return c;
 }
 
+/**
+ * Verwirft die Maske vollständig: das Originalbild ist wieder komplett sichtbar.
+ * `hasMaskEdits` fällt auf false zurück, der Bereich bleibt eingeschaltet.
+ */
 export function resetBgMask(doc: DocumentObject) {
   const anyDoc = doc as any;
   anyDoc._bgFgMask = null;
   anyDoc._bgMaskRev = (anyDoc._bgMaskRev || 0) + 1;
   anyDoc._bgMaskDataCache = null;
+  anyDoc._bgMaskDirty = false;
   const b = ensureBgRemoval(doc);
   b.fgMaskDataUrl = null;
+  b.hasMaskEdits = false;
   // Crop ebenfalls freigeben, sonst bleibt der Rahmen eingezogen.
   anyDoc.cropM = { top: 0, right: 0, bottom: 0, left: 0 };
 }
 
+/**
+ * Schreibt die Speicher-Maske als PNG-DataURL in `fgMaskDataUrl`, damit sie
+ * gemeinsam mit `hasMaskEdits` gespeichert, synchronisiert und nach einem
+ * Gerätewechsel identisch wiederhergestellt wird.
+ */
 export function exportBgMaskDataUrl(doc: DocumentObject): string | null {
   const anyDoc = doc as any;
   if (!anyDoc._bgFgMask) return ensureBgRemoval(doc).fgMaskDataUrl;
   try {
     const url = (anyDoc._bgFgMask as HTMLCanvasElement).toDataURL("image/png");
-    ensureBgRemoval(doc).fgMaskDataUrl = url;
+    const b = ensureBgRemoval(doc);
+    b.fgMaskDataUrl = url;
+    anyDoc._bgMaskDirty = false;
     return url;
   } catch { return ensureBgRemoval(doc).fgMaskDataUrl; }
 }
