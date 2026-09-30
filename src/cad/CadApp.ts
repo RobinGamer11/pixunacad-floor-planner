@@ -381,8 +381,91 @@ export class CadApp {
   dimensionHubState: { visible: boolean; screenX: number; screenY: number; dimensionId: string | null } = {
     visible: false, screenX: 0, screenY: 0, dimensionId: null,
   };
-  /** Aktiver Modus der Dimension-Hub-Box. "move" = nächster Klick setzt PlacementPoint (mit Snap). */
+  /** Aktiver Modus der Dimension-Hub-Box. "move" = Verschiebe-Sitzung (Armierung + Vorschau). */
   dimensionHubMode: "none" | "move" = "none";
+
+  // --- Maßketten-Verschiebung: explizite Transform-Sitzung ------------------
+  // Ablauf: Symbol antippen → armiert. Erster Kontakt auf der Fläche setzt nur
+  // den Greifpunkt (kein Sprung, kein Abschluss). Danach folgt die Vorschau.
+  // Nur „✓ Fixieren“/Enter schreibt; Escape/Abbrechen verwirft alles.
+  /** Sitzung läuft (armiert oder in Bewegung). */
+  dimensionMoveActive = false;
+  /** Armiert, aber noch kein Kontakt auf der Zeichenfläche. */
+  dimensionMoveArmed = false;
+  /** Maßkette der laufenden Sitzung. */
+  dimensionMoveDimId: string | null = null;
+  /** Ausgangsplatzierung — Grundlage für Abbrechen/Escape. */
+  dimensionMoveOriginalPlacement: { x: number; y: number } | null = null;
+  /** Flüchtige Vorschau; wird nie ins Scene-Modell geschrieben. */
+  dimensionMovePreviewPlacement: { x: number; y: number } | null = null;
+  /** Versatz zwischen erstem Kontaktpunkt und Platzierung (verhindert Springen). */
+  dimensionMoveGrabOffset: { x: number; y: number } | null = null;
+
+  /** Verschieben scharfstellen (noch keine Bewegung, keine Änderung). */
+  startDimensionMove(dimensionId: string) {
+    const dim = this.scene.getDimensionById(dimensionId);
+    if (!dim) return;
+    this.dimensionMoveActive = true;
+    this.dimensionMoveArmed = true;
+    this.dimensionMoveDimId = dimensionId;
+    this.dimensionMoveOriginalPlacement = { x: dim.placementPoint.x, y: dim.placementPoint.y };
+    this.dimensionMovePreviewPlacement = { x: dim.placementPoint.x, y: dim.placementPoint.y };
+    this.dimensionMoveGrabOffset = null;
+    this.dimensionHubMode = "move";
+    this._syncDimensionMovePreview();
+  }
+
+  /** Vorschau übernehmen: genau ein Verlaufsschritt. */
+  commitDimensionMove() {
+    const id = this.dimensionMoveDimId;
+    const preview = this.dimensionMovePreviewPlacement;
+    const original = this.dimensionMoveOriginalPlacement;
+    this._endDimensionMove();
+    if (!id || !preview) return;
+    const dim = this.scene.getDimensionById(id);
+    if (!dim) return;
+    const moved = !original
+      || Math.abs(preview.x - original.x) > 1e-9
+      || Math.abs(preview.y - original.y) > 1e-9;
+    if (!moved) { this.renderer.render(); return; }
+    dim.placementPoint = { x: preview.x, y: preview.y } as any;
+    this.renderer.render();
+    this.refreshLabelUI?.();
+    this.commitHistorySnapshot?.();
+  }
+
+  /** Vorschau vollständig verwerfen — Ausgangslage bleibt erhalten. */
+  cancelDimensionMove() {
+    const id = this.dimensionMoveDimId;
+    const original = this.dimensionMoveOriginalPlacement;
+    this._endDimensionMove();
+    if (id && original) {
+      const dim = this.scene.getDimensionById(id);
+      // Sicherheitsnetz: falls doch etwas geschrieben wurde, exakt zurücksetzen.
+      if (dim) dim.placementPoint = { x: original.x, y: original.y } as any;
+    }
+    this.renderer.render();
+  }
+
+  private _endDimensionMove() {
+    this.dimensionMoveActive = false;
+    this.dimensionMoveArmed = false;
+    this.dimensionMoveDimId = null;
+    this.dimensionMoveOriginalPlacement = null;
+    this.dimensionMovePreviewPlacement = null;
+    this.dimensionMoveGrabOffset = null;
+    this.dimensionHubMode = "none";
+    this._syncDimensionMovePreview();
+  }
+
+  /** Vorschau an den Renderer spiegeln (rein visuell). */
+  _syncDimensionMovePreview() {
+    const r: any = this.renderer;
+    if (!r) return;
+    r.dimensionMovePreview = (this.dimensionMoveActive && this.dimensionMoveDimId && this.dimensionMovePreviewPlacement)
+      ? { dimensionId: this.dimensionMoveDimId, placementPoint: { ...this.dimensionMovePreviewPlacement } }
+      : null;
+  }
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
