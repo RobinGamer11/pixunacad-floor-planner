@@ -7,7 +7,7 @@ import {
   resetBgMask,
   exportBgMaskDataUrl,
 } from "./documentBgRemove";
-import { serializeScene, deserializeScene } from "./sceneSerde";
+import { restoreOneScene } from "./sceneSerde";
 import { Scene } from "./Scene";
 
 function makeDoc(): any {
@@ -85,21 +85,21 @@ describe("Hintergrund entfernen: enabled vs. hasMaskEdits", () => {
 
   it("Maske und Markierung überleben Speichern und Laden", () => {
     const scene = new Scene();
-    const doc: any = makeDoc();
-    doc.bgRemoval = {
-      enabled: true,
-      hasMaskEdits: true,
-      fgMaskDataUrl: "data:image/png;base64,MASK",
-      tolerance: 40,
-      brushRadiusM: 0.2,
-      fgColor: null,
-      fgAlpha: 1,
-      bgColor: null,
-      bgAlpha: 0,
+    const raw: any = {
+      documents: [{
+        id: "doc-1", name: "Bild", kind: "image", src: "data:image/png;base64,AAAA",
+        position: { x: 0, y: 0 }, widthM: 1, heightM: 1, rotationRad: 0, labelId: "l1",
+        bgRemoval: {
+          enabled: true,
+          hasMaskEdits: true,
+          fgMaskDataUrl: "data:image/png;base64,MASK",
+          tolerance: 40, brushRadiusM: 0.2,
+          fgColor: null, fgAlpha: 1, bgColor: null, bgAlpha: 0,
+        },
+      }],
     };
-    scene.documents.push(doc);
-    const restored = deserializeScene(serializeScene(scene) as any);
-    const rd: any = restored.documents.find((d: any) => d.id === "doc-1");
+    restoreOneScene(scene, raw);
+    const rd: any = scene.documents.find((d: any) => d.id === "doc-1");
     expect(rd.bgRemoval.hasMaskEdits).toBe(true);
     expect(rd.bgRemoval.fgMaskDataUrl).toBe("data:image/png;base64,MASK");
     expect(bgRemovalApplied(rd)).toBe(true);
