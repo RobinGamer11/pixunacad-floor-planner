@@ -1776,14 +1776,36 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           >
             <button
               type="button"
-              title={dimHub.mode === "move" ? "Klick auf Canvas: neuen Platzierungspunkt setzen (Snap aktiv)" : "Maßkette frei verschieben (mit Snap)"}
+              title={dimHub.mode === "move" ? "Verschieben läuft — mit „✓ Fixieren“ oder Enter speichern, Esc bricht ab" : "Maßkette frei verschieben (mit Snap)"}
+              aria-label="Maßkette verschieben"
               className={`cad-toolbar-btn h-7 w-7 justify-center px-0 ${dimHub.mode === "move" ? "active" : ""}`}
               onClick={() => {
-                setDimHub(prev => ({ ...prev, mode: prev.mode === "move" ? "none" : "move" }));
+                const app = appRef.current;
+                if (!app || !dimHub.dimensionId) return;
+                if (app.dimensionMoveActive) app.cancelDimensionMove();
+                else app.startDimensionMove(dimHub.dimensionId);
+                setDimHub(prev => ({ ...prev, mode: app.dimensionMoveActive ? "move" : "none" }));
               }}
             >
               <Move className="h-4 w-4" />
             </button>
+            {dimHub.mode === "move" && (
+              <button
+                type="button"
+                title="Neue Platzierung der Maßkette speichern (Enter)"
+                aria-label="Platzierung fixieren"
+                className="cad-toolbar-btn h-7 justify-center px-2 ml-1 text-[11px] font-medium"
+                style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
+                onClick={() => {
+                  const app = appRef.current;
+                  if (!app) return;
+                  app.commitDimensionMove();
+                  setDimHub(prev => ({ ...prev, mode: "none" }));
+                }}
+              >
+                ✓ Fixieren
+              </button>
+            )}
             <button
               type="button"
               title="Maßkette spiegeln (Text auf gegenüberliegende Seite; nur aktiv wenn Häkchen gesetzt)"
