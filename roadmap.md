@@ -124,3 +124,9 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Export: Seiteneinstellungen im Mappen-Stil, Lochungsmuster, echter Seitenverbund (spreadLayouts cloudfähig), letzte Seite geschützt, CAD-Startansicht
 - [ ] Browser-/Tablet-Abnahme Verbund-Ziehen und Verbund-PDF (Nutzer)
 - [x] Export: nur aktive Seite verschiebbar, flüchtiger Modus „Seitenanordnung bearbeiten“, blaue Eckpunkte, symbolischer Ausschnitt-Hub, Cursor-Reset, Transparenzpause als schreibgeschützte Fangquelle
+
+## CAD-Bedienung Tablet – Stand
+- [x] Maßkette verschieben als Transform-Sitzung: Symbol = scharfstellen, erster Kontakt greift nur (kein Sprung), Vorschau rein visuell (`Renderer.dimensionMovePreview`), Speichern nur per „✓ Fixieren“/Enter mit genau einem Undo-Schritt, Esc/Abbrechen stellt die Ausgangslage her, Finger anheben bestätigt nie
+- [x] „Hintergrund entfernen“ als eigener An/Aus-Bereich unter „Bild spiegeln“ (`BgRemoveSection`): `enabled` = Bereich offen, `hasMaskEdits` = einzige Anwendungsmarkierung; Einschalten schneidet nichts weg; Maske + Flag werden gespeichert/synchronisiert; An/Aus, „Automatisch erkennen“, „Maske zurücksetzen“ und jeder Pinselstrich je genau ein Undo-Schritt
+- [x] Bildbearbeitung auf dem Tablet wieder vertikal scrollbar (keine pauschalen Stop-Propagation-Handler im Filterbereich)
+- [ ] Abnahme auf echtem Tablet (Nutzer)

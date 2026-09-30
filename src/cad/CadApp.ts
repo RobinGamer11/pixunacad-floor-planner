@@ -381,8 +381,91 @@ export class CadApp {
   dimensionHubState: { visible: boolean; screenX: number; screenY: number; dimensionId: string | null } = {
     visible: false, screenX: 0, screenY: 0, dimensionId: null,
   };
-  /** Aktiver Modus der Dimension-Hub-Box. "move" = nächster Klick setzt PlacementPoint (mit Snap). */
+  /** Aktiver Modus der Dimension-Hub-Box. "move" = Verschiebe-Sitzung (Armierung + Vorschau). */
   dimensionHubMode: "none" | "move" = "none";
+
+  // --- Maßketten-Verschiebung: explizite Transform-Sitzung ------------------
+  // Ablauf: Symbol antippen → armiert. Erster Kontakt auf der Fläche setzt nur
+  // den Greifpunkt (kein Sprung, kein Abschluss). Danach folgt die Vorschau.
+  // Nur „✓ Fixieren“/Enter schreibt; Escape/Abbrechen verwirft alles.
+  /** Sitzung läuft (armiert oder in Bewegung). */
+  dimensionMoveActive = false;
+  /** Armiert, aber noch kein Kontakt auf der Zeichenfläche. */
+  dimensionMoveArmed = false;
+  /** Maßkette der laufenden Sitzung. */
+  dimensionMoveDimId: string | null = null;
+  /** Ausgangsplatzierung — Grundlage für Abbrechen/Escape. */
+  dimensionMoveOriginalPlacement: { x: number; y: number } | null = null;
+  /** Flüchtige Vorschau; wird nie ins Scene-Modell geschrieben. */
+  dimensionMovePreviewPlacement: { x: number; y: number } | null = null;
+  /** Versatz zwischen erstem Kontaktpunkt und Platzierung (verhindert Springen). */
+  dimensionMoveGrabOffset: { x: number; y: number } | null = null;
+
+  /** Verschieben scharfstellen (noch keine Bewegung, keine Änderung). */
+  startDimensionMove(dimensionId: string) {
+    const dim = this.scene.getDimensionById(dimensionId);
+    if (!dim) return;
+    this.dimensionMoveActive = true;
+    this.dimensionMoveArmed = true;
+    this.dimensionMoveDimId = dimensionId;
+    this.dimensionMoveOriginalPlacement = { x: dim.placementPoint.x, y: dim.placementPoint.y };
+    this.dimensionMovePreviewPlacement = { x: dim.placementPoint.x, y: dim.placementPoint.y };
+    this.dimensionMoveGrabOffset = null;
+    this.dimensionHubMode = "move";
+    this._syncDimensionMovePreview();
+  }
+
+  /** Vorschau übernehmen: genau ein Verlaufsschritt. */
+  commitDimensionMove() {
+    const id = this.dimensionMoveDimId;
+    const preview = this.dimensionMovePreviewPlacement;
+    const original = this.dimensionMoveOriginalPlacement;
+    this._endDimensionMove();
+    if (!id || !preview) return;
+    const dim = this.scene.getDimensionById(id);
+    if (!dim) return;
+    const moved = !original
+      || Math.abs(preview.x - original.x) > 1e-9
+      || Math.abs(preview.y - original.y) > 1e-9;
+    if (!moved) { this.renderer.render(); return; }
+    dim.placementPoint = { x: preview.x, y: preview.y } as any;
+    this.renderer.render();
+    this.refreshLabelUI?.();
+    this.commitHistorySnapshot?.();
+  }
+
+  /** Vorschau vollständig verwerfen — Ausgangslage bleibt erhalten. */
+  cancelDimensionMove() {
+    const id = this.dimensionMoveDimId;
+    const original = this.dimensionMoveOriginalPlacement;
+    this._endDimensionMove();
+    if (id && original) {
+      const dim = this.scene.getDimensionById(id);
+      // Sicherheitsnetz: falls doch etwas geschrieben wurde, exakt zurücksetzen.
+      if (dim) dim.placementPoint = { x: original.x, y: original.y } as any;
+    }
+    this.renderer.render();
+  }
+
+  private _endDimensionMove() {
+    this.dimensionMoveActive = false;
+    this.dimensionMoveArmed = false;
+    this.dimensionMoveDimId = null;
+    this.dimensionMoveOriginalPlacement = null;
+    this.dimensionMovePreviewPlacement = null;
+    this.dimensionMoveGrabOffset = null;
+    this.dimensionHubMode = "none";
+    this._syncDimensionMovePreview();
+  }
+
+  /** Vorschau an den Renderer spiegeln (rein visuell). */
+  _syncDimensionMovePreview() {
+    const r: any = this.renderer;
+    if (!r) return;
+    r.dimensionMovePreview = (this.dimensionMoveActive && this.dimensionMoveDimId && this.dimensionMovePreviewPlacement)
+      ? { dimensionId: this.dimensionMoveDimId, placementPoint: { ...this.dimensionMovePreviewPlacement } }
+      : null;
+  }
 
   // Clipboard + Paste-Vorschau
   clipboard: Clipboard | null = null;
@@ -826,12 +909,16 @@ export class CadApp {
           try { maskUrl = d._eraseMask.toDataURL("image/png"); d.eraseMaskDataUrl = maskUrl; d._eraseMaskDirty = false; }
           catch { /* ignore */ }
         }
-        // BgRemoval-Maske ebenfalls exportieren.
+        // BgRemoval: Flag UND tatsächliche Maske exportieren, damit nach
+        // Neuladen/Cloud-Abgleich exakt dieselbe Fläche entfernt bleibt.
         let bgClone: any = undefined;
         const anyD = d as any;
         if (anyD.bgRemoval) {
+          if (typeof anyD.bgRemoval.hasMaskEdits !== "boolean") {
+            anyD.bgRemoval.hasMaskEdits = !!anyD.bgRemoval.fgMaskDataUrl;
+          }
           bgClone = { ...anyD.bgRemoval };
-          if (anyD._bgFgMask) {
+          if (anyD.bgRemoval.hasMaskEdits && anyD._bgFgMask) {
             try { bgClone.fgMaskDataUrl = (anyD._bgFgMask as HTMLCanvasElement).toDataURL("image/png"); }
             catch { /* ignore */ }
           }
@@ -2495,9 +2582,15 @@ export class CadApp {
         e.preventDefault(); this.selectTool.confirmPasteFloat(); return;
       }
 
+      // Enter → laufende Maßketten-Verschiebung übernehmen (ein Undo-Schritt).
+      if (e.key === "Enter" && this.dimensionMoveActive) {
+        e.preventDefault(); this.commitDimensionMove(); return;
+      }
+
       if (e.key === "Escape") {
         // ESC bricht ALLES ab — unabhängig von Werkzeug und Objekt:
         // laufende Hub-Interaktionen, Sonder-Modi und Rahmen-Auswahl.
+        if (this.dimensionMoveActive) this.cancelDimensionMove();
         this.dimensionHubMode = "none";
         this.documentHubMode = "none";
         this.bgRemoveInteraction = null;

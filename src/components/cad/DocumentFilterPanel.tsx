@@ -154,12 +154,10 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
   const showFilters = part !== "opacity";
 
   return (
-    <div
-      className="space-y-3"
-      onPointerDown={(e) => e.stopPropagation()}
-      onPointerMove={(e) => e.stopPropagation()}
-      onWheel={(e) => e.stopPropagation()}
-    >
+    // Keine pauschalen Stop-Propagation-Handler: Wisch-Gesten auf freien
+    // Flächen müssen den DragScrollDiv erreichen (vertikales Scrollen auf
+    // Tablets). Regler/Buttons stoppen gezielt selbst.
+    <div className="space-y-3">
       {/* Opacity */}
       {showOpacity && (
       <div>
@@ -210,8 +208,10 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
               onDragEnd={endDrag}
             />
 
-            {/* Hintergrund entfernen */}
-            {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
+            {/* „Hintergrund entfernen“ ist ein eigener Bereich unter
+                „Bild spiegeln“ (BgRemoveSection) und nicht mehr Teil der
+                Bildbearbeitung. */}
+
 
             {/* Filter-Liste */}
             <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -288,210 +288,8 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
   );
 }
 
-// ---------------------------------------------------------------- BgRemovePanel
-function BgRemovePanel({ app, doc }: { app: CadApp | null; doc: any }) {
-  const [, force] = useState(0);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [brushMode, setBrushMode] = useState<"fg" | "bg">("bg");
-  const rerender = () => force(v => v + 1);
-  const bg = doc.bgRemoval || null;
-  const inter = app?.bgRemoveInteraction || null;
-  const isThisDoc = !!inter && inter.docId === doc.id;
 
-  const runAuto = (tol?: number) => {
-    void import("@/cad/documentBgRemove").then(({ autoRemoveBackgroundFromCorners }) => {
-      const t = tol ?? doc.bgRemoval?.tolerance ?? 32;
-      const done = autoRemoveBackgroundFromCorners(doc, t, () => {
-        autoRemoveBackgroundFromCorners(doc, t);
-        rerender();
-      });
-      if (done) rerender();
-    });
-  };
-
-  const enable = () => {
-    void import("@/cad/documentBgRemove").then(({ defaultBgRemoval }) => {
-      if (!doc.bgRemoval) {
-        doc.bgRemoval = defaultBgRemoval();
-        doc.bgRemoval.enabled = true;
-        // Automatik direkt beim ersten Einschalten — genau das, was Nutzer erwartet.
-        runAuto(doc.bgRemoval.tolerance);
-      } else {
-        doc.bgRemoval.enabled = !doc.bgRemoval.enabled;
-      }
-      rerender();
-    });
-  };
-  const setInter = (tool: "wand" | "brush" | null, target: "fg" | "bg" = "bg") => {
-    if (!app) return;
-    if (tool === null) app.bgRemoveInteraction = null;
-    else app.bgRemoveInteraction = { docId: doc.id, tool, target };
-    rerender();
-  };
-  const patchBg = (patch: any) => {
-    if (!doc.bgRemoval) return;
-    Object.assign(doc.bgRemoval, patch);
-    rerender();
-  };
-  const reset = () => {
-    void import("@/cad/documentBgRemove").then(({ resetBgMask }) => {
-      resetBgMask(doc);
-      rerender();
-    });
-  };
-
-  const wandActive = (t: "fg" | "bg") => isThisDoc && inter?.tool === "wand" && inter?.target === t;
-  const brushActive = isThisDoc && inter?.tool === "brush";
-
-  return (
-    <div className="space-y-2">
-      <SettingsToggleButton
-        label="Hintergrund entfernen"
-        active={!!bg?.enabled}
-        onClick={enable}
-        title="Aktiviert das Ausschneiden. Beim ersten Einschalten wird der Hintergrund automatisch anhand der Bild-Ecken erkannt."
-      />
-
-      {bg?.enabled && (
-        <>
-          {/* Auto-Button */}
-          <button
-            type="button"
-            onClick={() => runAuto()}
-            className="cad-toolbar-btn h-10 w-full text-[12px] font-semibold justify-center"
-            style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" }}
-            title="Erkennt den Hintergrund automatisch anhand der 4 Bild-Ecken. Bei zu wenig/zu viel Wegschnitt die Genauigkeit unten anpassen und erneut klicken."
-          >
-            Automatisch erkennen
-          </button>
-
-          {/* Genauigkeit */}
-          <div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span title="Farb-Toleranz. Niedrig = nur sehr ähnliche Farben werden entfernt. Hoch = auch abweichende Töne werden mitgenommen.">
-                Genauigkeit
-              </span>
-              <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{bg.tolerance}</span>
-            </div>
-            <input type="range" min={1} max={128} step={1} value={bg.tolerance}
-              onChange={(e) => patchBg({ tolerance: parseInt(e.target.value, 10) })}
-              className="pixuna-range w-full" />
-          </div>
-
-          {/* Klick-Werkzeuge */}
-          <div className="space-y-1">
-            <div className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Klick-Werkzeug</div>
-            <div className="grid grid-cols-2 gap-1">
-              <ToolBtn
-                active={wandActive("bg")}
-                onClick={() => setInter(wandActive("bg") ? null : "wand", "bg")}
-                label="Wegklicken"
-                title="Klick auf einen Bereich im Bild → alle zusammenhängenden ähnlich­farbigen Pixel werden entfernt."
-              />
-              <ToolBtn
-                active={wandActive("fg")}
-                onClick={() => setInter(wandActive("fg") ? null : "wand", "fg")}
-                label="Wiederherstellen"
-                title="Klick auf einen entfernten Bereich → er wird wieder sichtbar."
-              />
-            </div>
-          </div>
-
-          {/* Pinsel */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-[11px]">
-              <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Pinsel (Feinarbeit)</span>
-              <div className="flex gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setBrushMode("bg")}
-                  className="cad-toolbar-btn h-7 px-2 text-[11px]"
-                  style={{
-                    borderColor: brushMode === "bg" ? "hsl(var(--primary))" : undefined,
-                    background: brushMode === "bg" ? "hsl(var(--primary) / 0.15)" : undefined,
-                  }}
-                  title="Pinsel entfernt (radiert Vordergrund)"
-                >Entfernen</button>
-                <button
-                  type="button"
-                  onClick={() => setBrushMode("fg")}
-                  className="cad-toolbar-btn h-7 px-2 text-[11px]"
-                  style={{
-                    borderColor: brushMode === "fg" ? "hsl(var(--primary))" : undefined,
-                    background: brushMode === "fg" ? "hsl(var(--primary) / 0.15)" : undefined,
-                  }}
-                  title="Pinsel stellt wieder her"
-                >Zurückholen</button>
-              </div>
-            </div>
-            <ToolBtn
-              active={brushActive}
-              onClick={() => setInter(brushActive ? null : "brush", brushMode)}
-              label={brushActive ? "Pinsel aktiv — im Canvas ziehen" : "Pinsel aktivieren"}
-              title="Nach dem Aktivieren im Canvas auf das Bild klicken oder ziehen."
-            />
-            <div>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span>Pinselgröße</span>
-                <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{(bg.brushRadiusM * 100).toFixed(0)} cm</span>
-              </div>
-              <input type="range" min={1} max={200} step={1} value={Math.round(bg.brushRadiusM * 100)}
-                onChange={(e) => patchBg({ brushRadiusM: parseInt(e.target.value, 10) / 100 })}
-                className="pixuna-range w-full" />
-            </div>
-          </div>
-
-          {isThisDoc && (
-            <div className="text-[10px] rounded px-2 py-1" style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}>
-              Bearbeitungs­modus aktiv — klicke im Canvas auf das Bild.
-            </div>
-          )}
-
-          {/* Erweitert */}
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen(v => !v)}
-            className="flex h-9 w-full items-center justify-between gap-2 rounded-md border px-2 text-[11px] font-medium hover:bg-muted"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <span>Erweitert (Einfärben &amp; Deckkraft)</span>
-            {advancedOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          </button>
-
-          {advancedOpen && (
-            <div className="space-y-2 pl-2" style={{ borderLeft: "1px solid hsl(var(--border))" }}>
-              <ColorAlphaRow
-                label="Vordergrund"
-                color={bg.fgColor}
-                alpha={bg.fgAlpha}
-                onChange={(color, alpha) => patchBg({ fgColor: color, fgAlpha: alpha })}
-                hint="Bleibt sichtbar. Farbe = Einfärbung, Deckkraft = Transparenz des sichtbaren Bild­teils."
-              />
-              <ColorAlphaRow
-                label="Hintergrund"
-                color={bg.bgColor}
-                alpha={bg.bgAlpha}
-                onChange={(color, alpha) => patchBg({ bgColor: color, bgAlpha: alpha })}
-                hint="Der weggeschnittene Bereich. Transparent + Deckkraft 0 % = komplett entfernt."
-              />
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={reset}
-            className="cad-toolbar-btn h-7 w-full text-[11px] justify-center"
-            title="Setzt die Maske zurück — das ganze Bild wird wieder komplett sichtbar."
-          >
-            Maske zurücksetzen
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
-function ToolBtn({ active, onClick, label, title }: { active: boolean; onClick: () => void; label: string; title?: string }) {
+export function ToolBtn({ active, onClick, label, title }: { active: boolean; onClick: () => void; label: string; title?: string }) {
   return (
     <button
       type="button"
@@ -508,7 +306,7 @@ function ToolBtn({ active, onClick, label, title }: { active: boolean; onClick: 
   );
 }
 
-function ColorAlphaRow({ label, color, alpha, onChange, hint }: {
+export function ColorAlphaRow({ label, color, alpha, onChange, hint }: {
   label: string; color: string | null; alpha: number;
   onChange: (color: string | null, alpha: number) => void;
   hint?: string;

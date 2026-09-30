@@ -171,6 +171,14 @@ export class Renderer {
    */
   textPtScale: number = 1;
 
+  /**
+   * Flüchtige Vorschau beim Verschieben einer Maßkette über den Hub.
+   * Nur Darstellung — das Scene-Objekt bleibt bis „✓ Fixieren“ unverändert.
+   * Wird nie serialisiert, synchronisiert oder in den Verlauf geschrieben.
+   */
+  dimensionMovePreview: { dimensionId: string; placementPoint: { x: number; y: number } } | null = null;
+
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
@@ -2629,9 +2637,22 @@ export class Renderer {
       .sort((a, b) => (rank.get(b.labelId) ?? 0) - (rank.get(a.labelId) ?? 0));
   }
 
+  /**
+   * Liefert für die Darstellung ggf. eine flüchtige Kopie mit der
+   * Vorschau-Platzierung. Das echte Scene-Objekt bleibt unberührt.
+   */
+  private _dimForRender(dim: any): any {
+    const p = this.dimensionMovePreview;
+    if (!p || p.dimensionId !== dim.id) return dim;
+    const clone = Object.create(Object.getPrototypeOf(dim));
+    Object.assign(clone, dim);
+    clone.placementPoint = { x: p.placementPoint.x, y: p.placementPoint.y };
+    return clone;
+  }
+
   private _drawDimensions() {
     for (const dim of this._dimensionsBackToFront()) {
-      this._drawSingleDimension(this.ctx, this.camera, dim, false);
+      this._drawSingleDimension(this.ctx, this.camera, this._dimForRender(dim), false);
     }
   }
 
@@ -2639,7 +2660,7 @@ export class Renderer {
     for (const dim of this.scene.dimensions) {
       if (dim.labelId !== labelId) continue;
       if (!this.labels.isVisible(dim.labelId)) continue;
-      this._drawSingleDimension(this.ctx, this.camera, dim, false);
+      this._drawSingleDimension(this.ctx, this.camera, this._dimForRender(dim), false);
     }
   }
 

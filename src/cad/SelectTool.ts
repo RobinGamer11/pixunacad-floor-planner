@@ -140,6 +140,9 @@ export class SelectTool {
   dragDimGrabDx = 0;
   dragDimGrabDy = 0;
   private dimensionHubGuideOrigin: Vec2 | null = null;
+  /** Läuft gerade ein zusammenhängender Pinselstrich (ein Verlaufsschritt)? */
+  private _bgBrushStrokeActive = false;
+  private _bgBrushStrokeDocId: string | null = null;
 
   // Bibliotheksinstanz Drag-State (Translate)
   /* Bibliotheksobjekte werden NICHT mehr direkt per Linksklick gezogen. Die
@@ -3015,21 +3018,45 @@ export class SelectTool {
       }
     }
 
-    // Hintergrund-Ausschnitt-Interaktion (aktiviert via DocumentFilterPanel).
+    // Hintergrund-Ausschnitt-Interaktion (aktiviert via BgRemoveSection).
     // Klick = Magic-Wand-Fill; Drag mit gedrückter Maustaste = Pinsel.
+    // Wichtig: Es wird nie still `enabled` gesetzt — nur ein bewusst
+    // eingeschalteter Bereich erlaubt Bearbeitung.
+    if (this._bgBrushStrokeActive && !input.mouse.left) {
+      // Zusammenhängender Pinselstrich beendet → genau ein Verlaufsschritt.
+      this._bgBrushStrokeActive = false;
+      const strokeDoc = this._bgBrushStrokeDocId
+        ? this.app.scene.getDocumentById(this._bgBrushStrokeDocId)
+        : null;
+      this._bgBrushStrokeDocId = null;
+      this.app.suspendHistory = false;
+      void import("./documentBgRemove").then(({ exportBgMaskDataUrl, applyMaskCropToDoc }) => {
+        if (strokeDoc) { applyMaskCropToDoc(strokeDoc); exportBgMaskDataUrl(strokeDoc); }
+        this.app.commitHistorySnapshot?.();
+      });
+    }
     if (this.app.bgRemoveInteraction) {
       const inter = this.app.bgRemoveInteraction;
       const doc = this.app.scene.getDocumentById(inter.docId);
-      if (doc) {
+      if (doc && (doc as any).bgRemoval?.enabled) {
         const mouseW = v(input.mouse.wx, input.mouse.wy);
         // Nur reagieren, wenn Cursor über dem Dokument ist.
         if (pointInDocument(mouseW, doc)) {
-          void import("./documentBgRemove").then(({ ensureBgRemoval, floodFillAt, paintBrushAt }) => {
+          if (inter.tool === "brush" && input.mouse.left && !this._bgBrushStrokeActive) {
+            this._bgBrushStrokeActive = true;
+            this._bgBrushStrokeDocId = doc.id;
+            this.app.suspendHistory = true;
+          }
+          void import("./documentBgRemove").then(({ ensureBgRemoval, floodFillAt, paintBrushAt, exportBgMaskDataUrl }) => {
             const b = ensureBgRemoval(doc);
-            b.enabled = true;
+            if (!b.enabled) return;
             if (inter.tool === "wand") {
               if (input.clicked) {
-                floodFillAt(doc, mouseW, b.tolerance, inter.target);
+                // Wegklicken/Wiederherstellen: ein Klick = ein Verlaufsschritt.
+                if (floodFillAt(doc, mouseW, b.tolerance, inter.target)) {
+                  exportBgMaskDataUrl(doc);
+                  this.app.commitHistorySnapshot?.();
+                }
               }
             } else if (inter.tool === "brush") {
               if (input.mouse.left) {
@@ -3044,39 +3071,52 @@ export class SelectTool {
 
 
 
-    // Dimension-Hub-Box: aktiver "move"-Modus → nächster Klick legt
-    // den PlacementPoint der ausgewählten Maßkette (mit Snap auf andere
-    // Maßketten / Geometrie) neu. Wir intercepten den Klick hier ganz oben,
-    // damit weder Drag noch andere Auswahl-Handler ausgelöst werden.
-    if (this.app.dimensionHubMode === "move" && this.app.dimensionHubState.dimensionId) {
-      const dim = this.app.scene.getDimensionById(this.app.dimensionHubState.dimensionId);
+    // Maßketten-Verschiebung als explizite Transform-Sitzung.
+    // Armierung: Symbol angetippt → bereit. Erster Kontakt auf der Fläche setzt
+    // nur den Greifpunkt (kein Sprung, kein Abschluss). Danach folgt die
+    // Vorschau flüssig dem Finger/Stift. Das Scene-Objekt bleibt bis
+    // „✓ Fixieren“/Enter unverändert; Loslassen bestätigt nie.
+    if (this.app.dimensionMoveActive && this.app.dimensionMoveDimId) {
+      const dim = this.app.scene.getDimensionById(this.app.dimensionMoveDimId);
       if (!dim) {
-        this.app.dimensionHubMode = "none";
+        this.app.cancelDimensionMove();
         this.app.dimensionHubState = { visible: false, screenX: 0, screenY: 0, dimensionId: null };
         this.dimensionHubGuideOrigin = null;
         this._clearTransformGuides();
       } else {
+        const original = this.app.dimensionMoveOriginalPlacement || dim.placementPoint;
         if (!this.dimensionHubGuideOrigin) {
           this._clearTransformGuides();
-          this.dimensionHubGuideOrigin = v(dim.placementPoint.x, dim.placementPoint.y);
+          this.dimensionHubGuideOrigin = v(original.x, original.y);
         }
         const mouseW = v(input.mouse.wx, input.mouse.wy);
-        const exclusions = {
-          dimensionIds: new Set([dim.id]),
-        };
+        const exclusions = { dimensionIds: new Set([dim.id]) };
         if (this._tryToggleTransformGuide(input, exclusions, this.dimensionHubGuideOrigin)) return;
         const snap = this._findTransformSnap(input, exclusions);
-        // Live-Vorschau: PlacementPoint folgt dem Mauszeiger bzw. Snap.
-        dim.placementPoint = snap ? v(snap.world.x, snap.world.y) : mouseW;
-        // Hub-Position aktualisieren, damit sie der Maßlinie folgt
-        const g1 = getDimensionGeometry(dim);
+        const target = snap ? v(snap.world.x, snap.world.y) : mouseW;
+
+        if (this.app.dimensionMoveArmed) {
+          // Erster Kontakt: nur greifen. Versatz merken, damit nichts springt.
+          if (input.mouse.left || input.clicked) {
+            this.app.dimensionMoveArmed = false;
+            this.app.dimensionMoveGrabOffset = {
+              x: original.x - target.x,
+              y: original.y - target.y,
+            };
+          }
+        } else {
+          const off = this.app.dimensionMoveGrabOffset || { x: 0, y: 0 };
+          this.app.dimensionMovePreviewPlacement = { x: target.x + off.x, y: target.y + off.y };
+        }
+        this.app._syncDimensionMovePreview();
+
+        // Hub folgt der Vorschau-Maßlinie (rein visuell, kein Modell-Schreiben).
+        const preview = this.app.dimensionMovePreviewPlacement || original;
+        const ghost: any = Object.assign(Object.create(Object.getPrototypeOf(dim)), dim);
+        ghost.placementPoint = { x: preview.x, y: preview.y };
+        const g1 = getDimensionGeometry(ghost);
         const sp = this.app.camera.worldToScreen(g1.mid.x, g1.mid.y);
         this.app.dimensionHubState = { visible: true, screenX: sp.x, screenY: sp.y, dimensionId: dim.id };
-        if (input.clicked) {
-          this.app.dimensionHubMode = "none";
-          this.dimensionHubGuideOrigin = null;
-          this._clearTransformGuides();
-        }
         // Snap-Indikator zeichnen
         this.snap = snap;
         return;

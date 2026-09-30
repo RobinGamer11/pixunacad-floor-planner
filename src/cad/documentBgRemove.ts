@@ -16,7 +16,15 @@ import { Vec2 } from "./geometry";
 import { documentCenterWorld } from "./documentGeometry";
 
 export interface BgRemoval {
+  /** Bearbeitungsbereich ist eingeschaltet (heißt nicht: Maske angewendet). */
   enabled: boolean;
+  /**
+   * Einzige verlässliche Anwendungsmarkierung: es wurde automatisch erkannt,
+   * weggeklickt oder gepinselt. Der Renderer maskiert nur bei
+   * `enabled && hasMaskEdits`. Bewusst nicht aus `fgMaskDataUrl` abgeleitet —
+   * während der Bearbeitung liegt die Maske nur im Speicher.
+   */
+  hasMaskEdits: boolean;
   /** Persistente Foreground-Alpha-Maske (PNG-DataURL). null = leer/schwarz. */
   fgMaskDataUrl: string | null;
   /** Flood-Fill-Toleranz (0..128). Höher = großzügiger. */
@@ -36,6 +44,7 @@ export interface BgRemoval {
 export function defaultBgRemoval(): BgRemoval {
   return {
     enabled: false,
+    hasMaskEdits: false,
     fgMaskDataUrl: null,
     tolerance: 32,
     brushRadiusM: 0.15,
@@ -49,7 +58,31 @@ export function defaultBgRemoval(): BgRemoval {
 export function ensureBgRemoval(doc: DocumentObject): BgRemoval {
   const anyDoc = doc as any;
   if (!anyDoc.bgRemoval) anyDoc.bgRemoval = defaultBgRemoval();
-  return anyDoc.bgRemoval as BgRemoval;
+  const b = anyDoc.bgRemoval as BgRemoval;
+  // Abwärtskompatibilität: Altdokumente kennen das Flag nicht. Eine vorhandene
+  // gespeicherte Maske bedeutet dort "angewendet".
+  if (typeof b.hasMaskEdits !== "boolean") b.hasMaskEdits = !!b.fgMaskDataUrl;
+  return b;
+}
+
+/** Wirkt die Hintergrundentfernung aktuell auf die Darstellung? */
+export function bgRemovalApplied(doc: DocumentObject): boolean {
+  const b: BgRemoval | undefined = (doc as any).bgRemoval;
+  if (!b || !b.enabled) return false;
+  if (typeof b.hasMaskEdits !== "boolean") return !!b.fgMaskDataUrl;
+  return b.hasMaskEdits;
+}
+
+/**
+ * Markiert eine echte Maskenbearbeitung. Die Pixelmaske selbst liegt im
+ * Speicher-Canvas; `fgMaskDataUrl` wird beim Sichern/Serialisieren aus dem
+ * Canvas neu erzeugt (siehe `exportBgMaskDataUrl`).
+ */
+export function markBgMaskEdited(doc: DocumentObject) {
+  const b = ensureBgRemoval(doc);
+  b.hasMaskEdits = true;
+  b.fgMaskDataUrl = null;
+  (doc as any)._bgMaskDirty = true;
 }
 
 /** Signatur für Renderer-Cache. */
@@ -57,8 +90,10 @@ export function bgRemovalSignature(doc: DocumentObject): string {
   const anyDoc = doc as any;
   const b: BgRemoval | undefined = anyDoc.bgRemoval;
   if (!b || !b.enabled) return "";
+  if (!bgRemovalApplied(doc)) return "";
   return [
     b.enabled ? "1" : "0",
+    "e1",
     b.fgColor || "-",
     b.fgAlpha.toFixed(3),
     b.bgColor || "-",
@@ -112,23 +147,36 @@ export function getOrCreateBgMask(doc: DocumentObject, onLoaded?: () => void): H
   return c;
 }
 
+/**
+ * Verwirft die Maske vollständig: das Originalbild ist wieder komplett sichtbar.
+ * `hasMaskEdits` fällt auf false zurück, der Bereich bleibt eingeschaltet.
+ */
 export function resetBgMask(doc: DocumentObject) {
   const anyDoc = doc as any;
   anyDoc._bgFgMask = null;
   anyDoc._bgMaskRev = (anyDoc._bgMaskRev || 0) + 1;
   anyDoc._bgMaskDataCache = null;
+  anyDoc._bgMaskDirty = false;
   const b = ensureBgRemoval(doc);
   b.fgMaskDataUrl = null;
+  b.hasMaskEdits = false;
   // Crop ebenfalls freigeben, sonst bleibt der Rahmen eingezogen.
   anyDoc.cropM = { top: 0, right: 0, bottom: 0, left: 0 };
 }
 
+/**
+ * Schreibt die Speicher-Maske als PNG-DataURL in `fgMaskDataUrl`, damit sie
+ * gemeinsam mit `hasMaskEdits` gespeichert, synchronisiert und nach einem
+ * Gerätewechsel identisch wiederhergestellt wird.
+ */
 export function exportBgMaskDataUrl(doc: DocumentObject): string | null {
   const anyDoc = doc as any;
   if (!anyDoc._bgFgMask) return ensureBgRemoval(doc).fgMaskDataUrl;
   try {
     const url = (anyDoc._bgFgMask as HTMLCanvasElement).toDataURL("image/png");
-    ensureBgRemoval(doc).fgMaskDataUrl = url;
+    const b = ensureBgRemoval(doc);
+    b.fgMaskDataUrl = url;
+    anyDoc._bgMaskDirty = false;
     return url;
   } catch { return ensureBgRemoval(doc).fgMaskDataUrl; }
 }
@@ -243,8 +291,7 @@ function _floodFillFromPixel(
   }
   ctx.putImageData(md, 0, 0);
   (doc as any)._bgMaskRev = ((doc as any)._bgMaskRev || 0) + 1;
-  const b = ensureBgRemoval(doc);
-  b.fgMaskDataUrl = null;
+  markBgMaskEdited(doc);
   applyMaskCropToDoc(doc);
   return true;
 }
@@ -301,7 +348,7 @@ export function pointInDocumentVisible(p: Vec2, doc: DocumentObject): boolean {
   if (ly < -hy + (crop.top || 0) || ly > hy - (crop.bottom || 0)) return false;
   const b: BgRemoval | undefined = (doc as any).bgRemoval;
   const mask: HTMLCanvasElement | undefined = (doc as any)._bgFgMask;
-  if (b?.enabled && mask) {
+  if (b?.enabled && bgRemovalApplied(doc) && mask) {
     const cache = _getMaskDataCache(doc, mask);
     if (cache) {
       const u = (lx + hx) / doc.widthM;
@@ -342,7 +389,7 @@ function _getMaskDataCache(doc: DocumentObject, mask: HTMLCanvasElement): { data
 export function applyMaskCropToDoc(doc: DocumentObject) {
   const b: BgRemoval | undefined = (doc as any).bgRemoval;
   const mask: HTMLCanvasElement | undefined = (doc as any)._bgFgMask;
-  if (!b?.enabled || !mask) return;
+  if (!b?.enabled || !bgRemovalApplied(doc) || !mask) return;
   const cache = _getMaskDataCache(doc, mask);
   if (!cache) return;
   const w = mask.width, h = mask.height;
@@ -391,7 +438,7 @@ export function paintBrushAt(doc: DocumentObject, worldPoint: Vec2, radiusM: num
   ctx.fill();
   ctx.restore();
   (doc as any)._bgMaskRev = ((doc as any)._bgMaskRev || 0) + 1;
-  ensureBgRemoval(doc).fgMaskDataUrl = null;
+  markBgMaskEdited(doc);
   // Crop-Update throttlen (Full-Mask-Scan wäre pro Brush-Frame zu teuer).
   const now = performance.now();
   const anyDoc = doc as any;
@@ -420,7 +467,7 @@ export function applyBgRemovalToCanvas(
   doc: DocumentObject,
 ): HTMLCanvasElement {
   const b: BgRemoval | undefined = (doc as any).bgRemoval;
-  if (!b || !b.enabled) return source;
+  if (!b || !b.enabled || !bgRemovalApplied(doc)) return source;
   const mask: HTMLCanvasElement | null = (doc as any)._bgFgMask || null;
   if (!mask) return source;
   const w = source.width, h = source.height;

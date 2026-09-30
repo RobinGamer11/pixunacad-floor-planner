@@ -12,6 +12,7 @@ import { Maximize2, Ruler as RulerIcon } from "lucide-react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
+import { BgRemoveSection } from "@/components/cad/BgRemoveSection";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
@@ -206,6 +207,9 @@ export function CadDocumentInspector({ engine }: Props) {
       <WarpSection engine={engine} docId={sel.id} />
 
       <FlipSection engine={engine} docId={sel.id} />
+
+      {/* Eigener Bereich direkt unter „Bild spiegeln“ */}
+      <BgRemoveSection app={engine as any} docId={sel.id} sig={filterSig} />
 
       <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} part="filters" showBgRemove={false} />
 
