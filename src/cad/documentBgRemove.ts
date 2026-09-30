@@ -348,7 +348,7 @@ export function pointInDocumentVisible(p: Vec2, doc: DocumentObject): boolean {
   if (ly < -hy + (crop.top || 0) || ly > hy - (crop.bottom || 0)) return false;
   const b: BgRemoval | undefined = (doc as any).bgRemoval;
   const mask: HTMLCanvasElement | undefined = (doc as any)._bgFgMask;
-  if (b?.enabled && mask) {
+  if (b?.enabled && bgRemovalApplied(doc) && mask) {
     const cache = _getMaskDataCache(doc, mask);
     if (cache) {
       const u = (lx + hx) / doc.widthM;
