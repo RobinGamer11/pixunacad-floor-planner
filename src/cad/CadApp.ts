@@ -2582,9 +2582,15 @@ export class CadApp {
         e.preventDefault(); this.selectTool.confirmPasteFloat(); return;
       }
 
+      // Enter → laufende Maßketten-Verschiebung übernehmen (ein Undo-Schritt).
+      if (e.key === "Enter" && this.dimensionMoveActive) {
+        e.preventDefault(); this.commitDimensionMove(); return;
+      }
+
       if (e.key === "Escape") {
         // ESC bricht ALLES ab — unabhängig von Werkzeug und Objekt:
         // laufende Hub-Interaktionen, Sonder-Modi und Rahmen-Auswahl.
+        if (this.dimensionMoveActive) this.cancelDimensionMove();
         this.dimensionHubMode = "none";
         this.documentHubMode = "none";
         this.bgRemoveInteraction = null;
