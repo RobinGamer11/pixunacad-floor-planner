@@ -154,12 +154,10 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
   const showFilters = part !== "opacity";
 
   return (
-    <div
-      className="space-y-3"
-      onPointerDown={(e) => e.stopPropagation()}
-      onPointerMove={(e) => e.stopPropagation()}
-      onWheel={(e) => e.stopPropagation()}
-    >
+    // Keine pauschalen Stop-Propagation-Handler: Wisch-Gesten auf freien
+    // Flächen müssen den DragScrollDiv erreichen (vertikales Scrollen auf
+    // Tablets). Regler/Buttons stoppen gezielt selbst.
+    <div className="space-y-3">
       {/* Opacity */}
       {showOpacity && (
       <div>
