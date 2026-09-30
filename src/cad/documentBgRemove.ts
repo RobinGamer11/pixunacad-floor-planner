@@ -389,7 +389,7 @@ function _getMaskDataCache(doc: DocumentObject, mask: HTMLCanvasElement): { data
 export function applyMaskCropToDoc(doc: DocumentObject) {
   const b: BgRemoval | undefined = (doc as any).bgRemoval;
   const mask: HTMLCanvasElement | undefined = (doc as any)._bgFgMask;
-  if (!b?.enabled || !mask) return;
+  if (!b?.enabled || !bgRemovalApplied(doc) || !mask) return;
   const cache = _getMaskDataCache(doc, mask);
   if (!cache) return;
   const w = mask.width, h = mask.height;
@@ -438,7 +438,7 @@ export function paintBrushAt(doc: DocumentObject, worldPoint: Vec2, radiusM: num
   ctx.fill();
   ctx.restore();
   (doc as any)._bgMaskRev = ((doc as any)._bgMaskRev || 0) + 1;
-  ensureBgRemoval(doc).fgMaskDataUrl = null;
+  markBgMaskEdited(doc);
   // Crop-Update throttlen (Full-Mask-Scan wäre pro Brush-Frame zu teuer).
   const now = performance.now();
   const anyDoc = doc as any;
@@ -467,7 +467,7 @@ export function applyBgRemovalToCanvas(
   doc: DocumentObject,
 ): HTMLCanvasElement {
   const b: BgRemoval | undefined = (doc as any).bgRemoval;
-  if (!b || !b.enabled) return source;
+  if (!b || !b.enabled || !bgRemovalApplied(doc)) return source;
   const mask: HTMLCanvasElement | null = (doc as any)._bgFgMask || null;
   if (!mask) return source;
   const w = source.width, h = source.height;
