@@ -291,8 +291,7 @@ function _floodFillFromPixel(
   }
   ctx.putImageData(md, 0, 0);
   (doc as any)._bgMaskRev = ((doc as any)._bgMaskRev || 0) + 1;
-  const b = ensureBgRemoval(doc);
-  b.fgMaskDataUrl = null;
+  markBgMaskEdited(doc);
   applyMaskCropToDoc(doc);
   return true;
 }
