@@ -16,7 +16,15 @@ import { Vec2 } from "./geometry";
 import { documentCenterWorld } from "./documentGeometry";
 
 export interface BgRemoval {
+  /** Bearbeitungsbereich ist eingeschaltet (heißt nicht: Maske angewendet). */
   enabled: boolean;
+  /**
+   * Einzige verlässliche Anwendungsmarkierung: es wurde automatisch erkannt,
+   * weggeklickt oder gepinselt. Der Renderer maskiert nur bei
+   * `enabled && hasMaskEdits`. Bewusst nicht aus `fgMaskDataUrl` abgeleitet —
+   * während der Bearbeitung liegt die Maske nur im Speicher.
+   */
+  hasMaskEdits: boolean;
   /** Persistente Foreground-Alpha-Maske (PNG-DataURL). null = leer/schwarz. */
   fgMaskDataUrl: string | null;
   /** Flood-Fill-Toleranz (0..128). Höher = großzügiger. */
@@ -36,6 +44,7 @@ export interface BgRemoval {
 export function defaultBgRemoval(): BgRemoval {
   return {
     enabled: false,
+    hasMaskEdits: false,
     fgMaskDataUrl: null,
     tolerance: 32,
     brushRadiusM: 0.15,
@@ -49,7 +58,31 @@ export function defaultBgRemoval(): BgRemoval {
 export function ensureBgRemoval(doc: DocumentObject): BgRemoval {
   const anyDoc = doc as any;
   if (!anyDoc.bgRemoval) anyDoc.bgRemoval = defaultBgRemoval();
-  return anyDoc.bgRemoval as BgRemoval;
+  const b = anyDoc.bgRemoval as BgRemoval;
+  // Abwärtskompatibilität: Altdokumente kennen das Flag nicht. Eine vorhandene
+  // gespeicherte Maske bedeutet dort "angewendet".
+  if (typeof b.hasMaskEdits !== "boolean") b.hasMaskEdits = !!b.fgMaskDataUrl;
+  return b;
+}
+
+/** Wirkt die Hintergrundentfernung aktuell auf die Darstellung? */
+export function bgRemovalApplied(doc: DocumentObject): boolean {
+  const b: BgRemoval | undefined = (doc as any).bgRemoval;
+  if (!b || !b.enabled) return false;
+  if (typeof b.hasMaskEdits !== "boolean") return !!b.fgMaskDataUrl;
+  return b.hasMaskEdits;
+}
+
+/**
+ * Markiert eine echte Maskenbearbeitung. Die Pixelmaske selbst liegt im
+ * Speicher-Canvas; `fgMaskDataUrl` wird beim Sichern/Serialisieren aus dem
+ * Canvas neu erzeugt (siehe `exportBgMaskDataUrl`).
+ */
+export function markBgMaskEdited(doc: DocumentObject) {
+  const b = ensureBgRemoval(doc);
+  b.hasMaskEdits = true;
+  b.fgMaskDataUrl = null;
+  (doc as any)._bgMaskDirty = true;
 }
 
 /** Signatur für Renderer-Cache. */
@@ -57,8 +90,10 @@ export function bgRemovalSignature(doc: DocumentObject): string {
   const anyDoc = doc as any;
   const b: BgRemoval | undefined = anyDoc.bgRemoval;
   if (!b || !b.enabled) return "";
+  if (!bgRemovalApplied(doc)) return "";
   return [
     b.enabled ? "1" : "0",
+    "e1",
     b.fgColor || "-",
     b.fgAlpha.toFixed(3),
     b.bgColor || "-",
