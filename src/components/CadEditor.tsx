@@ -52,6 +52,7 @@ import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
+import { BgRemoveSection } from "@/components/cad/BgRemoveSection";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
 import { CanvasFabBar, LayerFab, LayersHelpCard, LayersPanelTitle } from "@/components/cad/LayerHelp";
@@ -3383,7 +3384,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
                 <FlipSection engine={appRef.current} docId={docSelected.id} />
 
-                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="filters" />
+                {/* Eigener Bereich direkt unter „Bild spiegeln“ */}
+                <BgRemoveSection app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
+
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="filters" showBgRemove={false} />
 
               </div>
             </div>
