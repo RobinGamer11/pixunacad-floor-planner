@@ -140,6 +140,9 @@ export class SelectTool {
   dragDimGrabDx = 0;
   dragDimGrabDy = 0;
   private dimensionHubGuideOrigin: Vec2 | null = null;
+  /** Läuft gerade ein zusammenhängender Pinselstrich (ein Verlaufsschritt)? */
+  private _bgBrushStrokeActive = false;
+  private _bgBrushStrokeDocId: string | null = null;
 
   // Bibliotheksinstanz Drag-State (Translate)
   /* Bibliotheksobjekte werden NICHT mehr direkt per Linksklick gezogen. Die
