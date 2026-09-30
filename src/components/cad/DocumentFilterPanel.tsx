@@ -208,8 +208,10 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
               onDragEnd={endDrag}
             />
 
-            {/* Hintergrund entfernen */}
-            {showBgRemove !== false && <BgRemovePanel app={app} doc={doc} />}
+            {/* „Hintergrund entfernen“ ist ein eigener Bereich unter
+                „Bild spiegeln“ (BgRemoveSection) und nicht mehr Teil der
+                Bildbearbeitung. */}
+
 
             {/* Filter-Liste */}
             <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
