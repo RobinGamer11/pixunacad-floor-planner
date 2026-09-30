@@ -171,6 +171,14 @@ export class Renderer {
    */
   textPtScale: number = 1;
 
+  /**
+   * Flüchtige Vorschau beim Verschieben einer Maßkette über den Hub.
+   * Nur Darstellung — das Scene-Objekt bleibt bis „✓ Fixieren“ unverändert.
+   * Wird nie serialisiert, synchronisiert oder in den Verlauf geschrieben.
+   */
+  dimensionMovePreview: { dimensionId: string; placementPoint: { x: number; y: number } } | null = null;
+
+
   constructor(ctx: CanvasRenderingContext2D, camera: Camera, scene: Scene, labels: LabelManager) {
     this.ctx = ctx;
     this.camera = camera;
