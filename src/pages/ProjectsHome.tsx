@@ -89,7 +89,6 @@ import { formatMinutes, netMinutes, useTimeEntries, useTimeEntriesForProjects } 
 import { ProjectTeamTab } from "@/components/project/ProjectTeamTab";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
-import { clearMappeClipboard } from "@/lib/mappeClipboard";
 import { SectionHeading } from "@/components/layout/SectionHeading";
 import { projectThumbnailSrc, thumbnailErrorFallback } from "@/lib/projectMeta";
 
@@ -1469,10 +1468,7 @@ function ProjectCard({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
-  const drawings = (p.pages ?? []).reduce(
-    (n, pg: any) => n + ((pg?.elements ?? []).filter((e: any) => e?.type === "cad-view").length || 0),
-    0
-  );
+  const sheetCount = (p.sheets ?? []).length;
   return (
     <div
       draggable
@@ -1518,7 +1514,7 @@ function ProjectCard({
           )}
         </div>
         <div className="text-[10px] truncate" style={{ color: "#8A9099" }}>
-          {p.pages.length} {p.pages.length === 1 ? "Seite" : "Seiten"} · {drawings} {drawings === 1 ? "Zeichnung" : "Zeichnungen"}
+          {sheetCount} {sheetCount === 1 ? "Zeichnungsblatt" : "Zeichnungsblätter"}
         </div>
       </div>
       <div className="relative self-start" ref={menuRef}>

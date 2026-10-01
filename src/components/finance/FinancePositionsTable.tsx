@@ -2,9 +2,9 @@ import { useNavigate } from "react-router-dom";
 import React, { useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { GripVertical, Trash2, Calendar, FileText, ChevronUp, ChevronDown } from "lucide-react";
+import { GripVertical, Trash2, Calendar, ChevronUp, ChevronDown } from "lucide-react";
 import {
-  financeStore, formatEur, parseEur, templateKeyOf,
+  financeStore, formatEur, parseEur,
   type FinancePosition, type FinancePositionType,
 } from "@/lib/financeStore";
 
@@ -152,14 +152,6 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
                   style={{ borderColor: "hsl(var(--hairline))" }}>
                   Zuklappen
                 </button>
-                {p.hasTemplate && (
-                  <button type="button"
-                    onClick={() => navigate(`/project/${projectId}?tpl=${encodeURIComponent(templateKeyOf(p.type, p.id))}&back=${nodeId}`)}
-                    className="h-9 px-3 rounded-md border flex items-center gap-2 text-xs"
-                    style={{ borderColor: "hsl(var(--hairline))" }}>
-                    <FileText size={14} /> Vorlage
-                  </button>
-                )}
                 <button type="button" onClick={() => financeStore.deletePosition(projectId, p.id)}
                   className="h-9 px-3 rounded-md border flex items-center gap-2 text-xs"
                   style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -262,15 +254,6 @@ export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, posi
 
 
             <div className="flex items-center justify-end gap-1">
-              {p.hasTemplate && (
-                <button type="button"
-                  onClick={() => navigate(`/project/${projectId}?tpl=${encodeURIComponent(templateKeyOf(p.type, p.id))}&back=${nodeId}`)}
-                  className="h-7 w-7 rounded flex items-center justify-center border hover:bg-muted"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                  title="Vorlage in der Projektmappe bearbeiten">
-                  <FileText size={14} style={{ color: "hsl(var(--ink-soft))" }} />
-                </button>
-              )}
               <button type="button" onClick={() => financeStore.deletePosition(projectId, p.id)}
                 className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted" title="Position löschen">
                 <Trash2 size={14} style={{ color: "hsl(var(--ink-soft))" }} />

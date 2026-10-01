@@ -9,7 +9,6 @@ import { WorkspaceSyncProvider } from "@/lib/workspaceSync";
 import { ProjectAccessProvider } from "@/lib/projectAccessProvider";
 import ProjectsHome from "./pages/ProjectsHome";
 import Login from "./pages/Login";
-import ProjectWorkspace from "./pages/ProjectWorkspace";
 import CadPage from "./pages/CadPage";
 import BoardPage from "./pages/BoardPage";
 import PasswordReset from "./pages/PasswordReset";
@@ -68,7 +67,7 @@ const App = () => (
             <Route path="/datenschutz" element={<Datenschutz />} />
             <Route element={<RequireAuth />}>
               <Route path="/" element={<ProjectsHome />} />
-              <Route path="/project/:projectId" element={<ProjectWorkspace />} />
+              <Route path="/project/:projectId" element={<ProjectRootRedirect />} />
               <Route path="/project/:projectId/cad" element={<CadPage />} />
               <Route path="/project/:projectId/cad/:sheetId" element={<CadPage />} />
               <Route path="/project/:projectId/export" element={<CadPage />} />
