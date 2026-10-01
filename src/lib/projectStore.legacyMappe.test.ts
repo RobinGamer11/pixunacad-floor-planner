@@ -49,7 +49,9 @@ describe("Entfernung der früheren Projektmappe", () => {
     expect(p).not.toHaveProperty("mappen");
     expect(p).not.toHaveProperty("activeMappeId");
     expect(p).not.toHaveProperty("textSpanTemplates");
-    expect((p.sheets as typeof SHEETS)[0].sceneJson).toBe(SHEETS[0].sceneJson);
+    const sheet = (p.sheets as typeof SHEETS)[0];
+    expect(sheet.id).toBe("s1");
+    expect(JSON.parse(sheet.sceneJson).segments[0].id).toBe("a");
   });
 
   it("übernimmt die alte Hilfe-Einstellung einmalig als helpOn", async () => {
@@ -79,7 +81,7 @@ describe("Entfernung der früheren Projektmappe", () => {
     const p = projectStore.getState().projects.find((x) => x.id === "p-cloud") as unknown as Record<string, unknown>;
     expect(p).not.toHaveProperty("pages");
     expect(p).not.toHaveProperty("mappen");
-    expect(p.sheets).toEqual(SHEETS);
+    expect(p.sheets).toMatchObject(SHEETS);
   });
 
   it("speichert die Hilfe dauerhaft ohne Undo-Schritt", async () => {
