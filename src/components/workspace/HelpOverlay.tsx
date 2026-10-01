@@ -124,8 +124,8 @@ function TextModeGlyph() {
   );
 }
 
-/** Rein visuelle, vollständig durchklickbare Schnellhilfe für die Mappe. */
-export function MappeHelpOverlay({
+/** Rein visuelle, vollständig durchklickbare Schnellhilfe für CAD und Export. */
+export function HelpOverlay({
   guideActive = false,
   lineActive = false,
   hatchActive = false,
