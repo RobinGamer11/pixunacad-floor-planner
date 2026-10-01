@@ -136,3 +136,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Versionierte Bereinigung alter Mappenfelder (lokal + Cloud), Hilfe-Schalter neutral als `helpOn`
 - [x] Projektübersicht zählt CAD-Blätter; CAD-Druckpläne und Export unverändert
 - [ ] Abnahme im Browser mit Anmeldung (Nutzer)
+
+## Alte CAD-Druckplan-Bedienung entfernt – Stand
+- [x] PlanPanel, Häkchen-Auswahl, „PDF drucken“, alter Exportieren-Knopf entfernt; Exportseiten/Plan-Szenen/Ausschnitte unverändert
+- [ ] Abnahme im Browser mit echtem Projekt (Nutzer)
