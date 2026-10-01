@@ -48,7 +48,7 @@ import {
   CadSegmentedProxy,
 } from "@/components/cad/CadFieldProxies";
 
-import { MappeHelpOverlay } from "@/components/workspace/MappeHelpOverlay";
+import { HelpOverlay } from "@/components/workspace/HelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
@@ -2138,9 +2138,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <CadCommentLayer app={appRef.current} projectId={projectId} />
         )}
 
-        {/* Hilfeanzeige wie in der Mappe — werkzeugabhängig. */}
+        {/* Hilfeanzeige — werkzeugabhängig. */}
         {!presenting && helpOn && (
-          <MappeHelpOverlay
+          <HelpOverlay
             guideActive={false}
             lineActive={activeTool === ToolIds.LINE || activeTool === ToolIds.FREE}
             hatchActive={activeTool === ToolIds.HATCH}

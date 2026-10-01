@@ -10,7 +10,7 @@
  *   - Bildschirmzoom (pxPerMm) ist eine unabhängige reine Darstellungsgröße.
  *   - PDF-Export: 1 mm Papier == 1 mm PDF (kein "fit to page").
  */
-import type { PageFormat, ProjectPage } from "./projectStore";
+import type { PageFormat } from "./projectStore";
 import { normalizeScaleDen } from "./scale";
 
 export { MM_PER_INCH, MM_TO_PT } from "./scale";
@@ -34,7 +34,7 @@ export const DIN_FORMATS_MM = {
 
 /** Reale Papiergröße einer Seite in mm.
  *  Für "frei" werden — falls vorhanden — die individuellen Felder benutzt. */
-export function getPageSizeMm(page: Pick<ProjectPage, "format" | "customWidthMm" | "customHeightMm">): {
+export function getPageSizeMm(page: { format: PageFormat; customWidthMm?: number; customHeightMm?: number }): {
   wMm: number;
   hMm: number;
 } {

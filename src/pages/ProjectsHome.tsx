@@ -89,7 +89,6 @@ import { formatMinutes, netMinutes, useTimeEntries, useTimeEntriesForProjects } 
 import { ProjectTeamTab } from "@/components/project/ProjectTeamTab";
 import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
-import { clearMappeClipboard } from "@/lib/mappeClipboard";
 import { SectionHeading } from "@/components/layout/SectionHeading";
 import { projectThumbnailSrc, thumbnailErrorFallback } from "@/lib/projectMeta";
 
@@ -144,8 +143,6 @@ export default function ProjectsHome() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [headerMenuOpen]);
-  // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
-  useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
 
     if (!shopOpen) return;
@@ -351,8 +348,8 @@ export default function ProjectsHome() {
   };
 
   const deleteProjectWithConfirm = (p: Project) => {
-    const label = p.isTemplate ? "Vorlage" : "Projektmappe";
-    const msg = `${label} „${p.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dokumente\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+    const label = p.isTemplate ? "Vorlage" : "Projekt";
+    const msg = `${label} „${p.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Zeichenblätter & Exportseiten\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dokumente\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
     if (!confirm(msg)) return;
     projectStore.deleteProject(p.id);
     if (selectedId === p.id) {
@@ -1058,7 +1055,7 @@ export default function ProjectsHome() {
                       Tutorial – Grundlagen
                     </div>
                     <div className="mt-1 text-xs" style={{ color: "rgba(220,230,255,0.4)" }}>
-                      PixunaCAD · Einführung in Oberfläche, Werkzeuge und Projektmappe
+                      PixunaCAD · Einführung in Oberfläche, Werkzeuge und Export
                     </div>
                   </div>
                 </div>
@@ -1242,8 +1239,8 @@ export default function ProjectsHome() {
                         </button>
                         <button
                           onClick={() => {
-                            const label = selected.isTemplate ? "Vorlage" : "Projektmappe";
-                            const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Seiten & Zeichenblätter\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dokumente\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
+                            const label = selected.isTemplate ? "Vorlage" : "Projekt";
+                            const msg = `${label} „${selected.name}" wirklich löschen?\n\nAlle Inhalte werden endgültig entfernt:\n• Zeichenblätter & Exportseiten\n• CAD-Elemente & Bemaßungen\n• Board-Themen, Aufgaben & Notizen\n• Dokumente\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`;
                             if (confirm(msg)) {
                               projectStore.deleteProject(selected.id);
                               setTitleMenuOpen(false);
@@ -1469,10 +1466,7 @@ function ProjectCard({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
-  const drawings = (p.pages ?? []).reduce(
-    (n, pg: any) => n + ((pg?.elements ?? []).filter((e: any) => e?.type === "cad-view").length || 0),
-    0
-  );
+  const sheetCount = (p.sheets ?? []).length;
   return (
     <div
       draggable
@@ -1518,7 +1512,7 @@ function ProjectCard({
           )}
         </div>
         <div className="text-[10px] truncate" style={{ color: "#8A9099" }}>
-          {p.pages.length} {p.pages.length === 1 ? "Seite" : "Seiten"} · {drawings} {drawings === 1 ? "Zeichnung" : "Zeichnungen"}
+          {sheetCount} {sheetCount === 1 ? "Zeichnungsblatt" : "Zeichnungsblätter"}
         </div>
       </div>
       <div className="relative self-start" ref={menuRef}>
@@ -1718,186 +1712,6 @@ function TaskTimeline({ project }: { project: Project }) {
               </div>
             );
           })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SeitenInhaltGrid({ project, onAddPage }: { project: Project; onAddPage: () => void }) {
-  const thumbInput = useRef<HTMLInputElement | null>(null);
-  const [editKonzept, setEditKonzept] = useState(false);
-  const [konzeptDraft, setKonzeptDraft] = useState(project.konzept ?? "");
-
-  // Sheets actually placed onto a page (cad-view elements)
-  const usedSheetIds = new Set<string>();
-  project.pages.forEach((pg) =>
-    pg.elements.forEach((el) => {
-      if (el.kind === "cad-view" && el.sheetId) usedSheetIds.add(el.sheetId);
-    })
-  );
-  const usedSheets = project.sheets.filter((s) => usedSheetIds.has(s.id));
-
-  const handleThumb = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => {
-      projectStore.updateProject(project.id, { thumbnail: String(r.result) });
-    };
-    r.readAsDataURL(f);
-  };
-
-  return (
-    <div className="grid grid-cols-[260px_1fr] gap-6 mt-6">
-      {/* Seitenliste */}
-      <div
-        className="rounded-2xl p-4"
-        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-      >
-        <div className="flex items-center justify-between text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-          SEITEN
-          <button
-            onClick={onAddPage}
-            title="Neue Seite hinzufügen"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
-        <div className="mt-3 space-y-2">
-          {project.pages.map((pg) => (
-            <div
-              key={pg.id}
-              className="flex items-center gap-3 p-2 rounded-md"
-              style={{ background: "hsl(var(--surface-muted))" }}
-            >
-              <div
-                className="w-10 h-10 rounded bg-white border"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-              />
-              <div className="flex-1 text-sm truncate">{pg.title}</div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-5 text-[11px] font-semibold tracking-[0.18em] text-muted-foreground">
-          ZEICHNUNGSBLÄTTER
-        </div>
-        <div className="mt-3 space-y-2">
-          {usedSheets.length === 0 && (
-            <div className="text-xs text-muted-foreground italic px-1">
-              Noch keine Zeichnungsblätter platziert.
-            </div>
-          )}
-          {usedSheets.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted">
-              <div
-                className="w-10 h-10 rounded bg-white border"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-              />
-              <div className="flex-1">
-                <div className="text-sm">{s.name}</div>
-                <div className="text-[11px] text-muted-foreground">{s.scale}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Hero / Konzept */}
-      <div
-        className="rounded-2xl p-6"
-        style={{ background: "hsl(var(--surface-card))", border: "1px solid hsl(var(--hairline))" }}
-      >
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Projekttitelbild</span>
-          <span>Geändert: {new Date(project.updatedAt).toLocaleString("de-DE")}</span>
-        </div>
-        <div className="mt-3 group" style={{ perspective: "1200px" }}>
-        <div
-          className="rounded-xl overflow-hidden aspect-[16/9] relative shadow-xl transition-transform duration-700 group-hover:[transform:rotateY(0deg)_rotateX(0deg)_scale(1.01)]"
-          style={{
-            background: "hsl(var(--surface-muted))",
-            transform: "rotateY(-8deg) rotateX(4deg)",
-            transformStyle: "preserve-3d",
-          }}
-        >
-          <img src={projectThumbnailSrc(project.thumbnail, project.projektTyp)} onError={(e) => thumbnailErrorFallback(e, project.projektTyp)} alt="" className="w-full h-full object-cover" />
-
-          <button
-            onClick={() => thumbInput.current?.click()}
-            title="Titelbild ändern"
-            className="absolute top-3 right-3 h-8 w-8 rounded-full flex items-center justify-center shadow"
-            style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
-          >
-            <Pencil size={14} />
-          </button>
-          <input
-            ref={thumbInput}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleThumb}
-          />
-        </div>
-        </div>
-
-        <div className="mt-5">
-          <div className="flex items-center justify-between">
-            <div
-              className="text-xs font-semibold tracking-[0.18em]"
-              style={{ color: "hsl(var(--accent-gold))" }}
-            >
-              KONZEPT
-            </div>
-            {!editKonzept && (
-              <button
-                onClick={() => {
-                  setKonzeptDraft(project.konzept ?? "");
-                  setEditKonzept(true);
-                }}
-                title="Konzept bearbeiten"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <Pencil size={14} />
-              </button>
-            )}
-          </div>
-          {editKonzept ? (
-            <div className="mt-2 space-y-2">
-              <textarea
-                value={konzeptDraft}
-                onChange={(e) => setKonzeptDraft(e.target.value)}
-                rows={4}
-                className="w-full text-sm rounded-md border p-2 bg-transparent outline-none"
-                style={{ borderColor: "hsl(var(--hairline))" }}
-              />
-              <div className="flex gap-2 justify-end">
-                <button
-                  onClick={() => setEditKonzept(false)}
-                  className="h-8 px-3 rounded-md border text-xs"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                >
-                  Abbrechen
-                </button>
-                <button
-                  onClick={() => {
-                    projectStore.updateProject(project.id, { konzept: konzeptDraft });
-                    setEditKonzept(false);
-                  }}
-                  className="h-8 px-3 rounded-md text-xs font-medium"
-                  style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-                >
-                  Speichern
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground max-w-xl whitespace-pre-wrap">
-              {project.konzept ||
-                "Noch keine Beschreibung. Klicke auf das Stift-Symbol, um ein kurzes Konzept hinzuzufügen."}
-            </p>
-          )}
         </div>
       </div>
     </div>

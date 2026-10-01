@@ -46,7 +46,7 @@ export function CommentsTab({
       bookId: c.book_id,
       commentId: c.id,
     });
-    navigate(c.context === "cad" ? `/project/${c.project_id}/cad/${c.sheet_id}` : `/project/${c.project_id}`);
+    navigate(c.context === "cad" ? `/project/${c.project_id}/cad/${c.sheet_id}` : `/project/${c.project_id}/cad`);
   };
 
   if (!projects.length) {
@@ -115,7 +115,7 @@ export function CommentsTab({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{c.body}</span>
                   <span className="block text-[11px] opacity-60">
-                    {nameOf(c.author_id)} · {c.context === "cad" ? "CAD" : "Projektmappe"} ·{" "}
+                    {nameOf(c.author_id)} · {c.context === "cad" ? "CAD" : "Archiv"} ·{" "}
                     {formatWhen(c.created_at)} · {c.status === "done" ? "Erledigt" : "Offen"}
                   </span>
                 </span>

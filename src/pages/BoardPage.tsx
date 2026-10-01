@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useParams, useSearchParams } from "react-router-dom";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { projectStore, useProject } from "@/lib/projectStore";
-import { clearMappeClipboard } from "@/lib/mappeClipboard";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 
 import {
@@ -89,19 +88,17 @@ type InsightTab = "cat" | "time" | "dev" | null;
 export default function BoardPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const project = useProject(projectId);
-  // Wechsel in eine andere Hauptoberfläche leert die Projektmappen-Zwischenablage.
-  useEffect(() => { clearMappeClipboard(); }, []);
   const state = useTimeline(projectId);
   const hist = useTimelineHistory(projectId);
 
-  /* Kopfzeilen-Hilfen wie in Mappe/CAD/Finanzen. */
+  /* Kopfzeilen-Hilfen wie in CAD/Finanzen. */
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
     try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
   });
   useEffect(() => {
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch { /* ignore */ }
   }, [tabletAidOn]);
-  const mappeHelpOn = project?.settings?.mappeHelpOn ?? true;
+  const helpOn = project?.settings?.helpOn ?? true;
 
 
 
@@ -570,8 +567,8 @@ export default function BoardPage() {
         onRedo={hist.redo}
         canDelete={!!selectedId}
         onDelete={() => { if (projectId && selectedId) { timelineStore.deleteItem(projectId, selectedId); setSelectedId(null); } }}
-        mappeHelpOn={mappeHelpOn}
-        onToggleMappeHelp={() => project && projectStore.setMappeHelpOn(project.id, !mappeHelpOn)}
+        helpOn={helpOn}
+        onToggleHelp={() => project && projectStore.setHelpOn(project.id, !helpOn)}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />

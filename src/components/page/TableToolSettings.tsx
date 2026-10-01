@@ -6,7 +6,6 @@ import {
   Rows3, Columns3, Trash2, Filter, Equal,
   SquareDashed, Square, Info,
 } from "lucide-react";
-import { projectStore } from "@/lib/projectStore";
 import type { PageElement } from "@/lib/projectStore";
 import {
   normalizeTable, toTableData, resizeGrid, insertRow, insertCol, removeRow, removeCol,
@@ -107,8 +106,7 @@ export function TableToolSettings({
       patch.w = Math.max(1, Math.min(100, (wMm / pageWmm) * 100));
       patch.h = Math.max(1, Math.min(100, (hMm / pageHmm) * 100));
     }
-    if (onPatch) onPatch(patch);
-    else projectStore.updateElement(projectId, pageId, tableElement.id, patch as any);
+    onPatch?.(patch);
   };
 
   const patchTable = (patch: Partial<TableModel>) => commit({ ...model, ...patch });

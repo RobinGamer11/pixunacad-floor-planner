@@ -34,7 +34,7 @@ const emit = (event: SharedSyncEvent) => listeners.forEach((fn) => fn(event));
 
 function isPlausibleProject(value: unknown): value is Project {
   const p = value as Project | null;
-  return Boolean(p && typeof p.id === "string" && Array.isArray(p.pages));
+  return Boolean(p && typeof p.id === "string" && Array.isArray(p.sheets));
 }
 
 /**
@@ -63,7 +63,7 @@ export async function hydrateSharedProject(projectId: string): Promise<boolean> 
     if (deletedAt) projectStore.applyCloudTrash(projectId, deletedAt);
   }
   if (cloudDeletedAt) return false;
-  if (hasBaseline(baselineKey("mappe", projectId)) || hasBaseline(baselineKey("cad", projectId))) return false;
+  if (hasBaseline(baselineKey("cad", projectId))) return false;
   try {
     const doc = await loadProjectDocument(projectId);
     if (!doc) return false;

@@ -130,3 +130,9 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] „Hintergrund entfernen“ als eigener An/Aus-Bereich unter „Bild spiegeln“ (`BgRemoveSection`): `enabled` = Bereich offen, `hasMaskEdits` = einzige Anwendungsmarkierung; Einschalten schneidet nichts weg; Maske + Flag werden gespeichert/synchronisiert; An/Aus, „Automatisch erkennen“, „Maske zurücksetzen“ und jeder Pinselstrich je genau ein Undo-Schritt
 - [x] Bildbearbeitung auf dem Tablet wieder vertikal scrollbar (keine pauschalen Stop-Propagation-Handler im Filterbereich)
 - [ ] Abnahme auf echtem Tablet (Nutzer)
+
+## Alte Projektmappe entfernt – Stand
+- [x] Mappe-Reiter, Bildschirm, Zwischenablage, Cloud-Pfade, Seiten-/Vorlagenlogik und Altdateien entfernt; `/project/:id` leitet auf CAD weiter
+- [x] Versionierte Bereinigung alter Mappenfelder (lokal + Cloud), Hilfe-Schalter neutral als `helpOn`
+- [x] Projektübersicht zählt CAD-Blätter; CAD-Druckpläne und Export unverändert
+- [ ] Abnahme im Browser mit Anmeldung (Nutzer)

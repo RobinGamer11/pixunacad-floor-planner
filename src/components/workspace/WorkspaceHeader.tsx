@@ -32,7 +32,6 @@ import {
   Loader2,
   Users,
   Play,
-  FolderKanban,
   Compass, Printer,
   Trash2,
   Copy,
@@ -44,12 +43,12 @@ import {
   Wallet,
 } from "lucide-react";
 
-export type WorkspaceMode = "workspace" | "cad" | "export" | "finance" | "board";
+export type WorkspaceMode = "cad" | "export" | "finance" | "board";
 
 interface Props {
   projectId?: string;
   projectName?: string;
-  contextLabel?: string;         // e.g. active page title / mappe name
+  contextLabel?: string;         // e.g. active sheet or page title
   mode: WorkspaceMode;
   canUndo?: boolean;
   canRedo?: boolean;
@@ -59,7 +58,7 @@ interface Props {
   onDelete?: () => void;
   canCopy?: boolean;
   onCopy?: () => void;
-  /** Ansicht zentrieren (CAD: Weltursprung, Mappe: Blatt/100 %). */
+  /** Ansicht zentrieren (CAD: Weltursprung). */
   onCenterView?: () => void;
   canPaste?: boolean;
   onPaste?: () => void;
@@ -74,12 +73,12 @@ interface Props {
   tabletAidOn?: boolean;
   onToggleTabletAid?: () => void;
   /** Projektbezogene Schnellhilfe ein- oder ausblenden. */
-  mappeHelpOn?: boolean;
-  onToggleMappeHelp?: () => void;
+  helpOn?: boolean;
+  onToggleHelp?: () => void;
 }
 
 /**
- * Gemeinsamer Kopf für Projektmappenbearbeitung und CAD-Oberfläche.
+ * Gemeinsamer Kopf für CAD, Export und Board.
  * Layout ist in beiden Modi identisch — schnelles Umschalten via Modus-Buttons.
  */
 export function WorkspaceHeader({
@@ -106,13 +105,12 @@ export function WorkspaceHeader({
   onExport,
   tabletAidOn = false,
   onToggleTabletAid,
-  mappeHelpOn = false,
-  onToggleMappeHelp,
+  helpOn = false,
+  onToggleHelp,
 }: Props) {
   const navigate = useNavigate();
   const headerRef = useDragScroll<HTMLElement>("x");
 
-  const goWorkspace = () => projectId && navigate(`/project/${projectId}`);
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
   const goExport = () => projectId && navigate(`/project/${projectId}/export`);
   const showExportTab = isExportAreaEnabled() || mode === "export";
@@ -154,15 +152,15 @@ export function WorkspaceHeader({
           </>
         )}
 
-        {(onToggleMappeHelp || onToggleTabletAid) && (
+        {(onToggleHelp || onToggleTabletAid) && (
           <div className="ml-1 flex items-center gap-1">
-            {onToggleMappeHelp && (
+            {onToggleHelp && (
               <HeaderAidToggle
-                active={mappeHelpOn}
+                active={helpOn}
                 icon={<HelpCircle size={16} />}
                 label="Hilfe"
                 title="Bedienungshilfe ein- oder ausblenden"
-                onClick={onToggleMappeHelp}
+                onClick={onToggleHelp}
               />
             )}
             {onToggleTabletAid && (
@@ -198,13 +196,6 @@ export function WorkspaceHeader({
               />
             </>
           )}
-          <ModeDivider />
-          <ModeButton
-            icon={<FolderKanban size={13} />}
-            label="Mappe"
-            active={mode === "workspace"}
-            onClick={goWorkspace}
-          />
 
         </div>
       </div>
@@ -374,7 +365,7 @@ function CloudSaveControl({ projectId }: { projectId?: string }) {
             style={{ borderColor: "hsl(var(--hairline))" }}
           >
             <div className="font-medium flex items-center gap-1.5"><CloudDownload size={14} /> Cloudstand laden</div>
-            <div className="text-muted-foreground text-xs mt-1">Der gesicherte Cloudstand ersetzt CAD und Mappe auf diesem Gerät. Abweichende Inhalte dieses Geräts werden verworfen.</div>
+            <div className="text-muted-foreground text-xs mt-1">Der gesicherte Cloudstand ersetzt CAD und Export auf diesem Gerät. Abweichende Inhalte dieses Geräts werden verworfen.</div>
           </button>
           <button
             disabled={busy}

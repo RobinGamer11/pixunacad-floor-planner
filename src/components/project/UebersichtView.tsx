@@ -17,8 +17,6 @@ import {
 
 interface Props {
   project: Project;
-  activeMappeId?: string;
-  onSelectMappe?: (id: string) => void;
   /** Öffnet den gemeinsamen Projekt-Bearbeiten-Dialog. */
   onEditProject?: () => void;
 }

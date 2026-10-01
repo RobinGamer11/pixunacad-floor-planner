@@ -65,7 +65,7 @@ export function saveSeenSeq(baseKey: string, seq: number): void {
  * Zuerst im lokalen Speicher; passt sie dort nicht hinein, wird sie als Datei
  * heruntergeladen – die Kopie geht also nie verloren.
  */
-export function writeSafetyCopy(scope: "cad" | "mappe", projectId: string, content: string): void {
+export function writeSafetyCopy(scope: "cad", projectId: string, content: string): void {
   if (typeof window === "undefined") return;
   const key = `pixuna.cloudbackup.${scope}.${projectId}`;
   try {
