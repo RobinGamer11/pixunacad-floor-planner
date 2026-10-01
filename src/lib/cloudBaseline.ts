@@ -12,7 +12,7 @@ const PREFIX = "pixuna.cloudbase.";
 /** Trennzeichen innerhalb eines Objektschlüssels (kommt in IDs nicht vor). */
 export const BASELINE_SEP = "\u0001";
 
-export function baselineKey(scope: "cad" | "mappe", projectId: string): string {
+export function baselineKey(scope: "cad", projectId: string): string {
   return `${PREFIX}${scope}.${projectId}`;
 }
 

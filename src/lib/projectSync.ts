@@ -11,7 +11,7 @@
  *  - "live"    – mindestens zwei aktive Personen: objektweise Live-Synchronisierung;
  *                manuelles Speichern entfällt.
  *
- * CAD und Projektmappe melden sich hier als Quellen an. Sie behalten ihre
+ * CAD (inkl. Export) meldet sich hier als Quelle an. Sie behalten ihre
  * eigenen objektweisen Operationen, folgen aber derselben Entscheidung.
  * Es gibt keinen weiteren Weg mehr, über den Projektinhalte in die Cloud
  * geschrieben werden.
@@ -99,7 +99,7 @@ function recompute(projectId: string) {
   listeners.forEach((fn) => fn());
 }
 
-/** Meldet CAD bzw. Projektmappe als Quelle an. */
+/** Meldet eine Quelle (CAD/Export) an. */
 export function registerProjectSyncSource(
   projectId: string,
   key: string,
