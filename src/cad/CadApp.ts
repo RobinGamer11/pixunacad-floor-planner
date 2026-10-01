@@ -52,7 +52,6 @@ import { DoorTool } from "./DoorTool";
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
 import { PlanManager, getPlanPaperSize } from "./PlanManager";
-import { PlanPanel } from "./PlanPanel";
 import { PlanController } from "./PlanController";
 import { drawProjection as drawPlanProjection, computeProjectionLayout } from "./PlanProjections";
 import { collectSceneSnapGeometry, transformSnapGeometryToPlan, type TracingSnapGeometry } from "./tracingSnapGeometry";
@@ -523,9 +522,8 @@ export class CadApp {
   /** Map: sheetId → eigene Scene. Default-Sheet teilt sich die initiale `this.scene`. */
   scenesById: Map<string, Scene> = new Map();
 
-  /** Druckpläne (Layout-Blätter mit Papierformat). */
+  /** Exportseiten (Papierseiten mit Format, Ordnern, Ausschnitten). */
   planManager: PlanManager = new PlanManager();
-  planPanel: PlanPanel | null = null;
   /** Aktiver Plan (null = Zeichnungsmodus, kein Plan-Hintergrund). */
   activePlanId: string | null = null;
   /**
@@ -3599,44 +3597,7 @@ export class CadApp {
     this.sheetPanel?.render();
   }
 
-  /**
-   * Verdrahtet das Druckpläne-Panel.
-   * Wird vom React-Wrapper nach dem Mount aufgerufen.
-   */
-  attachPlanPanel(
-    root: HTMLDivElement,
-    body: HTMLDivElement,
-    list: HTMLDivElement,
-    addBtn: HTMLButtonElement,
-    printBtn: HTMLButtonElement,
-    toggleBtn: HTMLButtonElement,
-  ) {
-    this.planPanel = new PlanPanel(
-      this.planManager,
-      this.planOverlayStore,
-      root, body, list, addBtn, printBtn, toggleBtn,
-      {
-        getActivePlanId: () => this.activePlanId,
-        setActivePlanId: (id: string | null) => this.setActivePlanId(id),
-        printSelected: () => this.printSelectedPlans(),
-        onChange: () => {
-          // Verwaiste Plan-Scenes/Overlays aufräumen.
-          this._syncPlanSceneMap();
-          // Falls Format des aktiven Plans geändert wurde → Renderer aktualisieren.
-          if (this.activePlanId) this._applyPlanModeToRenderer();
-          // Tracing-Layer (andere Pläne) neu aufbauen.
-          this._syncPlanTracingLayers();
-          this.refreshPlanUI();
-          // Snapshot, damit Plan-Änderungen in Undo/Redo landen.
-          this.commitHistorySnapshot();
-        },
-      },
-    );
-    this.planPanel.render();
-  }
-
   refreshPlanUI() {
-    this.planPanel?.render();
     this._emitPlanUiChange();
   }
 
@@ -4194,14 +4155,6 @@ export class CadApp {
     return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
   }
 
-  async printSelectedPlans() {
-    const sel = this.planManager.getSelected();
-    if (sel.length === 0) {
-      alert("Bitte mindestens einen Plan auswählen (Häkchen rechts neben dem Plannamen).");
-      return;
-    }
-    await this._exportPlansPdf(sel);
-  }
 
   private async _exportPlansPdf(sel: import("./PlanManager").Plan[]) {
     try {
@@ -4227,7 +4180,7 @@ export class CadApp {
         : `Druckplaene_${stamp}.pdf`;
       downloadPdfBytes(bytes, fname);
     } catch (err) {
-      console.error("[printSelectedPlans] PDF-Export fehlgeschlagen:", err);
+      console.error("[exportPlansPdf] PDF-Export fehlgeschlagen:", err);
       alert("PDF-Export fehlgeschlagen. Details in der Browser-Konsole.");
     }
   }

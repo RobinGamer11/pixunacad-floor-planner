@@ -68,7 +68,6 @@ interface Props {
   zoomPercent?: number;          // display-only; may be undefined
   onPresent?: () => void;
   onShare?: () => void;
-  onExport?: () => void;
   /** Tablet-Hilfsrad (LMB/RMB/SHIFT/ESC/ENTF) einblenden. */
   tabletAidOn?: boolean;
   onToggleTabletAid?: () => void;
@@ -102,7 +101,6 @@ export function WorkspaceHeader({
   zoomPercent,
   onPresent,
   onShare,
-  onExport,
   tabletAidOn = false,
   onToggleTabletAid,
   helpOn = false,
@@ -299,14 +297,6 @@ export function WorkspaceHeader({
               title="Präsentieren"
             >
               <Play size={13} /> Präsentieren
-            </button>
-            <button
-              onClick={onExport}
-              className="h-8 px-3 rounded-md text-xs font-medium"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}
-              title="Exportieren"
-            >
-              Exportieren
             </button>
           </>
         )}

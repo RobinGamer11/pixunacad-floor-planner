@@ -7,7 +7,7 @@ import { normalizeHolePunchSide, normalizeHolePattern, type HolePunchSide, type 
  * Druckpläne: Layout-Blätter mit Papierformat, auf denen Projektionen
  * (Snapshots von Zeichenblättern) platziert werden können.
  *
- * Hinweis: Reines Datenmodell. UI in PlanPanel, Rendering in Renderer (Step 3+).
+ * Hinweis: Reines Datenmodell. UI im Exportbereich (ExportSidebar), Rendering im Renderer.
  */
 
 /** Papierformat in Millimeter (Hochformat: width<=height by convention). */
@@ -424,7 +424,6 @@ export class PlanManager {
     if (!this.canDeletePlan(id)) return false;
     const sid = this.getById(id)?.spreadId ?? null;
     this.plans = this.plans.filter(p => p.id !== id);
-    this._legacyPrintSelection.delete(id);
     if (sid) this._cleanupSpread(sid);
     return true;
   }
@@ -439,21 +438,6 @@ export class PlanManager {
     return true;
   }
 
-  /** Häkchen der alten CAD-Druckplanliste: rein lokaler UI-Zustand, nie
-   * Teil von Planmodell, Serialisierung, Verlauf oder Cloud. */
-  private _legacyPrintSelection = new Set<string>();
-
-  setSelected(id: string, selected: boolean): boolean {
-    if (!this.getById(id)) return false;
-    if (selected) this._legacyPrintSelection.add(id); else this._legacyPrintSelection.delete(id);
-    return true;
-  }
-
-  isSelected(id: string): boolean { return this._legacyPrintSelection.has(id); }
-
-  getSelected(): Plan[] {
-    return this.plans.filter(p => this._legacyPrintSelection.has(p.id));
-  }
 
   /** Fügt eine Projektion an. Daten werden 1:1 übernommen (Caller liefert sceneSnapshot). */
   addProjection(planId: string, projection: Projection): Projection | null {

@@ -128,7 +128,6 @@ const CadPage = () => {
         onToggleHelp={() => project && projectStore.setHelpOn(project.id, !helpOn)}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
-        onExport={() => editorRef.current?.openExportPanel()}
       />
       <main
         ref={mainRef}
