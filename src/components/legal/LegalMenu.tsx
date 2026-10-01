@@ -39,7 +39,7 @@ export function LegalMenuPopover({ onClose }: { onClose: () => void }) {
         </ThemeIconButton>
         <ThemeIconButton
           active={canvasDark}
-          title="Nur Zeichenfläche schwarz (CAD & Projektmappe, auch beim Export)"
+          title="Nur Zeichenfläche schwarz (CAD und Export)"
           onClick={() => setCanvasDark(!canvasDark)}
         >
           <Contrast size={15} />
