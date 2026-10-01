@@ -143,8 +143,6 @@ export default function ProjectsHome() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [headerMenuOpen]);
-  // Projekt verlassen → Projektmappen-Zwischenablage verwerfen.
-  useEffect(() => { clearMappeClipboard(); }, []);
   useEffect(() => {
 
     if (!shopOpen) return;

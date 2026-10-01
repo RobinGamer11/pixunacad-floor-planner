@@ -27,6 +27,12 @@ function FinanceRedirect() {
   return <Navigate to={`/?project=${projectId ?? ""}&tab=finanzen`} replace />;
 }
 
+/** Die frühere Projektmappe ist entfernt: alte Projektadressen öffnen CAD. */
+function ProjectRootRedirect() {
+  const { projectId } = useParams<{ projectId: string }>();
+  return <Navigate to={`/project/${projectId ?? ""}/cad`} replace />;
+}
+
 function RequireAuth() {
   const { configured, loading, session } = useAuth();
 

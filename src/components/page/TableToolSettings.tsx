@@ -6,7 +6,6 @@ import {
   Rows3, Columns3, Trash2, Filter, Equal,
   SquareDashed, Square, Info,
 } from "lucide-react";
-import { projectStore } from "@/lib/projectStore";
 import type { PageElement } from "@/lib/projectStore";
 import {
   normalizeTable, toTableData, resizeGrid, insertRow, insertCol, removeRow, removeCol,

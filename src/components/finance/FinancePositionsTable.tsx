@@ -1,4 +1,3 @@
-import { useNavigate } from "react-router-dom";
 import React, { useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -38,7 +37,6 @@ const FIELD_STYLE: React.CSSProperties = {
 };
 
 export const FinancePositionsTable: React.FC<Props> = ({ projectId, nodeId, positions, background, emptyHint }) => {
-  const navigate = useNavigate();
   const isMobile = useIsMobile();
 
   const [dragId, setDragId] = useState<string | null>(null);
