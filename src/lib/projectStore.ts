@@ -330,10 +330,6 @@ export interface Project {
   /** @deprecated Legacy-Fotoablage; wird beim Laden verlustfrei nach `files` migriert. */
   photos?: FileNode[];
   settings?: ProjectSettings;
-  /** „Auf allen Seiten“-Textbox-Vorlagen (Projektmappe).
-   *  Jede Vorlage beschreibt den Zustand, mit dem eine neue Seite
-   *  automatisch eine eigene, danach individuell bearbeitbare Kopie erhält. */
-  textSpanTemplates?: TextSpanTemplate[];
 }
 
 /** Gültigkeitsbereich einer „Auf allen Seiten“-Gruppe.
@@ -460,190 +456,24 @@ function mergeLegacyPhotoNodes(files: FileNode[], photos: FileNode[]): FileNode[
   return [...files, ...migratedPhotos];
 }
 
-/** Stellt sicher, dass jedes Projekt mindestens eine Mappe und eine Dokumentenablage hat. */
+/** Stellt sicher, dass jedes Projekt eine Dokumentenablage hat und entfernt Altdaten der früheren Projektmappe. */
 function migrateProject(p: Project): Project {
-  const next: Project = { ...p };
-  if (!Array.isArray(next.mappen) || next.mappen.length === 0) {
-    const defaultId = `m-${next.id}-main`;
-    next.mappen = [{
-      id: defaultId,
-      name: "Hauptmappe",
-      konzept: "",
-      pageIds: next.pages.map((pg) => pg.id),
-    }];
-    next.activeMappeId = defaultId;
-  } else if (!next.activeMappeId || !next.mappen.find((m) => m.id === next.activeMappeId)) {
-    next.activeMappeId = next.mappen[0].id;
-  }
-  // Alle noch nicht zugeordneten Seiten kommen in die erste Mappe.
-  const assigned = new Set(next.mappen.flatMap((m) => m.pageIds));
-  const orphan = next.pages.filter((pg) => !assigned.has(pg.id)).map((pg) => pg.id);
-  if (orphan.length) {
-    next.mappen = next.mappen.map((m, i) => (i === 0 ? { ...m, pageIds: [...m.pageIds, ...orphan] } : m));
-  }
+  const next: Project = stripLegacyMappe(p);
   const files = Array.isArray(next.files) ? next.files : [];
   const legacyPhotos = Array.isArray(next.photos) ? next.photos : [];
   next.files = mergeLegacyPhotoNodes(files, legacyPhotos);
   next.photos = [];
   if (!next.settings) next.settings = { timelinePosition: "bottom" };
+  if (!Array.isArray(next.sheets)) next.sheets = [];
+  if (!Array.isArray(next.tasks)) next.tasks = [];
+  if (!Array.isArray(next.events)) next.events = [];
   // Stufe 3: Sheet.defaultScaleDen aus Legacy-String ableiten.
-  if (Array.isArray(next.sheets)) {
-    next.sheets = next.sheets.map((s) => (
-      typeof s.defaultScaleDen === "number" && s.defaultScaleDen > 0
-        ? s
-        : { ...s, defaultScaleDen: parseScaleDen(s.scale) }
-    ));
-  }
-  // Stufe 2: mm-Koordinaten auf jedem Element sicherstellen.
-  // Stufe 3: Viewport-Metadaten (scaleDen, modelCenterM, viewportRotationDeg)
-  //          auf jedem cad-view/cad-viewport-Element sicherstellen.
-  next.pages = next.pages.map((pg) => syncPageElementUnits(migratePageViewports(pg)));
+  next.sheets = next.sheets.map((s) => (
+    typeof s.defaultScaleDen === "number" && s.defaultScaleDen > 0
+      ? s
+      : { ...s, defaultScaleDen: parseScaleDen(s.scale) }
+  ));
   return next;
-}
-
-/** Stufe 3: Legacy `cad-view`-Elemente bekommen die neuen Viewport-Felder
- *  (scaleDen, modelCenterM, viewportRotationDeg) beim Laden befüllt. Zusätzlich
- *  wird — falls basePaperMm/baseScaleDen vorhanden — der Rahmen (wMm/hMm) aus
- *  dem aktuellen scaleDen automatisch neu berechnet, damit veraltete Größen
- *  aus Legacy-Datenständen nicht zu falschen Papier-Ausschnitten führen. */
-function migratePageViewports(page: ProjectPage): ProjectPage {
-  const { wMm: pageW, hMm: pageH } = getPageSizeMm(page);
-  let changed = false;
-  const elements = page.elements.map((el) => {
-    if (el.kind !== "cad-view" && el.kind !== "cad-viewport") return el;
-    const next: PageElement = { ...el };
-    let touched = false;
-    if (typeof next.scaleDen !== "number" || !(next.scaleDen > 0)) {
-      next.scaleDen = parseScaleDen(el.scale);
-      touched = true;
-    }
-    if (!next.modelCenterM) {
-      next.modelCenterM = { x: 0, y: 0 };
-      touched = true;
-    }
-    if (typeof next.viewportRotationDeg !== "number") {
-      next.viewportRotationDeg = typeof el.rotation === "number" ? el.rotation : 0;
-      touched = true;
-    }
-    // Basis-Referenz für Rahmenberechnung: fehlt sie (Legacy), aus aktuellen
-    // Werten stempeln — künftige Maßstabsänderungen bleiben dann konsistent.
-    if (!next.basePaperMm && pageW > 0 && pageH > 0
-        && typeof el.w === "number" && typeof el.h === "number") {
-      next.basePaperMm = {
-        w: (el.w / 100) * pageW,
-        h: (el.h / 100) * pageH,
-      };
-      touched = true;
-    }
-    if (typeof next.baseScaleDen !== "number" || !(next.baseScaleDen > 0)) {
-      next.baseScaleDen = next.scaleDen;
-      touched = true;
-    }
-    // Auto-Recompute Rahmen: aktueller Papier-Ausschnitt = basePaperMm * baseScaleDen / scaleDen.
-    if (next.basePaperMm && next.baseScaleDen && next.scaleDen
-        && pageW > 0 && pageH > 0) {
-      const targetWmm = next.basePaperMm.w * (next.baseScaleDen / next.scaleDen);
-      const targetHmm = next.basePaperMm.h * (next.baseScaleDen / next.scaleDen);
-      const currentWmm = (typeof el.w === "number") ? (el.w / 100) * pageW : 0;
-      const currentHmm = (typeof el.h === "number") ? (el.h / 100) * pageH : 0;
-      if (Math.abs(targetWmm - currentWmm) > 0.25 || Math.abs(targetHmm - currentHmm) > 0.25) {
-        next.w = Math.max(0.5, Math.min(400, (targetWmm / pageW) * 100));
-        next.h = Math.max(0.5, Math.min(400, (targetHmm / pageH) * 100));
-        next.wMm = targetWmm;
-        next.hMm = targetHmm;
-        touched = true;
-      }
-    }
-    if (touched) changed = true;
-    return touched ? next : el;
-  });
-  return changed ? { ...page, elements } : page;
-}
-
-
-/** Hält Prozent- und Millimeter-Koordinaten der Seitenelemente konsistent.
- *  Regel (Stufe 2, Kompatibilitätsphase):
- *   – Fehlt `*Mm`, wird es aus % + Seitenformat abgeleitet (einmalige Migration).
- *   – Weichen % und mm voneinander ab, gewinnt der zuletzt geschriebene Wert:
- *     Da UI aktuell noch % schreibt, folgen mm dem %-Wert. Wird künftig `xMm`
- *     direkt geschrieben, so aktualisiert diese Funktion ebenfalls das %-Feld
- *     (sofern der Aufrufer `x/y/w/h` nicht selbst neu setzt).
- */
-export function syncPageElementUnits(page: ProjectPage): ProjectPage {
-  const { wMm: pageW, hMm: pageH } = getPageSizeMm(page);
-  if (!(pageW > 0 && pageH > 0)) return page;
-  let changed = false;
-  const elements = page.elements.map((el) => {
-    const next = { ...el } as PageElement;
-    let touched = false;
-    // Box: % ↔ mm
-    const hasPct = typeof el.x === "number" && typeof el.y === "number"
-                 && typeof el.w === "number" && typeof el.h === "number";
-    const hasMm = typeof el.xMm === "number" && typeof el.yMm === "number"
-                && typeof el.wMm === "number" && typeof el.hMm === "number";
-    if (hasPct && !hasMm) {
-      next.xMm = (el.x / 100) * pageW;
-      next.yMm = (el.y / 100) * pageH;
-      next.wMm = (el.w / 100) * pageW;
-      next.hMm = (el.h / 100) * pageH;
-      touched = true;
-    } else if (hasPct && hasMm) {
-      // Beide vorhanden: erkennen, welche Achse zuletzt geschrieben wurde.
-      // Wenn %-Wert mit alter mm-Ableitung übereinstimmt → mm wurde neu geschrieben → % nachziehen.
-      // Sonst → % neu → mm nachziehen.
-      const pctFromMm = {
-        x: (el.xMm! / pageW) * 100,
-        y: (el.yMm! / pageH) * 100,
-        w: (el.wMm! / pageW) * 100,
-        h: (el.hMm! / pageH) * 100,
-      };
-      const mmFromPct = {
-        x: (el.x / 100) * pageW,
-        y: (el.y / 100) * pageH,
-        w: (el.w / 100) * pageW,
-        h: (el.h / 100) * pageH,
-      };
-      const pctDrift = Math.abs(pctFromMm.x - el.x) + Math.abs(pctFromMm.y - el.y)
-                     + Math.abs(pctFromMm.w - el.w) + Math.abs(pctFromMm.h - el.h);
-      const mmDrift = Math.abs(mmFromPct.x - el.xMm!) + Math.abs(mmFromPct.y - el.yMm!)
-                    + Math.abs(mmFromPct.w - el.wMm!) + Math.abs(mmFromPct.h - el.hMm!);
-      if (mmDrift < 1e-3 && pctDrift < 1e-3) {
-        // konsistent, nichts zu tun
-      } else if (pctDrift < mmDrift) {
-        // mm ist neu → % aus mm ableiten
-        next.x = pctFromMm.x; next.y = pctFromMm.y; next.w = pctFromMm.w; next.h = pctFromMm.h;
-        touched = true;
-      } else {
-        // % ist neu → mm aus % ableiten
-        next.xMm = mmFromPct.x; next.yMm = mmFromPct.y; next.wMm = mmFromPct.w; next.hMm = mmFromPct.h;
-        touched = true;
-      }
-    } else if (!hasPct && hasMm) {
-      next.x = (el.xMm! / pageW) * 100;
-      next.y = (el.yMm! / pageH) * 100;
-      next.w = (el.wMm! / pageW) * 100;
-      next.h = (el.hMm! / pageH) * 100;
-      touched = true;
-    }
-
-    // Points: % ↔ mm (Linien / Guides)
-    if (Array.isArray(el.points) && el.points.length && !Array.isArray(el.pointsMm)) {
-      next.pointsMm = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
-      touched = true;
-    } else if (Array.isArray(el.points) && Array.isArray(el.pointsMm)
-            && el.points.length === el.pointsMm.length) {
-      const derived = el.points.map((p) => ({ x: (p.x / 100) * pageW, y: (p.y / 100) * pageH }));
-      const drift = derived.some((p, i) =>
-        Math.abs(p.x - el.pointsMm![i].x) > 1e-4 || Math.abs(p.y - el.pointsMm![i].y) > 1e-4);
-      if (drift) { next.pointsMm = derived; touched = true; }
-    } else if (!Array.isArray(el.points) && Array.isArray(el.pointsMm) && el.pointsMm.length) {
-      next.points = el.pointsMm.map((p) => ({ x: (p.x / pageW) * 100, y: (p.y / pageH) * 100 }));
-      touched = true;
-    }
-    if (touched) changed = true;
-    return touched ? next : el;
-  });
-  return changed ? { ...page, elements } : page;
 }
 
 
@@ -706,29 +536,17 @@ const lastPushAt: Map<string, number> = new Map();
 const lastSig: Map<string, string> = new Map();
 
 
-/** Grobe Signatur der geänderten Objekte (Seiten-/Element-IDs, Anzahl). */
+/** Grobe Signatur der geänderten Projektfelder. */
 function changeSignature(a: Project, b: Project): string {
   try {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
     const parts: string[] = [];
-    const ap = a.pages ?? [], bp = b.pages ?? [];
-    if (ap.length !== bp.length) parts.push(`pages:${ap.length}->${bp.length}`);
-    const aById = new Map(ap.map((p) => [p.id, p] as const));
-    for (const pg of bp) {
-      const op = aById.get(pg.id);
-      if (!op) { parts.push(`page+${pg.id}`); continue; }
-      if (op === pg) continue;
-      const ael = op.elements ?? [], bel = pg.elements ?? [];
-      if (ael.length !== bel.length) { parts.push(`page~${pg.id}:count`); continue; }
-      const aEl = new Map(ael.map((el) => [el.id, el] as const));
-      for (const el of bel) {
-        const oe = aEl.get(el.id);
-        if (!oe) { parts.push(`el+${el.id}`); }
-        else if (oe !== el && JSON.stringify(oe) !== JSON.stringify(el)) parts.push(`el~${el.id}`);
-      }
-      if (!parts.length) parts.push(`page~${pg.id}`);
+    for (const k of keys) {
+      if (k === "updatedAt") continue;
+      const av = (a as any)[k], bv = (b as any)[k];
+      if (av !== bv && JSON.stringify(av) !== JSON.stringify(bv)) parts.push(k);
     }
-    if (!parts.length) parts.push("other");
-    return parts.sort().join("|");
+    return parts.length ? parts.sort().join("|") : "other";
   } catch {
     return "other";
   }
@@ -842,147 +660,6 @@ function commitProjectUiProjects(projects: Project[]) {
 }
 
 
-
-/** Seitenkontext einer Seite: Vorlagen-Seiten zählen ausschließlich zu ihrem
- *  templateKey, alle übrigen zu ihrer Projektmappe. */
-export function pageSpanScope(p: Project, pageId: string): TextSpanScope | null {
-  const page = p.pages.find((pg) => pg.id === pageId);
-  if (!page) return null;
-  if (page.templateKey) return { type: "template", key: page.templateKey };
-  const mappe = (p.mappen ?? []).find((m) => m.pageIds.includes(pageId));
-  return mappe ? { type: "mappe", id: mappe.id } : null;
-}
-
-function sameScope(a: TextSpanScope | null, b: TextSpanScope | null): boolean {
-  if (!a || !b || a.type !== b.type) return false;
-  return a.type === "mappe" ? a.id === (b as any).id : a.key === (b as any).key;
-}
-
-/** Scope einer Vorlage — mit Fallback für Altdaten ohne `scope`:
- *  abgeleitet aus der ersten Seite, die bereits eine Kopie der Gruppe trägt. */
-function templateScope(p: Project, t: TextSpanTemplate): TextSpanScope | null {
-  if (t.scope) return t.scope;
-  const carrier = p.pages.find((pg) =>
-    ((pg.cadOverlay as any)?.textBoxes ?? []).some((b: any) => b?.style?.spanGroupId === t.groupId),
-  );
-  return carrier ? pageSpanScope(p, carrier.id) : null;
-}
-
-/** Vorlagen, die für den Kontext einer (neuen) Seite gelten. */
-function templatesForScope(p: Project, scope: TextSpanScope | null): TextSpanTemplate[] {
-  if (!scope) return [];
-  return (p.textSpanTemplates ?? []).filter((t) => sameScope(templateScope(p, t), scope));
-}
-
-/** Seiten, die von „Auf allen Seiten“ betroffen sind: ausschließlich Seiten im
- *  selben Kontext (Mappe bzw. Vorlagen-Schlüssel) wie die Quellseite. */
-export function spanTargetPageIds(p: Project, sourcePageId: string): Set<string> {
-  const scope = pageSpanScope(p, sourcePageId);
-  if (!scope) return new Set([sourcePageId]);
-  return new Set(
-    p.pages.filter((pg) => sameScope(pageSpanScope(p, pg.id), scope)).map((pg) => pg.id),
-  );
-}
-
-/** Ist eine „Auf allen Seiten“-Gruppe im Seitenkontext dieser Seite aktiv?
- *  Gruppen anderer „Bücher“ (andere Mappe / anderer templateKey) zählen nicht. */
-export function isSpanGroupActiveForPage(p: Project, pageId: string, groupId: string): boolean {
-  const scope = pageSpanScope(p, pageId);
-  if (!scope) return false;
-  return templatesForScope(p, scope).some((t) => t.groupId === groupId);
-}
-
-
-/** Fügt einem Overlay-Zustand fehlende „Auf allen Seiten“-Kopien hinzu.
- *  Jede Kopie erhält eine eigene Objekt-ID, behält aber die groupId. */
-function seedSpanOverlay(
-  overlay: any,
-  templates: { groupId: string; box: any }[] | undefined,
-  pageId: string,
-): any {
-  if (!templates?.length) return overlay;
-  const base = overlay ? { ...overlay } : {};
-  const boxes: any[] = Array.isArray(base.textBoxes) ? [...base.textBoxes] : [];
-  let added = false;
-  for (const t of templates) {
-    if (boxes.some((b) => b?.style?.spanGroupId === t.groupId)) continue;
-    const clone = JSON.parse(JSON.stringify(t.box));
-    clone.id = `${pageId}-span-${t.groupId}-${Math.random().toString(36).slice(2, 7)}`;
-    clone.style = { ...(clone.style ?? {}), spanGroupId: t.groupId };
-    boxes.push(clone);
-    added = true;
-  }
-  if (!added && overlay) return overlay;
-  base.textBoxes = boxes;
-  return base;
-}
-
-/** Vergibt für alle Objekte eines CAD-Overlays frische IDs (tiefe Kopie). */
-function refreshOverlayIds(overlay: any, pageId: string): any {
-  if (!overlay || typeof overlay !== "object") return overlay;
-  const out: any = Array.isArray(overlay) ? [] : {};
-  let n = 0;
-  const walk = (src: any, dst: any) => {
-    for (const k of Object.keys(src)) {
-      const v = src[k];
-      if (Array.isArray(v)) {
-        dst[k] = v.map((item) => {
-          if (item && typeof item === "object") {
-            const c: any = Array.isArray(item) ? [] : {};
-            walk(item, c);
-            if (typeof item.id === "string") c.id = `${pageId}-o${n++}`;
-            return c;
-          }
-          return item;
-        });
-      } else if (v && typeof v === "object") {
-        const c: any = {};
-        walk(v, c);
-        dst[k] = c;
-      } else {
-        dst[k] = v;
-      }
-    }
-  };
-  walk(overlay, out);
-  return out;
-}
-
-/**
- * Klont eine Seitenvorlage in ein Vorlagen-Buch (`templateKey`).
- * Alle Seiten, Elemente und CAD-Overlay-Objekte erhalten frische IDs, damit
- * Quelle und Klon vollständig unabhängig voneinander sind.
- */
-function cloneTemplatePages(
-  p: Project,
-  templateKey: string,
-  title: string,
-  source?: ProjectPage[],
-): ProjectPage[] {
-  const stamp = Date.now().toString(36);
-  const src: ProjectPage[] = source?.length
-    ? source
-    : [{ id: "", title, format: "A4-hoch", margins: 20, background: false, elements: [] }];
-  const tplSpan = templatesForScope(p, { type: "template", key: templateKey });
-  return src.map((pg, i) => {
-    const id = `${p.id}-tpl${stamp}${i}${Math.random().toString(36).slice(2, 6)}`;
-    const clone = JSON.parse(JSON.stringify(pg)) as ProjectPage;
-    return {
-      ...clone,
-      id,
-      title: i === 0 ? title : `${title} ${i + 1}`,
-      templateKey,
-      spreadId: undefined,
-      cadOverlay: seedSpanOverlay(refreshOverlayIds(clone.cadOverlay, id), tplSpan, id),
-      elements: (clone.elements ?? []).map((el: any, k: number) => ({
-        ...el,
-        id: `${id}-e${k}`,
-      })),
-    } as ProjectPage;
-  });
-}
-
-
 export const projectStore = {
   getState: () => state,
   subscribe: (fn: () => void) => {
@@ -1039,8 +716,6 @@ export const projectStore = {
    */
   ensureCloudStub: (id: string, name: string) => {
     if (state.projects.some((p) => p.id === id)) return;
-    const firstPageId = `${id}-p1`;
-    const mappeId = `m-${id}-main`;
     const stub: Project = {
       id,
       name: name || "Projekt",
@@ -1048,16 +723,11 @@ export const projectStore = {
       thumbnail: placeholder(name || "Projekt"),
       createdAtIso: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      pages: [
-        { id: firstPageId, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
-      ],
       sheets: [],
       tasks: [],
       events: [],
-      mappen: [{ id: mappeId, name: "Hauptmappe", konzept: "", pageIds: [firstPageId] }],
-      activeMappeId: mappeId,
       files: [],
-      settings: { timelinePosition: "bottom", mappeHelpOn: true },
+      settings: { timelinePosition: "bottom", helpOn: true },
     };
     _systemWrite = true;
     const prevSuspend = _suspendHistory;
@@ -1071,8 +741,6 @@ export const projectStore = {
   },
   createProject: () => {
     const id = `p-${Date.now().toString(36)}`;
-    const firstPageId = `${id}-p1`;
-    const mappeId = `m-${id}-main`;
     const blank: Project = {
       id,
       name: "Neues Projekt",
@@ -1080,16 +748,11 @@ export const projectStore = {
       thumbnail: placeholder("Neues Projekt"),
       createdAtIso: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      pages: [
-        { id: firstPageId, title: "01 Titel", format: "A3-quer", margins: 20, background: false, elements: [] },
-      ],
       sheets: [],
       tasks: [],
       events: [],
-      mappen: [{ id: mappeId, name: "Hauptmappe", konzept: "", pageIds: [firstPageId] }],
-      activeMappeId: mappeId,
       files: [],
-      settings: { timelinePosition: "bottom", mappeHelpOn: true },
+      settings: { timelinePosition: "bottom", helpOn: true },
     };
     setState((s) => ({ projects: [{ ...blank, sortIndex: nextTopIndex(s.projects, null) }, ...s.projects] }));
     return id;
@@ -1140,12 +803,11 @@ export const projectStore = {
     systemWrite(() => setState((s) => ({ projects: s.projects.filter((p) => p.id !== id) })));
     try {
       import("./timelineStore").then((m) => m.timelineStore.deleteProject(id)).catch(() => {});
-      localStorage.removeItem(`pixuna.pendingSheetPdf.${id}`);
     } catch {}
   },
   /**
-   * Erstellt eine 1:1-Kopie eines Projekts (Seiten, Elemente, Mappen, Blätter,
-   * Aufgaben, Termine, Dateien) inklusive Board- und Finanzdaten.
+   * Erstellt eine 1:1-Kopie eines Projekts (Blätter, Aufgaben, Termine,
+   * Dateien) inklusive Board- und Finanzdaten.
    * Blatt-IDs bleiben erhalten, damit CAD-Ansichten weiter greifen.
    */
   duplicateProject: (id: string) => {
@@ -1153,17 +815,6 @@ export const projectStore = {
     if (!src) return undefined;
     const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
     const newId = `${src.isTemplate ? "tpl" : "p"}-${Date.now().toString(36)}`;
-    const newPages = clone(src.pages).map((pg) => ({
-      ...pg,
-      id: `${newId}-${pg.id}`,
-      elements: (pg.elements ?? []).map((el) => ({ ...el, id: `${newId}-${el.id}` })),
-    }));
-    const oldToNewPage = new Map(src.pages.map((pg, i) => [pg.id, newPages[i].id] as const));
-    const newMappen = clone(src.mappen ?? []).map((m) => ({
-      ...m,
-      id: `m-${newId}-${m.id}`,
-      pageIds: (m.pageIds ?? []).map((pid) => oldToNewPage.get(pid) ?? pid),
-    }));
     const copy: Project = {
       ...clone(src),
       id: newId,
@@ -1171,11 +822,6 @@ export const projectStore = {
       updatedAt: new Date().toISOString(),
       deletedAt: undefined,
       favorite: false,
-      pages: newPages,
-      mappen: newMappen.length ? newMappen : undefined,
-      activeMappeId: newMappen.length
-        ? (newMappen.find((m) => m.id === `m-${newId}-${src.activeMappeId}`)?.id ?? newMappen[0].id)
-        : undefined,
       tasks: clone(src.tasks ?? []).map((t) => ({ ...t, id: `${newId}-${t.id}` })),
       events: clone(src.events ?? []).map((e) => ({ ...e, id: `${newId}-${e.id}` })),
     };
@@ -1197,16 +843,6 @@ export const projectStore = {
     const src = state.projects.find((p) => p.id === id);
     if (!src) return undefined;
     const newId = `tpl-${Date.now().toString(36)}`;
-    const remap: Record<string, string> = {};
-    const newPages = src.pages.map((pg) => {
-      const nid = `${newId}-${pg.id}`;
-      remap[pg.id] = nid;
-      return {
-        ...pg,
-        id: nid,
-        elements: pg.elements.map((el) => ({ ...el, id: `${newId}-${el.id}` })),
-      };
-    });
     const tpl: Project = {
       ...src,
       id: newId,
@@ -1214,12 +850,11 @@ export const projectStore = {
       isTemplate: true,
       favorite: false,
       updatedAt: new Date().toISOString(),
-      pages: newPages,
       sheets: src.sheets.map((s) => ({ ...s })),
       tasks: src.tasks.map((t) => ({ ...t, id: `${newId}-${t.id}`, done: false })),
       events: src.events.map((e) => ({ ...e, id: `${newId}-${e.id}` })),
       customFields: src.customFields?.map((f) => ({ ...f })),
-      settings: { ...(src.settings ?? {}), mappeHelpOn: true },
+      settings: { ...(src.settings ?? {}), helpOn: true },
     };
     setState((s) => ({ projects: [tpl, ...s.projects] }));
     return newId;
@@ -1232,17 +867,6 @@ export const projectStore = {
     const src = state.projects.find((p) => p.id === templateId);
     if (!src) return undefined;
     const newId = `p-${Date.now().toString(36)}`;
-    const newPages = src.pages.map((pg) => ({
-      ...pg,
-      id: `${newId}-${pg.id}`,
-      elements: pg.elements.map((el) => ({ ...el, id: `${newId}-${el.id}` })),
-    }));
-    const oldToNewPage = new Map(src.pages.map((pg, i) => [pg.id, newPages[i].id] as const));
-    const newMappen = (src.mappen ?? []).map((m) => ({
-      ...m,
-      id: `m-${newId}-${m.id}`,
-      pageIds: m.pageIds.map((pid) => oldToNewPage.get(pid) ?? pid),
-    }));
     const proj: Project = {
       ...src,
       id: newId,
@@ -1250,14 +874,11 @@ export const projectStore = {
       isTemplate: false,
       favorite: false,
       updatedAt: new Date().toISOString(),
-      pages: newPages,
-      mappen: newMappen,
-      activeMappeId: newMappen[0]?.id,
       sheets: src.sheets.map((s) => ({ ...s })),
       tasks: src.tasks.map((t) => ({ ...t, id: `${newId}-${t.id}`, done: false })),
       events: src.events.map((e) => ({ ...e, id: `${newId}-${e.id}` })),
       customFields: src.customFields?.map((f) => ({ ...f })),
-      settings: { ...(src.settings ?? {}), mappeHelpOn: true },
+      settings: { ...(src.settings ?? {}), helpOn: true },
     };
     setState((s) => ({ projects: [proj, ...s.projects] }));
     return newId;
@@ -1276,7 +897,6 @@ export const projectStore = {
           erstelltAm: "",
           konzept: "",
           updatedAt: new Date().toISOString(),
-          pages: p.pages.map((pg) => ({ ...pg, elements: [], notes: "" })),
           tasks: p.tasks.map((t) => ({ ...t, date: undefined, time: undefined, done: false })),
           events: [],
           customFields: p.customFields?.map((f) => ({ ...f, value: "" })),
@@ -1319,611 +939,6 @@ export const projectStore = {
       projects: s.projects.map((p) =>
         p.id === projectId
           ? { ...p, customFields: (p.customFields ?? []).filter((f) => f.id !== fieldId) }
-          : p
-      ),
-    }));
-  },
-  /**
-   * Neue Seite anlegen. `refPageId` = aktuell ausgewählte Seite: Deren
-   * Seiteneinstellungen (Format, Ränder, Hintergrund, Spalten, Hilfslinien,
-   * Lochung, freie Papiergröße) werden für die neue Seite übernommen.
-   */
-  addPage: (projectId: string, mappeId?: string, refPageId?: string) => {
-    const newId = `${projectId}-p${Date.now().toString(36)}`;
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const n = p.pages.length + 1;
-        const num = String(n).padStart(2, "0");
-        const targetMappe = mappeId || p.activeMappeId || p.mappen?.[0]?.id;
-        const mappen = (p.mappen ?? []).map((m) =>
-          m.id === targetMappe ? { ...m, pageIds: [...m.pageIds, newId] } : m
-        );
-        const ref =
-          (refPageId ? p.pages.find((pg) => pg.id === refPageId) : undefined) ??
-          (targetMappe
-            ? p.pages.find(
-                (pg) =>
-                  pg.id ===
-                  (p.mappen ?? []).find((m) => m.id === targetMappe)?.pageIds.slice(-1)[0],
-              )
-            : undefined);
-        return {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          pages: [
-            ...p.pages,
-            {
-              id: newId,
-              title: `${num} Neue Seite`,
-              format: ref?.format ?? "A3-quer",
-              margins: ref?.margins ?? 20,
-              background: ref?.background ?? false,
-              columns: ref?.columns,
-              columnGap: ref?.columnGap,
-              guides: ref?.guides,
-              punchPattern: ref?.punchPattern,
-              punchSide: ref?.punchSide,
-              customWidthMm: ref?.customWidthMm,
-              customHeightMm: ref?.customHeightMm,
-              elements: [],
-              cadOverlay: seedSpanOverlay(
-                undefined,
-                targetMappe ? templatesForScope(p, { type: "mappe", id: targetMappe }) : [],
-                newId,
-              ),
-
-            },
-          ],
-          mappen,
-        };
-      }),
-    }));
-    return newId;
-  },
-  /**
-   * Neue Seite innerhalb eines Vorlagenkontexts (Finanzen). Die Seite behält
-   * denselben templateKey, gehört zu keiner Mappe und erhält nur die
-   * All-Pages-Templates des eigenen Vorlagen-Scopes.
-   */
-  addTemplatePage: (projectId: string, templateKey: string, title = "Neue Seite") => {
-    const newId = `${projectId}-tpl${Date.now().toString(36)}`;
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const siblings = p.pages.filter((pg) => pg.templateKey === templateKey);
-        const ref = siblings[siblings.length - 1];
-        const tplSpan = templatesForScope(p, { type: "template", key: templateKey });
-        const page: ProjectPage = {
-          id: newId,
-          title: `${title} ${siblings.length + 1}`,
-          format: ref?.format ?? "A4-hoch",
-          margins: ref?.margins ?? 20,
-          background: false,
-          elements: [],
-          templateKey,
-          cadOverlay: seedSpanOverlay(undefined, tplSpan, newId),
-        };
-        return { ...p, updatedAt: new Date().toISOString(), pages: [...p.pages, page] };
-      }),
-    }));
-    return newId;
-  },
-
-  /**
-   * Stellt sicher, dass für einen Vorlagen-Schlüssel (Finanzen: Angebot /
-   * Rechnung / Nachtrag) mindestens eine Seite existiert. Vorlagen-Seiten
-   * gehören zu keiner Mappe und sind im normalen Mappen-Modus unsichtbar.
-   * `favorite` ist ein optionaler Satz Vorlagen-Seiten, der geklont wird.
-   */
-  ensureTemplatePages: (
-    projectId: string,
-    templateKey: string,
-    title: string,
-    favorite?: ProjectPage[],
-  ) => {
-    let ids: string[] = [];
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const existing = p.pages.filter((pg) => pg.templateKey === templateKey);
-        if (existing.length) { ids = existing.map((pg) => pg.id); return p; }
-        const created = cloneTemplatePages(p, templateKey, title, favorite);
-        ids = created.map((pg) => pg.id);
-        return { ...p, updatedAt: new Date().toISOString(), pages: [...p.pages, ...created] };
-      }),
-    }));
-    return ids;
-  },
-
-  /**
-   * Ersetzt sämtliche Seiten eines Vorlagen-Schlüssels durch frische Klone.
-   * Wird ausschließlich für die einmalige Migration eines unveränderten
-   * leeren Platzhalters der Standard-Mustervorlage benutzt.
-   */
-  replaceTemplatePages: (
-    projectId: string,
-    templateKey: string,
-    title: string,
-    source: ProjectPage[],
-  ) => {
-    let ids: string[] = [];
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const created = cloneTemplatePages(p, templateKey, title, source);
-        ids = created.map((pg) => pg.id);
-        const rest = p.pages.filter((pg) => pg.templateKey !== templateKey);
-        return { ...p, updatedAt: new Date().toISOString(), pages: [...rest, ...created] };
-      }),
-    }));
-    return ids;
-  },
-
-  updatePage: (projectId: string, pageId: string, patch: Partial<ProjectPage>) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              pages: p.pages.map((pg) =>
-                pg.id === pageId ? syncPageElementUnits({ ...pg, ...patch }) : pg
-              ),
-            }
-          : p
-      ),
-    }));
-  },
-
-  deletePage: (projectId: string, pageId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId ? { ...p, pages: p.pages.filter((pg) => pg.id !== pageId) } : p
-      ),
-    }));
-  },
-  reorderPage: (projectId: string, fromIndex: number, toIndex: number) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const pages = [...p.pages];
-        if (fromIndex < 0 || fromIndex >= pages.length) return p;
-        const [moved] = pages.splice(fromIndex, 1);
-        const insertAt = Math.max(0, Math.min(pages.length, toIndex));
-        pages.splice(insertAt, 0, moved);
-        return { ...p, updatedAt: new Date().toISOString(), pages };
-      }),
-    }));
-  },
-  duplicatePage: (projectId: string, pageId: string) => {
-    const project = state.projects.find((p) => p.id === projectId);
-    if (!project) return undefined;
-    const src = project.pages.find((pg) => pg.id === pageId);
-    if (!src) return undefined;
-    const newId = `${projectId}-p${Date.now().toString(36)}`;
-    const stripNum = src.title.replace(/^\d+\s*/, "");
-    const copy: ProjectPage = {
-      ...src,
-      id: newId,
-      title: `${stripNum} (Kopie)`,
-      elements: src.elements.map((e) => ({ ...e, id: `el-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` })),
-      groups: src.groups?.map((g) => ({ ...g })),
-    };
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const idx = p.pages.findIndex((pg) => pg.id === pageId);
-        const pages = [...p.pages];
-        pages.splice(idx + 1, 0, copy);
-        return { ...p, updatedAt: new Date().toISOString(), pages };
-      }),
-    }));
-    return newId;
-  },
-
-  /* ---------- „Auf allen Seiten“ — Textboxen (Projektmappe) ---------- */
-  /**
-   * Verteilt eine Textbox als eigenständige Kopie auf alle übrigen Seiten der
-   * Mappe und hinterlegt den Vorlagenzustand für später erstellte Seiten.
-   * Bereits vorhandene Kopien derselben Gruppe bleiben unangetastet
-   * (individuelle Änderungen werden nie überschrieben).
-   */
-  applyTextSpanToPages: (projectId: string, sourcePageId: string, groupId: string, box: any) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const scope = pageSpanScope(p, sourcePageId);
-        const targets = spanTargetPageIds(p, sourcePageId);
-        const templates: TextSpanTemplate[] = [
-          ...(p.textSpanTemplates ?? []).filter((t) => t.groupId !== groupId),
-          ...(scope ? [{ groupId, box: JSON.parse(JSON.stringify(box)), scope }] : []),
-        ];
-
-        return {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          textSpanTemplates: templates,
-          pages: p.pages.map((pg) => {
-            if (pg.id === sourcePageId || !targets.has(pg.id)) return pg;
-            return { ...pg, cadOverlay: seedSpanOverlay(pg.cadOverlay, [{ groupId, box }], pg.id) };
-          }),
-        };
-      }),
-    }));
-  },
-
-  /**
-   * Hebt die Verteilung auf: Alle Kopien der Gruppe auf anderen Seiten werden
-   * entfernt, die Vorlage wird gelöscht. Die Kopie auf `keepPageId` bleibt
-   * bestehen (sie wird vom Aufrufer zu einer normalen Textbox gemacht).
-   */
-  removeTextSpanGroup: (projectId: string, keepPageId: string, groupId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        return {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          textSpanTemplates: (p.textSpanTemplates ?? []).filter((t) => t.groupId !== groupId),
-          pages: p.pages.map((pg) => {
-            if (pg.id === keepPageId) return pg;
-            const boxes = pg.cadOverlay?.textBoxes;
-            if (!Array.isArray(boxes)) return pg;
-            const kept = boxes.filter((b: any) => b?.style?.spanGroupId !== groupId);
-            if (kept.length === boxes.length) return pg;
-            return { ...pg, cadOverlay: { ...pg.cadOverlay, textBoxes: kept } };
-          }),
-        };
-      }),
-    }));
-  },
-
-  // ---------- Spreads (Seiten-Verbund) ----------
-  /** Zwei oder mehr benachbarte Pages zu einem neuen Spread verbinden. */
-  linkPagesToSpread: (projectId: string, pageIds: string[]) => {
-    if (pageIds.length < 2) return;
-    const spreadId = `sp-${Date.now().toString(36)}`;
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        // Alle bereits vorhandenen Zuordnungen für diese Pages neu setzen.
-        return {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          pages: p.pages.map((pg) => {
-            const idx = pageIds.indexOf(pg.id);
-            if (idx < 0) return pg;
-            return {
-              ...pg,
-              spreadId,
-              spreadIndex: idx,
-              spreadLayoutMode: pg.spreadLayoutMode ?? "grid",
-              spreadExcluded: false,
-              spreadCollapsed: false,
-            };
-          }),
-        };
-      }),
-    }));
-  },
-  /** Eine Page an einen bestehenden Spread anhängen (ans Ende). */
-  addPageToSpread: (projectId: string, spreadId: string, pageId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const members = p.pages.filter((pg) => pg.spreadId === spreadId);
-        const nextIndex = members.length;
-        return {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          pages: p.pages.map((pg) =>
-            pg.id === pageId
-              ? { ...pg, spreadId, spreadIndex: nextIndex, spreadLayoutMode: pg.spreadLayoutMode ?? "grid" }
-              : pg
-          ),
-        };
-      }),
-    }));
-  },
-  /** Page aus ihrem Spread entfernen (wird wieder Einzelseite). */
-  removePageFromSpread: (projectId: string, pageId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const target = p.pages.find((pg) => pg.id === pageId);
-        const spreadId = target?.spreadId;
-        if (!spreadId) return p;
-        // Zielseite lösen und übrige Members neu indexieren.
-        const others = p.pages
-          .filter((pg) => pg.spreadId === spreadId && pg.id !== pageId)
-          .sort((a, b) => (a.spreadIndex ?? 0) - (b.spreadIndex ?? 0));
-        const indexMap = new Map<string, number>();
-        others.forEach((pg, i) => indexMap.set(pg.id, i));
-        return {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          pages: p.pages.map((pg) => {
-            if (pg.id === pageId) {
-              const { spreadId: _s, spreadIndex: _i, spreadOffset: _o, spreadCollapsed: _c, ...rest } = pg;
-              return { ...rest };
-            }
-            if (indexMap.has(pg.id)) return { ...pg, spreadIndex: indexMap.get(pg.id)! };
-            return pg;
-          }),
-        };
-      }),
-    }));
-  },
-  setSpreadLayoutMode: (projectId: string, spreadId: string, mode: "grid" | "free") => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id !== projectId ? p : {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadLayoutMode: mode } : pg)),
-        }
-      ),
-    }));
-  },
-  setSpreadCollapsed: (projectId: string, spreadId: string, collapsed: boolean) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id !== projectId ? p : {
-          ...p,
-          pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadCollapsed: collapsed } : pg)),
-        }
-      ),
-    }));
-  },
-  setSpreadLayoutLocked: (projectId: string, spreadId: string, locked: boolean) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id !== projectId ? p : {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          pages: p.pages.map((pg) => (pg.spreadId === spreadId ? { ...pg, spreadLayoutLocked: locked } : pg)),
-        }
-      ),
-    }));
-  },
-  setSpreadOffset: (
-    projectId: string,
-    pageId: string,
-    offset: { xMm: number; yMm: number; rotationDeg?: number }
-  ) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id !== projectId ? p : {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          pages: p.pages.map((pg) => (pg.id === pageId ? { ...pg, spreadOffset: offset } : pg)),
-        }
-      ),
-    }));
-  },
-  /** Musterlänge des Spreads (N Seiten) auf alle weiteren Pages ohne spreadId
-   *  fortlaufend anwenden — überspringt spreadExcluded. */
-  applySpreadPatternToRest: (projectId: string, spreadId: string): number => {
-    let count = 0;
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const src = p.pages.filter((pg) => pg.spreadId === spreadId);
-        const N = src.length;
-        if (N < 2) return p;
-        const layoutMode = src[0]?.spreadLayoutMode ?? "grid";
-        const firstIdx = p.pages.findIndex((pg) => pg.spreadId === spreadId);
-        const lastIdx = firstIdx + N - 1;
-        const rest = p.pages.slice(lastIdx + 1);
-        // Neue Spread-IDs pro Chunk.
-        const patched = [...p.pages];
-        let i = 0;
-        while (i + N <= rest.length) {
-          const chunk = rest.slice(i, i + N);
-          if (chunk.some((pg) => pg.spreadId || pg.spreadExcluded)) { i += 1; continue; }
-          const newSid = `sp-${Date.now().toString(36)}-${count}`;
-          chunk.forEach((pg, k) => {
-            const globalIdx = lastIdx + 1 + i + k;
-            patched[globalIdx] = {
-              ...patched[globalIdx],
-              spreadId: newSid,
-              spreadIndex: k,
-              spreadLayoutMode: layoutMode,
-            };
-          });
-          count += 1;
-          i += N;
-        }
-        return { ...p, updatedAt: new Date().toISOString(), pages: patched };
-      }),
-    }));
-    return count;
-  },
-
-  reorderElement: (projectId: string, pageId: string, fromIndex: number, toIndex: number) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              pages: p.pages.map((pg) => {
-                if (pg.id !== pageId) return pg;
-                const els = [...pg.elements];
-                if (fromIndex < 0 || fromIndex >= els.length) return pg;
-                const [moved] = els.splice(fromIndex, 1);
-                els.splice(Math.max(0, Math.min(els.length, toIndex)), 0, moved);
-                return { ...pg, elements: els };
-              }),
-            }
-          : p
-      ),
-    }));
-  },
-  groupElements: (projectId: string, pageId: string, elementIds: string[], name = "Gruppe") => {
-    if (!elementIds.length) return undefined;
-    const groupId = `g-${Date.now().toString(36)}`;
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              pages: p.pages.map((pg) =>
-                pg.id === pageId
-                  ? {
-                      ...pg,
-                      groups: [...(pg.groups ?? []), { id: groupId, name }],
-                      elements: pg.elements.map((e) =>
-                        elementIds.includes(e.id) ? { ...e, groupId } : e
-                      ),
-                    }
-                  : pg
-              ),
-            }
-          : p
-      ),
-    }));
-    return groupId;
-  },
-  renameGroup: (projectId: string, pageId: string, groupId: string, name: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              pages: p.pages.map((pg) =>
-                pg.id === pageId
-                  ? { ...pg, groups: (pg.groups ?? []).map((g) => (g.id === groupId ? { ...g, name } : g)) }
-                  : pg
-              ),
-            }
-          : p
-      ),
-    }));
-  },
-  ungroup: (projectId: string, pageId: string, groupId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              pages: p.pages.map((pg) =>
-                pg.id === pageId
-                  ? {
-                      ...pg,
-                      groups: (pg.groups ?? []).filter((g) => g.id !== groupId),
-                      elements: pg.elements.map((e) =>
-                        e.groupId === groupId ? { ...e, groupId: undefined } : e
-                      ),
-                    }
-                  : pg
-              ),
-            }
-          : p
-      ),
-    }));
-  },
-  renameLayer: (projectId: string, pageId: string, elementId: string, layerName: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              pages: p.pages.map((pg) =>
-                pg.id === pageId
-                  ? {
-                      ...pg,
-                      elements: pg.elements.map((e) =>
-                        e.id === elementId ? { ...e, layerName } : e
-                      ),
-                    }
-                  : pg
-              ),
-            }
-          : p
-      ),
-    }));
-  },
-  addElement: (projectId: string, pageId: string, el: Omit<PageElement, "id">) => {
-    const id = `el-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              pages: p.pages.map((pg) =>
-                pg.id === pageId
-                  ? syncPageElementUnits({ ...pg, elements: [...pg.elements, { ...el, id }] })
-                  : pg
-              ),
-            }
-          : p
-      ),
-    }));
-    return id;
-  },
-  updateElement: (
-    projectId: string,
-    pageId: string,
-    elementId: string,
-    patch: Partial<PageElement>
-  ) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              pages: p.pages.map((pg) =>
-                pg.id === pageId
-                  ? syncPageElementUnits({
-                      ...pg,
-                      elements: pg.elements.map((e) => {
-                        if (e.id !== elementId) return e;
-                        const next: PageElement = { ...e, ...patch };
-                        const { wMm: pageW, hMm: pageH } = getPageSizeMm(pg);
-                        const patchWritesPct =
-                          typeof patch.x === "number" ||
-                          typeof patch.y === "number" ||
-                          typeof patch.w === "number" ||
-                          typeof patch.h === "number";
-                        const patchWritesMm =
-                          typeof patch.xMm === "number" ||
-                          typeof patch.yMm === "number" ||
-                          typeof patch.wMm === "number" ||
-                          typeof patch.hMm === "number";
-                        if (patchWritesPct && !patchWritesMm && pageW > 0 && pageH > 0) {
-                          if (typeof next.x === "number") next.xMm = (next.x / 100) * pageW;
-                          if (typeof next.y === "number") next.yMm = (next.y / 100) * pageH;
-                          if (typeof next.w === "number") next.wMm = (next.w / 100) * pageW;
-                          if (typeof next.h === "number") next.hMm = (next.h / 100) * pageH;
-                        }
-                        return next;
-                      }),
-                    })
-                  : pg
-              ),
-            }
-          : p
-      ),
-    }));
-  },
-
-  deleteElement: (projectId: string, pageId: string, elementId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              pages: p.pages.map((pg) =>
-                pg.id === pageId
-                  ? { ...pg, elements: pg.elements.filter((e) => e.id !== elementId) }
-                  : pg
-              ),
-            }
           : p
       ),
     }));
@@ -1971,101 +986,11 @@ export const projectStore = {
     }));
   },
 
-  // ---------- Mappen ----------
-  addMappe: (projectId: string, name = "Neue Mappe") => {
-    const id = `m-${Date.now().toString(36)}`;
+  updateProjectSettings: (projectId: string, patch: Partial<ProjectSettings>) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              mappen: [...(p.mappen ?? []), { id, name, konzept: "", pageIds: [] }],
-              activeMappeId: id,
-            }
-          : p
+        p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), ...patch } } : p
       ),
-    }));
-    return id;
-  },
-  renameMappe: (projectId: string, mappeId: string, name: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              mappen: (p.mappen ?? []).map((m) => (m.id === mappeId ? { ...m, name } : m)),
-            }
-          : p
-      ),
-    }));
-  },
-  updateMappeKonzept: (projectId: string, mappeId: string, konzept: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              updatedAt: new Date().toISOString(),
-              mappen: (p.mappen ?? []).map((m) => (m.id === mappeId ? { ...m, konzept } : m)),
-            }
-          : p
-      ),
-    }));
-  },
-  deleteMappe: (projectId: string, mappeId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const mappen = p.mappen ?? [];
-        if (mappen.length <= 1) return p; // mindestens eine Mappe muss bleiben
-        const target = mappen.find((m) => m.id === mappeId);
-        if (!target) return p;
-        const rest = mappen.filter((m) => m.id !== mappeId);
-        // Verwaiste Seiten in die erste verbleibende Mappe verschieben.
-        rest[0] = { ...rest[0], pageIds: [...rest[0].pageIds, ...target.pageIds] };
-        return {
-          ...p,
-          updatedAt: new Date().toISOString(),
-          mappen: rest,
-          activeMappeId: p.activeMappeId === mappeId ? rest[0].id : p.activeMappeId,
-        };
-      }),
-    }));
-  },
-  reorderMappe: (projectId: string, mappeId: string, direction: -1 | 1) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const mappen = [...(p.mappen ?? [])];
-        const idx = mappen.findIndex((m) => m.id === mappeId);
-        if (idx < 0) return p;
-        const target = idx + direction;
-        if (target < 0 || target >= mappen.length) return p;
-        [mappen[idx], mappen[target]] = [mappen[target], mappen[idx]];
-        return { ...p, mappen, updatedAt: new Date().toISOString() };
-      }),
-    }));
-  },
-  moveMappeToIndex: (projectId: string, mappeId: string, toIndex: number) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => {
-        if (p.id !== projectId) return p;
-        const mappen = [...(p.mappen ?? [])];
-        const from = mappen.findIndex((m) => m.id === mappeId);
-        if (from < 0) return p;
-        const clamped = Math.max(0, Math.min(mappen.length - 1, toIndex));
-        if (clamped === from) return p;
-        const [item] = mappen.splice(from, 1);
-        mappen.splice(clamped, 0, item);
-        return { ...p, mappen, updatedAt: new Date().toISOString() };
-      }),
-    }));
-  },
-  setActiveMappe: (projectId: string, mappeId: string) => {
-    setState((s) => ({
-      projects: s.projects.map((p) => (p.id === projectId ? { ...p, activeMappeId: mappeId } : p)),
     }));
   },
   updateProjectSettings: (projectId: string, patch: Partial<ProjectSettings>) => {
@@ -2075,13 +1000,13 @@ export const projectStore = {
       ),
     }));
   },
-  setMappeHelpOn: (projectId: string, mappeHelpOn: boolean) => {
+  setHelpOn: (projectId: string, helpOn: boolean) => {
     const project = state.projects.find((p) => p.id === projectId);
     if (!project) return false;
-    if (project.settings?.mappeHelpOn === mappeHelpOn) return true;
+    if (project.settings?.helpOn === helpOn) return true;
     const projects = state.projects.map((p) =>
       p.id === projectId
-        ? { ...p, settings: { ...(p.settings ?? {}), mappeHelpOn } }
+        ? { ...p, settings: { ...(p.settings ?? {}), helpOn } }
         : p
     );
     return commitProjectUiProjects(projects);
