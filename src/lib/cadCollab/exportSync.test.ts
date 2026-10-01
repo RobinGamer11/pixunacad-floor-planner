@@ -57,7 +57,7 @@ describe("Lokaler Export-Bedienzustand geht nie in die Cloud", () => {
     const p = pm.createPlan({ name: "A" });
     pm.createFolder("F");
     const before = { ...base, plans: pm.toJSON(), planFolders: pm.foldersToJSON() };
-    pm.setSelected(p.id, true);
+    pm.setActive?.(p.id);
     const after = { ...base, plans: pm.toJSON(), planFolders: pm.foldersToJSON() };
     expect(diffSnapshots(JSON.stringify(before), JSON.stringify(after))).toHaveLength(0);
     expect(JSON.stringify(after)).not.toMatch(/selected|collapsed/);
