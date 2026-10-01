@@ -46,7 +46,7 @@ export interface FinanceState {
   projectNote: string;
 }
 
-import { migrateFinanceState, migrateProjectPages, stampVersion, FINANCE_KIND } from "./persistence";
+import { migrateFinanceState, stampVersion, FINANCE_KIND } from "./persistence";
 
 const KEY = (projectId: string) => `pixuna.finance.v2.${projectId}`;
 
@@ -342,45 +342,3 @@ export function parseEur(v: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// ------------------------------------------------- Vorlagen (Projektmappe)
-
-export const TEMPLATE_LABEL: Record<FinancePositionType, string> = {
-  offer: "Angebot",
-  invoice: "Rechnung",
-  supplement: "Nachtrag",
-};
-
-/** Schlüssel einer Vorlagenseite in der Projektmappe. */
-export function templateKeyOf(type: FinancePositionType, positionId: string): string {
-  return `fin:${type}:${positionId}`;
-}
-
-export function parseTemplateKey(key: string): { type: FinancePositionType; positionId: string } | null {
-  const m = /^fin:(offer|invoice|supplement):(.+)$/.exec(key);
-  return m ? { type: m[1] as FinancePositionType, positionId: m[2] } : null;
-}
-
-const FAV_KEY = (projectId: string, type: FinancePositionType) =>
-  `pixuna.finance.tplfav.${projectId}.${type}`;
-
-/**
- * Favoriten-Vorlage (Seiten-Snapshot) lesen.
- * Bestandsdaten ohne Versionsfeld (Legacy/v0) laufen durch dieselbe additive
- * Seiten-Migration wie Projektseiten — sichtbare Eigenschaften bleiben 1:1.
- */
-export function getFavoriteTemplate<T = unknown>(projectId: string, type: FinancePositionType): T[] | undefined {
-  try {
-    const raw = localStorage.getItem(FAV_KEY(projectId, type));
-    if (!raw) return undefined;
-    const parsed = migrateProjectPages(JSON.parse(raw));
-    return Array.isArray(parsed) && parsed.length ? (parsed as T[]) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-
-/** Favoriten-Vorlage setzen (Snapshot der aktuellen Vorlagenseiten). */
-export function setFavoriteTemplate(projectId: string, type: FinancePositionType, pages: unknown[]) {
-  try { localStorage.setItem(FAV_KEY(projectId, type), JSON.stringify(pages)); } catch {}
-}
