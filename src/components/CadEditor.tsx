@@ -145,8 +145,6 @@ const TOOL_VARIANTS: Record<string, ToolVariant[]> = {
 export interface CadEditorHandle {
   undo: () => void;
   redo: () => void;
-  exportPdf: () => void;
-  openExportPanel: () => void;
   deleteSelection: () => void;
   hasDeletableSelection: () => boolean;
   copySelection: () => boolean;
@@ -222,13 +220,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const sheetAddBtnRef = useRef<HTMLButtonElement>(null);
   const sheetToggleBtnRef = useRef<HTMLButtonElement>(null);
 
-  // PlanPanel refs (Druckpläne)
-  const planPanelRef = useRef<HTMLDivElement>(null);
-  const planBodyRef = useRef<HTMLDivElement>(null);
-  const planListRef = useRef<HTMLDivElement>(null);
-  const planAddBtnRef = useRef<HTMLButtonElement>(null);
-  const planPrintBtnRef = useRef<HTMLButtonElement>(null);
-  const planToggleBtnRef = useRef<HTMLButtonElement>(null);
 
   // Hatch settings refs
   const hatchSettingsRef = useRef<HTMLDivElement>(null);
@@ -352,20 +343,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   React.useImperativeHandle(ref, () => ({
     undo: () => appRef.current?.undo(),
     redo: () => appRef.current?.redo(),
-    exportPdf: () => appRef.current?.printSelectedPlans(),
-    openExportPanel: () => {
-      setRightOpen(true);
-      setRightTab("sheets");
-      if (exportModeRef.current) return; // Export: keine Druckpläne
-      // Kleines Delay, damit der Sheets-Tab gerendert ist bevor wir hineinscrollen.
-      setTimeout(() => {
-        // Sicherstellen, dass die Druckpläne-Sektion ausgeklappt ist.
-        if (planPanelRef.current?.classList.contains("collapsed")) {
-          planToggleBtnRef.current?.click();
-        }
-        planPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 40);
-    },
     deleteSelection: () => { appRef.current?.deleteSelection(); },
     copySelection: () => appRef.current?.copySelection() ?? false,
     pasteClipboard: () => appRef.current?.startPastePreview() ?? false,
@@ -1070,23 +1047,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       sheetToggleBtnRef.current!,
     );
 
-    // Druckpläne-Panel verdrahten (Schritt 2)
-    if (planPanelRef.current && planBodyRef.current && planListRef.current &&
-        planAddBtnRef.current && planPrintBtnRef.current && planToggleBtnRef.current) {
-      app.attachPlanPanel(
-        planPanelRef.current,
-        planBodyRef.current,
-        planListRef.current,
-        planAddBtnRef.current,
-        planPrintBtnRef.current,
-        planToggleBtnRef.current,
-      );
-      // Druckpläne starten immer eingeklappt; sie öffnen sich erst über
-      // „Exportieren“ oder durch aktives Aufklappen im Panel.
-      if (!planPanelRef.current.classList.contains("collapsed")) {
-        planToggleBtnRef.current.click();
-      }
-    }
 
     appRef.current = app;
     setCadApp(app);
@@ -3445,7 +3405,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <div ref={sheetPanelRef} className="cad-id-panel cad-sheet-panel w-full">
             <div className="cad-sheet-tab-head">
               <div className="cad-sheet-tab-title">Seiten</div>
-              <div className="cad-sheet-tab-subtitle">Blätter und Druckpläne verwalten</div>
+              <div className="cad-sheet-tab-subtitle">CAD-Blätter verwalten</div>
             </div>
             <button ref={sheetToggleBtnRef} type="button" className="hidden" tabIndex={-1} aria-hidden="true" />
             <div ref={sheetBodyRef} className="id-body">
@@ -3456,31 +3416,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             </div>
           </div>
 
-          {/* Druckpläne — direkt im Sheets-Tab, unterhalb der Zeichenblätter. */}
-          <div ref={planPanelRef} className="cad-id-panel cad-plan-panel w-full">
-            <div className="id-head">
-              <div className="id-title">Druckpläne</div>
-              <div className="id-head-actions">
-                <button ref={planToggleBtnRef} className="id-head-btn icon-only" title="Ein-/Ausklappen">
-                  <span className="id-toggle-chevron" />
-                </button>
-              </div>
-            </div>
-            <div ref={planBodyRef} className="id-body">
-              <div className="id-add-wrap">
-                <button ref={planAddBtnRef} className="id-head-btn id-add-btn id-add-outline">+ Druckplan</button>
-              </div>
-              <div ref={planListRef} className="id-list" />
-              <div className="plan-print-wrap">
-                <button ref={planPrintBtnRef} className="plan-print-btn" title="Ausgewählte Pläne als PDF drucken">
-                  🖨 Als PDF drucken
-                </button>
-              </div>
-              <div className="text-[11px] leading-snug px-2 py-2 mt-2" style={{ color: "hsl(var(--ink-soft))" }}>
-                Tipp: Pläne kannst du auch über das Werkzeug „CAD-Blatt" in der Projektmappenbearbeitung einfügen.
-              </div>
-            </div>
-          </div>
         </DragScrollDiv>
         {exportMode && cadApp && (
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden" style={{ display: rightTab === "sheets" ? "block" : "none" }}>

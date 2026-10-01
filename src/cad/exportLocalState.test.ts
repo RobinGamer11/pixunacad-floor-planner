@@ -7,8 +7,7 @@ describe("Export: lokaler Bedienzustand wird nie gespeichert", () => {
     const pm = new PlanManager();
     const p = pm.createPlan({ name: "A" });
     const f = pm.createFolder("EG");
-    pm.setSelected(p.id, true);
-    expect(pm.isSelected(p.id)).toBe(true);
+    expect(p.id).toBeTruthy();
     const json = JSON.stringify({ plans: pm.toJSON(), planFolders: pm.foldersToJSON() });
     expect(json).not.toContain("selected");
     expect(json).not.toContain("collapsed");
@@ -21,7 +20,8 @@ describe("Export: lokaler Bedienzustand wird nie gespeichert", () => {
       [{ id: "x", name: "Alt", formatKey: "a4", landscape: false, freeWidth: 1, freeHeight: 1, projections: [], selected: true } as any],
       [{ id: "f", name: "O", parentId: null, order: 0, collapsed: true } as any],
     );
-    expect(pm.isSelected("x")).toBe(false);
+    expect(pm.getById("x")).toBeTruthy();
+    expect((pm as any).getSelected).toBeUndefined();
     expect(JSON.stringify(pm.toJSON())).not.toContain("selected");
     expect(JSON.stringify(pm.foldersToJSON())).not.toContain("collapsed");
     expect(pm.getById("x")!.holePunchSide).toBe("left");
