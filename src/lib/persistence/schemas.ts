@@ -8,7 +8,6 @@
  * Tabellenlayout, Dokumentpositionen, Maßstäbe bleiben unangetastet).
  */
 import { defineSchema, migrateData } from "./schema";
-import { normalizeTable, tableWidthMm, tableHeightMm } from "../table/tableModel";
 import { stripLegacyMappe } from "../legacyMappeMigration";
 
 /* ------------------------------------------------------------------ Helpers */
