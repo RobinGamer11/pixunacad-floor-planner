@@ -297,8 +297,9 @@ Jede Abschlussmeldung endet mit einem vollständigen PowerShell-Befehl für den
 jeweils nächsten sinnvollen Schritt.
 
 ## Kontoübergreifende Projektspeicherung
-- Öffnen/Laden/Übernehmen folgt ausschließlich `decideOpen` in `src/lib/cloudProjectState.ts` (CAD und Mappe gleich) – so gibt es nur eine Regel: Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
-- CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`), Projektmetadaten als Mappen-Objekt `meta` – ohne sie fehlen Inhalte auf dem zweiten Gerät.
+- Öffnen/Laden/Übernehmen folgt ausschließlich `decideOpen` in `src/lib/cloudProjectState.ts` (CAD inkl. Export) – so gibt es nur eine Regel: Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
+- CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`) – ohne sie fehlen Inhalte auf dem zweiten Gerät.
+- Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt ausschließlich den Projekt-Payload (nie CAD-Snapshot/Export) – so kann kein alter Stand sie zurückbringen.
 - `cloud` (Cloudbasis, darf laden/sichern) und `shared` (mind. eine weitere berechtigte Person) sind getrennt in `ProjectAccess`; Realtime/Präsenz/Sperren nur bei weiteren Personen – verhindert Team-Anzeigen und Kosten bei Solo-Cloudprojekten.
 - Papierkorb von Cloudprojekten folgt `network_projects.deleted_at` über `src/lib/cloudTrash.ts` (offene lokale Aktionen haben Vorrang) – damit gelöschte Projekte nicht als Platzhalter zurückkehren.
 - Export ist dieselbe `CadApp` mit aktiver Exportseite (`?view=export`), Mutationen nur über `CadApp.mutatePlans` – ein Verlauf, keine zweite CAD-Welt (Details: `docs/export-architecture.md`).
