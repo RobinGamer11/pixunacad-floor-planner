@@ -32,7 +32,6 @@ import {
   Loader2,
   Users,
   Play,
-  FolderKanban,
   Compass, Printer,
   Trash2,
   Copy,
