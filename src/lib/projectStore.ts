@@ -1,9 +1,10 @@
 // Lightweight client-side project store backed by localStorage.
-// Holds the projects shown on the start page and inside the Projektmappe.
+// Holds the projects shown on the start page and in the project workspaces.
 // Intentionally framework-free: tiny pub/sub + useSyncExternalStore hook.
 
 import { useSyncExternalStore } from "react";
-import { getPageSizeMm, parseScaleDen } from "./paper";
+import { parseScaleDen } from "./paper";
+import { stripLegacyMappe } from "./legacyMappeMigration";
 import { migrateProjectState, stampVersion, PROJECT_STATE_KIND } from "./persistence";
 
 export type PageFormat = "A3-quer" | "A4-hoch" | "A4-quer" | "A3-hoch" | "frei";
@@ -144,56 +145,6 @@ export interface PageElement {
 export type PunchPattern = "none" | "2-fach" | "4-fach" | "6-fach-a5";
 export type PunchSide = "left" | "right" | "top" | "bottom";
 
-export interface ProjectPage {
-  id: string;
-  title: string;
-  format: PageFormat;
-  margins: number;
-  background: boolean;
-  elements: PageElement[];
-  notes?: string;
-  columns?: number;
-  columnGap?: number;
-  guides?: boolean;
-  punchPattern?: PunchPattern;
-  punchSide?: PunchSide;
-  /**
-   * Serialized CAD overlay scene for the page-embedded CAD engine.
-   * Holds geometry drawn with the embedded CAD tools (Line, later Text/Hatch).
-   * Opaque JSON.
-   */
-  cadOverlay?: any;
-  /** Named groups for the layers panel. */
-  groups?: { id: string; name: string; collapsed?: boolean }[];
-
-  /* ---------- Seiten-Verbund (Spreads) ---------- */
-  /** Gruppen-ID. Mehrere Pages mit derselben spreadId bilden einen Spread
-   *  (Doppelseite / freie Anordnung). Fehlt = Einzelseite. */
-  spreadId?: string;
-  /** Reihenfolge der Seite innerhalb ihres Spreads (0 = ganz links). */
-  spreadIndex?: number;
-  /** Layout-Modus des Spreads: "grid" = nebeneinander, "free" = frei positioniert. */
-  spreadLayoutMode?: "grid" | "free";
-  /** Nur bei "free"-Modus: Offset der Seite in mm, rel. zur ersten Seite des Spreads. */
-  spreadOffset?: { xMm: number; yMm: number; rotationDeg?: number };
-  /** Bei true wird diese Seite von „Muster übernehmen" übersprungen. */
-  spreadExcluded?: boolean;
-  /** UI: Spread im Seiten-Panel eingeklappt anzeigen. */
-  spreadCollapsed?: boolean;
-  /** Nur bei "free"-Modus: Anordnung gesperrt (kein Ziehen, kein Griff sichtbar). */
-  spreadLayoutLocked?: boolean;
-  /** Freie Papiergröße (nur bei format === "frei"). Werte in mm. */
-  customWidthMm?: number;
-  customHeightMm?: number;
-  /**
-   * Vorlagen-Seite der Finanzen-Oberfläche (z. B. "offer:f-abc123").
-   * Solche Seiten sind in der normalen Projektmappe unsichtbar und werden nur
-   * im Vorlagen-Modus (Angebot/Rechnung/Nachtrag anlegen) angezeigt.
-   */
-  templateKey?: string;
-}
-
-
 export interface Sheet {
   id: string;
   name: string;
@@ -240,18 +191,6 @@ export interface CustomField {
   value: string;
 }
 
-/**
- * Projektmappe: übergeordnete Sammlung innerhalb eines Projekts, die eigene
- * Seiten und eine eigene Konzept-Beschreibung besitzt. Pages leben weiterhin
- * in `project.pages`; die Mappe referenziert sie per ID.
- */
-export interface Mappe {
-  id: string;
-  name: string;
-  konzept?: string;
-  pageIds: string[];
-}
-
 export type FileKind = "folder" | "file";
 
 export interface FileNode {
@@ -269,12 +208,8 @@ export interface FileNode {
 export interface ProjectSettings {
   /** Position des Zeitstrahls im Übersichts-Tab. Default: "bottom". */
   timelinePosition?: "top" | "bottom";
-  /** Projektbezogene Schnellhilfe in der Mappe. Fehlend bedeutet initial aktiv. */
-  mappeHelpOn?: boolean;
-  /** Wenn true (Default), rendern CAD-Viewports in der Projektmappe live aus
-   *  der aktuellsten Szene des referenzierten Zeichenblatts. Wenn false,
-   *  werden Änderungen erst nach Klick auf „Ansicht aktualisieren" sichtbar. */
-  cadAutoUpdate?: boolean;
+  /** Projektbezogene Schnellhilfe in CAD, Export und Board. Fehlend bedeutet initial aktiv. */
+  helpOn?: boolean;
   /** Zielauflösung für neu erzeugte Pixelobjekte. */
   pixelRenderDpi?: number;
   /** Optionales zusätzliches Supersampling vor dem PNG-Zuschnitt. */
@@ -305,7 +240,6 @@ export interface Project {
   projektEnde?: string;
   updatedAt: string;
   favorite?: boolean;
-  pages: ProjectPage[];
   sheets: Sheet[];
   tasks: Task[];
   events: CalendarEvent[];
@@ -316,9 +250,6 @@ export interface Project {
   konzeptCollapsed?: boolean;
   customFields?: CustomField[];
   isTemplate?: boolean;
-  /** Projektmappen (falls fehlend, wird beim Laden eine "Hauptmappe" erzeugt). */
-  mappen?: Mappe[];
-  activeMappeId?: string;
   /** Zuordnung zu einem benutzerdefinierten Ordner (siehe ProjectFolder). */
   folderId?: string | null;
   /** Manuelle Sortierposition in der Sidebar (klein = weiter oben). */
@@ -331,25 +262,6 @@ export interface Project {
   photos?: FileNode[];
   settings?: ProjectSettings;
 }
-
-/** Gültigkeitsbereich einer „Auf allen Seiten“-Gruppe.
- *  `mappe` = nur Seiten dieser Projektmappe,
- *  `template` = nur Vorlagen-Seiten mit exakt diesem templateKey. */
-export type TextSpanScope =
-  | { type: "mappe"; id: string }
-  | { type: "template"; key: string };
-
-/** Vorlagenzustand einer „Auf allen Seiten“-Textbox. */
-export interface TextSpanTemplate {
-  /** Stabile Gruppen-/Vorlagen-ID; identisch auf allen Seitenkopien. */
-  groupId: string;
-  /** Serialisierte Textbox im CAD-Overlay-Format (Weltkoordinaten = Papier-mm/1000). */
-  box: any;
-  /** Seitenkontext, in dem die Gruppe gilt. Fehlt er (Altprojekte), wird er
-   *  aus den vorhandenen Kopien abgeleitet. */
-  scope?: TextSpanScope;
-}
-
 
 export interface ProjectFolder {
   id: string;
@@ -986,13 +898,6 @@ export const projectStore = {
     }));
   },
 
-  updateProjectSettings: (projectId: string, patch: Partial<ProjectSettings>) => {
-    setState((s) => ({
-      projects: s.projects.map((p) =>
-        p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), ...patch } } : p
-      ),
-    }));
-  },
   updateProjectSettings: (projectId: string, patch: Partial<ProjectSettings>) => {
     setState((s) => ({
       projects: s.projects.map((p) =>
