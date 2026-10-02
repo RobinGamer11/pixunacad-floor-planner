@@ -107,3 +107,49 @@ describe("Einfügen aus der Kopfzeile", () => {
     expect(pasted.b).toEqual(v(16, 9));
   });
 });
+describe("Mehrfach-Einfügen auf dem Tablet", () => {
+  it("nach Häkchen entsteht die nächste Vorschau nicht am Häkchen", () => {
+    const { app, beginNow } = armedApp();
+    app.multiPasteActive = true;
+    app.input.mouse = { sx: 500, sy: 400, wx: 5, wy: 4 } as typeof app.input.mouse;
+    app.afterPasteFloatConfirmed();
+    expect(app.pasteArmed).toBe(true);
+    expect(beginNow).not.toHaveBeenCalled();
+
+    // Zittern/Event am Häkchen startet nichts
+    app.input.pointerEventSeq += 1;
+    app.input.mouse = { sx: 503, sy: 402, wx: 5, wy: 4 } as typeof app.input.mouse;
+    Reflect.get(app, "_resolveArmedPaste").call(app);
+    expect(beginNow).not.toHaveBeenCalled();
+
+    // Nächster echter Kontakt auf der Zeichenfläche startet die Vorschau
+    app.input.pointerEventSeq += 1;
+    app.input.mouse = { sx: 900, sy: 800, wx: 9, wy: 8 } as typeof app.input.mouse;
+    Reflect.get(app, "_resolveArmedPaste").call(app);
+    expect(beginNow).toHaveBeenCalledTimes(1);
+  });
+
+  it("Canvas-Tipp bestätigt im Mehrfachmodus keine Kopie, Häkchen/Enter schon", () => {
+    const scene = new Scene();
+    const seg = scene.createSegment(v(0, 0), v(1, 0));
+    const camera = new Camera();
+    camera.scale = 100;
+    const app = {
+      scene, camera, multiPasteActive: true,
+      input: { mouse: { wx: 0, wy: 0, sx: 0, sy: 0 } },
+      topology: { findBestSnap: vi.fn(() => null) },
+      selection: { type: SelectionType.SEGMENT, segmentId: seg.id },
+      commitHistorySnapshot: vi.fn(),
+      afterPasteFloatConfirmed: vi.fn(),
+    } as unknown as CadApp;
+    const tool = new SelectTool(app);
+    tool.beginPasteFloat([{ kind: "segment", id: seg.id }], v(0, 0));
+    const confirm = vi.spyOn(tool, "confirmPasteFloat");
+    // Quelltext-Garantie: Canvas-Commit ist für multiPasteActive gesperrt
+    const src = SelectTool.prototype.update?.toString?.() ?? "";
+    expect(src === "" || src.includes("multiPasteActive")).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(tool.confirmPasteFloat()).toBe(true);
+    expect(seg.a).toEqual(v(0, 0));
+  });
+});

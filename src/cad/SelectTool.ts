@@ -3331,7 +3331,10 @@ export class SelectTool {
           if (this.pasteFloatActive && input.clicked) {
             input.clicked = false;
             input.doubleClicked = false;
-            this.confirmPasteFloat();
+            // Mehrfach-Einfügen: Ein Tipp/Klick auf die Zeichenfläche
+            // aktualisiert nur die Vorschau — bestätigt wird ausschließlich
+            // über das Häkchen oder Enter.
+            if (!(this.app as any).multiPasteActive) this.confirmPasteFloat();
           }
           return;
         }

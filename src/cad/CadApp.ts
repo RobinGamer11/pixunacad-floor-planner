@@ -2897,6 +2897,7 @@ export class CadApp {
     this.pastePreviewActive = false;
     this.pasteArmed = false;
     this._pasteArmedAfterPointerSeq = -1;
+    this._pasteArmedAwayFrom = null;
     if (this.multiPasteActive) {
       this.multiPasteActive = false;
       this.onMultiPasteChange?.(false);
@@ -2909,12 +2910,19 @@ export class CadApp {
    * Wird im Frame-Takt aufgerufen: Sobald der Zeiger die Zeichenfläche
    * erreicht, entsteht die bereitstehende Kopie exakt unter dem Cursor.
    */
+  /** Bestätigungsstelle (Häkchen/Enter) im Mehrfachmodus — dort nie starten. */
+  private _pasteArmedAwayFrom: { sx: number; sy: number } | null = null;
+
   private _resolveArmedPaste() {
     if (!this.pasteArmed) return;
     // Ausschließlich ein echtes Canvas-Ereignis NACH dem Scharfstellen darf
     // den Vorgang starten. `input.update()` hat dessen aktuelle Position im
     // selben Frame bereits in Weltkoordinaten umgerechnet.
     if (!this.input || this.input.pointerEventSeq <= this._pasteArmedAfterPointerSeq) return;
+    const away = this._pasteArmedAwayFrom;
+    if (away && this.input.mouse
+      && Math.hypot(this.input.mouse.sx - away.sx, this.input.mouse.sy - away.sy) < 16) return;
+    this._pasteArmedAwayFrom = null;
     this.pasteArmed = false;
     this._pasteArmedAfterPointerSeq = -1;
     if (!this._beginPasteFloatNow()) this.stopMultiPaste();
@@ -2951,16 +2959,26 @@ export class CadApp {
     this.multiPasteActive = false;
     this.pasteArmed = false;
     this._pasteArmedAfterPointerSeq = -1;
+    this._pasteArmedAwayFrom = null;
     this.onMultiPasteChange?.(false);
     try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
   }
 
-  /** Nach jeder gesetzten Kopie hängt die nächste Vorschau am Mauszeiger. */
+  /**
+   * Nach jeder bestätigten Kopie wird die nächste Vorschau nur scharfgestellt.
+   * Sie entsteht erst beim nächsten echten Canvas-Kontakt bzw. einer Bewegung
+   * weg von der Bestätigungsstelle — nie am Häkchen.
+   */
   afterPasteFloatConfirmed() {
     if (!this.multiPasteActive || this._multiPasteBusy) return;
     this._multiPasteBusy = true;
     try {
-      if (!this.startPastePreview()) this.stopMultiPaste();
+      if (!this.clipboard || this.clipboard.items.length === 0 || !this._armPasteForNextCanvasPointer()) {
+        this.stopMultiPaste();
+        return;
+      }
+      const m = this.input?.mouse;
+      this._pasteArmedAwayFrom = m ? { sx: m.sx, sy: m.sy } : null;
     } finally {
       this._multiPasteBusy = false;
     }
