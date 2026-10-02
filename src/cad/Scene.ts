@@ -964,6 +964,59 @@ export class TableObject {
   setData(next: any) { this.data = next; }
 }
 
+/**
+ * Semantisches Treppenobjekt. Gespeichert werden nur Parameter; Stufen,
+ * Podeste, Pfeil, Beschriftung und Fangpunkte leitet `stairGeometry.ts` ab.
+ */
+export class Stair {
+  id: string;
+  labelId: string;
+  mode: "straight" | "landing" | "winder" | "arc" = "straight";
+  /** Referenzlinie (Bezugskante) als offene Punktkette in Weltkoordinaten. */
+  path: Vec2[] = [];
+  referenceSide: "left" | "right" = "left";
+  treadDepthM = 0.28;
+  stairWidthM = 1.0;
+  riserHeightM = 0.175;
+  stepRuleCm = 63;
+  useStepRule = true;
+  floorHeightM: number | null = null;
+  riserExtra = 1;
+  stepDistancesM: number[] | null = null;
+  landingDepthM: number | null = null;
+  direction: "up" | "down" = "up";
+  showArrow = true;
+  showCircle = true;
+  showLabel = true;
+  showWidth = false;
+  color = "#111111";
+  lineWidthPx = 1;
+  // Für spätere Rundtreppen (Modus "arc") vorbereitet.
+  arc: { center: Vec2; innerRadiusM: number; outerRadiusM: number; startAngle: number; endAngle: number; walkRadiusM: number; ccw: boolean } | null = null;
+
+  constructor(init: Partial<Stair> & { id: string }) {
+    Object.assign(this, init);
+    this.labelId = init.labelId || Defaults.defaultLabelId;
+    this.path = (init.path || []).map(p => v(p.x, p.y));
+    this.stepDistancesM = Array.isArray(init.stepDistancesM) ? [...init.stepDistancesM] : null;
+  }
+}
+
+export function serializeStair(s: Stair): any {
+  return {
+    id: s.id, labelId: s.labelId, mode: s.mode,
+    path: s.path.map(p => ({ x: p.x, y: p.y })),
+    referenceSide: s.referenceSide, treadDepthM: s.treadDepthM, stairWidthM: s.stairWidthM,
+    riserHeightM: s.riserHeightM, stepRuleCm: s.stepRuleCm, useStepRule: s.useStepRule,
+    floorHeightM: s.floorHeightM, riserExtra: s.riserExtra,
+    stepDistancesM: s.stepDistancesM ? [...s.stepDistancesM] : null,
+    landingDepthM: s.landingDepthM, direction: s.direction,
+    showArrow: s.showArrow, showCircle: s.showCircle, showLabel: s.showLabel, showWidth: s.showWidth,
+    color: s.color, lineWidthPx: s.lineWidthPx,
+    arc: s.arc ? { ...s.arc, center: { ...s.arc.center } } : null,
+  };
+}
+
 export class Scene {
   segments: Segment[] = [];
   freeStrokes: FreeStroke[] = [];
@@ -977,6 +1030,8 @@ export class Scene {
   documents: DocumentObject[] = [];
   walls: Wall[] = [];
   doors: Door[] = [];
+  /** Semantische Treppen (Stufen werden nur abgeleitet). */
+  stairs: Stair[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Edit-Owner-ID markiert (Alt-Mechanismus, aktuell ungenutzt und immer null).
@@ -1780,6 +1835,18 @@ export class Scene {
     this.markWallsDirty();
     return [wA, wB];
   }
+
+  // ---- Treppen ----
+  createStair(init: Partial<Stair>): Stair {
+    const st = new Stair({ ...init, id: init.id || this._makeId() });
+    this.stairs.push(st);
+    return st;
+  }
+  getStairById(id: string): Stair | null { return this.stairs.find(s => s.id === id) || null; }
+  getStairsByLabelId(labelId: string): Stair[] { return this.stairs.filter(s => s.labelId === labelId); }
+  removeStair(st: Stair) { this.stairs = this.stairs.filter(s => s !== st); }
+  removeStairsByLabelId(labelId: string) { this.stairs = this.stairs.filter(s => s.labelId !== labelId); }
+  reassignStairsLabel(oldId: string, newId: string) { for (const s of this.stairs) if (s.labelId === oldId) s.labelId = newId; }
 
   // ---- Doors (Türen) ----
   createDoor(opts: {
