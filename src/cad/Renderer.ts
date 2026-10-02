@@ -35,6 +35,7 @@ import { getWallUnionGroups } from "./wallUnion";
 import { buildHealedWallSolidRing, buildWallSolidRing, ringToPCPolygon } from "./wallSolid";
 import { drawDoor } from "./doorGeom";
 import { isExportMode } from "@/lib/printExport";
+import { drawStair } from "./stairDraw";
 import { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
@@ -325,6 +326,7 @@ export class Renderer {
       this._drawHatchesForLabel(labelId);
       this._drawWallsForLabel(labelId);
       this._drawDoorsForLabel(labelId);
+      this._drawStairsForLabel(labelId);
       this._drawSegmentsForLabel(labelId);
       this._drawFreeStrokesForLabel(labelId);
       this._drawDimensionsForLabel(labelId);
@@ -1714,6 +1716,20 @@ export class Renderer {
   }
 
 
+
+  /** Hervorgehobene Treppen (Auswahl), wird vom CAD-Takt gesetzt. */
+  stairHighlightIds: ReadonlySet<string> = new Set();
+  /** Treppen, die gerade als Bearbeitungsvorschau gezeichnet werden (Original ausblenden). */
+  stairHiddenIds: ReadonlySet<string> = new Set();
+
+  private _drawStairsForLabel(labelId: string) {
+    const list = (this.scene as any).stairs as any[] | undefined;
+    if (!list || !list.length) return;
+    for (const st of list) {
+      if (st.labelId !== labelId || this.stairHiddenIds.has(st.id)) continue;
+      drawStair(this.ctx, this.camera as any, st, { selected: !isExportMode() && this.stairHighlightIds.has(st.id) });
+    }
+  }
 
   private _drawDoorsForLabel(labelId: string) {
     if (!this.scene.doors || this.scene.doors.length === 0) return;
