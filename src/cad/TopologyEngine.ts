@@ -1,4 +1,5 @@
 import { Defaults, SnapType } from "./constants";
+import { computeStairGeometry } from "./stairGeometry";
 import { Vec2, v, projectPointToSegment, projectPointToCurvedEdge } from "./geometry";
 import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
@@ -56,6 +57,8 @@ export interface SnapExclusions {
   doorIds?: ReadonlySet<string>;
   /** Bibliotheksinstanzen, die keine Fangpunkte liefern (z. B. die gerade transformierte). */
   libraryInstanceIds?: ReadonlySet<string>;
+  /** Treppen ohne Fangpunkte (z. B. die gerade bearbeitete). */
+  stairIds?: ReadonlySet<string>;
   /** true = das Lineal selbst liefert keine Fangpunkte (beim Ziehen des Lineals). */
   ruler?: boolean;
 }
@@ -299,6 +302,16 @@ export class TopologyEngine {
     }
     this._nearbyCache = { key, pts };
     return pts;
+  }
+
+  /** Fangpunkte/-kanten aller sichtbaren Treppen (gemeinsame Ecken eindeutig). */
+  private _addStairSnaps(considerPoint: (w: Vec2, s: any, h: any, i: number) => void, considerLine: (a: Vec2, b: Vec2, s: any, h: any) => void, excluded?: ReadonlySet<string>) {
+    for (const st of ((this.scene as any).stairs || []) as any[]) {
+      if (excluded?.has(st.id) || !this.labels.isVisible(st.labelId)) continue;
+      const g = computeStairGeometry(st);
+      for (const p of g.snapPoints) considerPoint(v(p.x, p.y), null, null, -1);
+      for (const [a, b] of g.snapLines) considerLine(v(a.x, a.y), v(b.x, b.y), null, null);
+    }
   }
 
   /** Aufgelöste Weltszenen der sichtbaren Bibliotheksinstanzen. */
@@ -690,6 +703,7 @@ export class TopologyEngine {
     for (const ls of this._libraryScenes(exclusions?.libraryInstanceIds)) {
       this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
     }
+    this._addStairSnaps(considerPoint, considerLine, exclusions?.stairIds);
 
 
 
@@ -795,6 +809,7 @@ export class TopologyEngine {
     }
 
     for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+    this._addStairSnaps(considerPoint, considerLine);
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
       if (score < bestScore) { bestScore = score; best = cand; }
@@ -860,6 +875,7 @@ export class TopologyEngine {
     }
 
     for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+    this._addStairSnaps(considerPoint, considerLine);
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
       if (score < bestScore) { bestScore = score; best = cand; }

@@ -92,6 +92,15 @@ export function migrateSceneData<T>(scene: T): T {
     fill(s, "definitionVersion", 1);
   });
 
+  // Treppen (additiv; alte Szenen haben das Feld nicht).
+  fill(scene, "stairs", []);
+  mapArray(scene, "stairs", (s) => {
+    fill(s, "mode", "straight");
+    fill(s, "referenceSide", "left");
+    fill(s, "riserExtra", 1);
+    fill(s, "direction", "up");
+  });
+
   mapArray(scene, "tables", (t) => {
     fill(t, "rotationRad", 0);
     fill(t, "scale", 1);

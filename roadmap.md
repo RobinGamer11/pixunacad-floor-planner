@@ -140,3 +140,11 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 ## Alte CAD-Druckplan-Bedienung entfernt – Stand
 - [x] PlanPanel, Häkchen-Auswahl, „PDF drucken“, alter Exportieren-Knopf entfernt; Exportseiten/Plan-Szenen/Ausschnitte unverändert
 - [ ] Abnahme im Browser mit echtem Projekt (Nutzer)
+
+## Treppe (Stufe A: gerade + Podest)
+- [x] stairGeometry (treadCount/riserCount getrennt, Podest-Regeln, Grenzverschiebung, eindeutige Fangpunkte) + Tests
+- [x] Stair in Scene/Serde/Klon/Cloud-Diff
+- [x] Renderer, Fangpunkte, Auswahl/Verschieben
+- [x] StairTool (Vorschau → Häkchen/Enter, Bezug an erster Stufe) + Einstellungspanel
+- [x] Gewendelt/Rund: vorbereitet, gesperrt
+- [ ] Echte Abnahme im Browser/Tablet (Platzierung, Griffe, Export-PDF)

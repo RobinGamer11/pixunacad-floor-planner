@@ -1,4 +1,5 @@
 import { copyDisplayGradient } from "./displayGradient";
+import { serializeStair } from "./Scene";
 import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, polygonCentroid } from "./geometry";
 import type { CadApp } from "./CadApp";
@@ -79,7 +80,11 @@ interface DoorSnap {
 }
 
 export type ClipboardItem = SegmentSnap | HatchSnap | DimensionSnap | TextBoxSnap | WallSnap | FreeSnap
-  | LibrarySnap | TableSnap | DocumentSnap | DoorSnap;
+  | LibrarySnap | TableSnap | DocumentSnap | DoorSnap | StairSnap;
+
+/** Treppe (vollständige Parameter, neue ID beim Einfügen). */
+interface StairSnap { kind: "stair"; data: any; path: Vec2[] }
+
 
 
 export interface Clipboard {
@@ -199,6 +204,7 @@ function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "library") return v(it.position.x, it.position.y);
   if (it.kind === "document") return v(it.position.x, it.position.y);
   if (it.kind === "door") return v(0, 0);
+  if (it.kind === "stair") return polygonCentroid(it.path);
   return v(it.center.x, it.center.y);
 }
 
@@ -213,6 +219,7 @@ function itemPoints(it: ClipboardItem): Vec2[] {
   if (it.kind === "library") return [it.position];
   if (it.kind === "document") return [it.position];
   if (it.kind === "door") return [];
+  if (it.kind === "stair") return it.path;
   return [it.center];
 }
 
@@ -267,6 +274,7 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       else if (kind === "freeStroke" || kind === "free") { const o = s.getFreeStrokeById?.(id); if (o) items.push(snapFree(o)); }
       else if (kind === "library") { const o = s.getLibraryInstanceById?.(id); if (o) items.push(snapLibrary(o)); }
       else if (kind === "table") { const o = s.getTableById?.(id); if (o) items.push(snapTable(o)); }
+      else if (kind === "stair") { const o = s.getStairById?.(id); if (o) { const data = serializeStair(o); items.push({ kind: "stair", data, path: data.path.map((p: any) => v(p.x, p.y)) }); } }
       else if (kind === "document") { const o = s.getDocumentById?.(id); if (o && !o._snapOnly) items.push(snapDocument(o)); }
       else if (kind === "wall") {
         const o = s.getWallById?.(id);
@@ -347,6 +355,7 @@ export function translatedItems(items: ClipboardItem[], dx: number, dy: number):
     if (it.kind === "document") return { ...it, position: { x: it.position.x + dx, y: it.position.y + dy } };
     if (it.kind === "table") return { ...it, center: { x: it.center.x + dx, y: it.center.y + dy } };
     if (it.kind === "door") return it;
+    if (it.kind === "stair") return { ...it, path: it.path.map(p => ({ x: p.x + dx, y: p.y + dy })) };
     return translatedText(it, dx, dy);
   });
 }
@@ -437,6 +446,10 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         JSON.parse(JSON.stringify(it.data ?? {})), it.mPerMm,
         { rotationRad: it.rotationRad, labelId: it.labelId, scale: it.scale });
       if (o) created.push({ kind: "table", id: o.id });
+    } else if (it.kind === "stair") {
+      const { id: _old, ...rest } = it.data || {};
+      const o = (app.scene as any).createStair?.({ ...rest, path: it.path.map(p => ({ x: p.x + dx, y: p.y + dy })) });
+      if (o) created.push({ kind: "stair", id: o.id });
     } else if (it.kind === "document") {
       const o = app.scene.createDocument({
         ...(JSON.parse(JSON.stringify(it.data)) as any),

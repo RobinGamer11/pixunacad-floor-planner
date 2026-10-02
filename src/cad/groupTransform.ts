@@ -21,6 +21,7 @@ export function getGroupObject(app: any, kind: string, id: string): any {
     case "table":      return s.getTableById?.(id);
     case "document":   return s.getDocumentById?.(id);
     case "library":    return s.getLibraryInstanceById?.(id);
+    case "stair":      return s.getStairById?.(id);
     default: return null;
   }
 }
@@ -42,6 +43,11 @@ function movablePoints(kind: string, o: any): Vec2[] {
     case "document": out.push(o.position); break;
     // Bibliotheksinstanz: nur der Einfügepunkt wandert; die Definition bleibt unberührt.
     case "library": out.push(o.position); break;
+    // Treppe: nur die Referenzlinie (und ggf. Bogenmitte); Stufen sind abgeleitet.
+    case "stair":
+      for (const p of o.path || []) out.push(p);
+      if (o.arc?.center) out.push(o.arc.center);
+      break;
   }
   return out.filter(Boolean);
 }

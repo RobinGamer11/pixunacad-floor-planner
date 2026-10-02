@@ -1,3 +1,4 @@
+import { computeStairGeometry } from "./stairGeometry";
 /**
  * Schreibgeschützte Fanggeometrie sichtbarer CAD-Ausschnitte (Transparenzpause im Export).
  *
@@ -93,6 +94,14 @@ export function collectSceneSnapGeometry(
         if (!g) continue;
         p(g.leftEnd); p(g.rightEnd); p(g.center);
       } catch { /* defensiv */ }
+    }
+
+    // Treppen: abgeleitete, deduplizierte Fanggeometrie.
+    for (const st of ((scn as any).stairs || []) as any[]) {
+      if (!vis(st.labelId)) continue;
+      const g = computeStairGeometry(st);
+      for (const q of g.snapPoints) p(q);
+      for (const [a, b] of g.snapLines) ln(a, b);
     }
 
     // Textobjekte und Tabellen nutzen dieselbe Eckpunkt-Infrastruktur.

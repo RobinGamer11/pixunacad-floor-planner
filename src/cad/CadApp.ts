@@ -48,6 +48,8 @@ import { RulerTool } from "./RulerTool";
 import { EraserTool } from "./EraserTool";
 import { WallTool } from "./WallTool";
 import { DoorTool } from "./DoorTool";
+import { serializeStair } from "./Scene";
+import { StairTool } from "./StairTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
@@ -346,6 +348,10 @@ export class CadApp {
   documentTool!: DocumentTool;
   freeDrawTool!: FreeDrawTool;
   rulerTool!: RulerTool;
+  stairTool!: StairTool;
+  /** Rückmeldung an die Oberfläche: Treppe ausgewählt/erstellt. */
+  onStairSelect: ((id: string | null) => void) | null = null;
+  onStairCreated: ((id: string) => void) | null = null;
   eraserTool!: EraserTool;
   wallTool!: WallTool;
   doorTool!: DoorTool;
@@ -693,6 +699,7 @@ export class CadApp {
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
     this.rulerTool = new RulerTool(this);
+    this.stairTool = new StairTool(this);
     this.eraserTool = new EraserTool(this);
     this.wallTool = new WallTool(this);
     this.doorTool = new DoorTool(this);
@@ -972,6 +979,7 @@ export class CadApp {
         sashEnabled: d.sashEnabled, glassColor: d.glassColor, glassThickM: d.glassThickM, glassFillColor: d.glassFillColor,
         labelId: d.labelId,
       })),
+      stairs: ((scene as any).stairs || []).map(serializeStair),
 
     };
   }
@@ -2482,6 +2490,9 @@ export class CadApp {
         if (this.activeTool === this.wallTool) { const h = this.wallTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
       }
 
+      if (e.key === "Enter" && (this.activeTool as any) === this.stairTool && !isHubInput) {
+        if (this.stairTool.confirm()) { e.preventDefault(); return; }
+      }
       if (e.key === "Enter" && this.activeTool === this.polygonTool && !isHubInput) {
         if (this.polygonTool.finishFromKey()) { e.preventDefault(); return; }
       }
@@ -2638,6 +2649,10 @@ export class CadApp {
           // 1. ESC: nur die gemerkte Quelle verwerfen — Werkzeug bleibt aktiv.
           if (this.pipetteTool.hasSource) { this.pipetteTool.clearSource(); return; }
           this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return;
+        }
+        if ((this.activeTool as any) === this.stairTool) {
+          if (this.stairTool.escape()) return;
+          this.setTool(ToolIds.SELECT); return;
         }
         if ((this.activeTool as any) === this.rulerTool) {
           // 1. ESC: laufende Platzierung verwerfen — Werkzeug bleibt aktiv.
@@ -3170,6 +3185,7 @@ export class CadApp {
     else if (id === ToolIds.DOOR) { this.activeTool = this.doorTool; this.doorTool.activate(); }
     else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool; this.tableTool.activate(); }
     else if (id === ToolIds.RULER) { this.activeTool = this.rulerTool as any; this.rulerTool.activate(); }
+    else if (id === ToolIds.STAIR) { this.activeTool = this.stairTool as any; this.stairTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
@@ -3507,6 +3523,12 @@ export class CadApp {
       if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
+      {
+        const sel = (this.selectTool as any)?.marqueeSelectedIds as { kind: string; id: string }[] | undefined;
+        const ids = (sel || []).filter((o) => o.kind === "stair").map((o) => o.id);
+        const cur = this.renderer.stairHighlightIds;
+        if (ids.length !== cur.size || ids.some((i) => !cur.has(i))) this.renderer.stairHighlightIds = new Set(ids);
+      }
       // Bereitstehendes Einfügen: erst jetzt, mit echter Cursorposition.
       this._resolveArmedPaste();
 

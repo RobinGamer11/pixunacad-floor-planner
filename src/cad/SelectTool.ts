@@ -1,4 +1,5 @@
 import { setSelectionTransformActive } from "./Input";
+import { hitStair, stairBoundsPoints } from "./stairGeometry";
 import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType, SelectionType, PointEditAction } from "./constants";
 import { Vec2, v, sub, add, mul, dot, dist, angleDeg, pointFromLengthAngle, projectPointToSegment, orthoSnapFromA, nearestAngleToReference, pointInPolygon, pointInHatchSolid, hatchOuterRing, hatchHoleRings, polygonCentroid, bulgeFromPoint, splitBulgedEdge, tessellateWithBulges, projectPointToInfiniteLine, projectPointToCurvedEdge, lineLineIntersectionInfinite, norm, perpLeft, len } from "./geometry";
@@ -989,6 +990,18 @@ export class SelectTool {
       position: { x: inst.position.x, y: inst.position.y },
       rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY,
     };
+  }
+
+  /** Oberste Treppe unter der Maus (Stufe/Podest wählt die ganze Treppe). */
+  private _hitStair(input: Input): any | null {
+    const q = { x: input.mouse.wx, y: input.mouse.wy };
+    const list = (this.app.scene as any).stairs || [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const st = list[i];
+      if (!this.app.labelManager.isEditable(st.labelId)) continue;
+      if (hitStair(st, q)) return st;
+    }
+    return null;
   }
 
   /** Oberste Bibliotheksinstanz unter der Maus oder null. */
@@ -4168,6 +4181,15 @@ export class SelectTool {
             return;
           }
           // 2) Objekt-Treffer: Linksklick wählt ausschließlich aus.
+          const stairHit = this._hitStair(input);
+          if (stairHit) {
+            this._clearTransformGuides();
+            this.app.setSelection(null as any);
+            this.marqueeSelectedIds = [{ kind: "stair", id: stairHit.id }];
+            (this.app as any).onStairSelect?.(stairHit.id);
+            this.app.pointEditMenu.hide();
+            return;
+          }
           const libHit = this._hitLibraryInstance(input);
           if (libHit) {
             this._clearTransformGuides();
@@ -4921,6 +4943,7 @@ export class SelectTool {
         case "textbox":  return boxCornersWorld(obj);
         case "table":    return boxCornersWorld(obj);
         case "document": return documentCornersWorld(obj);
+        case "stair": return stairBoundsPoints(obj) as any;
         case "library": {
           const geom = this._libraryGeometryOf(obj);
           return geom ? instanceCornersWorld(geom, this._libraryTransformOf(obj)) as any : [];
@@ -4964,6 +4987,7 @@ export class SelectTool {
     for (const o of s.tables || [])           if (selectable(o)) yield { kind: "table",      id: o.id, obj: o };
     for (const o of s.documents || [])        if (selectable(o)) yield { kind: "document",   id: o.id, obj: o };
     for (const o of s.libraryInstances || []) if (selectable(o)) yield { kind: "library",    id: o.id, obj: o };
+    for (const o of s.stairs || [])           if (selectable(o)) yield { kind: "stair",      id: o.id, obj: o };
   }
 
   private _commitMarquee() {
@@ -5072,6 +5096,7 @@ export class SelectTool {
           case "document":   { const o = scene.getDocumentById(id);        if (o) scene.removeDocument(o); break; }
           case "library":    { const o = (scene as any).getLibraryInstanceById(id); if (o) (scene as any).removeLibraryInstance(o); break; }
           case "door":       { const o = (scene as any).getDoorById?.(id);          if (o) (scene as any).removeDoor(o); break; }
+          case "stair":      { const o = (scene as any).getStairById?.(id);         if (o) (scene as any).removeStair(o); break; }
         }
       } catch { /* ignore individual failures */ }
     }

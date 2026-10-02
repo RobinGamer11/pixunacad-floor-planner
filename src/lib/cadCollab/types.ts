@@ -19,6 +19,7 @@ export const CAD_OBJECT_KINDS = [
   "documents",
   "freeStrokes",
   "doors",
+  "stairs",
 ] as const;
 
 /** Objektarten, die direkt in einer Zeichenszene liegen. */
