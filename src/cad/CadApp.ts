@@ -348,6 +348,10 @@ export class CadApp {
   documentTool!: DocumentTool;
   freeDrawTool!: FreeDrawTool;
   rulerTool!: RulerTool;
+  stairTool!: StairTool;
+  /** Rückmeldung an die Oberfläche: Treppe ausgewählt/erstellt. */
+  onStairSelect: ((id: string | null) => void) | null = null;
+  onStairCreated: ((id: string) => void) | null = null;
   eraserTool!: EraserTool;
   wallTool!: WallTool;
   doorTool!: DoorTool;
@@ -695,6 +699,7 @@ export class CadApp {
     this.documentTool = new DocumentTool(this);
     this.freeDrawTool = new FreeDrawTool(this);
     this.rulerTool = new RulerTool(this);
+    this.stairTool = new StairTool(this);
     this.eraserTool = new EraserTool(this);
     this.wallTool = new WallTool(this);
     this.doorTool = new DoorTool(this);
@@ -2485,6 +2490,9 @@ export class CadApp {
         if (this.activeTool === this.wallTool) { const h = this.wallTool.onTabRequest(); if (h) { e.preventDefault(); return; } }
       }
 
+      if (e.key === "Enter" && (this.activeTool as any) === this.stairTool && !isHubInput) {
+        if (this.stairTool.confirm()) { e.preventDefault(); return; }
+      }
       if (e.key === "Enter" && this.activeTool === this.polygonTool && !isHubInput) {
         if (this.polygonTool.finishFromKey()) { e.preventDefault(); return; }
       }
@@ -2641,6 +2649,10 @@ export class CadApp {
           // 1. ESC: nur die gemerkte Quelle verwerfen — Werkzeug bleibt aktiv.
           if (this.pipetteTool.hasSource) { this.pipetteTool.clearSource(); return; }
           this.pipetteTool.cancel(); this.setTool(ToolIds.SELECT); return;
+        }
+        if ((this.activeTool as any) === this.stairTool) {
+          if (this.stairTool.escape()) return;
+          this.setTool(ToolIds.SELECT); return;
         }
         if ((this.activeTool as any) === this.rulerTool) {
           // 1. ESC: laufende Platzierung verwerfen — Werkzeug bleibt aktiv.
@@ -3173,6 +3185,7 @@ export class CadApp {
     else if (id === ToolIds.DOOR) { this.activeTool = this.doorTool; this.doorTool.activate(); }
     else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool; this.tableTool.activate(); }
     else if (id === ToolIds.RULER) { this.activeTool = this.rulerTool as any; this.rulerTool.activate(); }
+    else if (id === ToolIds.STAIR) { this.activeTool = this.stairTool as any; this.stairTool.activate(); }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
