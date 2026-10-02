@@ -2897,6 +2897,7 @@ export class CadApp {
     this.pastePreviewActive = false;
     this.pasteArmed = false;
     this._pasteArmedAfterPointerSeq = -1;
+    this._pasteArmedAwayFrom = null;
     if (this.multiPasteActive) {
       this.multiPasteActive = false;
       this.onMultiPasteChange?.(false);
@@ -2958,6 +2959,7 @@ export class CadApp {
     this.multiPasteActive = false;
     this.pasteArmed = false;
     this._pasteArmedAfterPointerSeq = -1;
+    this._pasteArmedAwayFrom = null;
     this.onMultiPasteChange?.(false);
     try { this.selectTool.cancelPasteFloat(); } catch { /* optional */ }
   }
