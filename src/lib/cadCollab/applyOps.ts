@@ -71,6 +71,11 @@ const KIND_OPS: Record<CadSceneKind, KindOps> = {
     remove: (s, id) => { const o = s.getDoorById(id); if (o) s.removeDoor(o); },
     rebuild: () => { /* Türen haben keine ID-Zuordnung. */ },
   },
+  stairs: {
+    field: "stairs",
+    remove: (s, id) => { const o = anyScene(s).getStairById?.(id); if (o) anyScene(s).removeStair?.(o); },
+    rebuild: () => { /* Treppen haben keine ID-Zuordnung. */ },
+  },
 };
 
 /**

@@ -23,6 +23,7 @@ export interface SerializedScene {
   freeStrokes?: any[];
   rulerGuide?: any;
   doors?: any[];
+  stairs?: any[];
 }
 
 /** Deserialize a scene JSON into the given Scene instance (in-place). */
@@ -39,6 +40,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   scene.freeStrokes = [];
   scene.walls = [];
   scene.doors = [];
+  (scene as any).stairs = [];
   scene.rulerGuide = null;
   scene.markWallsDirty();
   (scene as any)._rebuildSegIdMap?.();
@@ -229,5 +231,9 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
       labelId: d.labelId,
     });
     if (d.id) (door as any).id = d.id;
+  }
+  for (const st of data.stairs || []) {
+    if (!st || !Array.isArray(st.path)) continue;
+    (scene as any).createStair?.({ ...st });
   }
 }

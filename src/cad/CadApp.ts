@@ -48,6 +48,8 @@ import { RulerTool } from "./RulerTool";
 import { EraserTool } from "./EraserTool";
 import { WallTool } from "./WallTool";
 import { DoorTool } from "./DoorTool";
+import { serializeStair } from "./Scene";
+import { StairTool } from "./StairTool";
 
 import { IdPanel } from "./IdPanel";
 import { SheetManager, SheetOverlayStore, SheetDefaults } from "./SheetManager";
@@ -972,6 +974,7 @@ export class CadApp {
         sashEnabled: d.sashEnabled, glassColor: d.glassColor, glassThickM: d.glassThickM, glassFillColor: d.glassFillColor,
         labelId: d.labelId,
       })),
+      stairs: ((scene as any).stairs || []).map(serializeStair),
 
     };
   }
