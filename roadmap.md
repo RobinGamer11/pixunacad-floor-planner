@@ -142,8 +142,9 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Abnahme im Browser mit echtem Projekt (Nutzer)
 
 ## Treppe (Stufe A: gerade + Podest)
-- [ ] stairGeometry (treadCount/riserCount getrennt, Podest-Regeln, Grenzverschiebung, eindeutige Fangpunkte) + Tests
-- [ ] Stair in Scene/Serde/Klon/Cloud-Diff
-- [ ] Renderer, Fangpunkte, Auswahl/Verschieben
-- [ ] StairTool (Vorschau → Häkchen/Enter, Bezug an erster Stufe) + Einstellungspanel
-- [ ] Gewendelt/Rund: vorbereitet, gesperrt
+- [x] stairGeometry (treadCount/riserCount getrennt, Podest-Regeln, Grenzverschiebung, eindeutige Fangpunkte) + Tests
+- [x] Stair in Scene/Serde/Klon/Cloud-Diff
+- [x] Renderer, Fangpunkte, Auswahl/Verschieben
+- [x] StairTool (Vorschau → Häkchen/Enter, Bezug an erster Stufe) + Einstellungspanel
+- [x] Gewendelt/Rund: vorbereitet, gesperrt
+- [ ] Echte Abnahme im Browser/Tablet (Platzierung, Griffe, Export-PDF)
