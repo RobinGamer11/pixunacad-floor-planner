@@ -7,6 +7,7 @@ import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, 
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
+import { StairSettingsPanel, StairIcon } from "@/components/cad/StairSettingsPanel";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import LibraryPanel from "@/components/cad/LibraryPanel";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
@@ -98,6 +99,7 @@ const CAD_TOOLS = [
   { id: ToolIds.SELECT, label: "Auswahl", key: "V", icon: MousePointer2 },
   { id: ToolIds.WALL, label: "Wand", key: "W", icon: BrickWall },
   { id: ToolIds.DOOR, label: "Türen/Fenster", key: "U", icon: DoorOpen },
+  { id: ToolIds.STAIR, label: "Treppe", key: "", icon: StairIcon },
   { id: ToolIds.POLYGON, label: "Polygon", key: "G", icon: Pentagon },
   { id: ToolIds.LINE, label: "Linie", key: "L", icon: Minus },
   { id: ToolIds.FREE, label: "Freihand", key: "F", icon: Pencil },
@@ -1370,7 +1372,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div key={t.id} className="relative w-full flex justify-center">
                 <button
                   onClick={() => handleToolClick(t.id)}
-                  title={`${t.label} (${t.key})`}
+                  title={t.key ? `${t.label} (${t.key})` : t.label}
+                  aria-label={t.label}
                   className={`cad-rail-btn ${isActive ? "active" : ""}`}
                 >
                   <Icon size={18} />
@@ -2969,6 +2972,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <EraserSettingsPanel app={appRef.current} variant="cad" />
               </div>
             </div>
+          )}
+
+          {(activeTool === ToolIds.STAIR || activeTool === ToolIds.SELECT) && (
+            <StairSettingsPanel app={appRef.current} activeTool={activeTool} />
           )}
 
           {/* Lineal-Panel — eigenständiges Werkzeug */}
