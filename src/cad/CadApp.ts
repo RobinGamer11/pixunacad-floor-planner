@@ -3523,6 +3523,12 @@ export class CadApp {
       if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
       if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
       this.input.update(this.camera);
+      {
+        const sel = (this.selectTool as any)?.marqueeSelectedIds as { kind: string; id: string }[] | undefined;
+        const ids = (sel || []).filter((o) => o.kind === "stair").map((o) => o.id);
+        const cur = this.renderer.stairHighlightIds;
+        if (ids.length !== cur.size || ids.some((i) => !cur.has(i))) this.renderer.stairHighlightIds = new Set(ids);
+      }
       // Bereitstehendes Einfügen: erst jetzt, mit echter Cursorposition.
       this._resolveArmedPaste();
 
