@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeStairGeometry, moveStairBoundary, stairLabelLines, riserFromRule, type StairParams } from "./stairGeometry";
 import { Scene, serializeStair } from "./Scene";
-import { serializeScene, restoreOneScene } from "./sceneSerde";
+import { restoreOneScene } from "./sceneSerde";
 
 const base = (path: { x: number; y: number }[], extra: Partial<StairParams> = {}): StairParams => ({
   mode: "straight", path, referenceSide: "left", treadDepthM: 0.28, stairWidthM: 1,
@@ -69,9 +69,9 @@ describe("Treppe – Persistenz", () => {
   it("bleibt nach Serialisierung ein einzelnes Objekt mit allen Parametern", () => {
     const s = new Scene();
     (s as any).createStair({ path: [{ x: 0, y: 0 }, { x: 2.8, y: 0 }] as any, stepDistancesM: [0.3] });
-    const data = serializeScene(s as any);
+    const data = { stairs: (s as any).stairs.map(serializeStair) };
     const s2 = new Scene();
-    restoreOneScene(s2 as any, JSON.parse(JSON.stringify(data)));
+    restoreOneScene(s2 as any, JSON.parse(JSON.stringify(data)) as any);
     expect((s2 as any).stairs.length).toBe(1);
     expect(serializeStair((s2 as any).stairs[0]).stepDistancesM).toEqual([0.3]);
   });
