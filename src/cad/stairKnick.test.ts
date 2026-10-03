@@ -65,3 +65,23 @@ describe("Treppe – Knick als genau eine Fläche", () => {
     expect((s as any).getStairsByLabelId("x").length).toBe(1);
   });
 });
+
+import { moveStairOuterPoint } from "./stairGeometry";
+describe("Treppe – Außenpunkt polygonartig bewegen", () => {
+  it("abgeleiteter Außenpunkt liegt genau am Ziel, Startpunkt bleibt", () => {
+    const p = base("left", [{ x: 0, y: 0 }, { x: L, y: 0 }, { x: L, y: -3 }]);
+    const g = computeStairGeometry(p);
+    const outer = g.treads.filter((t) => t.run === 1 && !t.isWinder).pop()!.poly[2];
+    const target = { x: outer.x + 0.3, y: outer.y - 0.28 };
+    const r = moveStairOuterPoint(p, 2, outer, target);
+    expect(r.path[0]).toEqual(p.path[0]);
+    expect(r.path[1]).toEqual(p.path[1]);
+    const g2 = computeStairGeometry(r);
+    const pts = g2.treads.flatMap((t) => t.poly);
+    expect(Math.min(...pts.map((q) => Math.hypot(q.x - target.x, q.y - target.y)))).toBeLessThan(1e-4);
+  });
+  it("Wendelanzahl wirkt sichtbar", () => {
+    const p = { ...setKnickMode(base("left", [{ x: 0, y: 0 }, { x: L, y: 0 }, { x: L, y: -3 }]), 1, "winder")!, winderCount: 4 };
+    expect(computeStairGeometry(p).treads.filter((t) => t.isWinder).length).toBe(4);
+  });
+});
