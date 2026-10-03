@@ -1,18 +1,26 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { Move, RotateCcw, Check } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import { ToolIds } from "@/cad/constants";
+import { isTabletMode } from "@/cad/StairTool";
 import { computeStairGeometry, stepRuleCheckText, suggestFromFloorHeight, treadFromRule } from "@/cad/stairGeometry";
 
 const HAIRLINE = "hsl(var(--hairline))";
+const MUTED = "hsl(var(--cad-toolbar-muted))";
 
 /** Treppen-Symbol (Vektor), gleiche Signatur wie lucide-Icons. */
 export const StairIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3 20h5v-5h5v-5h5V5h3" />
+    <path d="M4 20h4v-4h4v-4h4V8h4" />
   </svg>
 );
 
-const NumField: React.FC<{ label: string; value: number; unit: string; step?: number; onCommit: (n: number) => void; disabled?: boolean }> = ({ label, value, unit, onCommit, disabled }) => {
+const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: MUTED }}>{children}</div>
+);
+
+const NumField: React.FC<{ label: string; value: number; unit: string; onCommit: (n: number) => void; disabled?: boolean; suffix?: React.ReactNode }> = ({ label, value, unit, onCommit, disabled, suffix }) => {
   const [text, setText] = useState<string | null>(null);
   const shown = text ?? (Math.round(value * 100) / 100).toLocaleString("de-DE");
   const commit = () => {
@@ -23,8 +31,8 @@ const NumField: React.FC<{ label: string; value: number; unit: string; step?: nu
   };
   return (
     <label className="flex items-center justify-between gap-2 text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="flex h-8 w-28 items-center rounded-md border" style={{ borderColor: HAIRLINE }}>
+      <span style={{ color: MUTED }}>{label}{suffix}</span>
+      <span className="flex h-8 w-28 items-center rounded-md border" style={{ borderColor: HAIRLINE, opacity: disabled ? 0.55 : 1 }}>
         <input
           aria-label={label}
           disabled={disabled}
@@ -34,25 +42,75 @@ const NumField: React.FC<{ label: string; value: number; unit: string; step?: nu
           onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); commit(); } }}
           className="h-full min-w-0 flex-1 bg-transparent px-2 text-right tabular-nums outline-none"
         />
-        <span className="pr-2 text-[10px] text-muted-foreground">{unit}</span>
+        <span className="pr-2 text-[10px]" style={{ color: MUTED }}>{unit}</span>
       </span>
     </label>
   );
 };
 
-const Toggle: React.FC<{ label: string; on: boolean; onChange: (v: boolean) => void }> = ({ label, on, onChange }) => (
-  <label className="flex items-center justify-between text-xs">
+/** CAD-Toggle-Optik: Häkchen links neben dem Text. */
+const Check2: React.FC<{ label: string; on: boolean; onChange: (v: boolean) => void; big?: boolean }> = ({ label, on, onChange, big }) => (
+  <label className={`flex items-center gap-2 cursor-pointer select-none ${big ? "rounded-md border px-2 py-2 text-[13px] font-medium" : "text-xs"}`} style={big ? { borderColor: on ? "hsl(var(--primary))" : HAIRLINE } : undefined}>
+    <input
+      type="checkbox"
+      checked={on}
+      onChange={(e) => onChange(e.target.checked)}
+      aria-label={label}
+      className="w-[14px] h-[14px] cursor-pointer rounded-[3px] border"
+      style={{ accentColor: "hsl(var(--primary))", borderColor: "hsl(var(--border))" }}
+    />
     <span>{label}</span>
-    <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
   </label>
 );
 
-const STEPS = ["Startpunkt der ersten Stufe setzen", "Richtung wählen, mit ✓ bestätigen", "Bezug links oder rechts wählen", "Referenzlinie zeichnen, mit ✓ abschließen"];
+const STEPS = ["Startkante der ersten Stufe setzen", "Laufrichtung bestimmen", "Bezug L oder R wählen", "Referenzlinie zeichnen"];
+
+/** DOM-Bedienknöpfe über der Zeichenfläche (Häkchen, L/R). */
+const StairCanvasButtons: React.FC<{ app: CadApp }> = ({ app }) => {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const loop = () => { tick((n) => (n + 1) % 1e6); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const host = app.canvas?.parentElement;
+  if (!host) return null;
+  const b = app.stairTool.buttons;
+  const ox = app.canvas.offsetLeft, oy = app.canvas.offsetTop;
+  const stop = (e: React.PointerEvent | React.MouseEvent) => { e.stopPropagation(); };
+  const round = "absolute z-30 flex items-center justify-center rounded-full shadow-md";
+  return createPortal(
+    <>
+      {b.left && (
+        <button type="button" aria-label="Bezug links" title="Bezug links" onPointerDown={stop}
+          onClick={(e) => { stop(e); app.stairTool.chooseSide("left"); }}
+          className={`${round} h-8 w-8 text-xs font-semibold`}
+          style={{ left: ox + b.left.x - 16, top: oy + b.left.y - 16, background: b.left.active ? "hsl(var(--primary))" : "hsl(var(--background))", color: b.left.active ? "hsl(var(--primary-foreground))" : "hsl(var(--primary))", border: "1.5px solid hsl(var(--primary))" }}>L</button>
+      )}
+      {b.right && (
+        <button type="button" aria-label="Bezug rechts" title="Bezug rechts" onPointerDown={stop}
+          onClick={(e) => { stop(e); app.stairTool.chooseSide("right"); }}
+          className={`${round} h-8 w-8 text-xs font-semibold`}
+          style={{ left: ox + b.right.x - 16, top: oy + b.right.y - 16, background: b.right.active ? "hsl(var(--primary))" : "hsl(var(--background))", color: b.right.active ? "hsl(var(--primary-foreground))" : "hsl(var(--primary))", border: "1.5px solid hsl(var(--primary))" }}>R</button>
+      )}
+      {b.confirm && (
+        <button type="button" aria-label="Bestätigen" title="Bestätigen (Enter)" onPointerDown={stop}
+          onClick={(e) => { stop(e); app.stairTool.confirm(); }}
+          className={`${round} h-9 w-9`}
+          style={{ left: ox + b.confirm.x - 18, top: oy + b.confirm.y - 18, background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}>
+          <Check size={18} />
+        </button>
+      )}
+    </>,
+    host,
+  );
+};
 
 /**
  * Einstellungen der Treppe: neue Treppe (Werkzeug aktiv) oder ausgewählte
- * Treppe (Auswahlwerkzeug). Jede Änderung an einer bestehenden Treppe ist
- * genau ein Undo-Schritt.
+ * Treppe (Bearbeitung mit Griffen). Jede Änderung an einer bestehenden
+ * Treppe ist genau ein Undo-Schritt.
  */
 export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: string }> = ({ app, activeTool }) => {
   const [, force] = useState(0);
@@ -61,32 +119,14 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
     const t = window.setInterval(() => force((n) => n + 1), 200);
     return () => window.clearInterval(t);
   }, [app]);
-  if (!app) return null;
+  if (!app || activeTool !== ToolIds.STAIR) return null;
   const tool = app.stairTool;
-  const sel = ((app.selectTool as any).marqueeSelectedIds || []) as { kind: string; id: string }[];
-  const selId = activeTool === ToolIds.SELECT && sel.length === 1 && sel[0].kind === "stair" ? sel[0].id : null;
-  const editing = activeTool === ToolIds.STAIR && tool.phase === "edit";
-  const st: any = selId ? (app.scene as any).getStairById(selId) : null;
-  if (activeTool !== ToolIds.STAIR && !st) return null;
-  if (editing) {
-    return (
-      <div className="cad-settings-panel mb-2 space-y-2 text-xs">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Treppe bearbeiten</div>
-        <p className="text-muted-foreground">Griffe ziehen: weiße = Stufengrenze, gelb = Laufbreite, blau = Referenzlinie. Mit ✓ oder Enter speichern, Escape verwirft.</p>
-        {tool.lastWarnings.map((w) => <p key={w} className="text-destructive">{w}</p>)}
-        <div className="flex gap-2">
-          <button type="button" className="h-9 flex-1 rounded-md bg-primary text-primary-foreground font-semibold" onClick={() => tool.confirm()}>✓ Fixieren</button>
-          <button type="button" className="h-9 flex-1 rounded-md border" style={{ borderColor: HAIRLINE }} onClick={() => tool.escape()}>Abbrechen</button>
-        </div>
-      </div>
-    );
-  }
+  const st: any = tool.phase === "edit" ? tool.editStair() : null;
 
-  // Quelle: ausgewählte Treppe oder Werkzeug-Voreinstellungen.
   const src: any = st ?? tool.settings;
   const set = (patch: Record<string, any>) => {
     if (st) {
-      const before = { ...st };
+      const before = { ...st, path: st.path };
       Object.assign(st, patch);
       if (st.useStepRule && ("treadDepthM" in patch || "stepRuleCm" in patch || "useStepRule" in patch)) {
         st.riserHeightM = Math.max(0.05, (st.stepRuleCm / 100 - st.treadDepthM) / 2);
@@ -105,76 +145,129 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
   };
   const g = st ? computeStairGeometry(st) : null;
   const phaseIdx = ["start", "dir", "side", "path"].indexOf(tool.phase);
+  const labels: any[] = (app as any).labelManager?.list?.() ?? [];
+  const labelValue = st ? st.labelId : (app as any).activeDrawLabelId ?? "";
+  const info = st ? tool.handleInfo() : null;
+  const floorAuto = g ? g.totalHeightM : null;
+  const manualFloor = src.floorHeightM != null;
+  const tablet = isTabletMode();
 
   return (
     <div className="cad-settings-panel mb-2 space-y-3 text-xs">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Treppe</div>
+      <StairCanvasButtons app={app} />
+      <SectionTitle>{st ? "Treppe" : "Treppe zeichnen"}</SectionTitle>
 
-      <div className="grid grid-cols-2 gap-1">
-        <button type="button" className="h-8 rounded-md border bg-primary/10" style={{ borderColor: "hsl(var(--primary))" }}>Gerade / Podest</button>
-        <button type="button" disabled title="Folgt nach Abnahme der geraden Treppe" className="h-8 rounded-md border opacity-40" style={{ borderColor: HAIRLINE }}>Gewendelt</button>
-      </div>
+      <label className="block text-xs">
+        <span className="block mb-1" style={{ color: MUTED }}>Ebene</span>
+        <select
+          value={labelValue}
+          onChange={(e) => {
+            if (st) { st.labelId = e.target.value; app.commitHistorySnapshot(); }
+            else (app as any).setActiveDrawLabelId(e.target.value);
+            (app as any).refreshLabelUI?.();
+            app.renderer.render();
+            force((n) => n + 1);
+          }}
+          className="cad-settings-select w-full"
+        >
+          {labels.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+      </label>
 
       {!st && (
         <div className="space-y-1">
           {STEPS.map((l, i) => (
-            <div key={l} className="rounded-md border px-2 py-1.5" style={i === phaseIdx ? { borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)" } : { borderColor: HAIRLINE, color: "hsl(var(--muted-foreground))" }}>{i + 1}. {l}</div>
+            <div key={l} className="rounded-md border px-2 py-1.5" style={i === phaseIdx ? { borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.08)" } : { borderColor: HAIRLINE, color: MUTED }}>{i + 1}. {l}</div>
           ))}
-          {tool.phase === "side" && (
-            <div className="grid grid-cols-2 gap-1 pt-1">
-              <button type="button" className="h-9 rounded-md border" style={{ borderColor: HAIRLINE }} onClick={() => tool.chooseSide("left")}>Bezug links</button>
-              <button type="button" className="h-9 rounded-md border" style={{ borderColor: HAIRLINE }} onClick={() => tool.chooseSide("right")}>Bezug rechts</button>
-            </div>
-          )}
-          {(tool.phase === "dir" || tool.phase === "path") && (
-            <button type="button" className="h-9 w-full rounded-md bg-primary text-primary-foreground font-semibold" onClick={() => tool.confirm()}>✓ Bestätigen</button>
-          )}
+          <p style={{ color: MUTED }}>
+            {tablet ? "Bestätigen mit ✓ oder Enter. Fingerheben bestätigt nie." : "Klick bestätigt, Enter oder Doppelklick schließt die Referenzlinie ab. Shift richtet aus."}
+          </p>
           {tool.lastWarnings.map((w) => <p key={w} className="text-destructive">{w}</p>)}
         </div>
       )}
 
+      {st && (
+        <div className="space-y-2 rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
+          {!info && <p style={{ color: MUTED }}>Griff antippen, um ihn auszuwählen.</p>}
+          {info && (
+            <>
+              {info.lines.map(([k, v]) => (
+                <div key={k} className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>{k}</span><span>{v}</span></div>
+              ))}
+              {!tool.moving ? (
+                <div className="flex gap-1">
+                  <button type="button" className="cad-toolbar-btn h-8 flex-1 justify-center gap-1 text-[11px] font-medium" onClick={() => tool.startMove()} title="Griff verschieben (mit Fang)" aria-label="Verschieben">
+                    <Move size={14} /> Verschieben
+                  </button>
+                  {(info.kind === "boundary" || info.kind === "landing") && (
+                    <button type="button" className="cad-toolbar-btn h-8 w-9 justify-center disabled:opacity-40" disabled={!info.canReset}
+                      onClick={() => { tool.resetSelected(); force((n) => n + 1); }}
+                      title={info.canReset ? "Stufe auf Standardauftritt zurücksetzen" : (info.resetHint ?? "Bereits Standardauftritt")} aria-label="Zurücksetzen">
+                      <RotateCcw size={14} />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex gap-1">
+                  <button type="button" className="cad-toolbar-btn h-8 flex-1 justify-center text-[11px] font-medium" style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }} onClick={() => tool.confirm()} aria-label="Fixieren">✓ Fixieren</button>
+                  <button type="button" className="cad-toolbar-btn h-8 flex-1 justify-center text-[11px]" onClick={() => tool.escape()} aria-label="Abbrechen">Abbrechen</button>
+                </div>
+              )}
+              {info.resetHint && !info.canReset && <p style={{ color: MUTED }}>{info.resetHint}</p>}
+            </>
+          )}
+          {tool.moving && tool.lastWarnings.map((w) => <p key={w} className="text-destructive">{w}</p>)}
+        </div>
+      )}
+
       <div className="space-y-1.5">
+        <Check2 big label="Schrittmaßregel" on={!!src.useStepRule} onChange={(v) => set({ useStepRule: v })} />
         <NumField label="Auftritt" unit="cm" value={src.treadDepthM * 100} onCommit={(n) => set({ treadDepthM: n / 100 })} />
-        <NumField label="Steigung" unit="cm" value={src.riserHeightM * 100} disabled={src.useStepRule} onCommit={(n) => set({ riserHeightM: n / 100 })} />
+        <NumField label="Steigung" unit="cm" value={src.riserHeightM * 100} disabled={src.useStepRule}
+          suffix={g ? <span className="ml-1 tabular-nums">({g.riserCount} STG)</span> : null}
+          onCommit={(n) => set({ riserHeightM: n / 100 })} />
         <NumField label="Laufbreite" unit="m" value={src.stairWidthM} onCommit={(n) => set({ stairWidthM: n })} />
-        <Toggle label="Schrittmaßregel" on={!!src.useStepRule} onChange={(v) => set({ useStepRule: v })} />
         {src.useStepRule && <NumField label="Schrittmaß" unit="cm" value={src.stepRuleCm} onCommit={(n) => set({ stepRuleCm: n })} />}
-        <p className="text-muted-foreground tabular-nums">{stepRuleCheckText(src.treadDepthM, src.riserHeightM)}</p>
-        <NumField label="Geschosshöhe" unit="m" value={src.floorHeightM ?? 0} onCommit={(n) => {
-          const s = suggestFromFloorHeight(n, src.stepRuleCm / 100);
-          set({ floorHeightM: n, riserHeightM: s.riserM, treadDepthM: src.useStepRule ? treadFromRule(s.riserM, src.stepRuleCm / 100) : src.treadDepthM });
-        }} />
+        <p className="tabular-nums" style={{ color: MUTED }}>{stepRuleCheckText(src.treadDepthM, src.riserHeightM)}</p>
       </div>
 
-      {g && (
-        <div className="rounded-md border p-2 tabular-nums" style={{ borderColor: HAIRLINE }}>
-          <div>Steigungen: {g.riserCount} · Auftritte: {g.treadCount}</div>
-          <div>Höhe: {g.totalHeightM.toFixed(2)} m · Lauflänge: {g.totalRunM.toFixed(2)} m</div>
+      <div className="space-y-1.5">
+        <SectionTitle>Geschosshöhe</SectionTitle>
+        <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Berechnet</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
+        <Check2 label="Geschosshöhe vorgeben" on={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} />
+        {manualFloor && (
+          <>
+            <NumField label="Vorgabe" unit="m" value={src.floorHeightM} onCommit={(n) => {
+              const s = suggestFromFloorHeight(n, src.stepRuleCm / 100);
+              set({ floorHeightM: n, riserHeightM: s.riserM, treadDepthM: src.useStepRule ? treadFromRule(s.riserM, src.stepRuleCm / 100) : src.treadDepthM });
+            }} />
+            {(() => { const s = suggestFromFloorHeight(src.floorHeightM, src.stepRuleCm / 100); return <p className="tabular-nums" style={{ color: MUTED }}>→ {s.riserCount} Steigungen à {(s.riserM * 100).toFixed(1).replace(".", ",")} cm</p>; })()}
+          </>
+        )}
+      </div>
+
+      {g && g.warnings.length > 0 && (
+        <div className="rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
           {g.warnings.map((w) => <div key={w} className="text-destructive">{w}</div>)}
         </div>
       )}
 
       <div className="space-y-1.5">
+        <SectionTitle>Treppenrichtung</SectionTitle>
         <div className="grid grid-cols-2 gap-1">
           {(["up", "down"] as const).map((d) => (
-            <button key={d} type="button" onClick={() => set({ direction: d })} className="h-8 rounded-md border" style={{ borderColor: src.direction === d ? "hsl(var(--primary))" : HAIRLINE }}>{d === "up" ? "Aufwärts" : "Abwärts"}</button>
+            <button key={d} type="button" onClick={() => set({ direction: d })} className="cad-toolbar-btn h-8 justify-center text-[11px]" style={src.direction === d ? { background: "hsl(var(--primary) / 0.12)", borderColor: "hsl(var(--primary))" } : undefined}>{d === "up" ? "Aufwärts" : "Abwärts"}</button>
           ))}
         </div>
-        <Toggle label="Pfeil" on={src.showArrow !== false} onChange={(v) => set({ showArrow: v })} />
-        <Toggle label="Startkreis" on={src.showCircle !== false} onChange={(v) => set({ showCircle: v })} />
-        <Toggle label="Beschriftung" on={src.showLabel !== false} onChange={(v) => set({ showLabel: v })} />
-        <Toggle label="Laufbreite anzeigen" on={!!src.showWidth} onChange={(v) => set({ showWidth: v })} />
       </div>
 
-      {st && (
-        <div className="space-y-1">
-          <button type="button" className="h-9 w-full rounded-md border font-semibold" style={{ borderColor: HAIRLINE }} onClick={() => { if (tool.beginEdit(st.id)) app.setTool(ToolIds.STAIR); }}>Stufen & Linie bearbeiten</button>
-          <div className="grid grid-cols-2 gap-1">
-            <button type="button" className="h-9 rounded-md border" style={{ borderColor: HAIRLINE }} onClick={() => tool.addLandingRun(st.id)}>Podest hinzufügen</button>
-            <button type="button" disabled={st.path.length < 3} className="h-9 rounded-md border disabled:opacity-40" style={{ borderColor: HAIRLINE }} onClick={() => tool.removeLastLanding(st.id)}>Podest entfernen</button>
-          </div>
-        </div>
-      )}
+      <div className="space-y-1.5">
+        <SectionTitle>Anzeige</SectionTitle>
+        <Check2 label="Pfeil" on={src.showArrow !== false} onChange={(v) => set({ showArrow: v })} />
+        <Check2 label="Startkreis" on={src.showCircle !== false} onChange={(v) => set({ showCircle: v })} />
+        <Check2 label="Beschriftung" on={src.showLabel !== false} onChange={(v) => set({ showLabel: v })} />
+        <Check2 label="Laufbreite" on={!!src.showWidth} onChange={(v) => set({ showWidth: v })} />
+      </div>
     </div>
   );
 };
