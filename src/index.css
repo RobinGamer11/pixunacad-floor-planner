@@ -1657,3 +1657,7 @@
 /* Kommentare sind Zusammenarbeits-Hinweise und nie Teil eines Exports/Drucks. */
 .pixuna-exporting .pixuna-comments { display: none !important; }
 @media print { .pixuna-comments { display: none !important; } }
+
+/* Treppen-Warnungen: im Dark Mode deutlich heller (Kontrast auf dunklem Grund). */
+.cad-stair-warning { color: hsl(var(--destructive)); font-weight: 500; }
+.dark .cad-stair-warning { color: hsl(0 92% 76%); }
