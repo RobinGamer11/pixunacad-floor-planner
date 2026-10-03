@@ -39,4 +39,5 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Export-Bedienzustände sind lokal/flüchtig, nie Cloud/Undo/Snapshot/localStorage; Fangpunkte von Hintergrundseiten nur über `TopologyEngine.tracingSnapScenes`.
 - Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt nur den Projekt-Payload (nie CAD/Export).
 - Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
-- Treppen-Bedienknöpfe (Häkchen, L/R) sind DOM-Elemente über der Zeichenfläche – ihre Position wird nie Geometrie; Werkzeugwechsel setzt den Cursor zentral in `CadApp.setTool` zurück.
+- Treppen-Bedienknöpfe (Häkchen, Bezug A/B) sind DOM-Elemente über der Zeichenfläche – ihre Position wird nie Geometrie; Werkzeugwechsel setzt den Cursor zentral in `CadApp.setTool` zurück.
+- Ausschnitt-Transformationen im Export laufen als Sitzung in `PlanController` (`_drag.preview`) – die Projection bleibt bis ✓/Enter unverändert, damit weder Cloud noch Verlauf Zwischenstände sehen.

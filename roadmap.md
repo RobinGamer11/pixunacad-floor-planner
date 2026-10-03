@@ -148,3 +148,12 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] StairTool (Vorschau → Häkchen/Enter, Bezug an erster Stufe) + Einstellungspanel
 - [x] Gewendelt/Rund: vorbereitet, gesperrt
 - [ ] Echte Abnahme im Browser/Tablet (Platzierung, Griffe, Export-PDF)
+
+## Gesamtkorrektur Export-Ausschnitte / Treppe (03.10.)
+- [x] A: Ausschnitt verschieben/drehen/Kanten als Vorschau-Sitzung (armed → greifen → Vorschau; nur ✓/Enter speichert, Escape verwirft, ein Undo)
+- [x] B1–B3: Eckpodest = Laufbreite × Laufbreite, kein Aufblasen, Restlänge als Warnung, Podesttiefe je Knick (`landingDepthsM`)
+- [x] B4: Bezug A/B statt L/R
+- [x] B5: Geschosshöhe/Steigungen/Lauflänge/Restlänge live beim Platzieren
+- [ ] C: Treppenbearbeitung über normales Punktmenü (3 Fangpunkte je Kante, Kante bewegen, ganze Treppe verschieben/drehen), Werte rechts editierbar
+- [ ] D: Rechtsklick-Hilfslinien und Shift in allen Treppenschritten; alle Treppenkanten als Fangquellen
+- [ ] E: Browser-/Tablet-Abnahme, Zwei-Geräte-Test
