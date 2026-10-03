@@ -4,7 +4,7 @@ import { RotateCcw, Check } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import { ToolIds } from "@/cad/constants";
 import { isTabletMode } from "@/cad/StairTool";
-import { computeStairGeometry, stepRuleCheckText, suggestFromFloorHeight, treadFromRule } from "@/cad/stairGeometry";
+import { knickModeOf, computeStairGeometry, stepRuleCheckText, suggestFromFloorHeight, treadFromRule } from "@/cad/stairGeometry";
 
 const HAIRLINE = "hsl(var(--hairline))";
 const MUTED = "hsl(var(--cad-toolbar-muted))";
@@ -151,6 +151,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
   const labels: any[] = (app as any).labelManager?.list?.() ?? [];
   const labelValue = st ? st.labelId : (app as any).activeDrawLabelId ?? "";
   const info = st ? tool.handleInfo() : null;
+  const knick = st ? tool.selectedKnick() : null;
   const floorAuto = g ? g.totalHeightM : null;
   const manualFloor = src.floorHeightM != null;
   const tablet = isTabletMode();
@@ -165,7 +166,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
         <select
           value={labelValue}
           onChange={(e) => {
-            if (st) { st.labelId = e.target.value; app.commitHistorySnapshot(); }
+            if (st) { (app.scene as any).assignStairsToLabel([st.id], e.target.value); app.commitHistorySnapshot(); }
             else (app as any).setActiveDrawLabelId(e.target.value);
             (app as any).refreshLabelUI?.();
             app.renderer.render();
@@ -210,6 +211,19 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
               )}
               {tool.moving && <p style={{ color: MUTED }}>{tablet ? "Bestätigen mit ✓ oder Enter, Escape verwirft." : "Klick oder Enter bestätigt, Escape verwirft. Shift richtet aus."}</p>}
             </>
+          )}
+          {knick != null && (
+            <div className="space-y-1 border-t pt-2" style={{ borderColor: HAIRLINE }}>
+              <SectionTitle>Knickausbildung</SectionTitle>
+              {(["landing", "winder"] as const).map((m) => (
+                <label key={m} className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="radio" name={`knick-${knick}`} checked={knickModeOf(st, knick) === m} disabled={tool.moving}
+                    onChange={() => { tool.setKnickModeSelected(m); force((n) => n + 1); }}
+                    style={{ accentColor: "hsl(var(--primary))" }} aria-label={m === "landing" ? "Podest" : "Gewendelt"} />
+                  <span>{m === "landing" ? "Podest" : "Gewendelt"}</span>
+                </label>
+              ))}
+            </div>
           )}
           {tool.lastWarnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>

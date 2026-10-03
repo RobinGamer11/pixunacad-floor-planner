@@ -19,6 +19,7 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import { v } from "./geometry";
 import { drawSnapDot } from "./snapDraw";
+import { setKnickMode } from "./stairGeometry";
 import { drawStair } from "./stairDraw";
 import {
   computeStairGeometry, moveStairBoundary, resetStairTread, setStairWidth, riserFromRule, hitStair,

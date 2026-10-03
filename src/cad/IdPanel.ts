@@ -150,9 +150,10 @@ export class IdPanel {
       // Rasterinhalt (Pixelmodus der Projektmappe) zählt ebenfalls als Objekte.
       let rasterCount = 0;
       try { rasterCount = (this.app as any).rasterLayers?.get?.(group.id)?.strokeCount ?? 0; } catch {}
+      const stairCount = this.app.scene.getStairsByLabelId(group.id).length;
       let extraCount = 0;
       try { extraCount = (this.app as any).externalLabelCounter?.(group.id) ?? 0; } catch {}
-      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount + docCount + rasterCount + extraCount;
+      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount + stairCount + docCount + rasterCount + extraCount;
       const row = document.createElement("div");
       row.className = "id-row";
       row.dataset.id = group.id;
