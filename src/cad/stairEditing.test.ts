@@ -21,7 +21,10 @@ describe("Treppe – Bearbeitung über Fangpunkte", () => {
     expect(edges.filter((e) => e.kind === "width" && e.knick == null).length).toBe(2);
     const landing = edges.filter((e) => e.knick === 1);
     expect(landing.filter((e) => e.kind === "landing").length).toBe(2);
-    expect(landing.filter((e) => e.kind === "width").length).toBeGreaterThanOrEqual(1);
+    // Andere Drehrichtung: Podest liegt außen und hat eigene Seitenkanten (Breite).
+    const outer = stairEditableEdges(base([{ x: 0, y: 0 }, { x: L, y: 0 }, { x: L, y: L }])).filter((e) => e.knick === 1);
+    expect(outer.filter((e) => e.kind === "landing").length).toBe(2);
+    expect(outer.filter((e) => e.kind === "width").length).toBeGreaterThanOrEqual(1);
   });
 
   it("Abgangskante bewegen ändert nur dieses Podest, Mindestmaß bleibt geschützt", () => {

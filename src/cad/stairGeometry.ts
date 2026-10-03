@@ -427,13 +427,26 @@ export function stairEditableEdges(p: StairParams, g: StairGeometry = computeSta
     const d1 = norm(sub(p.path[k], p.path[k - 1]));
     const d2 = norm(sub(p.path[k + 1], p.path[k]));
     const poly = L.poly;
-    // poly: [refEnd, k, refStart, outStart, (x), outEnd]
-    const refEnd = poly[0], refStart = poly[2], outStart = poly[3], outEnd = poly[poly.length - 1];
-    out.push({ key: `l${k}in`, kind: "landing", a: outEnd, b: refEnd, dir: mul(d1, -1), knick: k });
-    out.push({ key: `l${k}out`, kind: "landing", a: refStart, b: outStart, dir: d2, knick: k });
-    const nrm = norm(sub(outStart, refStart));
-    for (let i = 3; i < poly.length - 1; i++) {
-      out.push({ key: `l${k}s${i}`, kind: "width", a: poly[i], b: poly[i + 1], dir: i === 3 ? nrm : norm(sub(outEnd, refEnd)) });
+    const kp = p.path[k];
+    const near = (u: P, w: P) => len(sub(u, w)) < 1e-6;
+    const refEnd = poly[0];
+    const refStart = sub(kp, mul(d2, -landingDepthOf(p, k)));
+    const perp = (e: P, d: P) => Math.abs(e.x * d.x + e.y * d.y) < 1e-6;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      if (near(a, kp) || near(b, kp)) continue; // Bezugsseiten am Knick
+      const e = norm(sub(b, a));
+      if ((near(a, refEnd) || near(b, refEnd)) && perp(e, d1)) {
+        out.push({ key: `l${k}in`, kind: "landing", a, b, dir: mul(d1, -1), knick: k });
+      } else if ((near(a, refStart) || near(b, refStart)) && perp(e, d2)) {
+        out.push({ key: `l${k}out`, kind: "landing", a, b, dir: d2, knick: k });
+      } else {
+        // Außenseite: Normale vom Podestzentrum weg → Breite.
+        let n = { x: -e.y, y: e.x };
+        const m = mul(add(a, b), 0.5);
+        if ((m.x - L.center.x) * n.x + (m.y - L.center.y) * n.y < 0) n = mul(n, -1);
+        out.push({ key: `l${k}s${i}`, kind: "width", a, b, dir: n, knick: k });
+      }
     }
   }
   return out;
