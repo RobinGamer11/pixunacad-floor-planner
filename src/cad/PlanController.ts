@@ -794,8 +794,6 @@ export class PlanController {
       if (act === "translate") {
         // Verschieben: Live-Drag startet sofort. Anker = aktuelle HUB-Verankerung
         // (Innensnap-Punkt) in Plan-mm; sonst Mausposition.
-        const sx0 = this.app.input.mouse.sx;
-        const sy0 = this.app.input.mouse.sy;
         let anchor: { x: number; y: number } | undefined;
         if (this._hubAnchorScreen) {
           const w = this.app.camera.screenToWorld(this._hubAnchorScreen.x, this._hubAnchorScreen.y);
@@ -813,9 +811,8 @@ export class PlanController {
           this.app.hub.bindCommit((vals) => {
             if (!this._drag || this._drag.kind !== "rotate") return;
             if (vals.angleDeg == null) return;
-            const p = this._currentProj();
-            if (!p) return;
-            p.rotation = (vals.angleDeg * Math.PI) / 180;
+            this._drag.preview.rotation = (vals.angleDeg * Math.PI) / 180;
+            this._drag.phase = "preview";
             this._endDrag();
           });
           this.app.hub.showAt(sx0, sy0);
@@ -823,7 +820,7 @@ export class PlanController {
           this.app.hub.updateDisplay(0, deg);
           this.app.hub.setValues(0, deg);
         } catch { /* noop */ }
-        this._hideHub();
+        this._renderHubButtons();
         this._setCursor("crosshair");
       } else if (act === "scale") {
         void this.changeSelectedScale();
@@ -877,7 +874,7 @@ export class PlanController {
     });
     // Enter/Escape während einer Kanten-/Verschiebe-Vorschau.
     window.addEventListener("keydown", (e) => {
-      if (!this._drag || this._drag.kind === "rotate") return;
+      if (!this._drag) return;
       if ((e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable]")) return;
       if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); this.confirmDrag(); }
       else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); this.cancelDrag(); }
@@ -911,7 +908,7 @@ export class PlanController {
     };
     const val = `style="font-size:11px;padding:0 2px;align-self:center;opacity:.8"`;
     let html = "";
-    if (this._drag && this._drag.kind !== "rotate") {
+    if (this._drag) {
       html = `
         <button data-act="confirm-drag" title="Setzen (Enter)" aria-label="Setzen">${ic.check}</button>
         <button data-act="cancel-drag" title="Abbrechen (Esc)" aria-label="Abbrechen">${ic.close}</button>
