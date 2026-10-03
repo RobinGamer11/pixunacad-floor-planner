@@ -27,23 +27,36 @@ import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag"
 
 type HandleKind = "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | "corner";
 
+type ProjXform = { x: number; y: number; rotation: number; clip: { left: number; right: number; top: number; bottom: number } };
+
+/**
+ * Transform-Sitzung (Verschieben/Drehen/Kanten). Das echte Projection-Objekt
+ * bleibt bis zur Bestätigung unverändert; gezeichnet wird `preview`.
+ *  armed    → Funktion scharf, noch kein Kontakt auf dem Papier
+ *  dragging → Kontakt hält; Greifpunkt/Offset beim Aufsetzen festgelegt
+ *  preview  → losgelassen; Vorschau bleibt stehen (Anheben setzt nie)
+ * Nur ✓ oder Enter schreibt (ein Undo-Schritt), Escape verwirft.
+ */
 interface DragState {
   kind: "move" | "rotate" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom";
   projectionId: string;
+  phase: "armed" | "dragging" | "preview";
   startSx: number;
   startSy: number;
   origX: number;
   origY: number;
   origRotation: number;
   origClip: { left: number; right: number; top: number; bottom: number };
-  /** Anker-Punkt für Move im Sheet-System der Projektion (Plan-Welt-mm). */
+  /** Vorschau-Stand beim aktuellen Aufsetzen (Basis für Offsets). */
+  base: ProjXform;
+  /** Aktuelle Vorschau (nur gerendert). */
+  preview: ProjXform;
+  /** Bevorzugter Greifpunkt (Innen-Fangpunkt aus dem Hub), Plan-Welt-mm. */
   anchorPlanMm?: { x: number; y: number };
-  /** Pivot für Rotate (Plan-Welt-Meter, BBox-Center). */
+  /** Greifpunkt dieses Kontakts (Plan-Welt-mm). */
+  grabPlanMm?: { x: number; y: number };
   rotatePivotPlanM?: { x: number; y: number };
-  /** Startwinkel zwischen Pivot und Maus (rad). */
   rotateStartAngle?: number;
-  /** Kante: Referenzpunkt wird erst beim ersten Zeigerwechsel gesetzt. */
-  refPending?: boolean;
 }
 
 export class PlanController {
@@ -230,8 +243,7 @@ export class PlanController {
   cancelDrag(): boolean {
     const d = this._drag;
     if (!d) { if (this._scaleEditing) { this._scaleEditing = false; this._renderHubButtons(); return true; } return false; }
-    const proj = this._currentProjById(d.projectionId);
-    if (proj) { proj.x = d.origX; proj.y = d.origY; proj.rotation = d.origRotation; proj.clip = { ...d.origClip }; }
+    // Projection wurde während der Vorschau nie verändert → nichts zurückzuschreiben.
     this._drag = null;
     this._activeSnapMarker = null;
     try { this.app.hub.bindCommit(null); this.app.hub.hide(); } catch { /* noop */ }
@@ -258,12 +270,13 @@ export class PlanController {
   drawAll(ctx: CanvasRenderingContext2D) {
     const plan = this._activePlan();
     if (!plan) return;
-    for (const proj of plan.projections) {
+    for (const real of plan.projections) {
+      const proj = this._view(real);
       const items = this.getItems(proj);
       const isSel = proj.id === this.selectedProjectionId;
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
-      if (this.isSourceMissing(proj)) {
+      if (this.isSourceMissing(real)) {
         const sc = this.app.camera.worldToScreen(proj.x / 1000, proj.y / 1000);
         ctx.save();
         ctx.font = "12px sans-serif";
@@ -335,7 +348,8 @@ export class PlanController {
   private _innerHover: { projectionId: string; sx: number; sy: number } | null = null;
 
   /** Sammelt Snap-Kandidaten (Bildschirm-Koords) für die gesamte Projektion. */
-  private _findInnerSnap(proj: Projection, sx: number, sy: number): { sx: number; sy: number } | null {
+  private _findInnerSnap(real: Projection, sx: number, sy: number): { sx: number; sy: number } | null {
+    const proj = this._view(real);
     const items = this.getItems(proj);
     if (items.length === 0) return null;
     const layout = computeProjectionLayout(items, proj);
@@ -397,7 +411,8 @@ export class PlanController {
    * Liefert die 4 Bildschirm-Koordinaten der Außenrahmen-Eckpunkte (clip-Rechteck).
    * Reihenfolge: 0=TL, 1=TR, 2=BR, 3=BL.
    */
-  private _cornerScreens(proj: Projection): { x: number; y: number }[] {
+  private _cornerScreens(real: Projection): { x: number; y: number }[] {
+    const proj = this._view(real);
     const items = this.getItems(proj);
     const layout = computeProjectionLayout(items, proj);
     const cam = this.app.camera;
@@ -459,25 +474,19 @@ export class PlanController {
     const sx = input.mouse.sx;
     const sy = input.mouse.sy;
 
-    // Armed Drag (nur für edge-cut): warte auf Maus-Down im Canvas, dann starte Edge-Drag.
-    if (this._armedDrag) {
-      this._setCursor((this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize" : "ns-resize");
-      if (input.mouse.left) {
-        const proj = plan.projections.find(p => p.id === this._armedDrag!.projectionId);
-        if (proj) {
-          this._beginDrag(this._armedDrag.kind as any, proj, sx, sy);
-        }
-        this._armedDrag = null;
-      }
-      return true;
-    }
-
-    // Aktiver Live-Drag (Move/Rotate/Edge): jeden Frame Preview, Klick beendet.
+    // Transform-Sitzung: Aufsetzen greift, Ziehen = Vorschau, Anheben setzt nie.
+    const left = !!input.mouse.left;
+    const pressed = left && !this._prevLeft;
+    this._prevLeft = left;
     if (this._drag) {
-      this._continueDrag(sx, sy);
-      // Move/Rotate werden durch Mausklick beendet; Edge-Drag durch Maus loslassen.
-      // Verschieben/Drehen/Kante: Zeiger folgt, Klick bzw. Antippen setzt.
-      if (input.clicked) this._endDrag();
+      const d = this._drag;
+      if (d.kind === "move") this._setCursor("move");
+      else if (d.kind === "rotate") this._setCursor("crosshair");
+      else this._setCursor((d.kind === "edge-left" || d.kind === "edge-right") ? "ew-resize" : "ns-resize");
+      if (pressed) this._grab(sx, sy);
+      else if (left && d.phase === "dragging") this._continueDrag(sx, sy);
+      else if (!left && d.phase === "dragging") { d.phase = "preview"; this._activeSnapMarker = null; }
+      if (d.phase !== "armed") this._positionHub();
       return true;
     }
 
