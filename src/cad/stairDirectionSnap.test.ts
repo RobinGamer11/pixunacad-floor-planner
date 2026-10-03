@@ -19,14 +19,16 @@ describe("Treppe – gegenüberliegender Fangpunkt in Schritt 02", () => {
     }) as unknown as Input;
     tool.update(input(0, 0, true));
     expect(tool.phase).toBe("dir");
+    const direction = () => (tool as unknown as { _dir: { x: number; y: number } })._dir;
+    const edge = () => (tool as unknown as { _startEdge: () => [{ x: number; y: number }, { x: number; y: number }] })._startEdge();
     // Nahe am Gegenpunkt: der Richtungs-Pfeil wird senkrecht zur Startkante gefangen.
     tool.update(input(1.02, 0, false));
-    expect((tool as any)._dir.x).toBeCloseTo(0);
-    expect((tool as any)._dir.y).toBeCloseTo(1);
-    expect((tool as any)._startEdge()[1]).toEqual({ x: 1, y: 0 });
+    expect(direction().x).toBeCloseTo(0);
+    expect(direction().y).toBeCloseTo(1);
+    expect(edge()[1]).toEqual({ x: 1, y: 0 });
     // Auch bei Zeiger auf der Laufrichtung kann die gegenüberliegende Ecke einrasten.
     tool.update(input(0.04, 0.8, false));
-    expect((tool as any)._startEdge()[1].x).toBeCloseTo(1);
+    expect(edge()[1].x).toBeCloseTo(1);
     // Fingerheben erzeugt keinen Bestätigungsklick.
     expect(tool.phase).toBe("dir");
   });
