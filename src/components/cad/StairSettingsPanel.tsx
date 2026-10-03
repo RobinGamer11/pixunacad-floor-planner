@@ -4,7 +4,7 @@ import { RotateCcw, Check } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import { ToolIds } from "@/cad/constants";
 import { isTabletMode } from "@/cad/StairTool";
-import { knickModeOf, computeStairGeometry, stepRuleCheckText, suggestFromFloorHeight, treadFromRule } from "@/cad/stairGeometry";
+import { DEFAULT_WINDER_COUNT, DEFAULT_MIN_WINDER_INNER_TREAD_M, knickModeOf, computeStairGeometry, stepRuleCheckText, suggestFromFloorHeight, treadFromRule } from "@/cad/stairGeometry";
 
 const HAIRLINE = "hsl(var(--hairline))";
 const MUTED = "hsl(var(--cad-toolbar-muted))";
@@ -268,6 +268,15 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           {g.warnings.map((w) => <div key={w} className="cad-stair-warning">{w}</div>)}
         </div>
       )}
+
+      <div className="space-y-1.5">
+        <SectionTitle>Gewendelte Stufen</SectionTitle>
+        <NumField label="Anzahl je Knick" unit="Stk" value={src.winderCount ?? DEFAULT_WINDER_COUNT}
+          onCommit={(n) => { tool.setWinderSetting({ winderCount: Math.max(2, Math.min(8, Math.round(n))) }); force((x) => x + 1); }} />
+        <NumField label="Mindestauftritt innen" unit="cm" value={(src.minWinderInnerTreadM ?? DEFAULT_MIN_WINDER_INNER_TREAD_M) * 100}
+          onCommit={(n) => { tool.setWinderSetting({ minWinderInnerTreadM: n / 100 }); force((x) => x + 1); }} />
+        <p style={{ color: MUTED }}>Projektvorgabe, gemessen 30 cm vom inneren Eckpunkt. Gewendelt wird je Knick über „Knickausbildung“ gewählt.</p>
+      </div>
 
       <div className="space-y-1.5">
         <SectionTitle>Treppenrichtung</SectionTitle>

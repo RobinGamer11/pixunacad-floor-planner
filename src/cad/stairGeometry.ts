@@ -577,3 +577,30 @@ export function stairOuterPointIndex(p: StairParams, q: P): number | null {
   p.path.forEach((r, i) => { const d = len(sub(q, r)); if (d < bd) { bd = d; best = i; } });
   return best != null && bd <= lim && bd > 1e-6 ? best : null;
 }
+
+/**
+ * Außenpunkt polygonartig bewegen: der zugehörige Referenzpunkt wird so
+ * nachgeführt, dass der abgeleitete Außenpunkt genau auf dem Ziel liegt.
+ * Nachbarläufe, Stufen und Podeste ergeben sich lückenlos neu aus der Geometrie.
+ */
+export function moveStairOuterPoint(p: StairParams, idx: number, outerStart: P, target: P): StairParams {
+  let cur = p;
+  let outer = outerStart;
+  for (let it = 0; it < 8; it++) {
+    const e = sub(target, outer);
+    if (len(e) < 1e-6) break;
+    const cand: StairParams = { ...cur, path: cur.path.map((q, i) => (i === idx ? add(q, e) : { x: q.x, y: q.y })) };
+    const g = computeStairGeometry(cand);
+    const corners = [...g.treads.flatMap((t) => t.poly), ...g.landings.flatMap((l) => l.poly)];
+    let best: P | null = null, bd = Infinity;
+    for (const c of corners) {
+      if (stairOuterPointIndex(cand, c) !== idx) continue;
+      const d = len(sub(c, add(outer, e)));
+      if (d < bd) { bd = d; best = c; }
+    }
+    cur = cand;
+    if (!best) break;
+    outer = best;
+  }
+  return cur;
+}

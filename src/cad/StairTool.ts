@@ -19,7 +19,7 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import { v } from "./geometry";
 import { drawSnapDot } from "./snapDraw";
-import { setKnickMode } from "./stairGeometry";
+import { setKnickMode, moveStairOuterPoint } from "./stairGeometry";
 import { drawStair } from "./stairDraw";
 import {
   computeStairGeometry, moveStairBoundary, resetStairTread, setStairWidth, riserFromRule, hitStair,
@@ -333,6 +333,20 @@ export class StairTool {
     // Podestkante existiert bei „Gewendelt“ nicht mehr → auf den Knickpunkt umschalten.
     const ph = this.handlesFor(this._draft).find((h) => h.kind === "point" && h.pathIndex === k);
     this.selectedHandleKey = ph ? ph.key : null;
+    this.app.commitHistorySnapshot();
+    this.app.renderer?.render?.();
+    return true;
+  }
+
+  /** Wendelvorgaben (Anzahl, Mindestauftritt innen) – genau ein Undo-Schritt. */
+  setWinderSetting(patch: { winderCount?: number; minWinderInnerTreadM?: number }): boolean {
+    const st = this.editStair();
+    if (!st) { Object.assign(this.settings as any, patch); return true; }
+    const next = { ...serializeStair(st), ...patch };
+    const g = computeStairGeometry(next);
+    Object.assign(st, patch);
+    this._draft = serializeStair(st);
+    this.lastWarnings = g.valid ? [] : g.warnings;
     this.app.commitHistorySnapshot();
     this.app.renderer?.render?.();
     return true;
@@ -792,7 +806,9 @@ export class StairTool {
           const idx = (h.pathIndex ?? h.assocIndex)!;
           const d = this._constrainDelta(raw.x, raw.y, base);
           this.moveDeltaM = Math.hypot(d.x, d.y);
-          next = { ...base, path: base.path.map((q, i) => (i === idx ? { x: q.x + d.x, y: q.y + d.y } : q)) };
+          next = h.pathIndex == null
+            ? moveStairOuterPoint(base, idx, h.pos, { x: h.pos.x + d.x, y: h.pos.y + d.y })
+            : { ...base, path: base.path.map((q, i) => (i === idx ? { x: q.x + d.x, y: q.y + d.y } : q)) };
         } else if (this.action === "translate") {
           const d = this._constrainDelta(raw.x, raw.y, base);
           this.moveDeltaM = Math.hypot(d.x, d.y);
