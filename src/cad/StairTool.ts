@@ -133,6 +133,54 @@ export class StairTool {
   private _resetPlacement() {
     this.phase = this.editId ? "edit" : "start";
     this._start = null; this._dir = null; this._path = []; this._pendingSide = null;
+    this._clearRotate();
+  }
+
+  /* ------------------------------------- Schritt 02: Drehen wie Wand-Drehen */
+  /** Winkel per Hub/Tastatur gesperrt (wie SelectTool.rotateHubLocked). */
+  private _hubLocked = false;
+  private _hubAngleDeg: number | null = null;
+  private _hubShown = false;
+  /** Shift-Raster aktiv → Drehführung in Gold wie beim Wand-Drehen. */
+  private _rotSnapped = false;
+
+  private _clearRotate() {
+    this._hubLocked = false; this._hubAngleDeg = null; this._angleText = ""; this._rotSnapped = false;
+    if (this._hubShown) {
+      this._hubShown = false;
+      try { this.app.hub.bindCommit(null); this.app.hub.hide(); } catch { /* optional */ }
+    }
+  }
+
+  private _setDirFromDeg(deg: number) {
+    const a = deg * Math.PI / 180;
+    this._dir = { x: Math.cos(a), y: Math.sin(a) };
+  }
+
+  /** Hub öffnen/aktualisieren – identisch zum Wand-Drehen (Radius = Laufbreite, Winkel in Grad). */
+  private _syncHub(input: Input) {
+    const hub = (this.app as any).hub;
+    if (!hub) return;
+    if (this.phase !== "dir" || !this._start) { if (this._hubShown) this._clearRotate(); return; }
+    const ang = this.dirAngleDeg() ?? 0;
+    const r = this.settings.stairWidthM;
+    if (!this._hubShown) {
+      this._hubShown = true;
+      hub.bindCommit((vals: { lengthM: number | null; angleDeg: number | null }) => this._applyHubValues(vals));
+      hub.showAt(input.mouse.sx, input.mouse.sy);
+      hub.setValues(r, ang);
+      hub.enterEditMode();
+    }
+    hub.updateDisplay(r, ang);
+  }
+
+  private _applyHubValues(vals: { lengthM: number | null; angleDeg: number | null }) {
+    if (this.phase !== "dir" || !this._start) return;
+    const cur = this.dirAngleDeg() ?? 0;
+    const next = (((vals.angleDeg != null ? vals.angleDeg : cur) % 360) + 360) % 360;
+    this._hubLocked = true; this._hubAngleDeg = next; this._rotSnapped = false;
+    this._setDirFromDeg(next);
+    try { this.app.hub.setValues(this.settings.stairWidthM, next); this.app.hub.updateDisplay(this.settings.stairWidthM, next); } catch { /* optional */ }
   }
 
   /* ------------------------------------------------------------ Parameter */
@@ -204,7 +252,7 @@ export class StairTool {
       this._path = []; this._pendingSide = null; this.phase = "side"; return true;
     }
     if (this.phase === "side") { this._pendingSide = null; this.phase = "dir"; return true; }
-    if (this.phase === "dir") { this._start = null; this.phase = "start"; this._angleText = ""; return true; }
+    if (this.phase === "dir") { this._start = null; this.phase = "start"; this._clearRotate(); return true; }
     return false;
   }
 
@@ -232,16 +280,16 @@ export class StairTool {
     } else return false;
     const n = parseFloat(this._angleText.replace(",", "."));
     if (Number.isFinite(n)) {
-      // 0° = nach rechts, positiv gegen den Uhrzeigersinn (Bildschirm, y nach unten).
-      const a = -n * Math.PI / 180;
-      this._dir = { x: Math.cos(a), y: Math.sin(a) };
-    }
+      // Gleiche Winkelkonvention wie der Hub beim Wand-Drehen.
+      this._hubLocked = true; this._hubAngleDeg = ((n % 360) + 360) % 360; this._rotSnapped = false;
+      this._setDirFromDeg(this._hubAngleDeg);
+    } else { this._hubLocked = false; this._hubAngleDeg = null; }
     return true;
   }
-  /** Aktueller Laufwinkel in Grad (0–360). */
+  /** Aktueller Laufwinkel in Grad (0–360), Konvention wie Wand-Drehen/Hub. */
   dirAngleDeg(): number | null {
     if (!this._dir) return null;
-    return ((-Math.atan2(this._dir.y, this._dir.x) * 180 / Math.PI) % 360 + 360) % 360;
+    return ((Math.atan2(this._dir.y, this._dir.x) * 180 / Math.PI) % 360 + 360) % 360;
   }
 
   selectedHandle(): StairHandle | null {
@@ -538,7 +586,7 @@ export class StairTool {
 
   /** Häkchen/Enter. */
   confirm(): boolean {
-    if (this.phase === "dir" && this._start && this._dir) { this.phase = "side"; this._pendingSide = null; this._angleText = ""; return true; }
+    if (this.phase === "dir" && this._start && this._dir) { this.phase = "side"; this._pendingSide = null; this._clearRotate(); return true; }
     if (this.phase === "side") {
       if (!this._pendingSide) return false;
       this._commitSide(this._pendingSide);
@@ -704,17 +752,23 @@ export class StairTool {
       return;
     }
     if (this.phase === "dir" && this._start) {
-      const dx = w.x - this._start.x, dy = w.y - this._start.y;
-      const L = Math.hypot(dx, dy);
-      if (L > 1e-3 && !this._angleText) {
-        let d = { x: dx / L, y: dy / L };
-        if (this._shift) {
-          // Wie beim Wand-Drehen: Shift rastet in 15°-Schritten.
-          const a = Math.round(Math.atan2(d.y, d.x) / (Math.PI / 12)) * (Math.PI / 12);
-          d = { x: Math.cos(a), y: Math.sin(a) };
+      // Exakt wie SelectTool._previewRotateAngle (Wand-Drehen):
+      // gesperrter Hub-Winkel hat Vorrang; ohne Shift zielt der Strahl genau auf
+      // den gefangenen Punkt; Shift = absolutes 45°-Raster auf die Rohmaus.
+      if (this._hubLocked && this._hubAngleDeg != null) {
+        this._setDirFromDeg(this._hubAngleDeg);
+      } else {
+        const target = this._shift ? { x: input.mouse.wx, y: input.mouse.wy } : w;
+        const dx = target.x - this._start.x, dy = target.y - this._start.y;
+        if (Math.hypot(dx, dy) > 1e-6) {
+          let ang = ((Math.atan2(dy, dx) * 180 / Math.PI) % 360 + 360) % 360;
+          if (this._shift) ang = ((Math.round(ang / 45) * 45) % 360 + 360) % 360;
+          this._setDirFromDeg(ang);
+          this._rotSnapped = this._shift;
+          if (!this._shift && this._dir) this._dir = this._snapDirectionOpposite(this._dir, w);
         }
-        this._dir = this._snapDirectionOpposite(d, w);
       }
+      this._syncHub(input);
       if (pressed) {
         input.clicked = false;
         // Desktop: Klick bestätigt die Richtung. Tablet: nur Häkchen/Enter.
