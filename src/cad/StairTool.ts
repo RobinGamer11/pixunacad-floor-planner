@@ -146,6 +146,7 @@ export class StairTool {
       mode: path.length > 2 ? "landing" : "straight", path, referenceSide: s.referenceSide,
       treadDepthM: s.treadDepthM, stairWidthM: s.stairWidthM, riserHeightM: s.riserHeightM,
       direction: s.direction, stepDistancesM: null, landingDepthM: null, landingDepthsM: null, riserExtra: 1,
+      winderCount: (s as any).winderCount ?? null, minWinderInnerTreadM: (s as any).minWinderInnerTreadM ?? null,
     };
   }
 
