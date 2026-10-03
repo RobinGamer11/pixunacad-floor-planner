@@ -41,3 +41,4 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
 - Treppen-Bedienknöpfe (Häkchen, Bezug A/B) sind DOM-Elemente über der Zeichenfläche – ihre Position wird nie Geometrie; Werkzeugwechsel setzt den Cursor zentral in `CadApp.setTool` zurück.
 - Ausschnitt-Transformationen im Export laufen als Sitzung in `PlanController` (`_drag.preview`) – die Projection bleibt bis ✓/Enter unverändert, damit weder Cloud noch Verlauf Zwischenstände sehen.
+- Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges` – kein zweites Bedienkonzept.
