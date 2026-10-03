@@ -204,7 +204,7 @@ export class StairTool {
     const cm = (m: number) => `${(Math.round(m * 1000) / 10).toLocaleString("de-DE")} cm`;
     const m2 = (m: number) => `${m.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
     if (h.kind === "edge" && h.edge.kind === "boundary") {
-      const t = g.treads[h.edge.treadIndex!];
+      const t = g.treads.find((t) => t.index === h.edge.treadIndex)!;
       const diff = t.depth - p.treadDepthM;
       return {
         kind: "boundary",
@@ -218,8 +218,8 @@ export class StairTool {
     }
     if (h.kind === "edge" && h.edge.kind === "landing") {
       const k = h.edge.knick!;
-      const prev = g.treads.filter((t) => t.run === k - 1).pop();
-      const next = g.treads.find((t) => t.run === k);
+      const prev = g.treads.filter((t) => t.run === k - 1 && !t.isWinder).pop();
+      const next = g.treads.find((t) => t.run === k && !t.isWinder);
       return {
         kind: "landing",
         lines: [
@@ -256,11 +256,11 @@ export class StairTool {
     if (!h || !p || h.kind !== "edge" || this.moving) return false;
     let next: StairParams | null = null;
     if (id === "tread" && h.edge.treadIndex != null) {
-      const t = computeStairGeometry(p).treads[h.edge.treadIndex];
+      const t = computeStairGeometry(p).treads.find((t) => t.index === h.edge.treadIndex)!;
       next = t ? moveStairBoundary(p, h.edge.treadIndex, value / 100 - t.depth) : null;
     } else if (id === "diff" && h.edge.treadIndex != null) {
       // Neue Stufentiefe = Standardauftritt + Differenz (dieselbe Funktion wie „Kante bewegen“).
-      const t = computeStairGeometry(p).treads[h.edge.treadIndex];
+      const t = computeStairGeometry(p).treads.find((t) => t.index === h.edge.treadIndex)!;
       next = t ? moveStairBoundary(p, h.edge.treadIndex, p.treadDepthM + value / 100 - t.depth) : null;
     } else if (id === "landing" && h.edge.knick != null) {
       next = setLandingDepth(p, h.edge.knick, value);

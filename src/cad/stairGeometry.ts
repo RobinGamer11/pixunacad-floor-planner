@@ -391,9 +391,9 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
  */
 export function moveStairBoundary(p: StairParams, treadIndex: number, deltaM: number): StairParams | null {
   const g = computeStairGeometry(p);
-  const tread = g.treads[treadIndex];
+  const tread = g.treads.find((t) => t.index === treadIndex)!;
   if (!tread) return null;
-  const next = g.treads[treadIndex + 1];
+  const next = g.treads.find((t) => t.index === treadIndex + 1);
   if (!next || next.run !== tread.run) return null;
   const newDepth = tread.depth + deltaM;
   if (newDepth < MIN_TREAD_M - 1e-9) return null;
@@ -411,7 +411,7 @@ export function moveStairBoundary(p: StairParams, treadIndex: number, deltaM: nu
 /** Setzt einen Auftritt auf den Standard zurück; Folgestufen wandern mit. */
 export function resetStairTread(p: StairParams, treadIndex: number): StairParams | null {
   const g = computeStairGeometry(p);
-  const t = g.treads[treadIndex];
+  const t = g.treads.find((t) => t.index === treadIndex)!;
   if (!t) return null;
   const delta = p.treadDepthM - t.depth;
   if (Math.abs(delta) < 1e-9) return null;
