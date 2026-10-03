@@ -984,6 +984,8 @@ export class Stair {
   riserExtra = 1;
   stepDistancesM: number[] | null = null;
   landingDepthM: number | null = null;
+  /** Podesttiefe je Knick (rückwärtskompatibel; fehlend = Laufbreite). */
+  landingDepthsM: Record<number, number> | null = null;
   direction: "up" | "down" = "up";
   showArrow = true;
   showCircle = true;
@@ -999,6 +1001,7 @@ export class Stair {
     this.labelId = init.labelId || Defaults.defaultLabelId;
     this.path = (init.path || []).map(p => v(p.x, p.y));
     this.stepDistancesM = Array.isArray(init.stepDistancesM) ? [...init.stepDistancesM] : null;
+    this.landingDepthsM = init.landingDepthsM && typeof init.landingDepthsM === "object" ? { ...init.landingDepthsM } : null;
   }
 }
 
@@ -1010,7 +1013,9 @@ export function serializeStair(s: Stair): any {
     riserHeightM: s.riserHeightM, stepRuleCm: s.stepRuleCm, useStepRule: s.useStepRule,
     floorHeightM: s.floorHeightM, riserExtra: s.riserExtra,
     stepDistancesM: s.stepDistancesM ? [...s.stepDistancesM] : null,
-    landingDepthM: s.landingDepthM, direction: s.direction,
+    landingDepthM: s.landingDepthM,
+    landingDepthsM: s.landingDepthsM ? { ...s.landingDepthsM } : null,
+    direction: s.direction,
     showArrow: s.showArrow, showCircle: s.showCircle, showLabel: s.showLabel, showWidth: s.showWidth,
     color: s.color, lineWidthPx: s.lineWidthPx,
     arc: s.arc ? { ...s.arc, center: { ...s.arc.center } } : null,

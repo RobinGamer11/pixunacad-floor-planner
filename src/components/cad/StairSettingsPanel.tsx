@@ -63,9 +63,9 @@ const Check2: React.FC<{ label: string; on: boolean; onChange: (v: boolean) => v
   </label>
 );
 
-const STEPS = ["Startkante der ersten Stufe setzen", "Laufrichtung bestimmen", "Bezug L oder R wählen", "Referenzlinie zeichnen"];
+const STEPS = ["Startkante der ersten Stufe setzen", "Laufrichtung bestimmen", "Bezug A oder B wählen", "Referenzlinie zeichnen"];
 
-/** DOM-Bedienknöpfe über der Zeichenfläche (Häkchen, L/R). */
+/** DOM-Bedienknöpfe über der Zeichenfläche (Häkchen, A/B). */
 const StairCanvasButtons: React.FC<{ app: CadApp }> = ({ app }) => {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -83,16 +83,16 @@ const StairCanvasButtons: React.FC<{ app: CadApp }> = ({ app }) => {
   return createPortal(
     <>
       {b.left && (
-        <button type="button" aria-label="Bezug links" title="Bezug links" onPointerDown={stop}
+        <button type="button" aria-label="Bezug A" title="Bezug A" onPointerDown={stop}
           onClick={(e) => { stop(e); app.stairTool.chooseSide("left"); }}
           className={`${round} h-8 w-8 text-xs font-semibold`}
-          style={{ left: ox + b.left.x - 16, top: oy + b.left.y - 16, background: b.left.active ? "hsl(var(--primary))" : "hsl(var(--background))", color: b.left.active ? "hsl(var(--primary-foreground))" : "hsl(var(--primary))", border: "1.5px solid hsl(var(--primary))" }}>L</button>
+          style={{ left: ox + b.left.x - 16, top: oy + b.left.y - 16, background: b.left.active ? "hsl(var(--primary))" : "hsl(var(--background))", color: b.left.active ? "hsl(var(--primary-foreground))" : "hsl(var(--primary))", border: "1.5px solid hsl(var(--primary))" }}>A</button>
       )}
       {b.right && (
-        <button type="button" aria-label="Bezug rechts" title="Bezug rechts" onPointerDown={stop}
+        <button type="button" aria-label="Bezug B" title="Bezug B" onPointerDown={stop}
           onClick={(e) => { stop(e); app.stairTool.chooseSide("right"); }}
           className={`${round} h-8 w-8 text-xs font-semibold`}
-          style={{ left: ox + b.right.x - 16, top: oy + b.right.y - 16, background: b.right.active ? "hsl(var(--primary))" : "hsl(var(--background))", color: b.right.active ? "hsl(var(--primary-foreground))" : "hsl(var(--primary))", border: "1.5px solid hsl(var(--primary))" }}>R</button>
+          style={{ left: ox + b.right.x - 16, top: oy + b.right.y - 16, background: b.right.active ? "hsl(var(--primary))" : "hsl(var(--background))", color: b.right.active ? "hsl(var(--primary-foreground))" : "hsl(var(--primary))", border: "1.5px solid hsl(var(--primary))" }}>B</button>
       )}
       {b.confirm && (
         <button type="button" aria-label="Bestätigen" title="Bestätigen (Enter)" onPointerDown={stop}
@@ -143,7 +143,9 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
     }
     force((n) => n + 1);
   };
-  const g = st ? computeStairGeometry(st) : null;
+  // Bearbeiten: gespeicherte Treppe; Platzieren: reine Vorschau des Werkzeugs (live).
+  const previewParams = st ? null : tool.getPreviewParams();
+  const g = st ? computeStairGeometry(st) : previewParams ? computeStairGeometry(previewParams) : null;
   const phaseIdx = ["start", "dir", "side", "path"].indexOf(tool.phase);
   const labels: any[] = (app as any).labelManager?.list?.() ?? [];
   const labelValue = st ? st.labelId : (app as any).activeDrawLabelId ?? "";
@@ -234,6 +236,15 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
       <div className="space-y-1.5">
         <SectionTitle>Geschosshöhe</SectionTitle>
         <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Berechnet</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
+        {g ? (
+          <>
+            <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Steigungen</span><span>{g.riserCount}</span></div>
+            <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Lauflänge</span><span>{g.totalRunM.toFixed(2).replace(".", ",")} m</span></div>
+            <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Restlänge</span><span>{(g.remainderM * 100).toFixed(1).replace(".", ",")} cm</span></div>
+          </>
+        ) : (
+          <p style={{ color: MUTED }}>Wird nach Festlegen der Referenzlinie berechnet</p>
+        )}
         <Check2 label="Geschosshöhe vorgeben" on={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} />
         {manualFloor && (
           <>

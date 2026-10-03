@@ -27,23 +27,36 @@ import { makeHubDraggable, resetHubUserMoved, hubWasUserMoved } from "./hubDrag"
 
 type HandleKind = "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom" | "corner";
 
+type ProjXform = { x: number; y: number; rotation: number; clip: { left: number; right: number; top: number; bottom: number } };
+
+/**
+ * Transform-Sitzung (Verschieben/Drehen/Kanten). Das echte Projection-Objekt
+ * bleibt bis zur Bestätigung unverändert; gezeichnet wird `preview`.
+ *  armed    → Funktion scharf, noch kein Kontakt auf dem Papier
+ *  dragging → Kontakt hält; Greifpunkt/Offset beim Aufsetzen festgelegt
+ *  preview  → losgelassen; Vorschau bleibt stehen (Anheben setzt nie)
+ * Nur ✓ oder Enter schreibt (ein Undo-Schritt), Escape verwirft.
+ */
 interface DragState {
   kind: "move" | "rotate" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom";
   projectionId: string;
+  phase: "armed" | "dragging" | "preview";
   startSx: number;
   startSy: number;
   origX: number;
   origY: number;
   origRotation: number;
   origClip: { left: number; right: number; top: number; bottom: number };
-  /** Anker-Punkt für Move im Sheet-System der Projektion (Plan-Welt-mm). */
+  /** Vorschau-Stand beim aktuellen Aufsetzen (Basis für Offsets). */
+  base: ProjXform;
+  /** Aktuelle Vorschau (nur gerendert). */
+  preview: ProjXform;
+  /** Bevorzugter Greifpunkt (Innen-Fangpunkt aus dem Hub), Plan-Welt-mm. */
   anchorPlanMm?: { x: number; y: number };
-  /** Pivot für Rotate (Plan-Welt-Meter, BBox-Center). */
+  /** Greifpunkt dieses Kontakts (Plan-Welt-mm). */
+  grabPlanMm?: { x: number; y: number };
   rotatePivotPlanM?: { x: number; y: number };
-  /** Startwinkel zwischen Pivot und Maus (rad). */
   rotateStartAngle?: number;
-  /** Kante: Referenzpunkt wird erst beim ersten Zeigerwechsel gesetzt. */
-  refPending?: boolean;
 }
 
 export class PlanController {
@@ -63,7 +76,6 @@ export class PlanController {
 
   private _drag: DragState | null = null;
   /** Wenn gesetzt: nächste Canvas-Mausdown startet ein Drag dieser Art. */
-  private _armedDrag: { kind: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom"; projectionId: string } | null = null;
 
   // HUB DOM
   private _hubEl: HTMLDivElement | null = null;
@@ -230,8 +242,7 @@ export class PlanController {
   cancelDrag(): boolean {
     const d = this._drag;
     if (!d) { if (this._scaleEditing) { this._scaleEditing = false; this._renderHubButtons(); return true; } return false; }
-    const proj = this._currentProjById(d.projectionId);
-    if (proj) { proj.x = d.origX; proj.y = d.origY; proj.rotation = d.origRotation; proj.clip = { ...d.origClip }; }
+    // Projection wurde während der Vorschau nie verändert → nichts zurückzuschreiben.
     this._drag = null;
     this._activeSnapMarker = null;
     try { this.app.hub.bindCommit(null); this.app.hub.hide(); } catch { /* noop */ }
@@ -258,12 +269,13 @@ export class PlanController {
   drawAll(ctx: CanvasRenderingContext2D) {
     const plan = this._activePlan();
     if (!plan) return;
-    for (const proj of plan.projections) {
+    for (const real of plan.projections) {
+      const proj = this._view(real);
       const items = this.getItems(proj);
       const isSel = proj.id === this.selectedProjectionId;
       const isHov = proj.id === this.hoverProjectionId && !isSel;
       drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
-      if (this.isSourceMissing(proj)) {
+      if (this.isSourceMissing(real)) {
         const sc = this.app.camera.worldToScreen(proj.x / 1000, proj.y / 1000);
         ctx.save();
         ctx.font = "12px sans-serif";
@@ -335,7 +347,8 @@ export class PlanController {
   private _innerHover: { projectionId: string; sx: number; sy: number } | null = null;
 
   /** Sammelt Snap-Kandidaten (Bildschirm-Koords) für die gesamte Projektion. */
-  private _findInnerSnap(proj: Projection, sx: number, sy: number): { sx: number; sy: number } | null {
+  private _findInnerSnap(real: Projection, sx: number, sy: number): { sx: number; sy: number } | null {
+    const proj = this._view(real);
     const items = this.getItems(proj);
     if (items.length === 0) return null;
     const layout = computeProjectionLayout(items, proj);
@@ -397,7 +410,8 @@ export class PlanController {
    * Liefert die 4 Bildschirm-Koordinaten der Außenrahmen-Eckpunkte (clip-Rechteck).
    * Reihenfolge: 0=TL, 1=TR, 2=BR, 3=BL.
    */
-  private _cornerScreens(proj: Projection): { x: number; y: number }[] {
+  private _cornerScreens(real: Projection): { x: number; y: number }[] {
+    const proj = this._view(real);
     const items = this.getItems(proj);
     const layout = computeProjectionLayout(items, proj);
     const cam = this.app.camera;
@@ -459,25 +473,19 @@ export class PlanController {
     const sx = input.mouse.sx;
     const sy = input.mouse.sy;
 
-    // Armed Drag (nur für edge-cut): warte auf Maus-Down im Canvas, dann starte Edge-Drag.
-    if (this._armedDrag) {
-      this._setCursor((this._armedDrag.kind === "edge-left" || this._armedDrag.kind === "edge-right") ? "ew-resize" : "ns-resize");
-      if (input.mouse.left) {
-        const proj = plan.projections.find(p => p.id === this._armedDrag!.projectionId);
-        if (proj) {
-          this._beginDrag(this._armedDrag.kind as any, proj, sx, sy);
-        }
-        this._armedDrag = null;
-      }
-      return true;
-    }
-
-    // Aktiver Live-Drag (Move/Rotate/Edge): jeden Frame Preview, Klick beendet.
+    // Transform-Sitzung: Aufsetzen greift, Ziehen = Vorschau, Anheben setzt nie.
+    const left = !!input.mouse.left;
+    const pressed = left && !this._prevLeft;
+    this._prevLeft = left;
     if (this._drag) {
-      this._continueDrag(sx, sy);
-      // Move/Rotate werden durch Mausklick beendet; Edge-Drag durch Maus loslassen.
-      // Verschieben/Drehen/Kante: Zeiger folgt, Klick bzw. Antippen setzt.
-      if (input.clicked) this._endDrag();
+      const d = this._drag;
+      if (d.kind === "move") this._setCursor("move");
+      else if (d.kind === "rotate") this._setCursor("crosshair");
+      else this._setCursor((d.kind === "edge-left" || d.kind === "edge-right") ? "ew-resize" : "ns-resize");
+      if (pressed) this._grab(sx, sy);
+      else if (left && d.phase === "dragging") this._continueDrag(sx, sy);
+      else if (!left && d.phase === "dragging") { d.phase = "preview"; this._activeSnapMarker = null; }
+      if (d.phase !== "armed") this._positionHub();
       return true;
     }
 
@@ -635,132 +643,129 @@ export class PlanController {
   /** Liefert aktuellen Snap-Marker für Renderer. */
   getActiveSnapMarker(): { sx: number; sy: number } | null { return this._activeSnapMarker; }
 
+  private _prevLeft = false;
+
+  /** Zeichen-/Trefferansicht: während einer Sitzung die Vorschau statt des gespeicherten Stands. */
+  private _view(proj: Projection): Projection {
+    const d = this._drag;
+    if (!d || d.projectionId !== proj.id || d.phase === "armed") return proj;
+    return { ...proj, ...d.preview, clip: { ...d.preview.clip } };
+  }
+
+  /** Startet eine Sitzung im Zustand „armed“ — nichts wird verändert. */
   private _beginDrag(
-    handle: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom",
+    handle: "body" | "rotate" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom",
     proj: Projection,
-    sx: number,
-    sy: number,
     anchorPlanMm?: { x: number; y: number },
   ) {
+    const x: ProjXform = { x: proj.x, y: proj.y, rotation: proj.rotation, clip: { ...proj.clip } };
     this._drag = {
       kind: handle === "body" ? "move" : handle,
       projectionId: proj.id,
-      startSx: sx,
-      startSy: sy,
-      origX: proj.x,
-      origY: proj.y,
-      origRotation: proj.rotation,
-      origClip: { ...proj.clip },
+      phase: "armed",
+      startSx: 0, startSy: 0,
+      origX: proj.x, origY: proj.y, origRotation: proj.rotation, origClip: { ...proj.clip },
+      base: { ...x, clip: { ...x.clip } },
+      preview: { ...x, clip: { ...x.clip } },
       anchorPlanMm,
     };
+    // Mögliches noch gedrücktes Aufsetzen nicht als Greifen werten.
+    this._prevLeft = !!this.app.input.mouse.left;
   }
 
-  private _beginRotateDrag(proj: Projection, sx: number, sy: number) {
-    const items = this.getItems(proj);
-    const layout = computeProjectionLayout(items, proj);
+  /** Aufsetzen auf dem Papier: legt nur Greifpunkt/Offset fest — kein Sprung. */
+  private _grab(sx: number, sy: number) {
+    const d = this._drag;
+    if (!d) return;
+    const proj = this._currentProjById(d.projectionId);
+    if (!proj) { this._drag = null; return; }
+    d.base = { ...d.preview, clip: { ...d.preview.clip } };
+    d.startSx = sx; d.startSy = sy;
+    d.phase = "dragging";
     const cam = this.app.camera;
-    const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
-    const startAng = Math.atan2(sy - cs.y, sx - cs.x);
-    this._drag = {
-      kind: "rotate",
-      projectionId: proj.id,
-      startSx: sx,
-      startSy: sy,
-      origX: proj.x,
-      origY: proj.y,
-      origRotation: proj.rotation,
-      origClip: { ...proj.clip },
-      rotatePivotPlanM: layout.centerPlanM,
-      rotateStartAngle: startAng,
-    };
+    if (d.kind === "move") {
+      const w = cam.screenToWorld(sx, sy);
+      let grab = { x: w.x * 1000, y: w.y * 1000 };
+      // Innen-Fangpunkt aus dem Hub nur beim ersten Greifen und nur nahe am Kontakt.
+      if (d.anchorPlanMm) {
+        const a = cam.worldToScreen(d.anchorPlanMm.x / 1000, d.anchorPlanMm.y / 1000);
+        if (Math.hypot(a.x - sx, a.y - sy) <= 24) grab = { ...d.anchorPlanMm };
+        d.anchorPlanMm = undefined;
+      }
+      d.grabPlanMm = grab;
+    } else if (d.kind === "rotate") {
+      const layout = computeProjectionLayout(this.getItems(proj), { ...proj, ...d.base });
+      d.rotatePivotPlanM = layout.centerPlanM;
+      const cs = cam.worldToScreen(layout.centerPlanM.x, layout.centerPlanM.y);
+      d.rotateStartAngle = Math.atan2(sy - cs.y, sx - cs.x);
+    }
   }
 
   private _continueDrag(sx: number, sy: number) {
-    if (!this._drag) return;
-    const plan = this._activePlan();
-    if (!plan) return;
-    const proj = plan.projections.find(p => p.id === this._drag!.projectionId);
+    const d = this._drag;
+    if (!d || d.phase !== "dragging") return;
+    const proj = this._currentProjById(d.projectionId);
     if (!proj) { this._drag = null; return; }
     const cam = this.app.camera;
+    const pv = d.preview;
 
-    if (this._drag.kind === "move") {
-      // Anker folgt der Maus. Snap zu anderen Projektions-Punkten.
-      const snap = this._snapForMove(this._drag.projectionId, sx, sy);
+    if (d.kind === "move") {
+      const snap = this._snapForMove(d.projectionId, sx, sy);
       this._activeSnapMarker = snap ? { sx: snap.sx, sy: snap.sy } : null;
-      let targetWorld: { x: number; y: number };
-      if (snap) {
-        targetWorld = { x: snap.planMm.x / 1000, y: snap.planMm.y / 1000 };
-      } else {
-        targetWorld = cam.screenToWorld(sx, sy);
-      }
-      const targetMm = { x: targetWorld.x * 1000, y: targetWorld.y * 1000 };
-      const anchor = this._drag.anchorPlanMm;
-      if (anchor) {
-        // Die Anker-Welt-Position vor Drag-Start: anchor.
-        // Verschiebung = target - anchor → proj.x/y entsprechend.
-        proj.x = this._drag.origX + (targetMm.x - anchor.x);
-        proj.y = this._drag.origY + (targetMm.y - anchor.y);
-      } else {
-        // Kein Anker: BBox-Center folgt Maus (Fallback).
-        proj.x = targetMm.x;
-        proj.y = targetMm.y;
-      }
-      // HUB-Position folgt dem Anker.
+      const tw = snap ? { x: snap.planMm.x / 1000, y: snap.planMm.y / 1000 } : cam.screenToWorld(sx, sy);
+      const grab = d.grabPlanMm!;
+      pv.x = d.base.x + (tw.x * 1000 - grab.x);
+      pv.y = d.base.y + (tw.y * 1000 - grab.y);
       this._hubAnchorScreen = snap ? { x: snap.sx, y: snap.sy } : { x: sx, y: sy };
-    } else if (this._drag.kind === "rotate") {
-      const pivot = this._drag.rotatePivotPlanM!;
+    } else if (d.kind === "rotate") {
+      const pivot = d.rotatePivotPlanM!;
       const cs = cam.worldToScreen(pivot.x, pivot.y);
-      const ang = Math.atan2(sy - cs.y, sx - cs.x);
-      let delta = ang - (this._drag.rotateStartAngle || 0);
-      // Shift = Snap auf 15°
+      let delta = Math.atan2(sy - cs.y, sx - cs.x) - (d.rotateStartAngle || 0);
+      let rot = d.base.rotation + delta;
       if (this.app.input.keys.shift) {
         const step = Math.PI / 12;
-        delta = Math.round(delta / step) * step;
+        rot = Math.round(rot / step) * step;
       }
-      proj.rotation = this._drag.origRotation + delta;
+      pv.rotation = rot;
       this._activeSnapMarker = null;
-      // Live-Anzeige im LineHub aktualisieren.
-      const degTotal = (proj.rotation * 180) / Math.PI;
-      try { this.app.hub.updateDisplay(0, degTotal); } catch { /* noop */ }
+      try { this.app.hub.updateDisplay(0, (rot * 180) / Math.PI); } catch { /* noop */ }
     } else {
-      // Kanten ziehen: Referenz erst beim ersten echten Zeigerwechsel setzen → kein Sprung.
-      if (this._drag.refPending) {
-        if (sx === this._drag.startSx && sy === this._drag.startSy) return;
-        this._drag.startSx = sx; this._drag.startSy = sy; this._drag.refPending = false;
-        return;
-      }
-      const dxPx = sx - this._drag.startSx;
-      const dyPx = sy - this._drag.startSy;
-      const dxMm = (dxPx / cam.scale) * 1000;
-      const dyMm = (dyPx / cam.scale) * 1000;
-      const cosA = Math.cos(-proj.rotation);
-      const sinA = Math.sin(-proj.rotation);
+      const dxMm = ((sx - d.startSx) / cam.scale) * 1000;
+      const dyMm = ((sy - d.startSy) / cam.scale) * 1000;
+      const cosA = Math.cos(-d.base.rotation);
+      const sinA = Math.sin(-d.base.rotation);
       const ldxMm = dxMm * cosA - dyMm * sinA;
       const ldyMm = dxMm * sinA + dyMm * cosA;
-      const items = this.getItems(proj);
-      const layout = computeProjectionLayout(items, { ...proj, clip: this._drag.origClip });
+      const layout = computeProjectionLayout(this.getItems(proj), { ...proj, rotation: d.base.rotation, clip: d.origClip });
       const bboxW = layout.bboxLocalMm.right - layout.bboxLocalMm.left;
       const bboxH = layout.bboxLocalMm.bottom - layout.bboxLocalMm.top;
-      proj.clip = clipAfterEdgeDrag(this._drag.origClip, this._drag.kind, ldxMm, ldyMm, bboxW, bboxH);
+      // Folgekontakte setzen dort fort, wo die Vorschau steht.
+      pv.clip = clipAfterEdgeDrag(d.base.clip, d.kind, ldxMm, ldyMm, bboxW, bboxH);
     }
   }
 
+  /** Bestätigen: Vorschau einmalig schreiben, genau ein Verlaufsschritt. */
   private _endDrag() {
-    const wasRotate = this._drag?.kind === "rotate";
+    const d = this._drag;
+    if (!d) return;
+    const wasRotate = d.kind === "rotate";
+    const proj = this._currentProjById(d.projectionId);
+    const changed = !!proj && d.phase !== "armed" && (
+      proj.x !== d.preview.x || proj.y !== d.preview.y || proj.rotation !== d.preview.rotation ||
+      JSON.stringify(proj.clip) !== JSON.stringify(d.preview.clip));
     this._drag = null;
     this._activeSnapMarker = null;
+    if (proj && changed) {
+      proj.x = d.preview.x; proj.y = d.preview.y; proj.rotation = d.preview.rotation; proj.clip = { ...d.preview.clip };
+      this.invalidateCache();
+      this.app.refreshPlanUI();
+    }
     if (wasRotate) {
       try { this.app.hub.bindCommit(null); this.app.hub.hide(); } catch { /* noop */ }
     }
-    // HUB für aktuelle Selektion wieder einblenden.
-    if (this.selectedProjectionId) {
-      const sx = this.app.input.mouse.sx;
-      const sy = this.app.input.mouse.sy;
-      this._showHub({ x: sx, y: sy });
-    }
+    if (this.selectedProjectionId) this._showHub(this._hubAnchorScreen ?? undefined);
     this.app.canvas.style.cursor = "";
-    // Snapshot in History
-    this.app.commitHistorySnapshot();
+    if (changed) this.app.commitHistorySnapshot();
   }
 
   /* ---------- HUB (im Stil von cad-point-menu) ---------- */
@@ -789,28 +794,25 @@ export class PlanController {
       if (act === "translate") {
         // Verschieben: Live-Drag startet sofort. Anker = aktuelle HUB-Verankerung
         // (Innensnap-Punkt) in Plan-mm; sonst Mausposition.
-        const sx0 = this.app.input.mouse.sx;
-        const sy0 = this.app.input.mouse.sy;
         let anchor: { x: number; y: number } | undefined;
         if (this._hubAnchorScreen) {
           const w = this.app.camera.screenToWorld(this._hubAnchorScreen.x, this._hubAnchorScreen.y);
           anchor = { x: w.x * 1000, y: w.y * 1000 };
         }
-        this._beginDrag("body", proj, sx0, sy0, anchor);
-        this._hideHub();
+        this._beginDrag("body", proj, anchor);
+        this._renderHubButtons();
         this._setCursor("move");
       } else if (act === "rotate") {
         const sx0 = this.app.input.mouse.sx;
         const sy0 = this.app.input.mouse.sy;
-        this._beginRotateDrag(proj, sx0, sy0);
+        this._beginDrag("rotate", proj);
         // LineHub mit Winkel-Eingabe öffnen.
         try {
           this.app.hub.bindCommit((vals) => {
             if (!this._drag || this._drag.kind !== "rotate") return;
             if (vals.angleDeg == null) return;
-            const p = this._currentProj();
-            if (!p) return;
-            p.rotation = (vals.angleDeg * Math.PI) / 180;
+            this._drag.preview.rotation = (vals.angleDeg * Math.PI) / 180;
+            this._drag.phase = "preview";
             this._endDrag();
           });
           this.app.hub.showAt(sx0, sy0);
@@ -818,7 +820,7 @@ export class PlanController {
           this.app.hub.updateDisplay(0, deg);
           this.app.hub.setValues(0, deg);
         } catch { /* noop */ }
-        this._hideHub();
+        this._renderHubButtons();
         this._setCursor("crosshair");
       } else if (act === "scale") {
         void this.changeSelectedScale();
@@ -835,8 +837,7 @@ export class PlanController {
           this.selectedHandle === "edge-bottom"
         ) {
           // Kante folgt sofort dem Zeiger; Klick/Antippen, Häkchen oder Enter setzt.
-          this._beginDrag(this.selectedHandle, proj, this.app.input.mouse.sx, this.app.input.mouse.sy);
-          if (this._drag) this._drag.refPending = true;
+          this._beginDrag(this.selectedHandle, proj);
           this._setCursor((this.selectedHandle === "edge-left" || this.selectedHandle === "edge-right") ? "ew-resize" : "ns-resize");
           this._renderHubButtons();
         }
@@ -873,7 +874,7 @@ export class PlanController {
     });
     // Enter/Escape während einer Kanten-/Verschiebe-Vorschau.
     window.addEventListener("keydown", (e) => {
-      if (!this._drag || this._drag.kind === "rotate") return;
+      if (!this._drag) return;
       if ((e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable]")) return;
       if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); this.confirmDrag(); }
       else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); this.cancelDrag(); }
@@ -907,7 +908,7 @@ export class PlanController {
     };
     const val = `style="font-size:11px;padding:0 2px;align-self:center;opacity:.8"`;
     let html = "";
-    if (this._drag && this._drag.kind !== "rotate") {
+    if (this._drag) {
       html = `
         <button data-act="confirm-drag" title="Setzen (Enter)" aria-label="Setzen">${ic.check}</button>
         <button data-act="cancel-drag" title="Abbrechen (Esc)" aria-label="Abbrechen">${ic.close}</button>
@@ -1048,7 +1049,6 @@ export class PlanController {
     this.hoverHandle = null;
     this.hoverCornerIndex = null;
     this._drag = null;
-    this._armedDrag = null;
     this._hideHub();
   }
 

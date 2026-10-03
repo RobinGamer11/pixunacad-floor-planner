@@ -5,14 +5,14 @@
  *   "start" → erster Punkt legt die Startkante (untere Kante der ersten Stufe) fest
  *   "dir"   → Laufrichtung relativ zur Startkante (Vorschau mit Pfeil);
  *             Desktop: Klick/Enter bestätigt. Tablet: nur Häkchen/Enter.
- *   "side"  → Bezug L/R. Desktop: Klick auf L/R legt fest. Tablet: L/R markiert,
+ *   "side"  → Bezug A/B (intern left/right: A = left, B = right). Desktop: Klick legt fest. Tablet: markiert,
  *             Häkchen/Enter legt fest.
  *   "path"  → Referenzlinie zeichnen; Enter/Doppelklick (Tablet: Häkchen) schließt ab.
  * Bearbeiten ("edit"): Griff antippen wählt ihn nur aus. „Verschieben“ startet
  * eine Sitzung mit Vorschau; Häkchen/Enter speichert genau einen Undo-Schritt,
  * Escape verwirft. Kein direktes Ziehen.
  *
- * Bedienknöpfe (Häkchen, L/R) sind DOM-Elemente über der Zeichenfläche; ihre
+ * Bedienknöpfe (Häkchen, A/B) sind DOM-Elemente über der Zeichenfläche; ihre
  * Bildschirmposition wird nie als Geometrie- oder Fangpunkt verwendet.
  */
 import type { CadApp } from "./CadApp";
@@ -22,8 +22,7 @@ import { drawSnapDot } from "./snapDraw";
 import { drawStair } from "./stairDraw";
 import {
   computeStairGeometry, moveStairBoundary, resetStairTread, setStairWidth, riserFromRule, hitStair,
-  type P, type StairParams,
-} from "./stairGeometry";
+  type P, type StairParams, setLandingDepth, landingDepthOf } from "./stairGeometry";
 import { serializeStair } from "./Scene";
 
 export type StairPhase = "start" | "dir" | "side" | "path" | "edit";
@@ -134,7 +133,7 @@ export class StairTool {
     return {
       mode: path.length > 2 ? "landing" : "straight", path, referenceSide: s.referenceSide,
       treadDepthM: s.treadDepthM, stairWidthM: s.stairWidthM, riserHeightM: s.riserHeightM,
-      direction: s.direction, stepDistancesM: null, landingDepthM: null, riserExtra: 1,
+      direction: s.direction, stepDistancesM: null, landingDepthM: null, landingDepthsM: null, riserExtra: 1,
     };
   }
 
@@ -280,7 +279,7 @@ export class StairTool {
     return false;
   }
 
-  /** Auswahl L/R. Desktop legt direkt fest; Tablet markiert nur. */
+  /** Auswahl Bezug A/B. Desktop legt direkt fest; Tablet markiert nur. */
   chooseSide(side: "left" | "right") {
     if (this.phase !== "side" || !this._start || !this._dir) return;
     this._pendingSide = side;
@@ -406,6 +405,19 @@ export class StairTool {
     return w;
   }
 
+  /**
+   * Reine Vorschau für die Einstellungsleiste: Parameter aus Startkante,
+   * Richtung, Bezugsseite, gesetzten Referenzpunkten und Zeiger. Verändert nichts.
+   * null, solange die Referenzlinie noch nicht bestimmt werden kann.
+   */
+  getPreviewParams(): StairParams | null {
+    if (this.phase === "path") {
+      const path = this._previewPath();
+      return path.length >= 2 ? this.paramsFromSettings(path) : null;
+    }
+    return null;
+  }
+
   private _previewPath(): P[] {
     if (!this._cursor || !this._path.length) return this._path;
     return [...this._path, this._constrainPathPoint(this._cursor)];
@@ -488,8 +500,8 @@ export class StairTool {
           next = setStairWidth(base, Math.round((base.stairWidthM + this.moveDeltaM) * 100) / 100);
         } else if (h.kind === "landing") {
           this.moveDeltaM = dx * h.dir.x + dy * h.dir.y;
-          const cur = Math.max(base.landingDepthM || 0, base.stairWidthM);
-          next = { ...base, landingDepthM: Math.max(base.stairWidthM, cur + this.moveDeltaM) };
+          // Nur dieses eine Podest; Mindestmaß Laufbreite × Laufbreite.
+          next = setLandingDepth(base, h.knick, landingDepthOf(base, h.knick) + this.moveDeltaM);
         } else {
           this.moveDeltaM = Math.hypot(dx, dy);
           const path = base.path.map((q, i) => (i === h.index ? { x: q.x + dx, y: q.y + dy } : q));
