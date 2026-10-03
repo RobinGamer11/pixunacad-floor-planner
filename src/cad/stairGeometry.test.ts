@@ -44,12 +44,23 @@ describe("Treppe – Geometrie", () => {
     expect(g.riserCount).toBe(g.treadCount + 2);
   });
 
-  it("Restlänge vor Podest: kein Aufblasen, keine Teilstufe, verständliche Warnung", () => {
+  it("Restlänge vor Podest: wird verteilt – kein Loch, Podest bleibt Mindestmaß", () => {
     const g = computeStairGeometry(base([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: -3 }]));
-    expect(g.valid).toBe(false);
+    expect(g.valid).toBe(true);
     expect(g.landings[0].depthM).toBeCloseTo(1);
-    expect(g.warnings.some((w) => w.includes("Restlänge 4.0 cm vor Podest 1"))).toBe(true);
-    for (const t of g.treads) expect(t.depth).toBeCloseTo(0.28);
+    const run0 = g.treads.filter((t) => t.run === 0);
+    const end = run0[run0.length - 1].poly[1];
+    expect(end.x).toBeCloseTo(2); // lückenlos am Podest (3 − 1)
+    expect(g.remainderM).toBeCloseTo(0);
+    for (const t of g.treads) expect(Math.abs(t.depth - 0.28)).toBeLessThanOrEqual(0.03);
+    expect(stairLabelLines(base([]), g, false)[1]).not.toBe("17,5 / 28 cm");
+  });
+
+  it("nicht verteilbare Restlänge: Warnung, ungültig", () => {
+    const g = computeStairGeometry(base([{ x: 0, y: 0 }, { x: 1.5, y: 0 }, { x: 1.5, y: -3 }]));
+    expect(g.valid).toBe(false);
+    expect(g.warnings.some((w) => w.includes("Restlänge"))).toBe(true);
+    expect(g.landings[0].depthM).toBeCloseTo(1);
   });
 
   it("Podesttiefe je Knick: ein Podest ändern lässt das andere unverändert; Altwert lesbar", () => {
