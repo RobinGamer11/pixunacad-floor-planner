@@ -22,7 +22,7 @@ import { drawSnapDot } from "./snapDraw";
 import { drawStair } from "./stairDraw";
 import {
   computeStairGeometry, moveStairBoundary, resetStairTread, setStairWidth, riserFromRule, hitStair,
-  type P, type StairParams, setLandingDepth, landingDepthOf } from "./stairGeometry";
+  type P, type StairParams, setLandingDepth, landingDepthOf, translateStair, rotateStair, stairEditableEdges, MIN_TREAD_M, type StairEdge } from "./stairGeometry";
 import { serializeStair } from "./Scene";
 
 export type StairPhase = "start" | "dir" | "side" | "path" | "edit";
@@ -44,11 +44,16 @@ export interface StairToolSettings {
   lineWidthPx: number;
 }
 
+/**
+ * Treppengriffe = normale CAD-Fangpunkte: je bearbeitbarer Kante zwei
+ * Endpunkte + Kantenmitte; Referenzpunkte der Linie sind strukturell.
+ */
 export type StairHandle =
-  | { kind: "boundary"; key: string; treadIndex: number; pos: P; dir: P }
-  | { kind: "width"; key: string; pos: P; normal: P }
-  | { kind: "path"; key: string; index: number; pos: P }
-  | { kind: "landing"; key: string; knick: number; pos: P; dir: P };
+  | { kind: "edge"; key: string; pos: P; edge: StairEdge }
+  | { kind: "point"; key: string; pos: P; pathIndex: number | null };
+
+/** Laufende Bearbeitung (über das kleine Punktmenü gestartet). */
+export type StairEditAction = "edge" | "movePoint" | "translate" | "rotate";
 
 export interface StairCanvasButtons {
   confirm: { x: number; y: number } | null;
@@ -92,6 +97,12 @@ export class StairTool {
   private _moveBase: StairParams | null = null;
   private _grab: P | null = null;
   moveDeltaM = 0;
+  moveAngle = 0;
+  action: StairEditAction | null = null;
+  private _pivot: P | null = null;
+  private _rotStart: number | null = null;
+  private _prevLeft = false;
+  private _regrab = false;
   lastWarnings: string[] = [];
 
   constructor(app: CadApp) { this.app = app; }
@@ -179,46 +190,129 @@ export class StairTool {
   }
 
   /** Infos zum ausgewählten Griff für das Einstellungsfenster. */
-  handleInfo(): null | { kind: StairHandle["kind"]; lines: [string, string][]; canReset: boolean; resetHint?: string } {
+  handleInfo(): null | {
+    kind: "boundary" | "landing" | "width" | "ref" | "point";
+    lines: [string, string][];
+    canReset: boolean; resetHint?: string;
+    /** Editierbare Werte (dieselben reinen Geometriefunktionen wie die Griffe). */
+    fields: { id: "tread" | "landing" | "width"; label: string; unit: "cm" | "m"; value: number; min: number }[];
+  } {
     const h = this.selectedHandle();
     const p = this._draft;
     if (!h || !p) return null;
     const g = computeStairGeometry(p);
     const cm = (m: number) => `${(Math.round(m * 1000) / 10).toLocaleString("de-DE")} cm`;
-    if (h.kind === "boundary") {
-      const t = g.treads[h.treadIndex];
+    const m2 = (m: number) => `${m.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
+    if (h.kind === "edge" && h.edge.kind === "boundary") {
+      const t = g.treads[h.edge.treadIndex!];
       const diff = t.depth - p.treadDepthM;
       return {
-        kind: h.kind,
-        lines: [["Stufentiefe", cm(t.depth)], ["Standardauftritt", cm(p.treadDepthM)], ["Differenz", `${diff >= 0 ? "+" : ""}${cm(diff)}`]],
+        kind: "boundary",
+        lines: [["Standardauftritt", cm(p.treadDepthM)], ["Differenz", `${diff >= 0 ? "+" : ""}${cm(diff)}`]],
         canReset: Math.abs(diff) > 1e-6,
+        fields: [{ id: "tread", label: "Stufentiefe", unit: "cm", value: t.depth * 100, min: MIN_TREAD_M * 100 }],
       };
     }
-    if (h.kind === "landing") {
-      const l = g.landings.find((x) => x.knick === h.knick);
-      const prev = g.treads.filter((t) => t.run === h.knick - 1).pop();
-      const next = g.treads.find((t) => t.run === h.knick);
+    if (h.kind === "edge" && h.edge.kind === "landing") {
+      const k = h.edge.knick!;
+      const prev = g.treads.filter((t) => t.run === k - 1).pop();
+      const next = g.treads.find((t) => t.run === k);
       return {
-        kind: h.kind,
+        kind: "landing",
         lines: [
-          ["Podesttiefe", l ? cm(l.depthM) : "—"], ["Podestbreite", l ? cm(l.widthM) : "—"],
+          ["Mindestmaß", `${m2(p.stairWidthM)} × ${m2(p.stairWidthM)}`],
           ["Stufe davor", prev ? cm(prev.depth) : "—"], ["Stufe danach", next ? cm(next.depth) : "—"],
         ],
-        canReset: false,
-        resetHint: "Eckpodest ist durch den Knick der Referenzlinie nötig.",
+        canReset: landingDepthOf(p, k) > p.stairWidthM + 1e-6,
+        resetHint: "Podest hat bereits das Mindestmaß.",
+        fields: [{ id: "landing", label: "Podesttiefe", unit: "m", value: landingDepthOf(p, k), min: p.stairWidthM }],
       };
     }
-    if (h.kind === "width") return { kind: h.kind, lines: [["Laufbreite", `${p.stairWidthM.toLocaleString("de-DE", { minimumFractionDigits: 2 })} m`]], canReset: false };
-    return { kind: h.kind, lines: [["Referenzpunkt", `${h.index + 1} von ${p.path.length}`]], canReset: false };
+    if (h.kind === "edge" && h.edge.kind === "width") {
+      return { kind: "width", lines: [], canReset: false, fields: [{ id: "width", label: h.edge.knick ? "Podestbreite" : "Laufbreite", unit: "m", value: p.stairWidthM, min: 0.3 }] };
+    }
+    if (h.kind === "edge") {
+      return { kind: "ref", lines: [["Bezugskante", "bleibt fest"], ["Länge", m2(Math.hypot(h.edge.b.x - h.edge.a.x, h.edge.b.y - h.edge.a.y))]], canReset: false, fields: [] };
+    }
+    const lines: [string, string][] = [];
+    if (h.pathIndex != null) {
+      const i = h.pathIndex;
+      const seg = (a: number) => Math.hypot(p.path[a + 1].x - p.path[a].x, p.path[a + 1].y - p.path[a].y);
+      if (i > 0) lines.push([`Lauf ${i} (davor)`, m2(seg(i - 1))]);
+      if (i < p.path.length - 1) lines.push([`Lauf ${i + 1} (danach)`, m2(seg(i))]);
+    } else {
+      lines.push(["Gesamtlauflänge", m2(g.totalRunM)]);
+    }
+    return { kind: "point", lines, canReset: false, fields: [] };
   }
 
-  startMove(): boolean {
-    if (!this._draft || !this.selectedHandle()) return false;
+  /** Zahleneingabe rechts — nutzt dieselben Funktionen wie „Kante bewegen“. Ein Undo-Schritt. */
+  setHandleValue(id: "tread" | "landing" | "width", value: number): boolean {
+    const h = this.selectedHandle();
+    const p = this._draft;
+    if (!h || !p || h.kind !== "edge" || this.moving) return false;
+    let next: StairParams | null = null;
+    if (id === "tread" && h.edge.treadIndex != null) {
+      const t = computeStairGeometry(p).treads[h.edge.treadIndex];
+      next = t ? moveStairBoundary(p, h.edge.treadIndex, value / 100 - t.depth) : null;
+    } else if (id === "landing" && h.edge.knick != null) {
+      next = setLandingDepth(p, h.edge.knick, value);
+    } else if (id === "width") {
+      next = setStairWidth(p, value);
+    }
+    if (!next) { this.lastWarnings = ["Wert nicht zulässig (Mindestmaß)."]; return false; }
+    const g = computeStairGeometry(next);
+    this.lastWarnings = g.warnings;
+    if (!g.valid) return false;
+    this._draft = next;
+    return this._applyDraftToScene();
+  }
+
+  /** Startet eine Bearbeitung des ausgewählten Griffs (aus dem Punktmenü). */
+  startAction(action: StairEditAction): boolean {
+    const h = this.selectedHandle();
+    if (!this._draft || !h) return false;
+    if (action === "edge" && h.kind !== "edge") return false;
+    if (action === "movePoint" && !(h.kind === "point" && h.pathIndex != null)) return false;
     this.moving = true;
+    this.action = action;
     this._moveBase = { ...this._draft, path: this._draft.path.map((q) => ({ ...q })) };
-    this._grab = null;
+    this._pivot = { ...h.pos };
+    this._rotStart = null;
     this.moveDeltaM = 0;
+    this.moveAngle = 0;
+    // Desktop: der angeklickte Fangpunkt ist sofort Greifpunkt (wie übrige CAD-Fangpunkte).
+    // Tablet: erst das nächste Aufsetzen greift — kein Sprung.
+    this._grab = isTabletMode() ? null : { ...h.pos };
+    this._prevLeft = !!this.app.input?.mouse?.left;
+    try { this.app.pointEditMenu?.hide?.(); } catch { /* optional */ }
     return true;
+  }
+
+  /** Kompatibilität: „Verschieben“ = Treppe am Griff verschieben. */
+  startMove(): boolean { return this.startAction("translate"); }
+
+  /** Aktion aus dem kleinen CAD-Punktmenü. */
+  onPointMenuAction(action: string): boolean {
+    if (this.phase !== "edit") return false;
+    if (action === "delete") {
+      const st = this.editStair();
+      if (st) {
+        (this.app.scene as any).removeStair?.(st);
+        this.app.commitHistorySnapshot();
+        try { this.app.pointEditMenu?.hide?.(); } catch { /* optional */ }
+        this.exitEdit();
+      }
+      return true;
+    }
+    const map: Record<string, StairEditAction> = { offset: "edge", move: "movePoint", translate: "translate", rotate: "rotate" };
+    const a = map[action];
+    return a ? this.startAction(a) : false;
+  }
+
+  private _menuActionsFor(h: StairHandle): string[] {
+    if (h.kind === "edge") return ["offset", "translate", "rotate"].filter((a) => a !== "offset" || h.edge.kind !== "ref");
+    return h.pathIndex != null ? ["move", "translate", "rotate", "delete"] : ["translate", "rotate", "delete"];
   }
 
   private _applyDraftToScene(): boolean {
@@ -233,11 +327,13 @@ export class StairTool {
     return true;
   }
 
-  /** Reset des ausgewählten Auftritts auf den Standard (ein Undo-Schritt). */
+  /** Reset des ausgewählten Griffs auf Standard (Auftritt bzw. Podest-Mindestmaß); ein Undo-Schritt. */
   resetSelected(): boolean {
     const h = this.selectedHandle();
-    if (!h || !this._draft || h.kind !== "boundary") return false;
-    const next = resetStairTread(this._draft, h.treadIndex);
+    if (!h || !this._draft || h.kind !== "edge") return false;
+    let next: StairParams | null = null;
+    if (h.edge.kind === "boundary") next = resetStairTread(this._draft, h.edge.treadIndex!);
+    else if (h.edge.kind === "landing") next = setLandingDepth(this._draft, h.edge.knick!, this._draft.stairWidthM);
     if (!next) return false;
     this._draft = next;
     return this._applyDraftToScene();
@@ -245,7 +341,7 @@ export class StairTool {
 
   private _cancelMove() {
     if (this._moveBase) this._draft = this._moveBase;
-    this.moving = false; this._moveBase = null; this._grab = null; this.moveDeltaM = 0;
+    this.moving = false; this._moveBase = null; this._grab = null; this.moveDeltaM = 0; this.moveAngle = 0;
   }
 
   /** Häkchen/Enter. */
@@ -260,7 +356,7 @@ export class StairTool {
     if (this.phase === "edit" && this.moving) {
       const ok = this._applyDraftToScene();
       if (!ok) { this._cancelMove(); return true; }
-      this.moving = false; this._moveBase = null; this._grab = null; this.moveDeltaM = 0;
+      this.moving = false; this._moveBase = null; this._grab = null; this.moveDeltaM = 0; this.moveAngle = 0; this.action = null; this._regrab = false;
       return true;
     }
     return false;
@@ -447,33 +543,37 @@ export class StairTool {
 
   handlesFor(p: StairParams): StairHandle[] {
     const g = computeStairGeometry(p);
+    const key = (q: P) => `${Math.round(q.x * 1e4)}:${Math.round(q.y * 1e4)}`;
+    const pts = new Map<string, StairHandle>();
+    // Strukturelle Referenzpunkte zuerst (Vorrang bei gleicher Lage).
+    p.path.forEach((q, i) => pts.set(key(q), { kind: "point", key: `p${i}`, pos: q, pathIndex: i }));
     const hs: StairHandle[] = [];
-    for (const b of g.boundaries) {
-      hs.push({ kind: "boundary", key: `b${b.treadIndex}`, treadIndex: b.treadIndex, dir: b.dir, pos: { x: (b.a.x + b.b.x) / 2, y: (b.a.y + b.b.y) / 2 } });
+    for (const e of stairEditableEdges(p, g)) {
+      hs.push({ kind: "edge", key: `e:${e.key}`, pos: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, edge: e });
+      for (const q of [e.a, e.b]) if (!pts.has(key(q))) pts.set(key(q), { kind: "point", key: `c${key(q)}`, pos: q, pathIndex: null });
     }
-    if (g.treads.length) {
-      const t = g.treads[0].poly;
-      const far = { x: (t[2].x + t[3].x) / 2, y: (t[2].y + t[3].y) / 2 };
-      const base = { x: (t[0].x + t[1].x) / 2, y: (t[0].y + t[1].y) / 2 };
-      const L = Math.hypot(far.x - base.x, far.y - base.y) || 1;
-      hs.push({ kind: "width", key: "w", pos: far, normal: { x: (far.x - base.x) / L, y: (far.y - base.y) / L } });
-    }
-    for (const l of g.landings) {
-      if (l.knick < 0) continue;
-      const a = p.path[l.knick - 1], k = p.path[l.knick];
-      const L = Math.hypot(k.x - a.x, k.y - a.y) || 1;
-      hs.push({ kind: "landing", key: `l${l.knick}`, knick: l.knick, pos: l.center, dir: { x: (k.x - a.x) / L, y: (k.y - a.y) / L } });
-    }
-    p.path.forEach((q, i) => hs.push({ kind: "path", key: `p${i}`, index: i, pos: q }));
-    return hs;
+    return [...pts.values(), ...hs];
   }
 
   private _hitHandle(input: Input): StairHandle | null {
     if (!this._draft) return null;
-    return this.handlesFor(this._draft).find((h) => {
+    let best: StairHandle | null = null, bd = HANDLE_HIT_PX;
+    for (const h of this.handlesFor(this._draft)) {
       const s = this.app.camera.worldToScreen(h.pos.x, h.pos.y);
-      return Math.hypot(s.x - input.mouse.sx, s.y - input.mouse.sy) <= HANDLE_HIT_PX;
-    }) ?? null;
+      const d = Math.hypot(s.x - input.mouse.sx, s.y - input.mouse.sy);
+      if (d <= bd) { bd = d; best = h; }
+    }
+    return best;
+  }
+
+  /** Shift: Verschiebung gerade/orthogonal zur Laufrichtung des ersten Laufs. */
+  private _constrainDelta(dx: number, dy: number, base: StairParams): P {
+    if (!this._shift || base.path.length < 2) return { x: dx, y: dy };
+    const a = base.path[0], b = base.path[1];
+    const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L }, n = { x: -u.y, y: u.x };
+    const pu = dx * u.x + dy * u.y, pn = dx * n.x + dy * n.y;
+    return Math.abs(pu) >= Math.abs(pn) ? { x: u.x * pu, y: u.y * pu } : { x: n.x * pn, y: n.y * pn };
   }
 
   private _updateEdit(input: Input) {
@@ -484,32 +584,66 @@ export class StairTool {
     if (!this._draft) return;
 
     if (this.moving && this._moveBase) {
-      this._setCursor("move");
+      const left = !!input.mouse.left;
+      const pressed = left && !this._prevLeft;
+      this._prevLeft = left;
+      this._setCursor(this.action === "rotate" ? "crosshair" : "move");
       const h = this.handlesFor(this._moveBase).find((x) => x.key === this.selectedHandleKey);
       const w = this._snap(input);
-      if (!this._grab) this._grab = w; // erster Kontakt setzt nur den Greifpunkt
+      // Tablet: erstes Aufsetzen legt nur den Greifpunkt fest.
+      if (!this._grab) {
+        if (pressed) { this._grab = w; input.clicked = false; }
+        return;
+      }
+      if (isTabletMode() && !left && !pressed) {
+        // Finger angehoben: Vorschau bleibt stehen; nächstes Aufsetzen greift neu.
+        if (this._draft !== this._moveBase) { /* stehen lassen */ }
+        input.clicked = false;
+        this._regrab = true;
+        return;
+      }
+      if (isTabletMode() && this._regrab && pressed) {
+        // Neues Aufsetzen: von der aktuellen Vorschau aus weiter (kein Sprung).
+        this._moveBase = { ...this._draft, path: this._draft.path.map((q) => ({ ...q })) };
+        this._grab = w; this._regrab = false; this._rotStart = null;
+        if (this.action !== "rotate" && h) this._pivot = { ...h.pos };
+        input.clicked = false;
+        return;
+      }
       if (h) {
-        const dx = w.x - this._grab.x, dy = w.y - this._grab.y;
-        let next: StairParams | null = null;
         const base = this._moveBase;
-        if (h.kind === "boundary") {
-          this.moveDeltaM = dx * h.dir.x + dy * h.dir.y;
-          next = moveStairBoundary(base, h.treadIndex, this.moveDeltaM);
-        } else if (h.kind === "width") {
-          this.moveDeltaM = dx * h.normal.x + dy * h.normal.y;
-          next = setStairWidth(base, Math.round((base.stairWidthM + this.moveDeltaM) * 100) / 100);
-        } else if (h.kind === "landing") {
-          this.moveDeltaM = dx * h.dir.x + dy * h.dir.y;
-          // Nur dieses eine Podest; Mindestmaß Laufbreite × Laufbreite.
-          next = setLandingDepth(base, h.knick, landingDepthOf(base, h.knick) + this.moveDeltaM);
-        } else {
-          this.moveDeltaM = Math.hypot(dx, dy);
-          const path = base.path.map((q, i) => (i === h.index ? { x: q.x + dx, y: q.y + dy } : q));
-          next = { ...base, path };
+        const raw = { x: w.x - this._grab.x, y: w.y - this._grab.y };
+        let next: StairParams | null = null;
+        if (this.action === "edge" && h.kind === "edge") {
+          const e = h.edge;
+          this.moveDeltaM = raw.x * e.dir.x + raw.y * e.dir.y;
+          if (e.kind === "boundary") next = moveStairBoundary(base, e.treadIndex!, this.moveDeltaM);
+          else if (e.kind === "width") next = setStairWidth(base, Math.round((base.stairWidthM + this.moveDeltaM) * 1000) / 1000);
+          else if (e.kind === "landing") next = setLandingDepth(base, e.knick!, landingDepthOf(base, e.knick!) + this.moveDeltaM);
+        } else if (this.action === "movePoint" && h.kind === "point" && h.pathIndex != null) {
+          const d = this._constrainDelta(raw.x, raw.y, base);
+          this.moveDeltaM = Math.hypot(d.x, d.y);
+          next = { ...base, path: base.path.map((q, i) => (i === h.pathIndex ? { x: q.x + d.x, y: q.y + d.y } : q)) };
+        } else if (this.action === "translate") {
+          const d = this._constrainDelta(raw.x, raw.y, base);
+          this.moveDeltaM = Math.hypot(d.x, d.y);
+          next = translateStair(base, d.x, d.y);
+        } else if (this.action === "rotate" && this._pivot) {
+          const pv = this._pivot;
+          const sp = this.app.camera.worldToScreen(pv.x, pv.y);
+          if (Math.hypot(input.mouse.sx - sp.x, input.mouse.sy - sp.y) > 12) {
+            const ang = Math.atan2(w.y - pv.y, w.x - pv.x);
+            if (this._rotStart == null) this._rotStart = ang;
+            let delta = ang - this._rotStart;
+            if (this._shift) delta = Math.round(delta / (Math.PI / 12)) * (Math.PI / 12);
+            this.moveAngle = delta;
+            next = rotateStair(base, pv, delta);
+          }
         }
         if (next) {
           const g = computeStairGeometry(next);
           this.lastWarnings = g.warnings;
+          // Ungültig: letzte gültige Vorschau bleibt, Warnung erscheint.
           if (g.valid) this._draft = next;
         }
       }
@@ -525,7 +659,14 @@ export class StairTool {
     this._setCursor(hover ? "pointer" : "default");
     if (input.clicked) {
       input.clicked = false;
-      if (hover) { this.selectedHandleKey = hover.key; return; }
+      if (hover) {
+        // Fangpunkt antippen = auswählen + kleines Punktmenü direkt am Punkt.
+        this.selectedHandleKey = hover.key;
+        const sp = this.app.camera.worldToScreen(hover.pos.x, hover.pos.y);
+        try { this.app.pointEditMenu.showAt(sp.x, sp.y, this._menuActionsFor(hover)); } catch { /* optional */ }
+        return;
+      }
+      try { this.app.pointEditMenu?.hide?.(); } catch { /* optional */ }
       if (hitStair(this._draft, { x: input.mouse.wx, y: input.mouse.wy })) { this.selectedHandleKey = null; return; }
       this.exitEdit();
     }
@@ -612,7 +753,10 @@ export class StairTool {
       ctx.save(); ctx.strokeStyle = BLUE; ctx.setLineDash([6, 4]); ctx.lineWidth = 1;
       ctx.beginPath(); this._draft.path.map(S).forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
       ctx.restore();
-      for (const h of this.handlesFor(this._draft)) {
+      const handles = this.handlesFor(this._draft);
+      const selH = handles.find((h) => h.key === this.selectedHandleKey);
+      if (selH && selH.kind === "edge") line(selH.edge.a, selH.edge.b, 3);
+      for (const h of handles) {
         const p = S(h.pos);
         const active = h.key === this.selectedHandleKey;
         drawSnapDot(ctx, p.x, p.y, { radius: active ? 5 : 3.5, ring: active });
@@ -621,7 +765,9 @@ export class StairTool {
         const h = this.selectedHandle();
         if (h) {
           const p = S(h.pos);
-          const txt = `Δ ${(Math.round(this.moveDeltaM * 1000) / 10).toLocaleString("de-DE")} cm`;
+          const txt = this.action === "rotate"
+            ? `${(Math.round(this.moveAngle * 1800 / Math.PI) / 10).toLocaleString("de-DE")}°`
+            : this._grab ? `Δ ${(Math.round(this.moveDeltaM * 1000) / 10).toLocaleString("de-DE")} cm` : "Aufsetzen zum Greifen";
           ctx.save(); ctx.font = "12px sans-serif"; ctx.textBaseline = "bottom";
           const tw = ctx.measureText(txt).width;
           ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fillRect(p.x + 10, p.y - 26, tw + 10, 18);
