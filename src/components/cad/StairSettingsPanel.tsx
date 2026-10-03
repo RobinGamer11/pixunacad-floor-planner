@@ -214,21 +214,6 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
               {tool.moving && <p style={{ color: MUTED }}>{tablet ? "Bestätigen mit ✓ oder Enter, Escape verwirft." : "Klick oder Enter bestätigt, Escape verwirft. Shift richtet aus."}</p>}
             </>
           )}
-          {st.path.length > 2 && (
-            <div className="space-y-1 border-t pt-2" style={{ borderColor: HAIRLINE }}>
-               <SectionTitle>Gewendelte Stufen</SectionTitle>
-              {st.path.slice(1, -1).map((_: unknown, i: number) => {
-                const k = i + 1;
-                return (
-                  <div key={k} className="flex items-center gap-2">
-                    <span className="w-14 shrink-0" style={{ color: k === knick ? "hsl(var(--primary))" : MUTED }}>Knick {k}</span>
-                    <OnOff value={knickModeOf(st, k) === "winder"} labels={["Podest", "Gewendelt"]} disabled={tool.moving}
-                      onChange={(w) => { tool.setKnickModeSelected(w ? "winder" : "landing", k); force((n) => n + 1); }} />
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 
@@ -267,11 +252,21 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
 
       <div className="space-y-1.5">
         <SectionTitle>Gewendelte Stufen</SectionTitle>
+        {st && st.path.length > 2 && st.path.slice(1, -1).map((_: unknown, i: number) => {
+          const k = i + 1;
+          return (
+            <div key={k} className="flex items-center gap-2">
+              <span className="w-14 shrink-0" style={{ color: k === knick ? "hsl(var(--primary))" : MUTED }}>Knick {k}</span>
+              <OnOff value={knickModeOf(st, k) === "winder"} labels={["Podest", "Gewendelt"]} disabled={tool.moving}
+                onChange={(w) => { tool.setKnickModeSelected(w ? "winder" : "landing", k); force((n) => n + 1); }} />
+            </div>
+          );
+        })}
         <NumField label="Anzahl je Knick" unit="Stk" value={src.winderCount ?? DEFAULT_WINDER_COUNT}
           onCommit={(n) => { tool.setWinderSetting({ winderCount: Math.max(2, Math.min(8, Math.round(n))) }); force((x) => x + 1); }} />
         <NumField label="Mindestauftritt innen" unit="cm" value={(src.minWinderInnerTreadM ?? DEFAULT_MIN_WINDER_INNER_TREAD_M) * 100}
           onCommit={(n) => { tool.setWinderSetting({ minWinderInnerTreadM: n / 100 }); force((x) => x + 1); }} />
-        <p style={{ color: MUTED }}>Projektvorgabe, gemessen 30 cm vom inneren Eckpunkt. Gewendelt wird je Knick oben unter „Gewendelte Stufen“ gewählt.</p>
+        <p style={{ color: MUTED }}>Projektvorgabe, gemessen 30 cm vom inneren Eckpunkt.</p>
       </div>
 
       <div className="space-y-1.5">
