@@ -986,6 +986,8 @@ export class Stair {
   landingDepthM: number | null = null;
   /** Podesttiefe je Knick (rückwärtskompatibel; fehlend = Laufbreite). */
   landingDepthsM: Record<number, number> | null = null;
+  /** Podesttiefe der Abgangsseite je Knick (fehlend = wie Zulauf). */
+  landingExitDepthsM: Record<number, number> | null = null;
   /** Knickausbildung je Knick ("winder" = gewendelt; fehlend = Podest). */
   knickModes: Record<number, "landing" | "winder"> | null = null;
   winderCount: number | null = null;
@@ -1006,6 +1008,7 @@ export class Stair {
     this.path = (init.path || []).map(p => v(p.x, p.y));
     this.stepDistancesM = Array.isArray(init.stepDistancesM) ? [...init.stepDistancesM] : null;
     this.landingDepthsM = init.landingDepthsM && typeof init.landingDepthsM === "object" ? { ...init.landingDepthsM } : null;
+    this.landingExitDepthsM = init.landingExitDepthsM && typeof init.landingExitDepthsM === "object" ? { ...init.landingExitDepthsM } : null;
     this.knickModes = init.knickModes && typeof init.knickModes === "object" ? { ...init.knickModes } : null;
   }
 }
@@ -1020,6 +1023,7 @@ export function serializeStair(s: Stair): any {
     stepDistancesM: s.stepDistancesM ? [...s.stepDistancesM] : null,
     landingDepthM: s.landingDepthM,
     landingDepthsM: s.landingDepthsM ? { ...s.landingDepthsM } : null,
+    landingExitDepthsM: s.landingExitDepthsM ? { ...s.landingExitDepthsM } : null,
     knickModes: s.knickModes ? { ...s.knickModes } : null,
     winderCount: s.winderCount ?? null, minWinderInnerTreadM: s.minWinderInnerTreadM ?? null,
     direction: s.direction,
