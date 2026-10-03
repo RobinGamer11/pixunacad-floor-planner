@@ -158,3 +158,8 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] D: Rechtsklick-Hilfslinien und Shift in allen Treppenschritten; alle Treppenkanten als Fangquellen
 - [x] E: Unit-Tests (Kanten, Podest einzeln, Zahl = Griff, Verschieben/Drehen, parallele Hilfslinie)
 - [ ] E: Browser-/Tablet-Abnahme und Zwei-Geräte-Test – Vorschau verlangt Anmeldung, im Sandkasten keine Sitzung verfügbar
+
+## Treppe – Einstellungen und Laufrichtung
+- [x] Gewendelt/Podest-Wahl unter „Gewendelte Stufen“ mit Anzahl und Mindestauftritt; Geschosshöhe direkt unter Schrittmaßregel
+- [x] Warnung je Zustand einmal oben; Schritt 02 fängt den Gegenpunkt der Startkante bei Maus, Finger und Stift
+- [ ] Platzierung und Einstellungen auf echtem Tablet abnehmen (Nutzer)
