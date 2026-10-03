@@ -40,7 +40,7 @@ describe("Treppe – Geometrie", () => {
     const landingXs = g.landings[0].poly.map((q) => q.x);
     expect(Math.min(...landingXs)).toBeCloseTo(lastEnd.x);
     expect(g.landings[0].depthM).toBeCloseTo(1);
-    for (const t of g.treads) expect(t.depth).toBeCloseTo(0.28);
+    for (const t of run0) expect(t.depth).toBeCloseTo(0.28);
     expect(g.riserCount).toBe(g.treadCount + 2);
   });
 
