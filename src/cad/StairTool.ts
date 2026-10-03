@@ -1041,22 +1041,33 @@ export class StairTool {
       ctx.lineTo(to.x - 10 * Math.cos(ang + 0.4), to.y - 10 * Math.sin(ang + 0.4));
       ctx.closePath(); ctx.fill(); ctx.restore();
       if (this.phase === "dir") {
-        // Drehanzeige wie beim Wand-Drehen: Strahl, Bogen ab 0°, Winkel in Grad.
-        const sa = S(a), R = 46;
-        const ang = Math.atan2(d.y, d.x);
+        // Drehführung identisch zu SelectTool._drawRotateGuide (Wand-Drehen).
+        const pivot = S(a);
+        const snapped = this._rotSnapped;
+        const cur = this._cursor ? S(this._cursor) : null;
+        const rPx = Math.max(28, Math.min(400, cur ? Math.hypot(cur.x - pivot.x, cur.y - pivot.y) : 80));
+        const p1 = S({ x: a.x + d.x, y: a.y + d.y });
+        const scrRad = Math.atan2(p1.y - pivot.y, p1.x - pivot.x);
         const deg = this.dirAngleDeg() ?? 0;
-        ctx.save(); ctx.strokeStyle = BLUE; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
-        ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sa.x + R * 1.6, sa.y); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sa.x + Math.cos(ang) * R * 2.2, sa.y + Math.sin(ang) * R * 2.2); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.beginPath(); ctx.arc(sa.x, sa.y, R, 0, ang, ang > 0 ? false : true); ctx.stroke();
-        const txt = this._angleText ? `${this._angleText}°` : `${deg.toFixed(1).replace(".", ",")}°`;
-        const tx = sa.x + Math.cos(ang / 2) * (R + 18), ty = sa.y + Math.sin(ang / 2) * (R + 18);
-        ctx.font = "600 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        const tw = ctx.measureText(txt).width + 10;
-        ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fillRect(tx - tw / 2, ty - 10, tw, 20);
-        ctx.strokeRect(tx - tw / 2, ty - 10, tw, 20);
-        ctx.fillStyle = BLUE; ctx.fillText(txt, tx, ty);
+        const col = snapped ? "rgba(212,175,55,0.98)" : "rgba(120,180,255,0.85)";
+        ctx.save();
+        ctx.lineWidth = snapped ? 1.8 : 1.2; ctx.strokeStyle = col;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(pivot.x, pivot.y); ctx.lineTo(pivot.x + rPx, pivot.y); ctx.stroke();
+        ctx.beginPath(); ctx.arc(pivot.x, pivot.y, rPx * 0.45, 0, scrRad, scrRad < 0); ctx.stroke();
+        ctx.setLineDash(snapped ? [] : [6, 5]);
+        ctx.beginPath(); ctx.moveTo(pivot.x, pivot.y);
+        ctx.lineTo(pivot.x + Math.cos(scrRad) * (rPx + 60), pivot.y + Math.sin(scrRad) * (rPx + 60)); ctx.stroke();
+        ctx.setLineDash([]); ctx.fillStyle = col;
+        ctx.beginPath(); ctx.arc(pivot.x, pivot.y, 3.2, 0, Math.PI * 2); ctx.fill();
+        const label = this._angleText ? `${this._angleText}°` : `${deg.toFixed(snapped ? 0 : 1)}°`;
+        const lx = pivot.x + Math.cos(scrRad) * (rPx * 0.62) + 10;
+        const ly = pivot.y + Math.sin(scrRad) * (rPx * 0.62) - 10;
+        ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+        const tw = ctx.measureText(label).width;
+        ctx.fillStyle = "rgba(18,18,20,0.85)"; ctx.fillRect(lx - 5, ly - 13, tw + 10, 19);
+        ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.strokeRect(lx - 5, ly - 13, tw + 10, 19);
+        ctx.fillStyle = snapped ? "#f4d47c" : "#dbeafe"; ctx.fillText(label, lx, ly + 1);
         ctx.restore();
         if (tablet) { const cs = S(c); btns.confirm = { x: cs.x + 28, y: cs.y }; }
       } else {
