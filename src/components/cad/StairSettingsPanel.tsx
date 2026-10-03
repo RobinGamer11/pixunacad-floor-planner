@@ -161,6 +161,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
     <div className="cad-settings-panel mb-2 space-y-3 text-xs">
       <StairCanvasButtons app={app} />
       <SectionTitle>{st ? "Treppe" : "Treppe zeichnen"}</SectionTitle>
+      {st && warnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
 
       <label className="block text-xs">
         <span className="block mb-1" style={{ color: MUTED }}>Ebene</span>
@@ -228,7 +229,6 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
               })}
             </div>
           )}
-           {warnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>
       )}
 
@@ -264,12 +264,6 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           <p style={{ color: MUTED }}>Wird nach Festlegen der Referenzlinie berechnet</p>
         )}
       </div>
-
-      {st && warnings.length > 0 && (
-        <div className="rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
-          {warnings.map((w) => <div key={w} className="cad-stair-warning">{w}</div>)}
-        </div>
-      )}
 
       <div className="space-y-1.5">
         <SectionTitle>Gewendelte Stufen</SectionTitle>
