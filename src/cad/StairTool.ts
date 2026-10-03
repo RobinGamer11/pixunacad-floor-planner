@@ -155,6 +155,7 @@ export class StairTool {
   beginEdit(stairId: string): boolean {
     const st = (this.app.scene as any).getStairById?.(stairId);
     if (!st) return false;
+    if (this.app.labelManager && !this.app.labelManager.isEditable(st.labelId)) return false;
     this.editId = stairId;
     this._draft = serializeStair(st);
     this.phase = "edit";
@@ -298,13 +299,51 @@ export class StairTool {
     return true;
   }
 
+  /** Aktive Zeichenebene; gesperrt/ausgeblendet → erste sichtbare, entsperrte Ebene. */
+  private _drawLabelId(): string | undefined {
+    const lm: any = this.app.labelManager;
+    const cur = (this.app as any).activeDrawLabelId as string | undefined;
+    if (!lm || !cur || lm.isEditable(cur)) return cur || undefined;
+    return lm.list().find((g: any) => lm.isEditable(g.id))?.id ?? cur;
+  }
+
+  /** Knick des ausgewählten Griffs (Podestkante oder innerer Referenzpunkt). */
+  selectedKnick(): number | null {
+    const h = this.selectedHandle();
+    const p = this._draft;
+    if (!h || !p) return null;
+    if (h.kind === "edge" && h.edge.knick != null && h.edge.knick > 0) return h.edge.knick;
+    const i = h.kind === "point" ? h.pathIndex : null;
+    return i != null && i > 0 && i < p.path.length - 1 ? i : null;
+  }
+
+  /** Knickausbildung am ausgewählten Knick setzen (genau ein Undo-Schritt). */
+  setKnickModeSelected(mode: "landing" | "winder"): boolean {
+    const st = this.editStair();
+    const k = this.selectedKnick();
+    if (!st || k == null || !this._draft) return false;
+    const next = setKnickMode(this._draft, k, mode);
+    if (!next) return false;
+    const g = computeStairGeometry(next);
+    if (!g.valid) { this.lastWarnings = g.warnings; return false; }
+    st.knickModes = next.knickModes ?? null;
+    this._draft = serializeStair(st);
+    this.lastWarnings = [];
+    // Podestkante existiert bei „Gewendelt“ nicht mehr → auf den Knickpunkt umschalten.
+    const ph = this.handlesFor(this._draft).find((h) => h.kind === "point" && h.pathIndex === k);
+    this.selectedHandleKey = ph ? ph.key : null;
+    this.app.commitHistorySnapshot();
+    this.app.renderer?.render?.();
+    return true;
+  }
+
   /** Kompatibilität: „Verschieben“ = Treppe am Griff verschieben. */
   startMove(): boolean { return this.startAction("translate"); }
 
   /** Aktion aus dem kleinen CAD-Punktmenü. */
   onPointMenuAction(action: string): boolean {
     if (this.phase !== "edit") return false;
-    if (action === "delete") {
+    if (action === "delete" && !this.selectedHandleKey) {
       const st = this.editStair();
       if (st) {
         (this.app.scene as any).removeStair?.(st);
@@ -323,9 +362,10 @@ export class StairTool {
     if (h.kind === "edge") return ["offset", "translate", "rotate"].filter((a) => a !== "offset" || h.edge.kind !== "ref");
     if (h.pathIndex != null) {
       const last = !!this._draft && h.pathIndex === this._draft.path.length - 1;
-      return last ? ["move", "translate", "rotate", "insertPoint", "delete"] : ["move", "translate", "rotate", "delete"];
+      // Einzelne Treppenpunkte bieten nie „Löschen“ – die Treppe wird nur als Ganzes gelöscht.
+      return last ? ["move", "translate", "rotate", "insertPoint"] : ["move", "translate", "rotate"];
     }
-    return h.assocIndex != null ? ["move", "translate", "rotate", "delete"] : ["translate", "rotate", "delete"];
+    return h.assocIndex != null ? ["move", "translate", "rotate"] : ["translate", "rotate"];
   }
 
   private _applyDraftToScene(): boolean {
@@ -649,7 +689,7 @@ export class StairTool {
     if (!g.valid) return false;
     const s = this.settings;
     const st = (this.app.scene as any).createStair({
-      ...params, labelId: (this.app as any).activeDrawLabelId || undefined,
+      ...params, labelId: this._drawLabelId(),
       stepRuleCm: s.stepRuleCm, useStepRule: s.useStepRule, floorHeightM: s.floorHeightM,
       showArrow: s.showArrow, showCircle: s.showCircle, showLabel: s.showLabel, showWidth: s.showWidth,
       color: s.color, lineWidthPx: s.lineWidthPx,
@@ -703,6 +743,8 @@ export class StairTool {
   private _updateEdit(input: Input) {
     const st = this.editStair();
     if (!st) { this.exitEdit(); return; }
+    // Ebene ausgeblendet oder gesperrt: Bearbeitung sauber beenden (keine Griffe/Fangpunkte mehr).
+    if (this.app.labelManager && !this.app.labelManager.isEditable(st.labelId)) { this.exitEdit(); return; }
     // Ohne laufende Sitzung immer vom gespeicherten Stand ausgehen (Undo/Cloud).
     if (!this.moving) this._draft = serializeStair(st);
     if (!this._draft) return;

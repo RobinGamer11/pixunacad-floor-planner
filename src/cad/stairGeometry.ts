@@ -533,6 +533,7 @@ export function stairEditableEdges(p: StairParams, g: StairGeometry = computeSta
         continue; // Bezugsseiten am Knick
       } else {
         // Außenseite: Normale vom Podestzentrum weg → Breite.
+        const e = norm(sub(b, a));
         let n = { x: -e.y, y: e.x };
         const m = mul(add(a, b), 0.5);
         if ((m.x - L.center.x) * n.x + (m.y - L.center.y) * n.y < 0) n = mul(n, -1);
