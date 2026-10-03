@@ -20,14 +20,15 @@ const SectionTitle: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: MUTED }}>{children}</div>
 );
 
-const NumField: React.FC<{ label: string; value: number; unit: string; onCommit: (n: number) => void; disabled?: boolean; suffix?: React.ReactNode }> = ({ label, value, unit, onCommit, disabled, suffix }) => {
+const NumField: React.FC<{ label: string; value: number; unit: string; onCommit: (n: number) => void; disabled?: boolean; suffix?: React.ReactNode; signed?: boolean }> = ({ label, value, unit, onCommit, disabled, suffix, signed }) => {
   const [text, setText] = useState<string | null>(null);
-  const shown = text ?? (Math.round(value * 100) / 100).toLocaleString("de-DE");
+  const rounded = Math.round(value * 100) / 100;
+  const shown = text ?? `${signed && rounded > 0 ? "+" : ""}${rounded.toLocaleString("de-DE")}`;
   const commit = () => {
     if (text == null) return;
     const n = parseFloat(text.replace(",", "."));
     setText(null);
-    if (Number.isFinite(n) && n > 0) onCommit(n);
+    if (Number.isFinite(n) && (signed || n > 0)) onCommit(n);
   };
   return (
     <label className="flex items-center justify-between gap-2 text-xs">
@@ -184,7 +185,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           <p style={{ color: MUTED }}>
             {tablet ? "Bestätigen mit ✓ oder Enter. Fingerheben bestätigt nie." : "Klick bestätigt, Enter oder Doppelklick schließt die Referenzlinie ab. Shift richtet aus."}
           </p>
-          {tool.lastWarnings.map((w) => <p key={w} className="text-destructive">{w}</p>)}
+          {tool.lastWarnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>
       )}
 
@@ -194,7 +195,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           {info && (
             <>
               {info.fields.map((f) => (
-                <NumField key={f.id} label={f.label} unit={f.unit} value={f.value} disabled={tool.moving}
+                <NumField key={f.id} label={f.label} unit={f.unit} value={f.value} disabled={tool.moving} signed={f.signed}
                   onCommit={(n) => { if (n >= f.min - 1e-9) tool.setHandleValue(f.id, n); else tool.lastWarnings = [`Mindestens ${f.min.toLocaleString("de-DE")} ${f.unit}.`]; force((x) => x + 1); }} />
               ))}
               {info.lines.map(([k, v]) => (
@@ -210,7 +211,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
               {tool.moving && <p style={{ color: MUTED }}>{tablet ? "Bestätigen mit ✓ oder Enter, Escape verwirft." : "Klick oder Enter bestätigt, Escape verwirft. Shift richtet aus."}</p>}
             </>
           )}
-          {tool.lastWarnings.map((w) => <p key={w} className="text-destructive">{w}</p>)}
+          {tool.lastWarnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>
       )}
 
@@ -227,31 +228,30 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
 
       <div className="space-y-1.5">
         <SectionTitle>Geschosshöhe</SectionTitle>
-        <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Berechnet</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
+        <div data-testid="floor-manual"><Check2 label="Geschosshöhe vorgeben" on={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} /></div>
+        {manualFloor && (
+          <NumField label="Vorgabe" unit="m" value={src.floorHeightM} onCommit={(n) => {
+            const s = suggestFromFloorHeight(n, src.stepRuleCm / 100);
+            set({ floorHeightM: n, riserHeightM: s.riserM, treadDepthM: src.useStepRule ? treadFromRule(s.riserM, src.stepRuleCm / 100) : src.treadDepthM });
+          }} />
+        )}
+        <div data-testid="floor-auto" className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Berechnet</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
         {g ? (
           <>
             <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Steigungen</span><span>{g.riserCount}</span></div>
+            <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Auftritt (verwendet)</span><span>{(g.usedTreadM * 100).toFixed(1).replace(".", ",")} cm</span></div>
             <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Lauflänge</span><span>{g.totalRunM.toFixed(2).replace(".", ",")} m</span></div>
             <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Restlänge</span><span>{(g.remainderM * 100).toFixed(1).replace(".", ",")} cm</span></div>
           </>
         ) : (
           <p style={{ color: MUTED }}>Wird nach Festlegen der Referenzlinie berechnet</p>
         )}
-        <Check2 label="Geschosshöhe vorgeben" on={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} />
-        {manualFloor && (
-          <>
-            <NumField label="Vorgabe" unit="m" value={src.floorHeightM} onCommit={(n) => {
-              const s = suggestFromFloorHeight(n, src.stepRuleCm / 100);
-              set({ floorHeightM: n, riserHeightM: s.riserM, treadDepthM: src.useStepRule ? treadFromRule(s.riserM, src.stepRuleCm / 100) : src.treadDepthM });
-            }} />
-            {(() => { const s = suggestFromFloorHeight(src.floorHeightM, src.stepRuleCm / 100); return <p className="tabular-nums" style={{ color: MUTED }}>→ {s.riserCount} Steigungen à {(s.riserM * 100).toFixed(1).replace(".", ",")} cm</p>; })()}
-          </>
-        )}
+        {manualFloor && (() => { const s = suggestFromFloorHeight(src.floorHeightM, src.stepRuleCm / 100); return <p className="tabular-nums" style={{ color: MUTED }}>→ {s.riserCount} Steigungen à {(s.riserM * 100).toFixed(1).replace(".", ",")} cm</p>; })()}
       </div>
 
       {g && g.warnings.length > 0 && (
         <div className="rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
-          {g.warnings.map((w) => <div key={w} className="text-destructive">{w}</div>)}
+          {g.warnings.map((w) => <div key={w} className="cad-stair-warning">{w}</div>)}
         </div>
       )}
 
