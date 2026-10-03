@@ -19,7 +19,9 @@ import type { CadApp } from "./CadApp";
 import type { Input } from "./Input";
 import { v } from "./geometry";
 import { drawSnapDot } from "./snapDraw";
-import { setKnickMode, moveStairOuterPoint } from "./stairGeometry";
+import { setKnickMode, moveStairOuterPoint, setLandingSideDepth, landingExitDepthOf } from "./stairGeometry";
+const landingSide = (e: { key: string }): "entry" | "exit" => (e.key.endsWith("out") ? "exit" : "entry");
+const sideDepth = (p: StairParams, k: number, side: "entry" | "exit") => (side === "exit" ? landingExitDepthOf(p, k) : landingDepthOf(p, k));
 import { drawStair } from "./stairDraw";
 import {
   computeStairGeometry, moveStairBoundary, resetStairTread, setStairWidth, riserFromRule, hitStair,
@@ -145,7 +147,7 @@ export class StairTool {
     return {
       mode: path.length > 2 ? "landing" : "straight", path, referenceSide: s.referenceSide,
       treadDepthM: s.treadDepthM, stairWidthM: s.stairWidthM, riserHeightM: s.riserHeightM,
-      direction: s.direction, stepDistancesM: null, landingDepthM: null, landingDepthsM: null, riserExtra: 1,
+      direction: s.direction, stepDistancesM: null, landingDepthM: null, landingDepthsM: null, landingExitDepthsM: null, riserExtra: 1,
       winderCount: (s as any).winderCount ?? null, minWinderInnerTreadM: (s as any).minWinderInnerTreadM ?? null,
     };
   }
@@ -229,9 +231,9 @@ export class StairTool {
           ["Mindestmaß", `${m2(p.stairWidthM)} × ${m2(p.stairWidthM)}`],
           ["Stufe davor", prev ? cm(prev.depth) : "—"], ["Stufe danach", next ? cm(next.depth) : "—"],
         ],
-        canReset: landingDepthOf(p, k) > p.stairWidthM + 1e-6,
+        canReset: sideDepth(p, k, landingSide(h.edge)) > p.stairWidthM + 1e-6,
         resetHint: "Podest hat bereits das Mindestmaß.",
-        fields: [{ id: "landing", label: "Podesttiefe", unit: "m", value: landingDepthOf(p, k), min: p.stairWidthM }],
+        fields: [{ id: "landing", label: "Podesttiefe", unit: "m", value: sideDepth(p, k, landingSide(h.edge)), min: p.stairWidthM }],
       };
     }
     if (h.kind === "edge" && h.edge.kind === "width") {
@@ -266,7 +268,7 @@ export class StairTool {
       const t = computeStairGeometry(p).treads.find((t) => t.index === h.edge.treadIndex)!;
       next = t ? moveStairBoundary(p, h.edge.treadIndex, p.treadDepthM + value / 100 - t.depth) : null;
     } else if (id === "landing" && h.edge.knick != null) {
-      next = setLandingDepth(p, h.edge.knick, value);
+      next = setLandingSideDepth(p, h.edge.knick, landingSide(h.edge), value);
     } else if (id === "width") {
       next = setStairWidth(p, value);
     }
@@ -402,7 +404,7 @@ export class StairTool {
     if (!h || !this._draft || h.kind !== "edge") return false;
     let next: StairParams | null = null;
     if (h.edge.kind === "boundary") next = resetStairTread(this._draft, h.edge.treadIndex!);
-    else if (h.edge.kind === "landing") next = setLandingDepth(this._draft, h.edge.knick!, this._draft.stairWidthM);
+    else if (h.edge.kind === "landing") next = setLandingSideDepth(this._draft, h.edge.knick!, landingSide(h.edge), this._draft.stairWidthM);
     if (!next) return false;
     this._draft = next;
     return this._applyDraftToScene();
@@ -802,7 +804,7 @@ export class StairTool {
           this.moveDeltaM = raw.x * e.dir.x + raw.y * e.dir.y;
           if (e.kind === "boundary") next = moveStairBoundary(base, e.treadIndex!, this.moveDeltaM);
           else if (e.kind === "width") next = setStairWidth(base, Math.round((base.stairWidthM + this.moveDeltaM) * 1000) / 1000);
-          else if (e.kind === "landing") next = setLandingDepth(base, e.knick!, landingDepthOf(base, e.knick!) + this.moveDeltaM);
+          else if (e.kind === "landing") next = setLandingSideDepth(base, e.knick!, landingSide(e), sideDepth(base, e.knick!, landingSide(e)) + this.moveDeltaM);
         } else if (this.action === "movePoint" && h.kind === "point" && (h.pathIndex ?? h.assocIndex) != null) {
           const idx = (h.pathIndex ?? h.assocIndex)!;
           const d = this._constrainDelta(raw.x, raw.y, base);
