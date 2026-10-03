@@ -76,7 +76,6 @@ export class PlanController {
 
   private _drag: DragState | null = null;
   /** Wenn gesetzt: nächste Canvas-Mausdown startet ein Drag dieser Art. */
-  private _armedDrag: { kind: "body" | "edge-left" | "edge-right" | "edge-top" | "edge-bottom"; projectionId: string } | null = null;
 
   // HUB DOM
   private _hubEl: HTMLDivElement | null = null;
@@ -740,14 +739,8 @@ export class PlanController {
       const layout = computeProjectionLayout(this.getItems(proj), { ...proj, rotation: d.base.rotation, clip: d.origClip });
       const bboxW = layout.bboxLocalMm.right - layout.bboxLocalMm.left;
       const bboxH = layout.bboxLocalMm.bottom - layout.bboxLocalMm.top;
-      // Basis-Clip mitführen: Folgekontakte setzen dort fort, wo die Vorschau steht.
-      const baseClip = d.base.clip;
-      const k = d.kind;
-      const offL = k === "edge-left" ? baseClip.left - d.origClip.left : 0;
-      const offR = k === "edge-right" ? baseClip.right - d.origClip.right : 0;
-      const offT = k === "edge-top" ? baseClip.top - d.origClip.top : 0;
-      const offB = k === "edge-bottom" ? baseClip.bottom - d.origClip.bottom : 0;
-      pv.clip = clipAfterEdgeDrag(d.origClip, k, ldxMm + offL - offR, ldyMm + offT - offB, bboxW, bboxH);
+      // Folgekontakte setzen dort fort, wo die Vorschau steht.
+      pv.clip = clipAfterEdgeDrag(d.base.clip, d.kind, ldxMm, ldyMm, bboxW, bboxH);
     }
   }
 
@@ -808,13 +801,13 @@ export class PlanController {
           const w = this.app.camera.screenToWorld(this._hubAnchorScreen.x, this._hubAnchorScreen.y);
           anchor = { x: w.x * 1000, y: w.y * 1000 };
         }
-        this._beginDrag("body", proj, sx0, sy0, anchor);
-        this._hideHub();
+        this._beginDrag("body", proj, anchor);
+        this._renderHubButtons();
         this._setCursor("move");
       } else if (act === "rotate") {
         const sx0 = this.app.input.mouse.sx;
         const sy0 = this.app.input.mouse.sy;
-        this._beginRotateDrag(proj, sx0, sy0);
+        this._beginDrag("rotate", proj);
         // LineHub mit Winkel-Eingabe öffnen.
         try {
           this.app.hub.bindCommit((vals) => {
@@ -847,8 +840,7 @@ export class PlanController {
           this.selectedHandle === "edge-bottom"
         ) {
           // Kante folgt sofort dem Zeiger; Klick/Antippen, Häkchen oder Enter setzt.
-          this._beginDrag(this.selectedHandle, proj, this.app.input.mouse.sx, this.app.input.mouse.sy);
-          if (this._drag) this._drag.refPending = true;
+          this._beginDrag(this.selectedHandle, proj);
           this._setCursor((this.selectedHandle === "edge-left" || this.selectedHandle === "edge-right") ? "ew-resize" : "ns-resize");
           this._renderHubButtons();
         }
@@ -1060,7 +1052,6 @@ export class PlanController {
     this.hoverHandle = null;
     this.hoverCornerIndex = null;
     this._drag = null;
-    this._armedDrag = null;
     this._hideHub();
   }
 
