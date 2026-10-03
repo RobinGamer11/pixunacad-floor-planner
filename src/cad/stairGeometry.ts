@@ -170,11 +170,38 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
     }
     const d = dirs[r], o = offs[r];
     const base = add(path[r], mul(d, startCut));
+    // 1) Volle Auftritte bestimmen.
+    const runStart = treadIdx;
+    const depths: number[] = [];
+    let s0 = 0;
+    while (true) {
+      const dep = depthAt(p, runStart + depths.length);
+      if (s0 + dep > usable + 1e-6) break;
+      depths.push(dep); s0 += dep;
+    }
+    let rest = Math.max(0, usable - s0);
+    // 2) Läufe an einem Podest: kleine Restdifferenz gleichmäßig auf die
+    //    Standardauftritte verteilen – lückenlos, keine Teilstufe, Podest bleibt Mindestmaß.
+    if (segCount > 1 && rest > 1e-4 && depths.length) {
+      const isFree = (j: number) => !((p.stepDistancesM?.[runStart + j] ?? 0) > 0);
+      const free = depths.map((_, j) => isFree(j));
+      const k = free.filter(Boolean).length;
+      if (k > 0) {
+        const up = rest / k;
+        const down = !p.stepDistancesM ? (p.treadDepthM - rest) / (k + 1) : Infinity;
+        if (down < up && down <= MAX_TREAD_ADJUST_M && p.treadDepthM - down >= MIN_TREAD_M) {
+          depths.push(p.treadDepthM); free.push(true);
+          for (let j = 0; j < depths.length; j++) if (free[j]) depths[j] -= down;
+          rest = 0;
+        } else if (up <= MAX_TREAD_ADJUST_M) {
+          for (let j = 0; j < depths.length; j++) if (free[j]) depths[j] += up;
+          rest = 0;
+        }
+      }
+    }
     let s = 0;
     let runTreads = 0;
-    while (true) {
-      const dep = depthAt(p, treadIdx);
-      if (s + dep > usable + 1e-6) break;
+    for (const dep of depths) {
       const a = add(base, mul(d, s)), b = add(base, mul(d, s + dep));
       const poly = [a, b, add(b, o), add(a, o)];
       out.treads.push({
@@ -186,14 +213,13 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
       }
       s += dep; cum += dep; treadIdx++; runTreads++;
     }
-    const rest = Math.max(0, usable - s);
     restOf[r] = rest;
-    // Kein stilles Aufblasen: Rest wird angezeigt; vor einem Podest macht er die Treppe ungültig.
     out.remainderM += rest;
-    if (r < segCount - 1 && rest > 1e-4) {
+    if (segCount > 1 && rest > 1e-4) {
       out.valid = false;
-      warnings.push(`Lauf ${r + 1}: Restlänge ${(rest * 100).toFixed(1)} cm vor Podest ${r + 1} – Referenzlinie anpassen, Podest bewusst vergrößern oder Auftritt ändern.`);
+      warnings.push(`Lauf ${r + 1}: Restlänge ${(rest * 100).toFixed(1)} cm lässt sich nicht regelkonform auf die Auftritte verteilen – Referenzlinie anpassen, Podest bewusst vergrößern oder Auftritt ändern.`);
     }
+
     if ((r === 0 || r === segCount - 1) && runTreads === 0) {
       out.valid = false;
       warnings.push(`Lauf ${r + 1}: kein voller Auftritt möglich.`);
