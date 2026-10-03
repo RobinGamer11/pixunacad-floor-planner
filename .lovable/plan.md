@@ -1,42 +1,46 @@
-# CAD-Werkzeug „Treppe“ – Stufe A: gerade Treppen und Podeste
+# Treppenwerkzeug – Korrekturen (Bedienung, Geometrie, CAD-Integration)
 
-Ausgangsstand `main`: `61d6c63a`.
+Ausgangsstand: `main` bei `dff14cb4`. Datenmodell bleibt: eine Treppe = ein `Stair`-Objekt, alles Sichtbare wird aus `stairGeometry.ts` abgeleitet.
 
-## Umfang dieser Runde
-Gerade Treppen und L-/U-Treppen mit Podest werden vollständig umgesetzt: Platzieren, Fangpunkte, Auswahl, Bearbeiten, Undo, Cloud, Export/PDF und Rastern.
-Gewendelte (`winder`) und runde (`arc`) Treppen sind schon im Datenmodell vorgesehen. In der Oberfläche erscheinen sie aber gesperrt mit dem Hinweis „folgt“. Freigeschaltet werden sie erst, wenn die gerade Treppe abgenommen ist.
+## 1. Optik und Cursor
+- Treppe nutzt CAD-Farben, blaue Fangpunkte (`drawSnapDot`), normale Auswahlrahmen und das bestehende Häkchen; gelbe/weiße Sondergriffe entfallen.
+- `StairTool.update()` setzt kein `crosshair` mehr: leer = `default`, nur über Griffen `pointer`/`move`.
+- Zentrales Zurücksetzen auf `default` in `CadApp.setTool`, bei Escape, Abbruch, Bestätigung und Unmount.
 
-## Für den Nutzer sichtbar
-- Neues Treppen-Symbol in der linken Werkzeugleiste.
-- Rechts unter „Werkzeugeinstellungen“: Modus, Auftritt, Laufbreite, Steigung, Schrittmaßregel an/aus mit Schrittmaß (Standard 63 cm), optional Geschosshöhe mit Vorschlag einer Stufenzahl, Bezug links/rechts, Pfeil aufwärts/abwärts sowie Pfeil, Kreis, Beschriftung und Maße jeweils an/aus.
-- Live-Anzeige: Prüfung „2 × 17,5 cm + 28 cm = 63 cm“, Stufenzahl, Gesamtlauflänge, Gesamthöhe und Restlänge (gelb hervorgehoben, nie als Teilstufe).
-- Ablauf: erst die Vorschau der ersten Stufe, dann bestätigen (Häkchen/Enter). Danach Bezug links oder rechts wählen und die Referenzlinie zeichnen (Punkte per Klick/Tipp). Abschluss per Häkchen, Enter oder Doppelklick. Ein erster Fingerkontakt setzt nie etwas.
-- Darstellung: Stufen, Teilungskanten, Kreis an der ersten Stufe, Pfeil bis zur letzten Stufe und zweizeilige Beschriftung („16 × 17,5 cm“ / „15 × 28 cm“, optional „B = 1,10 m“).
-- Bei ausgewählter Treppe: Verschieben/Drehen (Vorschau, Bestätigung nur per Häkchen/Enter, Abbruch mit Escape), Griffe an den Seitenkanten für die Laufbreite und an jeder Teilungskante für die Stufengrenze. Dazu Richtung umkehren, Podest hinzufügen/entfernen, Rastern (mit der bestehenden Warnung) und Löschen.
+## 2. Platzieren
+- Schritt 1 setzt die Startkante der ersten Stufe (Endpunkte + Mitte sichtbar/fangbar).
+- Schritt 2: Richtung relativ zur Startkante, Fang über bestehende TopologyEngine (Punkte, Kanten, Raster, Hilfslinien), mittiger Laufpfeil in der Vorschau.
+- Tablet: erster Kontakt nur Vorschaupunkt, Fingerheben bestätigt nie, nur Häkchen/Enter; Häkchen-Koordinaten nie als Geometrie.
+- Desktop ohne Tabletmodus: kein Häkchen, Klick oder Enter bestätigt.
 
-## Technische Umsetzung
-- `stairGeometry.ts` (neu, reine Funktionen): Schrittmaßregel, Stufenzahl/Restlänge, Stufenpolygone entlang der Referenzlinie mit Bezugsseite. An Knicken entsteht ein Podest (Mindesttiefe = Laufbreite). Dazu gehören eindeutige Fangpunkte (gemeinsame Ecken nur einmal, per Schlüssel dedupliziert), Kantenmitten und Kanten, Pfeil/Kreis/Beschriftungsposition sowie die Grenzverschiebung (nachfolgende Stufen behalten ihren Auftritt).
-- `constants.ts`: `ToolIds.STAIR`, `SelectionType.STAIR`.
-- `Scene.ts`: Klasse `Stair` (Felder gemäß Konzept inkl. Feldern für `arc`), `scene.stairs`, create/get/remove, Klonen sowie Label-/Ebenen-Filter wie bei Türen.
-- `StairTool.ts` (neu): Phasen 01–03, Tablet-sicher nach dem bestehenden Muster „scharfstellen → Vorschau → Häkchen“.
-- `Renderer.ts`: Zeichnen aus den abgeleiteten Daten. Derselbe Pfad wird für CAD, Exportausschnitte, PDF und Rastern genutzt.
-- `TopologyEngine.ts` und `tracingSnapGeometry.ts`: Fangpunkte und Kanten der Treppe, auch für die Transparenzpause.
-- `SelectTool.ts`: Trefferprüfung (Stufe wählt die ganze Treppe), Gruppen-Verschieben/Drehen, Griff-Sitzungen mit Vorschau ohne Mutation am Modell. Erst die Bestätigung schreibt und erzeugt genau einen Undo-Schritt.
-- `sceneSerde.ts`, `CadApp.ts` (Klon/Snapshot), `ClipboardManager.ts`, `groupTransform.ts`, `sceneDiff.ts`/`applyOps.ts`: Serialisierung (rückwärtskompatibel, fehlendes `stairs` ergibt `[]`), Copy/Paste, Cloud-Diff. Eine Persistenzmigration ist nicht nötig, weil das Feld nur hinzukommt.
-- `CadEditor.tsx`: Werkzeugsymbol (Vektor-Icon mit Tooltip/aria-label) sowie Einstellungs- und Auswahlpanel.
-- `AGENTS.md`: Regel „Treppen sind ein semantisches Objekt; Stufen werden nur abgeleitet, nie gespeichert“.
+## 3. Bezug L/R
+- Beide Kanten mit L/R beschriftet, gewählte Kante dick in CAD-Blau.
+- Desktop: Klick auf L/R legt fest; Tablet: L/R markiert, Häkchen/Enter legt fest.
 
-## Tests
-- Schrittmaßregel in beide Richtungen, Vorschlag aus der Geschosshöhe.
-- Stufenzahl und Restlänge (keine Teilstufe).
-- Eindeutige gemeinsame Fangpunkte.
-- Verschiebung einer Stufengrenze mit Mitverschiebung der Folgestufen, inkl. Grenzen und Mindestauftritt.
-- Verschieben/Drehen der ganzen Treppe.
-- Podest bei L- und U-Form.
-- Tablet: erster Kontakt setzt nichts, nur Häkchen/Enter bestätigt.
-- Serialisierung, Cloud-Diff, Copy/Paste, Undo (ein Schritt).
-- Darstellung im Exportausschnitt.
-- Danach: Typprüfung, Produktions-Build, vollständige Testsuite und eine Browserprüfung der Platzierung.
+## 4. Referenzlinie und Podeste
+- Shift = orthogonal je Abschnitt (auch nach Ecke/Podest); Rechtsklick nutzt die bestehende Hilfslinienlogik.
+- `computeStairGeometry`: Podest wird bündig vergrößert, damit kein Spalt entsteht; Normstufen behalten Standardauftritt; keine Teilstufen; Ungültiges wird gewarnt.
+- Podeste entstehen automatisch an Ecken bzw. bei abweichendem Auftritt; Knöpfe „Podest hinzufügen/entfernen" entfallen.
 
-## Nicht in dieser Runde
-Gewendelte und runde Treppen (nur vorbereitet), freie S-Kurven.
+## 5. Beschriftung
+- Oben `5 STG`, unten `17,5 / 28 cm`; Laufbreite nur bei aktivem Schalter; Steigungsanzahl auch im Panel bei „Steigung".
+
+## 6. Bearbeitung nach Auswahl
+- Klick wählt ganze Treppe, rechter Reiter springt auf „Werkzeugeinstellungen", Griffe erscheinen sofort (Stufengrenzen, Laufbreite, Referenzpunkte, Podestkanten/-ecken).
+- Griff antippen = nur auswählen. Button „Verschieben" startet Sitzung mit Vorschau, Fang und Maß relativ zur Ausgangslage; Häkchen/Enter = genau ein Undo-Schritt, Escape verwirft; kein direktes Ziehen. Button „Stufen & Linie bearbeiten" entfällt.
+
+## 7. Maße und Reset je Stufe
+- Ausgewählter Griff zeigt Tiefe, Standardauftritt, Differenz; Podest: Tiefe, Breite, Nachbarstufen; Laufbreite: Gesamtmaß.
+- Reset-Symbol neben „Verschieben": Stufe auf Standard, Podest verschwindet ggf.; bei Pflicht-Eckpodest deaktiviert mit Erklärung; ein Undo-Schritt.
+
+## 8. Panel-Reihenfolge
+Ebenenauswahl (wie Linienwerkzeug) → Schrittmaßregel (große Option, Häkchen links) → Auftritt → Steigung inkl. Anzahl → Laufbreite → Schrittmaß → Geschosshöhe (berechnet + „Geschosshöhe vorgeben") → Treppenrichtung → Anzeige (Pfeil, Startkreis, Beschriftung, Laufbreite als CAD-Toggles). „Gewendelt" wird ausgeblendet, Datenfelder bleiben intern.
+
+## 9. Ebenen
+- Gleiche Ebenenauswahl wie Linienwerkzeug; neue Treppen erhalten aktive Ebene, bestehende wechseln darüber.
+- Sichtbarkeit/Sperre wirken in Renderer, Auswahl, Fang, Export/PDF, Transparenzpause; Ebene umbenennen/löschen/verschieben/Gruppenauswahl berücksichtigt Treppen. Keine eigene Ebenenlogik.
+
+## Technische Details
+- Dateien: `stairGeometry.ts` (+Tests), `StairTool.ts`, `stairDraw.ts`, `StairSettingsPanel.tsx`, `CadApp.ts` (Cursor-Reset, Tablet-Flag), `CadEditor.tsx` (Reiterwechsel, Ebenenauswahl), `SelectTool.ts`, `Renderer.ts`, `TopologyEngine.ts`, `tracingSnapGeometry.ts`, Ebenen-Operationen in `Scene.ts`.
+- Vorher je Baustein repositoryweite Nutzungssuche; Persistenz rückwärtskompatibel (alte Treppen ohne neue Felder laden unverändert).
+- Tests: lückenloses Podest, Standardauftritte, Reset/Podest-Verschwinden, Beschriftung, Cursor-Reset, Häkchen-Koordinaten nie Geometrie, Ebenen-Sichtbarkeit/Sperre. Danach Typecheck, Build, volle Testsuite.
