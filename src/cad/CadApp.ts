@@ -351,6 +351,14 @@ export class CadApp {
   stairTool!: StairTool;
   /** Rückmeldung an die Oberfläche: Treppe ausgewählt/erstellt. */
   onStairSelect: ((id: string | null) => void) | null = null;
+  /** Ausgewählte Treppe direkt mit Griffen öffnen (Werkzeugeinstellungen). */
+  openStairEdit(id: string): boolean {
+    if (!(this.scene as any).getStairById?.(id)) return false;
+    this.setTool(ToolIds.STAIR);
+    const ok = this.stairTool.beginEdit(id);
+    this.onToolChange?.(ToolIds.STAIR);
+    return ok;
+  }
   onStairCreated: ((id: string) => void) | null = null;
   eraserTool!: EraserTool;
   wallTool!: WallTool;
@@ -2493,6 +2501,17 @@ export class CadApp {
       if (e.key === "Enter" && (this.activeTool as any) === this.stairTool && !isHubInput) {
         if (this.stairTool.confirm()) { e.preventDefault(); return; }
       }
+      if ((e.key === "Delete" || e.key === "Backspace") && (this.activeTool as any) === this.stairTool && !isHubInput
+        && this.stairTool.phase === "edit" && !this.stairTool.moving) {
+        const st = this.stairTool.editStair();
+        if (st) {
+          e.preventDefault();
+          this.stairTool.exitEdit();
+          (this.scene as any).removeStair(st);
+          this.commitHistorySnapshot();
+          return;
+        }
+      }
       if (e.key === "Enter" && this.activeTool === this.polygonTool && !isHubInput) {
         if (this.polygonTool.finishFromKey()) { e.preventDefault(); return; }
       }
@@ -3163,6 +3182,8 @@ export class CadApp {
 
 
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
+    // Cursor zentral zurücksetzen: kein Werkzeugcursor bleibt im nächsten Werkzeug.
+    try { this.canvas.style.cursor = "default"; } catch { /* optional */ }
     // Wand-Helfer ausschalten, wenn das Wandwerkzeug verlassen wird.
     if (this.activeTool === this.wallTool && id !== ToolIds.WALL) {
       this.renderer.showWallHelpers = false;
