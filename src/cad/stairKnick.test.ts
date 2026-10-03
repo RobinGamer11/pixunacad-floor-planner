@@ -85,3 +85,17 @@ describe("Treppe – Außenpunkt polygonartig bewegen", () => {
     expect(computeStairGeometry(p).treads.filter((t) => t.isWinder).length).toBe(4);
   });
 });
+
+import { setLandingSideDepth as _sld, stairEditableEdges as _see, computeStairGeometry as _csg } from "./stairGeometry";
+describe("Podestkante isoliert", () => {
+  it("Zulaufkante bewegen lässt Abgangskante liegen", () => {
+    const p: any = { mode: "landing", path: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }], referenceSide: "left", treadDepthM: 0.28, stairWidthM: 1, riserHeightM: 0.17, direction: "up" };
+    const out0 = _see(p).find((e) => e.key === "l1out")!;
+    const q = _sld(p, 1, "entry", 1.3)!;
+    const out1 = _see(q).find((e) => e.key === "l1out")!;
+    const in0 = _see(p).find((e) => e.key === "l1in")!, in1 = _see(q).find((e) => e.key === "l1in")!;
+    expect(Math.hypot(out1.a.x - out0.a.x, out1.a.y - out0.a.y) + Math.hypot(out1.b.x - out0.b.x, out1.b.y - out0.b.y)).toBeLessThan(1e-6);
+    expect(Math.abs(in1.a.x - in0.a.x) + Math.abs(in1.b.x - in0.b.x)).toBeGreaterThan(0.5);
+    expect(_csg(q).landings.length).toBe(1);
+  });
+});
