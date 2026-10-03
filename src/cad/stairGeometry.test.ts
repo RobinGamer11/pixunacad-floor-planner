@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStairGeometry, moveStairBoundary, resetStairTread, stairLabelLines, riserFromRule, type StairParams } from "./stairGeometry";
+import { computeStairGeometry, moveStairBoundary, resetStairTread, stairLabelLines, riserFromRule, type StairParams, setLandingDepth, landingDepthOf } from "./stairGeometry";
 import { Scene, serializeStair } from "./Scene";
 import { restoreOneScene } from "./sceneSerde";
 
@@ -31,24 +31,34 @@ describe("Treppe – Geometrie", () => {
     expect(g.firstTreadEdges!.left[0]).toEqual({ x: 0, y: 0 });
   });
 
-  it("L-Treppe: Podest mindestens Laufbreite, keine Überlappung mit Stufen", () => {
-    const g = computeStairGeometry(base([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: -3 }], { mode: "landing" }));
-    expect(g.valid).toBe(true);
-    expect(g.landings.length).toBe(1);
-    for (const t of g.treads.filter((t) => t.run === 0)) {
-      for (const q of t.poly) expect(q.x).toBeLessThanOrEqual(3 - 1 + 1e-9);
-    }
-  });
-
-  it("L-Treppe: kein Spalt zwischen letzter Stufe und Podest, Standardauftritte bleiben", () => {
-    const g = computeStairGeometry(base([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: -3 }]));
+  it("L-Treppe passend: Podest genau Laufbreite × Laufbreite, kein Spalt", () => {
+    const L = 1 + 0.28 * 7;
+    const g = computeStairGeometry(base([{ x: 0, y: 0 }, { x: L, y: 0 }, { x: L, y: -3 }], { mode: "landing" }));
     const run0 = g.treads.filter((t) => t.run === 0);
+    expect(run0.length).toBe(7);
     const lastEnd = run0[run0.length - 1].poly[1];
     const landingXs = g.landings[0].poly.map((q) => q.x);
     expect(Math.min(...landingXs)).toBeCloseTo(lastEnd.x);
+    expect(g.landings[0].depthM).toBeCloseTo(1);
     for (const t of g.treads) expect(t.depth).toBeCloseTo(0.28);
-    // Podest = eine Stufenebene: Steigungen = Auftritte + Podeste + 1
     expect(g.riserCount).toBe(g.treadCount + 2);
+  });
+
+  it("Restlänge vor Podest: kein Aufblasen, keine Teilstufe, verständliche Warnung", () => {
+    const g = computeStairGeometry(base([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: -3 }]));
+    expect(g.valid).toBe(false);
+    expect(g.landings[0].depthM).toBeCloseTo(1);
+    expect(g.warnings.some((w) => w.includes("Restlänge 4.0 cm vor Podest 1"))).toBe(true);
+    for (const t of g.treads) expect(t.depth).toBeCloseTo(0.28);
+  });
+
+  it("Podesttiefe je Knick: ein Podest ändern lässt das andere unverändert; Altwert lesbar", () => {
+    const p = base([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: -3 }, { x: 6, y: -3 }]);
+    const q = setLandingDepth(p, 1, 1.4)!;
+    expect(landingDepthOf(q, 1)).toBeCloseTo(1.4);
+    expect(landingDepthOf(q, 2)).toBeCloseTo(1);
+    expect(setLandingDepth(p, 2, 0.5)!.landingDepthsM![2]).toBeCloseTo(1); // Mindestmaß
+    expect(landingDepthOf({ ...p, landingDepthM: 1.2 }, 2)).toBeCloseTo(1.2);
   });
 
   it("stark vergrößerter Auftritt wird Zwischenpodest; Reset entfernt es wieder", () => {
