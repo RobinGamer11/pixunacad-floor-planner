@@ -189,7 +189,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
             {tablet ? "Bestätigen mit ✓ oder Enter. Fingerheben bestätigt nie." : "Klick bestätigt, Enter oder Doppelklick schließt die Referenzlinie ab. Shift richtet aus."}
           </p>
           {tool.phase === "dir" && (
-            <p className="tabular-nums" style={{ color: MUTED }}>Drehen um den Startpunkt: {(tool.dirAngleDeg() ?? 0).toFixed(1).replace(".", ",")}° – Winkel eintippen, Shift rastet 15°. Strg+Z geht einen Schritt zurück.</p>
+            <p className="tabular-nums" style={{ color: MUTED }}>Drehen um den Startpunkt: {(tool.dirAngleDeg() ?? 0).toFixed(1).replace(".", ",")}° – Winkel eintippen oder im Eingabefeld ändern, Shift rastet 45° wie beim Wand-Drehen. Strg+Z geht einen Schritt zurück.</p>
           )}
           {warnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>
