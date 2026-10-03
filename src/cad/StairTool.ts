@@ -22,7 +22,7 @@ import { drawSnapDot } from "./snapDraw";
 import { drawStair } from "./stairDraw";
 import {
   computeStairGeometry, moveStairBoundary, resetStairTread, setStairWidth, riserFromRule, hitStair,
-  type P, type StairParams, setLandingDepth, landingDepthOf, translateStair, rotateStair, stairEditableEdges, MIN_TREAD_M, type StairEdge } from "./stairGeometry";
+  type P, type StairParams, setLandingDepth, landingDepthOf, translateStair, rotateStair, stairEditableEdges, MIN_TREAD_M, type StairEdge, extendStairPath, stairOuterPointIndex } from "./stairGeometry";
 import { serializeStair } from "./Scene";
 
 export type StairPhase = "start" | "dir" | "side" | "path" | "edit";
@@ -50,10 +50,10 @@ export interface StairToolSettings {
  */
 export type StairHandle =
   | { kind: "edge"; key: string; pos: P; edge: StairEdge }
-  | { kind: "point"; key: string; pos: P; pathIndex: number | null };
+  | { kind: "point"; key: string; pos: P; pathIndex: number | null; assocIndex?: number | null };
 
 /** Laufende Bearbeitung (über das kleine Punktmenü gestartet). */
-export type StairEditAction = "edge" | "movePoint" | "translate" | "rotate";
+export type StairEditAction = "edge" | "movePoint" | "translate" | "rotate" | "extend";
 
 export interface StairCanvasButtons {
   confirm: { x: number; y: number } | null;
@@ -195,7 +195,7 @@ export class StairTool {
     lines: [string, string][];
     canReset: boolean; resetHint?: string;
     /** Editierbare Werte (dieselben reinen Geometriefunktionen wie die Griffe). */
-    fields: { id: "tread" | "landing" | "width"; label: string; unit: "cm" | "m"; value: number; min: number }[];
+    fields: { id: "tread" | "diff" | "landing" | "width"; label: string; unit: "cm" | "m"; value: number; min: number; signed?: boolean }[];
   } {
     const h = this.selectedHandle();
     const p = this._draft;
@@ -208,9 +208,12 @@ export class StairTool {
       const diff = t.depth - p.treadDepthM;
       return {
         kind: "boundary",
-        lines: [["Standardauftritt", cm(p.treadDepthM)], ["Differenz", `${diff >= 0 ? "+" : ""}${cm(diff)}`]],
         canReset: Math.abs(diff) > 1e-6,
-        fields: [{ id: "tread", label: "Stufentiefe", unit: "cm", value: t.depth * 100, min: MIN_TREAD_M * 100 }],
+        lines: [["Standardauftritt", cm(p.treadDepthM)]],
+        fields: [
+          { id: "tread", label: "Stufentiefe", unit: "cm", value: t.depth * 100, min: MIN_TREAD_M * 100 },
+          { id: "diff", label: "Differenz", unit: "cm", value: diff * 100, min: (MIN_TREAD_M - p.treadDepthM) * 100, signed: true },
+        ],
       };
     }
     if (h.kind === "edge" && h.edge.kind === "landing") {
@@ -247,7 +250,7 @@ export class StairTool {
   }
 
   /** Zahleneingabe rechts — nutzt dieselben Funktionen wie „Kante bewegen“. Ein Undo-Schritt. */
-  setHandleValue(id: "tread" | "landing" | "width", value: number): boolean {
+  setHandleValue(id: "tread" | "diff" | "landing" | "width", value: number): boolean {
     const h = this.selectedHandle();
     const p = this._draft;
     if (!h || !p || h.kind !== "edge" || this.moving) return false;
@@ -255,6 +258,10 @@ export class StairTool {
     if (id === "tread" && h.edge.treadIndex != null) {
       const t = computeStairGeometry(p).treads[h.edge.treadIndex];
       next = t ? moveStairBoundary(p, h.edge.treadIndex, value / 100 - t.depth) : null;
+    } else if (id === "diff" && h.edge.treadIndex != null) {
+      // Neue Stufentiefe = Standardauftritt + Differenz (dieselbe Funktion wie „Kante bewegen“).
+      const t = computeStairGeometry(p).treads[h.edge.treadIndex];
+      next = t ? moveStairBoundary(p, h.edge.treadIndex, p.treadDepthM + value / 100 - t.depth) : null;
     } else if (id === "landing" && h.edge.knick != null) {
       next = setLandingDepth(p, h.edge.knick, value);
     } else if (id === "width") {
@@ -273,7 +280,9 @@ export class StairTool {
     const h = this.selectedHandle();
     if (!this._draft || !h) return false;
     if (action === "edge" && h.kind !== "edge") return false;
-    if (action === "movePoint" && !(h.kind === "point" && h.pathIndex != null)) return false;
+    if (action === "movePoint" && !(h.kind === "point" && (h.pathIndex ?? h.assocIndex) != null)) return false;
+    if (action === "extend" && !(h.kind === "point" && h.pathIndex === this._draft.path.length - 1)) return false;
+    this._ext = [];
     this.moving = true;
     this.action = action;
     this._moveBase = { ...this._draft, path: this._draft.path.map((q) => ({ ...q })) };
@@ -305,14 +314,18 @@ export class StairTool {
       }
       return true;
     }
-    const map: Record<string, StairEditAction> = { offset: "edge", move: "movePoint", translate: "translate", rotate: "rotate" };
+    const map: Record<string, StairEditAction> = { offset: "edge", move: "movePoint", translate: "translate", rotate: "rotate", insertPoint: "extend" };
     const a = map[action];
     return a ? this.startAction(a) : false;
   }
 
   private _menuActionsFor(h: StairHandle): string[] {
     if (h.kind === "edge") return ["offset", "translate", "rotate"].filter((a) => a !== "offset" || h.edge.kind !== "ref");
-    return h.pathIndex != null ? ["move", "translate", "rotate", "delete"] : ["translate", "rotate", "delete"];
+    if (h.pathIndex != null) {
+      const last = !!this._draft && h.pathIndex === this._draft.path.length - 1;
+      return last ? ["move", "translate", "rotate", "insertPoint", "delete"] : ["move", "translate", "rotate", "delete"];
+    }
+    return h.assocIndex != null ? ["move", "translate", "rotate", "delete"] : ["translate", "rotate", "delete"];
   }
 
   private _applyDraftToScene(): boolean {
@@ -339,7 +352,73 @@ export class StairTool {
     return this._applyDraftToScene();
   }
 
+  /** Laufende Ergänzung: bereits gesetzte neue Referenzpunkte. */
+  private _ext: P[] = [];
+  private _extCursor: P | null = null;
+
+  private _extPreview(withCursor: boolean): StairParams | null {
+    if (!this._moveBase) return null;
+    const pts = [...this._ext];
+    if (withCursor && this._extCursor) pts.push(this._extCursor);
+    return extendStairPath(this._moveBase, pts);
+  }
+
+  /** Shift richtet den neuen Lauf gerade bzw. orthogonal zum vorherigen Abschnitt aus. */
+  private _constrainExt(w: P): P {
+    const path = this._extPreview(false)?.path ?? [];
+    if (!this._shift || path.length < 2) return w;
+    const last = path[path.length - 1], prev = path[path.length - 2];
+    const L = Math.hypot(last.x - prev.x, last.y - prev.y) || 1;
+    const u = { x: (last.x - prev.x) / L, y: (last.y - prev.y) / L }, n = { x: -u.y, y: u.x };
+    const dx = w.x - last.x, dy = w.y - last.y;
+    const a = dx * u.x + dy * u.y, b = dx * n.x + dy * n.y;
+    return Math.abs(a) >= Math.abs(b) ? { x: last.x + u.x * a, y: last.y + u.y * a } : { x: last.x + n.x * b, y: last.y + n.y * b };
+  }
+
+  private _updateExtend(input: Input, pressed: boolean) {
+    const target = this._constrainExt(this._snap(input));
+    this._extCursor = target;
+    if (input.doubleClicked) {
+      input.doubleClicked = false; input.clicked = false;
+      this._finishExtend();
+      return;
+    }
+    // Klick/Tippen setzt einen Referenzpunkt; Fingerheben bestätigt nie.
+    if (input.clicked || (isTabletMode() && pressed)) {
+      input.clicked = false;
+      const path = this._extPreview(false)?.path ?? [];
+      const last = path[path.length - 1];
+      if (!last || Math.hypot(target.x - last.x, target.y - last.y) > 1e-3) this._ext.push(target);
+    }
+    const next = this._extPreview(true);
+    if (next) {
+      const g = computeStairGeometry(next);
+      this.lastWarnings = g.warnings;
+      this._draft = next;
+      this.moveDeltaM = this._extCursor && this._moveBase ? Math.hypot(target.x - this._moveBase.path[this._moveBase.path.length - 1].x, target.y - this._moveBase.path[this._moveBase.path.length - 1].y) : 0;
+    }
+  }
+
+  /** Doppelklick/Enter/✓: gesamte Ergänzung als genau ein Undo-Schritt. */
+  private _finishExtend(): boolean {
+    const next = this._ext.length ? this._extPreview(false) : this._extPreview(true);
+    if (!next || !this._moveBase || next.path.length === this._moveBase.path.length && next.path.every((q, i) => q.x === this._moveBase!.path[i].x && q.y === this._moveBase!.path[i].y)) {
+      this._cancelMove();
+      return true;
+    }
+    const g = computeStairGeometry(next);
+    this.lastWarnings = g.warnings;
+    if (!g.valid) { this._draft = next; return false; }
+    this._draft = next;
+    this._applyDraftToScene();
+    this.moving = false; this._moveBase = null; this._grab = null; this.moveDeltaM = 0; this.moveAngle = 0; this.action = null; this._regrab = false;
+    this._ext = []; this._extCursor = null;
+    this.selectedHandleKey = null;
+    return true;
+  }
+
   private _cancelMove() {
+    this._ext = []; this._extCursor = null;
     if (this._moveBase) this._draft = this._moveBase;
     this.moving = false; this._moveBase = null; this._grab = null; this.moveDeltaM = 0; this.moveAngle = 0; this.action = null; this._regrab = false;
   }
@@ -353,6 +432,7 @@ export class StairTool {
       return true;
     }
     if (this.phase === "path") return this._finishPath();
+    if (this.phase === "edit" && this.moving && this.action === "extend") return this._finishExtend();
     if (this.phase === "edit" && this.moving) {
       const ok = this._applyDraftToScene();
       if (!ok) { this._cancelMove(); return true; }
@@ -592,7 +672,9 @@ export class StairTool {
     const hs: StairHandle[] = [];
     for (const e of stairEditableEdges(p, g)) {
       hs.push({ kind: "edge", key: `e:${e.key}`, pos: { x: (e.a.x + e.b.x) / 2, y: (e.a.y + e.b.y) / 2 }, edge: e });
-      for (const q of [e.a, e.b]) if (!pts.has(key(q))) pts.set(key(q), { kind: "point", key: `c${key(q)}`, pos: q, pathIndex: null });
+      ([[e.a, "a"], [e.b, "b"]] as const).forEach(([q, end]) => {
+        if (!pts.has(key(q))) pts.set(key(q), { kind: "point", key: `c:${e.key}:${end}`, pos: q, pathIndex: null, assocIndex: stairOuterPointIndex(p, q) });
+      });
     }
     return [...pts.values(), ...hs];
   }
@@ -629,7 +711,8 @@ export class StairTool {
       const left = !!input.mouse.left;
       const pressed = left && !this._prevLeft;
       this._prevLeft = left;
-      this._setCursor(this.action === "rotate" ? "crosshair" : "move");
+      this._setCursor(this.action === "rotate" ? "crosshair" : this.action === "extend" ? "crosshair" : "move");
+      if (this.action === "extend") { this._updateExtend(input, pressed); return; }
       const h = this.handlesFor(this._moveBase).find((x) => x.key === this.selectedHandleKey);
       const w = this._snap(input);
       // Tablet: erstes Aufsetzen legt nur den Greifpunkt fest.
@@ -662,10 +745,11 @@ export class StairTool {
           if (e.kind === "boundary") next = moveStairBoundary(base, e.treadIndex!, this.moveDeltaM);
           else if (e.kind === "width") next = setStairWidth(base, Math.round((base.stairWidthM + this.moveDeltaM) * 1000) / 1000);
           else if (e.kind === "landing") next = setLandingDepth(base, e.knick!, landingDepthOf(base, e.knick!) + this.moveDeltaM);
-        } else if (this.action === "movePoint" && h.kind === "point" && h.pathIndex != null) {
+        } else if (this.action === "movePoint" && h.kind === "point" && (h.pathIndex ?? h.assocIndex) != null) {
+          const idx = (h.pathIndex ?? h.assocIndex)!;
           const d = this._constrainDelta(raw.x, raw.y, base);
           this.moveDeltaM = Math.hypot(d.x, d.y);
-          next = { ...base, path: base.path.map((q, i) => (i === h.pathIndex ? { x: q.x + d.x, y: q.y + d.y } : q)) };
+          next = { ...base, path: base.path.map((q, i) => (i === idx ? { x: q.x + d.x, y: q.y + d.y } : q)) };
         } else if (this.action === "translate") {
           const d = this._constrainDelta(raw.x, raw.y, base);
           this.moveDeltaM = Math.hypot(d.x, d.y);
@@ -705,7 +789,14 @@ export class StairTool {
         // Fangpunkt antippen = auswählen + kleines Punktmenü direkt am Punkt.
         this.selectedHandleKey = hover.key;
         const sp = this.app.camera.worldToScreen(hover.pos.x, hover.pos.y);
-        try { this.app.pointEditMenu.showAt(sp.x, sp.y, this._menuActionsFor(hover)); } catch { /* optional */ }
+        try {
+          const btn = (this.app.pointEditMenu as any).buttonsByAction?.insertPoint as HTMLButtonElement | undefined;
+          if (btn) {
+            if (btn.dataset.stairOrigTitle == null) btn.dataset.stairOrigTitle = btn.title || "";
+            btn.title = "Podest / Lauf ergänzen"; btn.setAttribute("aria-label", "Podest / Lauf ergänzen");
+          }
+          this.app.pointEditMenu.showAt(sp.x, sp.y, this._menuActionsFor(hover));
+        } catch { /* optional */ }
         return;
       }
       try { this.app.pointEditMenu?.hide?.(); } catch { /* optional */ }

@@ -29,6 +29,8 @@ export interface StairParams {
 }
 
 export const MIN_TREAD_M = 0.12;
+/** Größte zulässige Anpassung je Auftritt beim Verteilen einer Restlänge vor einem Podest. */
+export const MAX_TREAD_ADJUST_M = 0.03;
 const EPS = 1e-7;
 
 /* ------------------------------------------------------------ Schrittmaß */
@@ -96,6 +98,8 @@ export interface StairGeometry {
   totalRunM: number;
   totalHeightM: number;
   remainderM: number;
+  /** Tatsächlich verwendeter (mittlerer) Auftritt der Normstufen. */
+  usedTreadM: number;
   /** Innere Teilungskanten (bearbeitbare Griffe). */
   boundaries: StairBoundary[];
   /** Lauflinie (Pfeil): Start → Ende in Gehrichtung. */
@@ -135,7 +139,7 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
   const warnings: string[] = [];
   const out: StairGeometry = {
     valid: true, warnings, treads: [], landings: [], treadCount: 0, riserCount: 0,
-    totalRunM: 0, totalHeightM: 0, remainderM: 0, boundaries: [], walkLine: [],
+    totalRunM: 0, totalHeightM: 0, remainderM: 0, usedTreadM: p.treadDepthM, boundaries: [], walkLine: [],
     snapPoints: [], snapLines: [], outline: [], firstTreadEdges: null,
   };
   const path = (p.path || []).filter((q, i, arr) => i === 0 || len(sub(q, arr[i - 1])) > EPS);
@@ -170,11 +174,38 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
     }
     const d = dirs[r], o = offs[r];
     const base = add(path[r], mul(d, startCut));
+    // 1) Volle Auftritte bestimmen.
+    const runStart = treadIdx;
+    const depths: number[] = [];
+    let s0 = 0;
+    while (true) {
+      const dep = depthAt(p, runStart + depths.length);
+      if (s0 + dep > usable + 1e-6) break;
+      depths.push(dep); s0 += dep;
+    }
+    let rest = Math.max(0, usable - s0);
+    // 2) Läufe an einem Podest: kleine Restdifferenz gleichmäßig auf die
+    //    Standardauftritte verteilen – lückenlos, keine Teilstufe, Podest bleibt Mindestmaß.
+    if (segCount > 1 && rest > 1e-4 && depths.length) {
+      const isFree = (j: number) => !((p.stepDistancesM?.[runStart + j] ?? 0) > 0);
+      const free = depths.map((_, j) => isFree(j));
+      const k = free.filter(Boolean).length;
+      if (k > 0) {
+        const up = rest / k;
+        const down = !p.stepDistancesM ? (p.treadDepthM - rest) / (k + 1) : Infinity;
+        if (down < up && down <= MAX_TREAD_ADJUST_M && p.treadDepthM - down >= MIN_TREAD_M) {
+          depths.push(p.treadDepthM); free.push(true);
+          for (let j = 0; j < depths.length; j++) if (free[j]) depths[j] -= down;
+          rest = 0;
+        } else if (up <= MAX_TREAD_ADJUST_M) {
+          for (let j = 0; j < depths.length; j++) if (free[j]) depths[j] += up;
+          rest = 0;
+        }
+      }
+    }
     let s = 0;
     let runTreads = 0;
-    while (true) {
-      const dep = depthAt(p, treadIdx);
-      if (s + dep > usable + 1e-6) break;
+    for (const dep of depths) {
       const a = add(base, mul(d, s)), b = add(base, mul(d, s + dep));
       const poly = [a, b, add(b, o), add(a, o)];
       out.treads.push({
@@ -186,14 +217,13 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
       }
       s += dep; cum += dep; treadIdx++; runTreads++;
     }
-    const rest = Math.max(0, usable - s);
     restOf[r] = rest;
-    // Kein stilles Aufblasen: Rest wird angezeigt; vor einem Podest macht er die Treppe ungültig.
     out.remainderM += rest;
     if (r < segCount - 1 && rest > 1e-4) {
       out.valid = false;
-      warnings.push(`Lauf ${r + 1}: Restlänge ${(rest * 100).toFixed(1)} cm vor Podest ${r + 1} – Referenzlinie anpassen, Podest bewusst vergrößern oder Auftritt ändern.`);
+      warnings.push(`Lauf ${r + 1}: Restlänge ${(rest * 100).toFixed(1)} cm lässt sich nicht regelkonform auf die Auftritte verteilen – Referenzlinie anpassen, Podest bewusst vergrößern oder Auftritt ändern.`);
     }
+
     if ((r === 0 || r === segCount - 1) && runTreads === 0) {
       out.valid = false;
       warnings.push(`Lauf ${r + 1}: kein voller Auftritt möglich.`);
@@ -228,6 +258,8 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
   // Jeder Lauf hat Auftritte + 1 Steigungen; ein Podest ist eine Stufenebene.
   out.riserCount = out.treadCount > 0 ? out.treadCount + out.landings.length + (p.riserExtra ?? 1) : 0;
   out.totalRunM = cum;
+  const norm0 = out.treads.filter((t) => !t.isLanding);
+  if (norm0.length) out.usedTreadM = norm0.reduce((a, t) => a + t.depth, 0) / norm0.length;
   out.totalHeightM = out.riserCount * (p.riserHeightM || 0);
 
   // Erste Stufe: linke/rechte Kante (Bezug der Referenzlinie).
@@ -343,7 +375,7 @@ export function setStairWidth(p: StairParams, widthM: number): StairParams | nul
 const cm = (m: number) => (Math.round(m * 1000) / 10).toLocaleString("de-DE", { maximumFractionDigits: 1 });
 
 export function stairLabelLines(p: StairParams, g: StairGeometry, showWidth: boolean): string[] {
-  const lines = [`${g.riserCount} STG`, `${cm(p.riserHeightM)} / ${cm(p.treadDepthM)} cm`];
+  const lines = [`${g.riserCount} STG`, `${cm(p.riserHeightM)} / ${cm(g.usedTreadM ?? p.treadDepthM)} cm`];
   if (showWidth) lines.push(`B = ${p.stairWidthM.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`);
   return lines;
 }
@@ -450,4 +482,38 @@ export function stairEditableEdges(p: StairParams, g: StairGeometry = computeSta
     }
   }
   return out;
+}
+
+/* ------------------------------------------- Podest / Lauf ergänzen */
+
+/** Entfernt doppelte und kollineare Zwischenpunkte (gerade Verlängerung = kein Podest). */
+export function simplifyStairPath(path: P[]): P[] {
+  const pts = path.filter((q, i, a) => i === 0 || len(sub(q, a[i - 1])) > 1e-6);
+  const out: P[] = [];
+  for (const q of pts) {
+    while (out.length >= 2) {
+      const a = out[out.length - 2], b = out[out.length - 1];
+      const u = norm(sub(b, a)), w = norm(sub(q, b));
+      if (Math.abs(u.x * w.y - u.y * w.x) < 1e-6 && u.x * w.x + u.y * w.y > 0) out.pop(); else break;
+    }
+    out.push(q);
+  }
+  return out;
+}
+
+/** Hängt am Ende der Referenzlinie weitere Punkte an; bestehende Podesttiefen bleiben. */
+export function extendStairPath(p: StairParams, extra: P[]): StairParams {
+  const path = simplifyStairPath([...p.path, ...extra].map((q) => ({ x: q.x, y: q.y })));
+  return { ...p, path, mode: path.length > 2 ? "landing" : "straight" };
+}
+
+/**
+ * Außenpunkt → zugehöriger Referenzpunkt (Laufanfang/-ende, Knick).
+ * null, wenn der Punkt keinem Referenzpunkt eindeutig zugeordnet ist.
+ */
+export function stairOuterPointIndex(p: StairParams, q: P): number | null {
+  let best: number | null = null, bd = Infinity;
+  const lim = Math.hypot(p.stairWidthM, Math.max(p.stairWidthM, ...p.path.map((_, i) => landingDepthOf(p, i)))) + 1e-6;
+  p.path.forEach((r, i) => { const d = len(sub(q, r)); if (d < bd) { bd = d; best = i; } });
+  return best != null && bd <= lim && bd > 1e-6 ? best : null;
 }
