@@ -287,7 +287,7 @@ export function moveStairBoundary(p: StairParams, treadIndex: number, deltaM: nu
   const path = p.path.map((q, i) => (i > r ? add(q, mul(d, deltaM)) : { x: q.x, y: q.y }));
   const res: StairParams = { ...p, path, stepDistancesM: dists };
   const g2 = computeStairGeometry(res);
-  if (!g2.valid || g2.treadCount !== g.treadCount) return null;
+  if (!g2.valid || g2.treads.length !== g.treads.length) return null;
   return res;
 }
 
