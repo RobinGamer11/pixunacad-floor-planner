@@ -189,6 +189,61 @@ export class StairTool {
     return this.editId ? (this.app.scene as any).getStairById?.(this.editId) ?? null : null;
   }
 
+  /**
+   * Strg+Z während des Zeichnens/Bewegens: nimmt nur den letzten lokalen
+   * Schritt zurück (Referenzpunkt, Phase, laufende Bewegung). Rückgabe true =
+   * behandelt, der globale CAD-Verlauf bleibt unberührt.
+   */
+  undoStep(): boolean {
+    if (this.phase === "edit") {
+      if (this.moving) { this._cancelMove(); return true; }
+      return false;
+    }
+    if (this.phase === "path") {
+      if (this._path.length > 1) { this._path.pop(); return true; }
+      this._path = []; this._pendingSide = null; this.phase = "side"; return true;
+    }
+    if (this.phase === "side") { this._pendingSide = null; this.phase = "dir"; return true; }
+    if (this.phase === "dir") { this._start = null; this.phase = "start"; this._angleText = ""; return true; }
+    return false;
+  }
+
+  /** Nach Undo/Redo der Szene: Entwurf auf den wiederhergestellten Stand setzen. */
+  afterHistoryRestore() {
+    if (this.phase !== "edit") return;
+    const st = this.editStair();
+    if (!st) { this._endEdit(); this.phase = "start"; return; }
+    this._draft = serializeStair(st);
+    this.selectedHandleKey = null;
+    this.moving = false; this._moveBase = null; this._grab = null;
+  }
+
+  /* ---------------------------------------------- Schritt 02: Winkel-Eingabe */
+  private _angleText = "";
+  /** Eingetippter Winkel (Grad) in Schritt 02, wie beim Wand-Drehen. */
+  get angleInput() { return this._angleText; }
+  /** Tastatur in Schritt 02: Ziffern setzen den Winkel direkt. Rückgabe: behandelt. */
+  angleKey(key: string): boolean {
+    if (this.phase !== "dir" || !this._start) return false;
+    if (/^[0-9]$/.test(key) || ((key === "," || key === ".") && !/[.,]/.test(this._angleText)) || (key === "-" && !this._angleText)) {
+      this._angleText += key;
+    } else if (key === "Backspace" && this._angleText) {
+      this._angleText = this._angleText.slice(0, -1);
+    } else return false;
+    const n = parseFloat(this._angleText.replace(",", "."));
+    if (Number.isFinite(n)) {
+      // 0° = nach rechts, positiv gegen den Uhrzeigersinn (Bildschirm, y nach unten).
+      const a = -n * Math.PI / 180;
+      this._dir = { x: Math.cos(a), y: Math.sin(a) };
+    }
+    return true;
+  }
+  /** Aktueller Laufwinkel in Grad (0–360). */
+  dirAngleDeg(): number | null {
+    if (!this._dir) return null;
+    return ((-Math.atan2(this._dir.y, this._dir.x) * 180 / Math.PI) % 360 + 360) % 360;
+  }
+
   selectedHandle(): StairHandle | null {
     if (!this._draft || !this.selectedHandleKey) return null;
     return this.handlesFor(this._draft).find((h) => h.key === this.selectedHandleKey) ?? null;
