@@ -26,6 +26,29 @@ export interface StairParams {
   /** Zusätzliche Steigungen gegenüber den Auftritten (üblich: 1). */
   riserExtra?: number;
   direction: "up" | "down";
+  /** Knickausbildung je Knick (Schlüssel = Knickindex); fehlend = Podest. */
+  knickModes?: Record<number, KnickMode> | null;
+  /** Anzahl gewendelter Stufen je gewendeltem Knick (Standard 3). */
+  winderCount?: number | null;
+  /** Projekt-Standard: Mindestauftritt der Wendelstufen an der inneren Schmalstelle. */
+  minWinderInnerTreadM?: number | null;
+}
+
+export type KnickMode = "landing" | "winder";
+export const DEFAULT_WINDER_COUNT = 3;
+/** Konfigurierbarer Projekt-Standard (keine Normzusage). */
+export const DEFAULT_MIN_WINDER_INNER_TREAD_M = 0.10;
+/** Abstand der inneren Schmalstelle vom inneren Eckpunkt (Messlinie). */
+export const WINDER_INNER_MEASURE_M = 0.30;
+
+export function knickModeOf(p: StairParams, k: number): KnickMode {
+  return p.knickModes?.[k] === "winder" ? "winder" : "landing";
+}
+export function setKnickMode(p: StairParams, k: number, mode: KnickMode): StairParams | null {
+  if (k <= 0 || k >= (p.path?.length ?? 0) - 1) return null;
+  const m: Record<number, KnickMode> = { ...(p.knickModes || {}) };
+  if (mode === "landing") delete m[k]; else m[k] = mode;
+  return { ...p, knickModes: Object.keys(m).length ? m : null };
 }
 
 export const MIN_TREAD_M = 0.12;
@@ -68,7 +91,7 @@ function lineIntersect(p: P, d: P, q: P, e: P): P | null {
 
 /* ------------------------------------------------------------ Geometrie */
 
-export interface StairTread { index: number; run: number; poly: P[]; depth: number; center: P; /** Abweichender, sehr tiefer Auftritt = Zwischenpodest im Lauf. */ isLanding?: boolean }
+export interface StairTread { index: number; run: number; poly: P[]; depth: number; center: P; /** Abweichender, sehr tiefer Auftritt = Zwischenpodest im Lauf. */ isLanding?: boolean; /** Gewendelte Stufe am Knick (index = -1, nicht einzeln editierbar). */ isWinder?: boolean; knick?: number }
 export interface StairLanding {
   /** Knickindex der Referenzlinie; -1 = Zwischenpodest im geraden Lauf. */
   knick: number;
@@ -79,6 +102,9 @@ export interface StairLanding {
   widthM: number;
   /** Globaler Auftrittsindex (nur Zwischenpodest). */
   treadIndex?: number;
+  /** Anschlusskanten am Eckpodest: Zulauf (letzte Stufe endet hier) / Abgang. */
+  entryEdge?: [P, P];
+  exitEdge?: [P, P];
 }
 export interface StairBoundary {
   /** Index des davorliegenden Auftritts (global). */
@@ -160,18 +186,68 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
   const offs = dirs.map((d) => mul(rightOf(d), w * sideSign));
   const landingDepthAt = (k: number) => landingDepthOf(p, k);
 
+  /** Ein Knick = genau eine Fläche: Bezug außen → Lauf endet Tiefe vor dem Knick;
+   *  Bezug innen → das Podest liegt jenseits der Bezugslinie (Kürzung = Tiefe − Laufbreite). */
+  const isOuterRef = (k: number) => offs[k - 1].x * dirs[k].x + offs[k - 1].y * dirs[k].y >= 0;
+  const depthAtKnick = (k: number) => (knickModeOf(p, k) === "winder" ? w : landingDepthAt(k));
+  const cutAt = (k: number) => (isOuterRef(k) ? depthAtKnick(k) : depthAtKnick(k) - w);
+  const minInner = p.minWinderInnerTreadM && p.minWinderInnerTreadM > 0 ? p.minWinderInnerTreadM : DEFAULT_MIN_WINDER_INNER_TREAD_M;
+  const buildKnick = (r: number) => {
+    const k = path[r];
+    const d1 = dirs[r - 1], d2 = dirs[r];
+    const cut = cutAt(r);
+    const refEnd = sub(k, mul(d1, cut));
+    const outEnd = add(refEnd, offs[r - 1]);
+    const refStart = add(k, mul(d2, cut));
+    const outStart = add(refStart, offs[r]);
+    const x = lineIntersect(outEnd, d1, outStart, d2) ?? outEnd;
+    const raw = [refEnd, outEnd, x, outStart, refStart, k];
+    const poly = raw.filter((q, i) => len(sub(q, raw[(i + raw.length - 1) % raw.length])) > 1e-6);
+    const c = poly.reduce((acc, q) => add(acc, q), { x: 0, y: 0 });
+    if (knickModeOf(p, r) !== "winder") {
+      out.landings.push({ knick: r, poly, center: mul(c, 1 / poly.length), depthM: depthAtKnick(r), widthM: w,
+        entryEdge: [refEnd, outEnd], exitEdge: [refStart, outStart] });
+      return;
+    }
+    // Gewendelt: Strahlen vom inneren Eckpunkt teilen die Knickfläche lückenlos.
+    const outer = isOuterRef(r);
+    const I = outer ? x : k;
+    const O = outer ? k : x;
+    const Eo = outer ? refEnd : outEnd;
+    const Xo = outer ? refStart : outStart;
+    const l1 = len(sub(O, Eo)), l2 = len(sub(Xo, O)), L = l1 + l2;
+    const n = Math.max(2, Math.round(p.winderCount ?? DEFAULT_WINDER_COUNT));
+    const at = (t: number): P => (t <= l1 ? add(Eo, mul(sub(O, Eo), l1 ? t / l1 : 0)) : add(O, mul(sub(Xo, O), l2 ? (t - l1) / l2 : 0)));
+    for (let i = 0; i < n; i++) {
+      const t0 = (L * i) / n, t1 = (L * (i + 1)) / n;
+      const pa = at(t0), pb = at(t1);
+      const wpoly = [I, pa, ...(t0 < l1 - 1e-9 && t1 > l1 + 1e-9 ? [O] : []), pb];
+      const cc = wpoly.reduce((acc, q) => add(acc, q), { x: 0, y: 0 });
+      // Auftritt auf der Lauflinie (Laufbreite/2 vom inneren Eckpunkt) und an der Schmalstelle.
+      const ua = norm(sub(pa, I)), ub = norm(sub(pb, I));
+      const chord = (rad: number) => len(sub(mul(ub, rad), mul(ua, rad)));
+      out.treads.push({ index: -1, run: r, poly: wpoly, depth: chord(w / 2), center: mul(cc, 1 / wpoly.length), isWinder: true, knick: r });
+      if (chord(Math.min(WINDER_INNER_MEASURE_M, w / 2)) < minInner - 1e-6) {
+        out.valid = false;
+        warnings.push(`Knick ${r}: gewendelte Stufe ${i + 1} ist an der inneren Schmalstelle schmaler als ${(minInner * 100).toFixed(0)} cm (Projekt-Standard).`);
+      }
+      cum += chord(w / 2);
+    }
+  };
+
   let treadIdx = 0;
   let cum = 0;
   const restOf: number[] = [];
   for (let r = 0; r < segCount; r++) {
-    const startCut = r > 0 ? landingDepthAt(r) : 0;
-    const endCut = r < segCount - 1 ? landingDepthAt(r + 1) : 0;
+    const startCut = r > 0 ? cutAt(r) : 0;
+    const endCut = r < segCount - 1 ? cutAt(r + 1) : 0;
     const usable = lens[r] - startCut - endCut;
     if (usable < -EPS) {
       out.valid = false;
       warnings.push(`Lauf ${r + 1}: Länge reicht nicht für das Podest (mindestens ${(startCut + endCut).toFixed(2)} m).`);
       continue;
     }
+    if (r > 0) buildKnick(r);
     const d = dirs[r], o = offs[r];
     const base = add(path[r], mul(d, startCut));
     // 1) Volle Auftritte bestimmen.
@@ -228,28 +304,13 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
       out.valid = false;
       warnings.push(`Lauf ${r + 1}: kein voller Auftritt möglich.`);
     }
-    if (r > 0) {
-      // Podest am Knick r: Ende von Lauf r-1, Anfang von Lauf r.
-      const k = path[r];
-      const d1 = dirs[r - 1], d2 = dirs[r];
-      const entryDepth = landingDepthAt(r);
-      const refEnd = sub(k, mul(d1, entryDepth));
-      const outEnd = add(refEnd, offs[r - 1]);
-      const refStart = add(k, mul(d2, landingDepthAt(r)));
-      const outStart = add(refStart, offs[r]);
-      const x = lineIntersect(outEnd, d1, outStart, d2);
-      const raw = [refEnd, k, refStart, outStart, ...(x ? [x] : []), outEnd];
-      const poly = raw.filter((q, i) => len(sub(q, raw[(i + raw.length - 1) % raw.length])) > 1e-6);
-      const c = poly.reduce((acc, q) => add(acc, q), { x: 0, y: 0 });
-      out.landings.push({ knick: r, poly, center: mul(c, 1 / poly.length), depthM: entryDepth, widthM: w });
-    }
   }
   if (segCount === 1 && out.remainderM > 1e-4) {
     warnings.push(`Restlänge ${(out.remainderM * 100).toFixed(1)} cm ergibt keine volle Stufe.`);
   }
   // Stark abweichende Auftritte werden automatisch zu Zwischenpodesten.
   for (const t of out.treads) {
-    if (t.depth > p.treadDepthM * 1.5 + 1e-6) {
+    if (!t.isWinder && t.depth > p.treadDepthM * 1.5 + 1e-6) {
       t.isLanding = true;
       out.landings.push({ knick: -1, poly: t.poly, center: t.center, depthM: t.depth, widthM: w, treadIndex: t.index });
     }
@@ -258,7 +319,7 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
   // Jeder Lauf hat Auftritte + 1 Steigungen; ein Podest ist eine Stufenebene.
   out.riserCount = out.treadCount > 0 ? out.treadCount + out.landings.length + (p.riserExtra ?? 1) : 0;
   out.totalRunM = cum;
-  const norm0 = out.treads.filter((t) => !t.isLanding);
+  const norm0 = out.treads.filter((t) => !t.isLanding && !t.isWinder);
   if (norm0.length) out.usedTreadM = norm0.reduce((a, t) => a + t.depth, 0) / norm0.length;
   out.totalHeightM = out.riserCount * (p.riserHeightM || 0);
 
@@ -330,13 +391,13 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
  */
 export function moveStairBoundary(p: StairParams, treadIndex: number, deltaM: number): StairParams | null {
   const g = computeStairGeometry(p);
-  const tread = g.treads[treadIndex];
+  const tread = g.treads.find((t) => t.index === treadIndex)!;
   if (!tread) return null;
-  const next = g.treads[treadIndex + 1];
+  const next = g.treads.find((t) => t.index === treadIndex + 1);
   if (!next || next.run !== tread.run) return null;
   const newDepth = tread.depth + deltaM;
   if (newDepth < MIN_TREAD_M - 1e-9) return null;
-  const dists = g.treads.map((t) => t.depth);
+  const dists = g.treads.filter((t) => !t.isWinder).map((t) => t.depth);
   dists[treadIndex] = newDepth;
   const r = tread.run;
   const d = norm(sub(p.path[r + 1], p.path[r]));
@@ -350,11 +411,11 @@ export function moveStairBoundary(p: StairParams, treadIndex: number, deltaM: nu
 /** Setzt einen Auftritt auf den Standard zurück; Folgestufen wandern mit. */
 export function resetStairTread(p: StairParams, treadIndex: number): StairParams | null {
   const g = computeStairGeometry(p);
-  const t = g.treads[treadIndex];
+  const t = g.treads.find((t) => t.index === treadIndex)!;
   if (!t) return null;
   const delta = p.treadDepthM - t.depth;
   if (Math.abs(delta) < 1e-9) return null;
-  const dists = g.treads.map((x) => x.depth);
+  const dists = g.treads.filter((x) => !x.isWinder).map((x) => x.depth);
   dists[treadIndex] = p.treadDepthM;
   const r = t.run;
   const d = norm(sub(p.path[r + 1], p.path[r]));
@@ -446,7 +507,7 @@ export function stairEditableEdges(p: StairParams, g: StairGeometry = computeSta
   const out: StairEdge[] = [];
   for (const b of g.boundaries) out.push({ key: `b${b.treadIndex}`, kind: "boundary", a: b.a, b: b.b, dir: b.dir, treadIndex: b.treadIndex });
   const runs = new Map<number, StairTread[]>();
-  for (const t of g.treads) { if (!runs.has(t.run)) runs.set(t.run, []); runs.get(t.run)!.push(t); }
+  for (const t of g.treads) { if (t.isWinder) continue; if (!runs.has(t.run)) runs.set(t.run, []); runs.get(t.run)!.push(t); }
   for (const [r, ts] of runs) {
     const f = ts[0].poly, l = ts[ts.length - 1].poly; // [a, b, b+o, a+o]
     const nrm = norm(sub(f[3], f[0]));
@@ -461,19 +522,18 @@ export function stairEditableEdges(p: StairParams, g: StairGeometry = computeSta
     const poly = L.poly;
     const kp = p.path[k];
     const near = (u: P, w: P) => len(sub(u, w)) < 1e-6;
-    const refEnd = poly[0];
-    const refStart = sub(kp, mul(d2, -landingDepthOf(p, k)));
-    const perp = (e: P, d: P) => Math.abs(e.x * d.x + e.y * d.y) < 1e-6;
+    const same = (a: P, b: P, e?: [P, P]) => !!e && ((near(a, e[0]) && near(b, e[1])) || (near(a, e[1]) && near(b, e[0])));
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i], b = poly[(i + 1) % poly.length];
-      if (near(a, kp) || near(b, kp)) continue; // Bezugsseiten am Knick
-      const e = norm(sub(b, a));
-      if ((near(a, refEnd) || near(b, refEnd)) && perp(e, d1)) {
+      if (same(a, b, L.entryEdge)) {
         out.push({ key: `l${k}in`, kind: "landing", a, b, dir: mul(d1, -1), knick: k });
-      } else if ((near(a, refStart) || near(b, refStart)) && perp(e, d2)) {
+      } else if (same(a, b, L.exitEdge)) {
         out.push({ key: `l${k}out`, kind: "landing", a, b, dir: d2, knick: k });
+      } else if (near(a, kp) || near(b, kp)) {
+        continue; // Bezugsseiten am Knick
       } else {
         // Außenseite: Normale vom Podestzentrum weg → Breite.
+        const e = norm(sub(b, a));
         let n = { x: -e.y, y: e.x };
         const m = mul(add(a, b), 0.5);
         if ((m.x - L.center.x) * n.x + (m.y - L.center.y) * n.y < 0) n = mul(n, -1);

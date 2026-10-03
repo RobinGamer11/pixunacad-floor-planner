@@ -986,6 +986,10 @@ export class Stair {
   landingDepthM: number | null = null;
   /** Podesttiefe je Knick (rückwärtskompatibel; fehlend = Laufbreite). */
   landingDepthsM: Record<number, number> | null = null;
+  /** Knickausbildung je Knick ("winder" = gewendelt; fehlend = Podest). */
+  knickModes: Record<number, "landing" | "winder"> | null = null;
+  winderCount: number | null = null;
+  minWinderInnerTreadM: number | null = null;
   direction: "up" | "down" = "up";
   showArrow = true;
   showCircle = true;
@@ -1002,6 +1006,7 @@ export class Stair {
     this.path = (init.path || []).map(p => v(p.x, p.y));
     this.stepDistancesM = Array.isArray(init.stepDistancesM) ? [...init.stepDistancesM] : null;
     this.landingDepthsM = init.landingDepthsM && typeof init.landingDepthsM === "object" ? { ...init.landingDepthsM } : null;
+    this.knickModes = init.knickModes && typeof init.knickModes === "object" ? { ...init.knickModes } : null;
   }
 }
 
@@ -1015,6 +1020,8 @@ export function serializeStair(s: Stair): any {
     stepDistancesM: s.stepDistancesM ? [...s.stepDistancesM] : null,
     landingDepthM: s.landingDepthM,
     landingDepthsM: s.landingDepthsM ? { ...s.landingDepthsM } : null,
+    knickModes: s.knickModes ? { ...s.knickModes } : null,
+    winderCount: s.winderCount ?? null, minWinderInnerTreadM: s.minWinderInnerTreadM ?? null,
     direction: s.direction,
     showArrow: s.showArrow, showCircle: s.showCircle, showLabel: s.showLabel, showWidth: s.showWidth,
     color: s.color, lineWidthPx: s.lineWidthPx,
@@ -1851,6 +1858,7 @@ export class Scene {
   getStairsByLabelId(labelId: string): Stair[] { return this.stairs.filter(s => s.labelId === labelId); }
   removeStair(st: Stair) { this.stairs = this.stairs.filter(s => s !== st); }
   removeStairsByLabelId(labelId: string) { this.stairs = this.stairs.filter(s => s.labelId !== labelId); }
+  assignStairsToLabel(ids: string[], labelId: string) { const set = new Set(ids); for (const s of this.stairs) if (set.has(s.id)) s.labelId = labelId; }
   reassignStairsLabel(oldId: string, newId: string) { for (const s of this.stairs) if (s.labelId === oldId) s.labelId = newId; }
 
   // ---- Doors (Türen) ----
