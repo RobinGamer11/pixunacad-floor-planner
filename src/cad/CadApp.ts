@@ -1340,10 +1340,13 @@ export class CadApp {
 
   undo() {
     if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
+    // Treppe: laufendes Zeichnen/Bewegen nimmt zuerst den lokalen Schritt zurück.
+    if ((this.activeTool as any) === this.stairTool && this.stairTool.undoStep()) { this.renderer?.render?.(); return; }
     this._maybeSnapshot();
     if (this._historyIndex <= 0) return;
     this._historyIndex--;
     this._restoreScene(this._history[this._historyIndex]);
+    this.stairTool?.afterHistoryRestore?.();
     this._emitHistoryChange();
   }
 
@@ -1351,6 +1354,7 @@ export class CadApp {
     if (this._historyIndex >= this._history.length - 1) return;
     this._historyIndex++;
     this._restoreScene(this._history[this._historyIndex]);
+    this.stairTool?.afterHistoryRestore?.();
     this._emitHistoryChange();
   }
 
@@ -2505,6 +2509,16 @@ export class CadApp {
 
       if (e.key === "Enter" && (this.activeTool as any) === this.stairTool && !isHubInput) {
         if (this.stairTool.confirm()) { e.preventDefault(); return; }
+      }
+      // Schritt 02: Winkel per Tastatur (Grad) wie beim Wand-Drehen.
+      if ((this.activeTool as any) === this.stairTool && !isHubInput && !e.ctrlKey && !e.metaKey
+        && !["input", "textarea", "select"].includes(tag) && this.stairTool.angleKey(e.key)) {
+        e.preventDefault(); this.renderer?.render?.(); return;
+      }
+      // Beim Zeichnen der Referenzlinie nimmt die Rücktaste den letzten Punkt zurück.
+      if (e.key === "Backspace" && (this.activeTool as any) === this.stairTool && !isHubInput
+        && !["input", "textarea", "select"].includes(tag) && this.stairTool.phase === "path") {
+        if (this.stairTool.undoStep()) { e.preventDefault(); this.renderer?.render?.(); return; }
       }
       if ((e.key === "Delete" || e.key === "Backspace") && (this.activeTool as any) === this.stairTool && !isHubInput
         && this.stairTool.phase === "edit" && !this.stairTool.moving) {

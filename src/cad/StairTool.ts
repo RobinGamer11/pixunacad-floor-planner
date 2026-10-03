@@ -189,6 +189,61 @@ export class StairTool {
     return this.editId ? (this.app.scene as any).getStairById?.(this.editId) ?? null : null;
   }
 
+  /**
+   * Strg+Z während des Zeichnens/Bewegens: nimmt nur den letzten lokalen
+   * Schritt zurück (Referenzpunkt, Phase, laufende Bewegung). Rückgabe true =
+   * behandelt, der globale CAD-Verlauf bleibt unberührt.
+   */
+  undoStep(): boolean {
+    if (this.phase === "edit") {
+      if (this.moving) { this._cancelMove(); return true; }
+      return false;
+    }
+    if (this.phase === "path") {
+      if (this._path.length > 1) { this._path.pop(); return true; }
+      this._path = []; this._pendingSide = null; this.phase = "side"; return true;
+    }
+    if (this.phase === "side") { this._pendingSide = null; this.phase = "dir"; return true; }
+    if (this.phase === "dir") { this._start = null; this.phase = "start"; this._angleText = ""; return true; }
+    return false;
+  }
+
+  /** Nach Undo/Redo der Szene: Entwurf auf den wiederhergestellten Stand setzen. */
+  afterHistoryRestore() {
+    if (this.phase !== "edit") return;
+    const st = this.editStair();
+    if (!st) { this._endEdit(); this.phase = "start"; return; }
+    this._draft = serializeStair(st);
+    this.selectedHandleKey = null;
+    this.moving = false; this._moveBase = null; this._grab = null;
+  }
+
+  /* ---------------------------------------------- Schritt 02: Winkel-Eingabe */
+  private _angleText = "";
+  /** Eingetippter Winkel (Grad) in Schritt 02, wie beim Wand-Drehen. */
+  get angleInput() { return this._angleText; }
+  /** Tastatur in Schritt 02: Ziffern setzen den Winkel direkt. Rückgabe: behandelt. */
+  angleKey(key: string): boolean {
+    if (this.phase !== "dir" || !this._start) return false;
+    if (/^[0-9]$/.test(key) || ((key === "," || key === ".") && !/[.,]/.test(this._angleText)) || (key === "-" && !this._angleText)) {
+      this._angleText += key;
+    } else if (key === "Backspace" && this._angleText) {
+      this._angleText = this._angleText.slice(0, -1);
+    } else return false;
+    const n = parseFloat(this._angleText.replace(",", "."));
+    if (Number.isFinite(n)) {
+      // 0° = nach rechts, positiv gegen den Uhrzeigersinn (Bildschirm, y nach unten).
+      const a = -n * Math.PI / 180;
+      this._dir = { x: Math.cos(a), y: Math.sin(a) };
+    }
+    return true;
+  }
+  /** Aktueller Laufwinkel in Grad (0–360). */
+  dirAngleDeg(): number | null {
+    if (!this._dir) return null;
+    return ((-Math.atan2(this._dir.y, this._dir.x) * 180 / Math.PI) % 360 + 360) % 360;
+  }
+
   selectedHandle(): StairHandle | null {
     if (!this._draft || !this.selectedHandleKey) return null;
     return this.handlesFor(this._draft).find((h) => h.key === this.selectedHandleKey) ?? null;
@@ -483,7 +538,7 @@ export class StairTool {
 
   /** Häkchen/Enter. */
   confirm(): boolean {
-    if (this.phase === "dir" && this._start && this._dir) { this.phase = "side"; this._pendingSide = null; return true; }
+    if (this.phase === "dir" && this._start && this._dir) { this.phase = "side"; this._pendingSide = null; this._angleText = ""; return true; }
     if (this.phase === "side") {
       if (!this._pendingSide) return false;
       this._commitSide(this._pendingSide);
@@ -651,10 +706,11 @@ export class StairTool {
     if (this.phase === "dir" && this._start) {
       const dx = w.x - this._start.x, dy = w.y - this._start.y;
       const L = Math.hypot(dx, dy);
-      if (L > 1e-3) {
+      if (L > 1e-3 && !this._angleText) {
         let d = { x: dx / L, y: dy / L };
         if (this._shift) {
-          const a = Math.round(Math.atan2(d.y, d.x) / (Math.PI / 4)) * (Math.PI / 4);
+          // Wie beim Wand-Drehen: Shift rastet in 15°-Schritten.
+          const a = Math.round(Math.atan2(d.y, d.x) / (Math.PI / 12)) * (Math.PI / 12);
           d = { x: Math.cos(a), y: Math.sin(a) };
         }
         this._dir = this._snapDirectionOpposite(d, w);
@@ -931,6 +987,23 @@ export class StairTool {
       ctx.lineTo(to.x - 10 * Math.cos(ang + 0.4), to.y - 10 * Math.sin(ang + 0.4));
       ctx.closePath(); ctx.fill(); ctx.restore();
       if (this.phase === "dir") {
+        // Drehanzeige wie beim Wand-Drehen: Strahl, Bogen ab 0°, Winkel in Grad.
+        const sa = S(a), R = 46;
+        const ang = Math.atan2(d.y, d.x);
+        const deg = this.dirAngleDeg() ?? 0;
+        ctx.save(); ctx.strokeStyle = BLUE; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+        ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sa.x + R * 1.6, sa.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sa.x + Math.cos(ang) * R * 2.2, sa.y + Math.sin(ang) * R * 2.2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(sa.x, sa.y, R, 0, ang, ang > 0 ? false : true); ctx.stroke();
+        const txt = this._angleText ? `${this._angleText}°` : `${deg.toFixed(1).replace(".", ",")}°`;
+        const tx = sa.x + Math.cos(ang / 2) * (R + 18), ty = sa.y + Math.sin(ang / 2) * (R + 18);
+        ctx.font = "600 12px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        const tw = ctx.measureText(txt).width + 10;
+        ctx.fillStyle = "rgba(255,255,255,0.92)"; ctx.fillRect(tx - tw / 2, ty - 10, tw, 20);
+        ctx.strokeRect(tx - tw / 2, ty - 10, tw, 20);
+        ctx.fillStyle = BLUE; ctx.fillText(txt, tx, ty);
+        ctx.restore();
         if (tablet) { const cs = S(c); btns.confirm = { x: cs.x + 28, y: cs.y }; }
       } else {
         const sel = this._pendingSide;

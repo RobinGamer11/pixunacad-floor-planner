@@ -188,6 +188,9 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           <p style={{ color: MUTED }}>
             {tablet ? "Bestätigen mit ✓ oder Enter. Fingerheben bestätigt nie." : "Klick bestätigt, Enter oder Doppelklick schließt die Referenzlinie ab. Shift richtet aus."}
           </p>
+          {tool.phase === "dir" && (
+            <p className="tabular-nums" style={{ color: MUTED }}>Drehen um den Startpunkt: {(tool.dirAngleDeg() ?? 0).toFixed(1).replace(".", ",")}° – Winkel eintippen, Shift rastet 15°. Strg+Z geht einen Schritt zurück.</p>
+          )}
           {warnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>
       )}
@@ -219,6 +222,18 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2"><span className="font-semibold">Schrittmaßregel</span><OnOff value={!!src.useStepRule} onChange={(v) => set({ useStepRule: v })} /></div>
+        <div data-testid="floor-manual" className="flex items-center justify-between gap-2"><span className="font-semibold">Geschosshöhe vorgeben</span><OnOff value={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} /></div>
+        {manualFloor ? (
+          <>
+            <NumField label="Geschosshöhe" unit="m" value={src.floorHeightM} onCommit={(n) => {
+              const s = suggestFromFloorHeight(n, src.stepRuleCm / 100);
+              set({ floorHeightM: n, riserHeightM: s.riserM, treadDepthM: src.useStepRule ? treadFromRule(s.riserM, src.stepRuleCm / 100) : src.treadDepthM });
+            }} />
+            {(() => { const s = suggestFromFloorHeight(src.floorHeightM, src.stepRuleCm / 100); return <p className="tabular-nums" style={{ color: MUTED }}>→ {s.riserCount} Steigungen à {(s.riserM * 100).toFixed(1).replace(".", ",")} cm</p>; })()}
+          </>
+        ) : (
+          <div data-testid="floor-auto" className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Geschosshöhe</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
+        )}
         <NumField label="Auftritt" unit="cm" value={src.treadDepthM * 100} onCommit={(n) => set({ treadDepthM: n / 100 })} />
         <NumField label="Steigung" unit="cm" value={src.riserHeightM * 100} disabled={src.useStepRule}
           suffix={g ? <span className="ml-1 tabular-nums">({g.riserCount} STG)</span> : null}
@@ -226,15 +241,6 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
         <NumField label="Laufbreite" unit="m" value={src.stairWidthM} onCommit={(n) => set({ stairWidthM: n })} />
         {src.useStepRule && <NumField label="Schrittmaß" unit="cm" value={src.stepRuleCm} onCommit={(n) => set({ stepRuleCm: n })} />}
         <p className="tabular-nums" style={{ color: MUTED }}>{stepRuleCheckText(src.treadDepthM, src.riserHeightM)}</p>
-        <div data-testid="floor-manual" className="flex items-center justify-between gap-2"><span>Geschosshöhe vorgeben</span><OnOff value={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} /></div>
-        {manualFloor && (
-          <NumField label="Vorgabe" unit="m" value={src.floorHeightM} onCommit={(n) => {
-            const s = suggestFromFloorHeight(n, src.stepRuleCm / 100);
-            set({ floorHeightM: n, riserHeightM: s.riserM, treadDepthM: src.useStepRule ? treadFromRule(s.riserM, src.stepRuleCm / 100) : src.treadDepthM });
-          }} />
-        )}
-        <div data-testid="floor-auto" className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Geschosshöhe</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
-        {manualFloor && (() => { const s = suggestFromFloorHeight(src.floorHeightM, src.stepRuleCm / 100); return <p className="tabular-nums" style={{ color: MUTED }}>→ {s.riserCount} Steigungen à {(s.riserM * 100).toFixed(1).replace(".", ",")} cm</p>; })()}
       </div>
 
       <div className="space-y-1.5">
