@@ -42,9 +42,14 @@ describe("Treppe – Restkorrekturen", () => {
     expect(computeStairGeometry(moved).treadCount).toBe(11);
   });
 
-  it("Geschosshöhe: „vorgeben“ steht vor „Berechnet“; Warnung hat Dark-Mode-Farbe", () => {
+  it("Geschosshöhe steht unter Schrittmaßregel; Warnung nur oben mit Dark-Mode-Farbe", () => {
     const src = readFileSync("src/components/cad/StairSettingsPanel.tsx", "utf8");
+    expect(src.indexOf("Schrittmaßregel")).toBeLessThan(src.indexOf("floor-manual"));
     expect(src.indexOf("floor-manual")).toBeLessThan(src.indexOf("floor-auto"));
+    expect(src).toContain('>Geschosshöhe</span>');
+    expect(src).not.toContain('<SectionTitle>Geschosshöhe</SectionTitle>');
+    expect(src).not.toContain('<SectionTitle>Knickausbildung</SectionTitle>');
+    expect(src.match(/warnings\.map\(\(w\)/g)).toHaveLength(2); // Platzieren oder Bearbeiten, nie beide
     expect(src).not.toContain("text-destructive");
     const css = readFileSync("src/index.css", "utf8");
     expect(css).toMatch(/\.dark \.cad-stair-warning \{ color: hsl\(0 92% 76%\)/);

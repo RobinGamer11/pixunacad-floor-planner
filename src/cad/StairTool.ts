@@ -561,6 +561,32 @@ export class StairTool {
     return [this._start, { x: this._start.x + r.x * w, y: this._start.y + r.y * w }];
   }
 
+  /** Die gegenüberliegende Ecke der Startkante darf an vorhandenen CAD-Punkten einrasten. */
+  private _snapDirectionOpposite(direction: P, cursor: P): P {
+    if (!this._start || this.settings.stairWidthM <= 0) return direction;
+    const width = this.settings.stairWidthM;
+    const tolerance = 10 / (this.app.camera.scale || 1);
+    const cx = cursor.x - this._start.x, cy = cursor.y - this._start.y;
+    // Direkter Tipp auf den gegenüberliegenden Fangpunkt der Startkante.
+    if (this._snapScreen && Math.abs(Math.hypot(cx, cy) - width) <= tolerance && Math.hypot(cx, cy) > 1e-6) {
+      const length = Math.hypot(cx, cy);
+      return { x: -cy / length, y: cx / length };
+    }
+    const opposite = { x: this._start.x + direction.y * width, y: this._start.y - direction.x * width };
+    const screen = this.app.camera.worldToScreen(opposite.x, opposite.y);
+    try {
+      const snap = (this.app as any).topology?.findBestSnap?.(screen, opposite);
+      if (!snap?.world) return direction;
+      const target = snap.world as P;
+      const dx = target.x - this._start.x, dy = target.y - this._start.y;
+      // Nur echte Fangpunkte auf dem Radius der Startkante: der Startpunkt selbst
+      // oder nahe Linienpunkte dürfen die Laufbreite nicht unbemerkt ändern.
+      if (Math.abs(Math.hypot(dx, dy) - width) > tolerance || Math.hypot(dx, dy) < 1e-6) return direction;
+      this._snapScreen = this.app.camera.worldToScreen(target.x, target.y);
+      return { x: -dy / Math.hypot(dx, dy), y: dx / Math.hypot(dx, dy) };
+    } catch { return direction; }
+  }
+
   /**
    * Rechtsklick in allen Treppenschritten: Fangpunkte setzt CadApp bereits als
    * globale Hilfslinie; hier kommt die parallele Hilfslinie zu einer Kante dazu
@@ -631,7 +657,7 @@ export class StairTool {
           const a = Math.round(Math.atan2(d.y, d.x) / (Math.PI / 4)) * (Math.PI / 4);
           d = { x: Math.cos(a), y: Math.sin(a) };
         }
-        this._dir = d;
+        this._dir = this._snapDirectionOpposite(d, w);
       }
       if (pressed) {
         input.clicked = false;
