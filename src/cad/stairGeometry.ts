@@ -397,7 +397,7 @@ export function moveStairBoundary(p: StairParams, treadIndex: number, deltaM: nu
   if (!next || next.run !== tread.run) return null;
   const newDepth = tread.depth + deltaM;
   if (newDepth < MIN_TREAD_M - 1e-9) return null;
-  const dists = g.treads.map((t) => t.depth);
+  const dists = g.treads.filter((t) => !t.isWinder).map((t) => t.depth);
   dists[treadIndex] = newDepth;
   const r = tread.run;
   const d = norm(sub(p.path[r + 1], p.path[r]));
@@ -415,7 +415,7 @@ export function resetStairTread(p: StairParams, treadIndex: number): StairParams
   if (!t) return null;
   const delta = p.treadDepthM - t.depth;
   if (Math.abs(delta) < 1e-9) return null;
-  const dists = g.treads.map((x) => x.depth);
+  const dists = g.treads.filter((x) => !x.isWinder).map((x) => x.depth);
   dists[treadIndex] = p.treadDepthM;
   const r = t.run;
   const d = norm(sub(p.path[r + 1], p.path[r]));
@@ -507,7 +507,7 @@ export function stairEditableEdges(p: StairParams, g: StairGeometry = computeSta
   const out: StairEdge[] = [];
   for (const b of g.boundaries) out.push({ key: `b${b.treadIndex}`, kind: "boundary", a: b.a, b: b.b, dir: b.dir, treadIndex: b.treadIndex });
   const runs = new Map<number, StairTread[]>();
-  for (const t of g.treads) { if (!runs.has(t.run)) runs.set(t.run, []); runs.get(t.run)!.push(t); }
+  for (const t of g.treads) { if (t.isWinder) continue; if (!runs.has(t.run)) runs.set(t.run, []); runs.get(t.run)!.push(t); }
   for (const [r, ts] of runs) {
     const f = ts[0].poly, l = ts[ts.length - 1].poly; // [a, b, b+o, a+o]
     const nrm = norm(sub(f[3], f[0]));
@@ -522,17 +522,15 @@ export function stairEditableEdges(p: StairParams, g: StairGeometry = computeSta
     const poly = L.poly;
     const kp = p.path[k];
     const near = (u: P, w: P) => len(sub(u, w)) < 1e-6;
-    const refEnd = poly[0];
-    const refStart = sub(kp, mul(d2, -landingDepthOf(p, k)));
-    const perp = (e: P, d: P) => Math.abs(e.x * d.x + e.y * d.y) < 1e-6;
+    const same = (a: P, b: P, e?: [P, P]) => !!e && ((near(a, e[0]) && near(b, e[1])) || (near(a, e[1]) && near(b, e[0])));
     for (let i = 0; i < poly.length; i++) {
       const a = poly[i], b = poly[(i + 1) % poly.length];
-      if (near(a, kp) || near(b, kp)) continue; // Bezugsseiten am Knick
-      const e = norm(sub(b, a));
-      if ((near(a, refEnd) || near(b, refEnd)) && perp(e, d1)) {
+      if (same(a, b, L.entryEdge)) {
         out.push({ key: `l${k}in`, kind: "landing", a, b, dir: mul(d1, -1), knick: k });
-      } else if ((near(a, refStart) || near(b, refStart)) && perp(e, d2)) {
+      } else if (same(a, b, L.exitEdge)) {
         out.push({ key: `l${k}out`, kind: "landing", a, b, dir: d2, knick: k });
+      } else if (near(a, kp) || near(b, kp)) {
+        continue; // Bezugsseiten am Knick
       } else {
         // Außenseite: Normale vom Podestzentrum weg → Breite.
         let n = { x: -e.y, y: e.x };
