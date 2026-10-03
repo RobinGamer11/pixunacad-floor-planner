@@ -1340,10 +1340,13 @@ export class CadApp {
 
   undo() {
     if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
+    // Treppe: laufendes Zeichnen/Bewegen nimmt zuerst den lokalen Schritt zurück.
+    if ((this.activeTool as any) === this.stairTool && this.stairTool.undoStep()) { this.renderer?.render?.(); return; }
     this._maybeSnapshot();
     if (this._historyIndex <= 0) return;
     this._historyIndex--;
     this._restoreScene(this._history[this._historyIndex]);
+    this.stairTool?.afterHistoryRestore?.();
     this._emitHistoryChange();
   }
 
