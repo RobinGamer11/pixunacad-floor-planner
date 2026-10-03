@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Move, RotateCcw, Check } from "lucide-react";
+import { RotateCcw, Check } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import { ToolIds } from "@/cad/constants";
 import { isTabletMode } from "@/cad/StairTool";
@@ -190,35 +190,27 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
 
       {st && (
         <div className="space-y-2 rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
-          {!info && <p style={{ color: MUTED }}>Griff antippen, um ihn auszuwählen.</p>}
+          {!info && <p style={{ color: MUTED }}>Blauen Fangpunkt antippen – das Punktmenü erscheint direkt am Punkt.</p>}
           {info && (
             <>
+              {info.fields.map((f) => (
+                <NumField key={f.id} label={f.label} unit={f.unit} value={f.value} disabled={tool.moving}
+                  onCommit={(n) => { if (n >= f.min - 1e-9) tool.setHandleValue(f.id, n); else tool.lastWarnings = [`Mindestens ${f.min.toLocaleString("de-DE")} ${f.unit}.`]; force((x) => x + 1); }} />
+              ))}
               {info.lines.map(([k, v]) => (
                 <div key={k} className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>{k}</span><span>{v}</span></div>
               ))}
-              {!tool.moving ? (
-                <div className="flex gap-1">
-                  <button type="button" className="cad-toolbar-btn h-8 flex-1 justify-center gap-1 text-[11px] font-medium" onClick={() => tool.startMove()} title="Griff verschieben (mit Fang)" aria-label="Verschieben">
-                    <Move size={14} /> Verschieben
-                  </button>
-                  {(info.kind === "boundary" || info.kind === "landing") && (
-                    <button type="button" className="cad-toolbar-btn h-8 w-9 justify-center disabled:opacity-40" disabled={!info.canReset}
-                      onClick={() => { tool.resetSelected(); force((n) => n + 1); }}
-                      title={info.canReset ? "Stufe auf Standardauftritt zurücksetzen" : (info.resetHint ?? "Bereits Standardauftritt")} aria-label="Zurücksetzen">
-                      <RotateCcw size={14} />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex gap-1">
-                  <button type="button" className="cad-toolbar-btn h-8 flex-1 justify-center text-[11px] font-medium" style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }} onClick={() => tool.confirm()} aria-label="Fixieren">✓ Fixieren</button>
-                  <button type="button" className="cad-toolbar-btn h-8 flex-1 justify-center text-[11px]" onClick={() => tool.escape()} aria-label="Abbrechen">Abbrechen</button>
-                </div>
+              {(info.kind === "boundary" || info.kind === "landing") && !tool.moving && (
+                <button type="button" className="cad-toolbar-btn h-8 w-full justify-center gap-1 text-[11px] disabled:opacity-40" disabled={!info.canReset}
+                  onClick={() => { tool.resetSelected(); force((n) => n + 1); }}
+                  title={info.canReset ? "Auf Standard zurücksetzen" : (info.resetHint ?? "Bereits Standard")} aria-label="Zurücksetzen">
+                  <RotateCcw size={14} /> Auf Standard
+                </button>
               )}
-              {info.resetHint && !info.canReset && <p style={{ color: MUTED }}>{info.resetHint}</p>}
+              {tool.moving && <p style={{ color: MUTED }}>{tablet ? "Bestätigen mit ✓ oder Enter, Escape verwirft." : "Klick oder Enter bestätigt, Escape verwirft. Shift richtet aus."}</p>}
             </>
           )}
-          {tool.moving && tool.lastWarnings.map((w) => <p key={w} className="text-destructive">{w}</p>)}
+          {tool.lastWarnings.map((w) => <p key={w} className="text-destructive">{w}</p>)}
         </div>
       )}
 
