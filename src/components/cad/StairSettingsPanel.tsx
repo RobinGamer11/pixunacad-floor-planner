@@ -212,17 +212,19 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
               {tool.moving && <p style={{ color: MUTED }}>{tablet ? "Bestätigen mit ✓ oder Enter, Escape verwirft." : "Klick oder Enter bestätigt, Escape verwirft. Shift richtet aus."}</p>}
             </>
           )}
-          {knick != null && (
+          {st.path.length > 2 && (
             <div className="space-y-1 border-t pt-2" style={{ borderColor: HAIRLINE }}>
               <SectionTitle>Knickausbildung</SectionTitle>
-              {(["landing", "winder"] as const).map((m) => (
-                <label key={m} className="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="radio" name={`knick-${knick}`} checked={knickModeOf(st, knick) === m} disabled={tool.moving}
-                    onChange={() => { tool.setKnickModeSelected(m); force((n) => n + 1); }}
-                    style={{ accentColor: "hsl(var(--primary))" }} aria-label={m === "landing" ? "Podest" : "Gewendelt"} />
-                  <span>{m === "landing" ? "Podest" : "Gewendelt"}</span>
-                </label>
-              ))}
+              {st.path.slice(1, -1).map((_: unknown, i: number) => {
+                const k = i + 1;
+                return (
+                  <div key={k} className="flex items-center gap-2">
+                    <span className="w-14 shrink-0" style={{ color: k === knick ? "hsl(var(--primary))" : MUTED }}>Knick {k}</span>
+                    <OnOff value={knickModeOf(st, k) === "winder"} labels={["Podest", "Gewendelt"]} disabled={tool.moving}
+                      onChange={(w) => { tool.setKnickModeSelected(w ? "winder" : "landing", k); force((n) => n + 1); }} />
+                  </div>
+                );
+              })}
             </div>
           )}
           {tool.lastWarnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
@@ -230,7 +232,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
       )}
 
       <div className="space-y-1.5">
-        <Check2 big label="Schrittmaßregel" on={!!src.useStepRule} onChange={(v) => set({ useStepRule: v })} />
+        <div className="flex items-center justify-between gap-2"><span className="font-semibold">Schrittmaßregel</span><OnOff value={!!src.useStepRule} onChange={(v) => set({ useStepRule: v })} /></div>
         <NumField label="Auftritt" unit="cm" value={src.treadDepthM * 100} onCommit={(n) => set({ treadDepthM: n / 100 })} />
         <NumField label="Steigung" unit="cm" value={src.riserHeightM * 100} disabled={src.useStepRule}
           suffix={g ? <span className="ml-1 tabular-nums">({g.riserCount} STG)</span> : null}
@@ -242,7 +244,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
 
       <div className="space-y-1.5">
         <SectionTitle>Geschosshöhe</SectionTitle>
-        <div data-testid="floor-manual"><Check2 label="Geschosshöhe vorgeben" on={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} /></div>
+        <div data-testid="floor-manual" className="flex items-center justify-between gap-2"><span>Geschosshöhe vorgeben</span><OnOff value={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} /></div>
         {manualFloor && (
           <NumField label="Vorgabe" unit="m" value={src.floorHeightM} onCommit={(n) => {
             const s = suggestFromFloorHeight(n, src.stepRuleCm / 100);
@@ -297,3 +299,13 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
     </div>
   );
 };
+
+/** Zwei Schaltflächen AN/AUS (bzw. eigene Beschriftung) statt Häkchen. */
+function OnOff({ value, onChange, labels = ["AUS", "AN"], disabled }: { value: boolean; onChange: (v: boolean) => void; labels?: [string, string]; disabled?: boolean }) {
+  const btn = (on: boolean, text: string) => (
+    <button type="button" disabled={disabled} aria-pressed={value === on} onClick={() => value !== on && onChange(on)}
+      className="cad-toolbar-btn h-7 flex-1 justify-center px-2 text-[11px] disabled:opacity-40"
+      style={value === on ? { background: "hsl(var(--primary) / 0.15)", borderColor: "hsl(var(--primary))", fontWeight: 600 } : undefined}>{text}</button>
+  );
+  return <div className="flex min-w-[110px] gap-1">{labels[1] === "AN" ? <>{btn(true, "AN")}{btn(false, "AUS")}</> : <>{btn(false, labels[0])}{btn(true, labels[1])}</>}</div>;
+}

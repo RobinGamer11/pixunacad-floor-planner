@@ -322,9 +322,9 @@ export class StairTool {
   }
 
   /** Knickausbildung am ausgewählten Knick setzen (genau ein Undo-Schritt). */
-  setKnickModeSelected(mode: "landing" | "winder"): boolean {
+  setKnickModeSelected(mode: "landing" | "winder", knick?: number): boolean {
     const st = this.editStair();
-    const k = this.selectedKnick();
+    const k = knick ?? this.selectedKnick();
     if (!st || k == null || !this._draft) return false;
     const next = setKnickMode(this._draft, k, mode);
     if (!next) return false;
