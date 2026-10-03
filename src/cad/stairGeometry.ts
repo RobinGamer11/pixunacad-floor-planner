@@ -373,3 +373,81 @@ export function stairBoundsPoints(p: StairParams): P[] {
   const pts = [...g.treads.flatMap((t) => t.poly), ...g.landings.flatMap((l) => l.poly)];
   return pts.length ? pts : p.path;
 }
+
+/* ------------------------------------------------- Ganze Treppe bewegen */
+
+/** Verschiebt die ganze Treppe (nur die Referenzlinie trägt Lage). */
+export function translateStair(p: StairParams, dx: number, dy: number): StairParams {
+  return { ...p, path: p.path.map((q) => ({ x: q.x + dx, y: q.y + dy })) };
+}
+
+/** Dreht die ganze Treppe um `pivot` (Bogenmaß); Geometrie bleibt zusammenhängend. */
+export function rotateStair(p: StairParams, pivot: P, angle: number): StairParams {
+  const c = Math.cos(angle), s = Math.sin(angle);
+  return {
+    ...p,
+    path: p.path.map((q) => {
+      const x = q.x - pivot.x, y = q.y - pivot.y;
+      return { x: pivot.x + x * c - y * s, y: pivot.y + x * s + y * c };
+    }),
+  };
+}
+
+/* ------------------------------------------------ Bearbeitbare Kanten */
+
+export type StairEdgeKind = "boundary" | "width" | "landing" | "ref";
+export interface StairEdge {
+  key: string;
+  kind: StairEdgeKind;
+  a: P; b: P;
+  /** Richtung, in die „Kante bewegen“ positiv wirkt (Einheitsvektor). */
+  dir: P;
+  treadIndex?: number;
+  knick?: number;
+}
+
+/**
+ * Alle bearbeitbaren Kanten einer Treppe: innere Stufengrenzen, Außenkanten
+ * je Lauf (Bezugsseite fest, Gegenseite = Laufbreite) und Podestkanten.
+ */
+export function stairEditableEdges(p: StairParams, g: StairGeometry = computeStairGeometry(p)): StairEdge[] {
+  const out: StairEdge[] = [];
+  for (const b of g.boundaries) out.push({ key: `b${b.treadIndex}`, kind: "boundary", a: b.a, b: b.b, dir: b.dir, treadIndex: b.treadIndex });
+  const runs = new Map<number, StairTread[]>();
+  for (const t of g.treads) { if (!runs.has(t.run)) runs.set(t.run, []); runs.get(t.run)!.push(t); }
+  for (const [r, ts] of runs) {
+    const f = ts[0].poly, l = ts[ts.length - 1].poly; // [a, b, b+o, a+o]
+    const nrm = norm(sub(f[3], f[0]));
+    out.push({ key: `r${r}`, kind: "ref", a: f[0], b: l[1], dir: mul(nrm, -1) });
+    out.push({ key: `w${r}`, kind: "width", a: f[3], b: l[2], dir: nrm });
+  }
+  for (const L of g.landings) {
+    if (L.knick < 0) continue;
+    const k = L.knick;
+    const d1 = norm(sub(p.path[k], p.path[k - 1]));
+    const d2 = norm(sub(p.path[k + 1], p.path[k]));
+    const poly = L.poly;
+    const kp = p.path[k];
+    const near = (u: P, w: P) => len(sub(u, w)) < 1e-6;
+    const refEnd = poly[0];
+    const refStart = sub(kp, mul(d2, -landingDepthOf(p, k)));
+    const perp = (e: P, d: P) => Math.abs(e.x * d.x + e.y * d.y) < 1e-6;
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      if (near(a, kp) || near(b, kp)) continue; // Bezugsseiten am Knick
+      const e = norm(sub(b, a));
+      if ((near(a, refEnd) || near(b, refEnd)) && perp(e, d1)) {
+        out.push({ key: `l${k}in`, kind: "landing", a, b, dir: mul(d1, -1), knick: k });
+      } else if ((near(a, refStart) || near(b, refStart)) && perp(e, d2)) {
+        out.push({ key: `l${k}out`, kind: "landing", a, b, dir: d2, knick: k });
+      } else {
+        // Außenseite: Normale vom Podestzentrum weg → Breite.
+        let n = { x: -e.y, y: e.x };
+        const m = mul(add(a, b), 0.5);
+        if ((m.x - L.center.x) * n.x + (m.y - L.center.y) * n.y < 0) n = mul(n, -1);
+        out.push({ key: `l${k}s${i}`, kind: "width", a, b, dir: n, knick: k });
+      }
+    }
+  }
+  return out;
+}

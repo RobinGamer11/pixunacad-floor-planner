@@ -154,6 +154,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] B1–B3: Eckpodest = Laufbreite × Laufbreite, kein Aufblasen, Restlänge als Warnung, Podesttiefe je Knick (`landingDepthsM`)
 - [x] B4: Bezug A/B statt L/R
 - [x] B5: Geschosshöhe/Steigungen/Lauflänge/Restlänge live beim Platzieren
-- [ ] C: Treppenbearbeitung über normales Punktmenü (3 Fangpunkte je Kante, Kante bewegen, ganze Treppe verschieben/drehen), Werte rechts editierbar
-- [ ] D: Rechtsklick-Hilfslinien und Shift in allen Treppenschritten; alle Treppenkanten als Fangquellen
-- [ ] E: Browser-/Tablet-Abnahme, Zwei-Geräte-Test
+- [x] C: Treppenbearbeitung über normales Punktmenü (3 Fangpunkte je Kante, Kante bewegen, ganze Treppe verschieben/drehen), Werte rechts editierbar
+- [x] D: Rechtsklick-Hilfslinien und Shift in allen Treppenschritten; alle Treppenkanten als Fangquellen
+- [x] E: Unit-Tests (Kanten, Podest einzeln, Zahl = Griff, Verschieben/Drehen, parallele Hilfslinie)
+- [ ] E: Browser-/Tablet-Abnahme und Zwei-Geräte-Test – Vorschau verlangt Anmeldung, im Sandkasten keine Sitzung verfügbar
