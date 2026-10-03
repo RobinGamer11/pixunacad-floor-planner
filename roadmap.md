@@ -146,7 +146,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Stair in Scene/Serde/Klon/Cloud-Diff
 - [x] Renderer, Fangpunkte, Auswahl/Verschieben
 - [x] StairTool (Vorschau → Häkchen/Enter, Bezug an erster Stufe) + Einstellungspanel
-- [x] Gewendelt/Rund: vorbereitet, gesperrt
+- [x] Gewendelte Stufen je Knick direkt im Einstellungsfenster wählbar; Rundtreppe weiterhin nicht verfügbar
 - [ ] Echte Abnahme im Browser/Tablet (Platzierung, Griffe, Export-PDF)
 
 ## Gesamtkorrektur Export-Ausschnitte / Treppe (03.10.)
