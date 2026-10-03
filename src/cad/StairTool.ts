@@ -22,7 +22,7 @@ import { drawSnapDot } from "./snapDraw";
 import { drawStair } from "./stairDraw";
 import {
   computeStairGeometry, moveStairBoundary, resetStairTread, setStairWidth, riserFromRule, hitStair,
-  type P, type StairParams, setLandingDepth, landingDepthOf, translateStair, rotateStair, stairEditableEdges, MIN_TREAD_M, type StairEdge } from "./stairGeometry";
+  type P, type StairParams, setLandingDepth, landingDepthOf, translateStair, rotateStair, stairEditableEdges, MIN_TREAD_M, type StairEdge, extendStairPath, stairOuterPointIndex } from "./stairGeometry";
 import { serializeStair } from "./Scene";
 
 export type StairPhase = "start" | "dir" | "side" | "path" | "edit";
