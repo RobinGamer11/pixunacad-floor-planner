@@ -211,7 +211,9 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
    *  Bezug innen → das Podest liegt jenseits der Bezugslinie (Kürzung = Tiefe − Laufbreite). */
   const isOuterRef = (k: number) => offs[k - 1].x * dirs[k].x + offs[k - 1].y * dirs[k].y >= 0;
   const depthAtKnick = (k: number) => (knickModeOf(p, k) === "winder" ? w : landingDepthAt(k));
+  const exitDepthAtKnick = (k: number) => (knickModeOf(p, k) === "winder" ? w : landingExitDepthOf(p, k));
   const cutAt = (k: number) => (isOuterRef(k) ? depthAtKnick(k) : depthAtKnick(k) - w);
+  const cutOutAt = (k: number) => (isOuterRef(k) ? exitDepthAtKnick(k) : exitDepthAtKnick(k) - w);
   const minInner = p.minWinderInnerTreadM && p.minWinderInnerTreadM > 0 ? p.minWinderInnerTreadM : DEFAULT_MIN_WINDER_INNER_TREAD_M;
   const buildKnick = (r: number) => {
     const k = path[r];
@@ -219,7 +221,7 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
     const cut = cutAt(r);
     const refEnd = sub(k, mul(d1, cut));
     const outEnd = add(refEnd, offs[r - 1]);
-    const refStart = add(k, mul(d2, cut));
+    const refStart = add(k, mul(d2, cutOutAt(r)));
     const outStart = add(refStart, offs[r]);
     const x = lineIntersect(outEnd, d1, outStart, d2) ?? outEnd;
     const raw = [refEnd, outEnd, x, outStart, refStart, k];
@@ -260,7 +262,7 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
   let cum = 0;
   const restOf: number[] = [];
   for (let r = 0; r < segCount; r++) {
-    const startCut = r > 0 ? cutAt(r) : 0;
+    const startCut = r > 0 ? cutOutAt(r) : 0;
     const endCut = r < segCount - 1 ? cutAt(r + 1) : 0;
     const usable = lens[r] - startCut - endCut;
     if (usable < -EPS) {
