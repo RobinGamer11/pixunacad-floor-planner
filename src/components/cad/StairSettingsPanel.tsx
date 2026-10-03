@@ -155,6 +155,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
   const floorAuto = g ? g.totalHeightM : null;
   const manualFloor = src.floorHeightM != null;
   const tablet = isTabletMode();
+  const warnings = [...new Set([...tool.lastWarnings, ...(g?.warnings ?? [])])];
 
   return (
     <div className="cad-settings-panel mb-2 space-y-3 text-xs">
@@ -186,7 +187,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           <p style={{ color: MUTED }}>
             {tablet ? "Bestätigen mit ✓ oder Enter. Fingerheben bestätigt nie." : "Klick bestätigt, Enter oder Doppelklick schließt die Referenzlinie ab. Shift richtet aus."}
           </p>
-          {tool.lastWarnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
+          {warnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>
       )}
 
@@ -214,7 +215,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           )}
           {st.path.length > 2 && (
             <div className="space-y-1 border-t pt-2" style={{ borderColor: HAIRLINE }}>
-              <SectionTitle>Knickausbildung</SectionTitle>
+               <SectionTitle>Gewendelte Stufen</SectionTitle>
               {st.path.slice(1, -1).map((_: unknown, i: number) => {
                 const k = i + 1;
                 return (
@@ -227,7 +228,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
               })}
             </div>
           )}
-          {tool.lastWarnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
+           {warnings.map((w) => <p key={w} className="cad-stair-warning">{w}</p>)}
         </div>
       )}
 
@@ -240,10 +241,6 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
         <NumField label="Laufbreite" unit="m" value={src.stairWidthM} onCommit={(n) => set({ stairWidthM: n })} />
         {src.useStepRule && <NumField label="Schrittmaß" unit="cm" value={src.stepRuleCm} onCommit={(n) => set({ stepRuleCm: n })} />}
         <p className="tabular-nums" style={{ color: MUTED }}>{stepRuleCheckText(src.treadDepthM, src.riserHeightM)}</p>
-      </div>
-
-      <div className="space-y-1.5">
-        <SectionTitle>Geschosshöhe</SectionTitle>
         <div data-testid="floor-manual" className="flex items-center justify-between gap-2"><span>Geschosshöhe vorgeben</span><OnOff value={manualFloor} onChange={(v) => set({ floorHeightM: v ? (floorAuto || 2.8) : null })} /></div>
         {manualFloor && (
           <NumField label="Vorgabe" unit="m" value={src.floorHeightM} onCommit={(n) => {
@@ -251,7 +248,11 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
             set({ floorHeightM: n, riserHeightM: s.riserM, treadDepthM: src.useStepRule ? treadFromRule(s.riserM, src.stepRuleCm / 100) : src.treadDepthM });
           }} />
         )}
-        <div data-testid="floor-auto" className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Berechnet</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
+        <div data-testid="floor-auto" className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Geschosshöhe</span><span>{floorAuto != null ? `${floorAuto.toFixed(2).replace(".", ",")} m` : "—"}</span></div>
+        {manualFloor && (() => { const s = suggestFromFloorHeight(src.floorHeightM, src.stepRuleCm / 100); return <p className="tabular-nums" style={{ color: MUTED }}>→ {s.riserCount} Steigungen à {(s.riserM * 100).toFixed(1).replace(".", ",")} cm</p>; })()}
+      </div>
+
+      <div className="space-y-1.5">
         {g ? (
           <>
             <div className="flex justify-between tabular-nums"><span style={{ color: MUTED }}>Steigungen</span><span>{g.riserCount}</span></div>
@@ -262,12 +263,11 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
         ) : (
           <p style={{ color: MUTED }}>Wird nach Festlegen der Referenzlinie berechnet</p>
         )}
-        {manualFloor && (() => { const s = suggestFromFloorHeight(src.floorHeightM, src.stepRuleCm / 100); return <p className="tabular-nums" style={{ color: MUTED }}>→ {s.riserCount} Steigungen à {(s.riserM * 100).toFixed(1).replace(".", ",")} cm</p>; })()}
       </div>
 
-      {g && g.warnings.length > 0 && (
+      {st && warnings.length > 0 && (
         <div className="rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
-          {g.warnings.map((w) => <div key={w} className="cad-stair-warning">{w}</div>)}
+          {warnings.map((w) => <div key={w} className="cad-stair-warning">{w}</div>)}
         </div>
       )}
 
@@ -277,7 +277,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
           onCommit={(n) => { tool.setWinderSetting({ winderCount: Math.max(2, Math.min(8, Math.round(n))) }); force((x) => x + 1); }} />
         <NumField label="Mindestauftritt innen" unit="cm" value={(src.minWinderInnerTreadM ?? DEFAULT_MIN_WINDER_INNER_TREAD_M) * 100}
           onCommit={(n) => { tool.setWinderSetting({ minWinderInnerTreadM: n / 100 }); force((x) => x + 1); }} />
-        <p style={{ color: MUTED }}>Projektvorgabe, gemessen 30 cm vom inneren Eckpunkt. Gewendelt wird je Knick über „Knickausbildung“ gewählt.</p>
+        <p style={{ color: MUTED }}>Projektvorgabe, gemessen 30 cm vom inneren Eckpunkt. Gewendelt wird je Knick oben unter „Gewendelte Stufen“ gewählt.</p>
       </div>
 
       <div className="space-y-1.5">
