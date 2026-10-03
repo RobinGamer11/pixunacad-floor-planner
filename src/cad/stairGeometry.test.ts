@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStairGeometry, moveStairBoundary, stairLabelLines, riserFromRule, type StairParams } from "./stairGeometry";
+import { computeStairGeometry, moveStairBoundary, resetStairTread, stairLabelLines, riserFromRule, type StairParams } from "./stairGeometry";
 import { Scene, serializeStair } from "./Scene";
 import { restoreOneScene } from "./sceneSerde";
 
@@ -17,8 +17,8 @@ describe("Treppe – Geometrie", () => {
     expect(g.totalHeightM).toBeCloseTo(16 * 0.175);
     expect(g.totalRunM).toBeCloseTo(15 * 0.28);
     const lines = stairLabelLines(base([]), g, false);
-    expect(lines[0]).toBe("16 × 17,5 cm");
-    expect(lines[1]).toBe("15 × 28 cm");
+    expect(lines[0]).toBe("16 STG");
+    expect(lines[1]).toBe("17,5 / 28 cm");
   });
 
   it("Schrittmaßregel: 63 cm, Auftritt 28 → Steigung 17,5", () => {
@@ -38,6 +38,30 @@ describe("Treppe – Geometrie", () => {
     for (const t of g.treads.filter((t) => t.run === 0)) {
       for (const q of t.poly) expect(q.x).toBeLessThanOrEqual(3 - 1 + 1e-9);
     }
+  });
+
+  it("L-Treppe: kein Spalt zwischen letzter Stufe und Podest, Standardauftritte bleiben", () => {
+    const g = computeStairGeometry(base([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: -3 }]));
+    const run0 = g.treads.filter((t) => t.run === 0);
+    const lastEnd = run0[run0.length - 1].poly[1];
+    const landingXs = g.landings[0].poly.map((q) => q.x);
+    expect(Math.min(...landingXs)).toBeCloseTo(lastEnd.x);
+    for (const t of g.treads) expect(t.depth).toBeCloseTo(0.28);
+    // Podest = eine Stufenebene: Steigungen = Auftritte + Podeste + 1
+    expect(g.riserCount).toBe(g.treadCount + 2);
+  });
+
+  it("stark vergrößerter Auftritt wird Zwischenpodest; Reset entfernt es wieder", () => {
+    const p = base([{ x: 0, y: 0 }, { x: 0.28 * 5, y: 0 }]);
+    const wide = moveStairBoundary(p, 2, 0.9)!;
+    expect(wide).not.toBeNull();
+    const g = computeStairGeometry(wide);
+    expect(g.landings.length).toBe(1);
+    expect(g.treadCount).toBe(4);
+    const back = resetStairTread(wide, 2)!;
+    expect(computeStairGeometry(back).landings.length).toBe(0);
+    expect(back.stepDistancesM).toBeNull();
+    expect(back.path[1].x).toBeCloseTo(0.28 * 5);
   });
 
   it("zu kurze Linie für Podest wird als ungültig markiert", () => {

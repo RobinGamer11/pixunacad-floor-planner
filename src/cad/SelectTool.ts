@@ -4188,6 +4188,7 @@ export class SelectTool {
             this.marqueeSelectedIds = [{ kind: "stair", id: stairHit.id }];
             (this.app as any).onStairSelect?.(stairHit.id);
             this.app.pointEditMenu.hide();
+            (this.app as any).openStairEdit?.(stairHit.id);
             return;
           }
           const libHit = this._hitLibraryInstance(input);

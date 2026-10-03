@@ -64,8 +64,18 @@ function lineIntersect(p: P, d: P, q: P, e: P): P | null {
 
 /* ------------------------------------------------------------ Geometrie */
 
-export interface StairTread { index: number; run: number; poly: P[]; depth: number; center: P }
-export interface StairLanding { knick: number; poly: P[]; center: P }
+export interface StairTread { index: number; run: number; poly: P[]; depth: number; center: P; /** Abweichender, sehr tiefer Auftritt = Zwischenpodest im Lauf. */ isLanding?: boolean }
+export interface StairLanding {
+  /** Knickindex der Referenzlinie; -1 = Zwischenpodest im geraden Lauf. */
+  knick: number;
+  poly: P[];
+  center: P;
+  /** Tiefe in Laufrichtung (bei Eckpodest: Zulauf-Seite inkl. Ausgleich). */
+  depthM: number;
+  widthM: number;
+  /** Globaler Auftrittsindex (nur Zwischenpodest). */
+  treadIndex?: number;
+}
 export interface StairBoundary {
   /** Index des davorliegenden Auftritts (global). */
   treadIndex: number;
@@ -128,6 +138,7 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
 
   let treadIdx = 0;
   let cum = 0;
+  const restOf: number[] = [];
   for (let r = 0; r < segCount; r++) {
     const startCut = r > 0 ? landingDepth : 0;
     const endCut = r < segCount - 1 ? landingDepth : 0;
@@ -156,7 +167,9 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
       s += dep; cum += dep; treadIdx++; runTreads++;
     }
     const rest = Math.max(0, usable - s);
-    out.remainderM += rest;
+    restOf[r] = rest;
+    // Vor einem Eckpodest wird der Rest dem Podest zugeschlagen (bündig, kein Spalt).
+    if (r === segCount - 1) out.remainderM += rest;
     if ((r === 0 || r === segCount - 1) && runTreads === 0) {
       out.valid = false;
       warnings.push(`Lauf ${r + 1}: kein voller Auftritt möglich.`);
@@ -165,7 +178,8 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
       // Podest am Knick r: Ende von Lauf r-1, Anfang von Lauf r.
       const k = path[r];
       const d1 = dirs[r - 1], d2 = dirs[r];
-      const refEnd = sub(k, mul(d1, landingDepth));
+      const entryDepth = landingDepth + (restOf[r - 1] || 0);
+      const refEnd = sub(k, mul(d1, entryDepth));
       const outEnd = add(refEnd, offs[r - 1]);
       const refStart = add(k, mul(d2, landingDepth));
       const outStart = add(refStart, offs[r]);
@@ -173,14 +187,22 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
       const raw = [refEnd, k, refStart, outStart, ...(x ? [x] : []), outEnd];
       const poly = raw.filter((q, i) => len(sub(q, raw[(i + raw.length - 1) % raw.length])) > 1e-6);
       const c = poly.reduce((acc, q) => add(acc, q), { x: 0, y: 0 });
-      out.landings.push({ knick: r, poly, center: mul(c, 1 / poly.length) });
+      out.landings.push({ knick: r, poly, center: mul(c, 1 / poly.length), depthM: entryDepth, widthM: w });
     }
   }
   if (out.remainderM > 1e-4) {
     warnings.push(`Restlänge ${(out.remainderM * 100).toFixed(1)} cm ergibt keine volle Stufe.`);
   }
-  out.treadCount = out.treads.length;
-  out.riserCount = out.treadCount > 0 ? out.treadCount + (p.riserExtra ?? 1) : 0;
+  // Stark abweichende Auftritte werden automatisch zu Zwischenpodesten.
+  for (const t of out.treads) {
+    if (t.depth > p.treadDepthM * 1.5 + 1e-6) {
+      t.isLanding = true;
+      out.landings.push({ knick: -1, poly: t.poly, center: t.center, depthM: t.depth, widthM: w, treadIndex: t.index });
+    }
+  }
+  out.treadCount = out.treads.filter((t) => !t.isLanding).length;
+  // Jeder Lauf hat Auftritte + 1 Steigungen; ein Podest ist eine Stufenebene.
+  out.riserCount = out.treadCount > 0 ? out.treadCount + out.landings.length + (p.riserExtra ?? 1) : 0;
   out.totalRunM = cum;
   out.totalHeightM = out.riserCount * (p.riserHeightM || 0);
 
@@ -210,7 +232,7 @@ export function computeStairGeometry(p: StairParams): StairGeometry {
   }
 
   // Fangpunkte: eindeutige Ecken + Kantenmitten; gemeinsame Kanten nur einmal.
-  const polys = [...out.treads.map((t) => t.poly), ...out.landings.map((l) => l.poly)];
+  const polys = [...out.treads.map((t) => t.poly), ...out.landings.filter((l) => l.knick >= 0).map((l) => l.poly)];
   const key = (q: P) => `${Math.round(q.x * 1e5)}:${Math.round(q.y * 1e5)}`;
   const pts = new Map<string, P>();
   const edges = new Map<string, [P, P]>();
@@ -265,8 +287,25 @@ export function moveStairBoundary(p: StairParams, treadIndex: number, deltaM: nu
   const path = p.path.map((q, i) => (i > r ? add(q, mul(d, deltaM)) : { x: q.x, y: q.y }));
   const res: StairParams = { ...p, path, stepDistancesM: dists };
   const g2 = computeStairGeometry(res);
-  if (!g2.valid || g2.treadCount !== g.treadCount) return null;
+  if (!g2.valid || g2.treads.length !== g.treads.length) return null;
   return res;
+}
+
+/** Setzt einen Auftritt auf den Standard zurück; Folgestufen wandern mit. */
+export function resetStairTread(p: StairParams, treadIndex: number): StairParams | null {
+  const g = computeStairGeometry(p);
+  const t = g.treads[treadIndex];
+  if (!t) return null;
+  const delta = p.treadDepthM - t.depth;
+  if (Math.abs(delta) < 1e-9) return null;
+  const dists = g.treads.map((x) => x.depth);
+  dists[treadIndex] = p.treadDepthM;
+  const r = t.run;
+  const d = norm(sub(p.path[r + 1], p.path[r]));
+  const path = p.path.map((q, i) => (i > r ? add(q, mul(d, delta)) : { x: q.x, y: q.y }));
+  const allStd = dists.every((x) => Math.abs(x - p.treadDepthM) < 1e-9);
+  const res: StairParams = { ...p, path, stepDistancesM: allStd ? null : dists };
+  return computeStairGeometry(res).valid ? res : null;
 }
 
 /** Ändert die Laufbreite; die Referenzlinie bleibt die Bezugskante. */
@@ -280,7 +319,7 @@ export function setStairWidth(p: StairParams, widthM: number): StairParams | nul
 const cm = (m: number) => (Math.round(m * 1000) / 10).toLocaleString("de-DE", { maximumFractionDigits: 1 });
 
 export function stairLabelLines(p: StairParams, g: StairGeometry, showWidth: boolean): string[] {
-  const lines = [`${g.riserCount} × ${cm(p.riserHeightM)} cm`, `${g.treadCount} × ${cm(p.treadDepthM)} cm`];
+  const lines = [`${g.riserCount} STG`, `${cm(p.riserHeightM)} / ${cm(p.treadDepthM)} cm`];
   if (showWidth) lines.push(`B = ${p.stairWidthM.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`);
   return lines;
 }
