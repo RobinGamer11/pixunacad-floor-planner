@@ -449,12 +449,13 @@ export class SelectTool {
   }
 
   /**
-   * Führendes Objekt der Mehrfachauswahl = zuletzt erfasster Eintrag.
-   * Wird von den Hosts genutzt, um das passende Eigenschaftenfenster zu zeigen.
+   * Führendes Objekt der Mehrfachauswahl = ERSTER Eintrag. Später ergänzte
+   * Objekte ändern weder Leader noch angezeigte Einstellungen. Wird der Leader
+   * abgewählt, rückt der nächste Eintrag nach.
    */
   get primarySelectedRef(): { kind: string; id: string } | null {
     const list = this.marqueeSelectedIds;
-    return list.length ? list[list.length - 1] : null;
+    return list.length ? list[0] : null;
   }
 
   /** Wandelt einen Auswahl-Ref in das Selection-Objekt des Hosts um. */
@@ -4889,6 +4890,18 @@ export class SelectTool {
     for (const o of s.stairs || [])           if (selectable(o)) yield { kind: "stair",      id: o.id, obj: o };
   }
 
+  /** Abstand des Element-Mittelpunkts zum Startpunkt des Auswahlrahmens. */
+  private _distToRectStart(pts: Vec2[]): number {
+    const s: any = (this as any).marqueeStart;
+    if (!s || !pts.length) return 0;
+    let cx = 0, cy = 0;
+    for (const p of pts) { cx += p.x; cy += p.y; }
+    cx /= pts.length; cy /= pts.length;
+    const sx = s.wx ?? s.x, sy = s.wy ?? s.y;
+    if (!Number.isFinite(sx) || !Number.isFinite(sy)) return 0;
+    return Math.hypot(cx - sx, cy - sy);
+  }
+
   private _commitMarquee() {
     const rect = this._marqueeRectWorld();
     const prev = this._marqueeAdditive ? this._marqueePrev : [];
@@ -4913,10 +4926,19 @@ export class SelectTool {
       const key = kind + ":" + id;
       if (seen.has(key)) continue;
       seen.add(key);
-      hits.push({ kind, id });
+      hits.push({ kind, id, _d: this._distToRectStart(pts) } as any);
     }
-    this.marqueeSelectedIds = hits;
-    // Führendes Objekt = zuletzt erfasster Eintrag der Rahmenauswahl.
+    // Ohne Vor-Auswahl: Leader = Objekt, dessen Mittelpunkt dem Rahmen-
+    // Startpunkt am nächsten liegt (Gleichstand → Zeichnungsreihenfolge).
+    if (!prev.length && hits.length > 1) {
+      let best = 0;
+      for (let i = 1; i < hits.length; i++) {
+        if ((hits[i] as any)._d < (hits[best] as any)._d - 1e-9) best = i;
+      }
+      if (best > 0) { const [lead] = hits.splice(best, 1); hits.unshift(lead); }
+    }
+    this.marqueeSelectedIds = hits.map(h => ({ kind: h.kind, id: h.id }));
+    // Führendes Objekt = erster Eintrag (bestehende Auswahl bleibt führend).
     this.syncPrimarySelection();
 
   }
