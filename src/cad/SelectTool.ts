@@ -189,11 +189,11 @@ export class SelectTool {
   dragAreaLabelGrabOffsetWorld: Vec2 | null = null; // mouse - labelCenterWorld at drag-start
   dragAreaLabelStartOffset: Vec2 | null = null;     // hatch.areaLabel.offsetX/Y at drag-start
 
-  // Hilfslinien-Anker während aktivem Punkt-Edit (per Rechtsklick auf Snap-Punkte gesetzt).
-  // Erzeugen vertikale + horizontale Hilfslinien durch jeden Anker, deren Schnittpunkte und Achsen snappen.
-  editGuideAnchors: { key: string; point: Vec2 }[] = [];
-  /** Parallele Transform-Hilfslinien (R-Klick auf eine bestehende Kante). */
-  editParallelGuides: { key: string; point: Vec2; dir: Vec2 }[] = [];
+  /** Bezugspunkt der laufenden Transformation für den zentralen Hilfslinien-Controller. */
+  private _guideOrigin: Vec2 | null = null;
+
+  /** Bezugspunkt für Rechtsklick-Hilfslinien (nur während einer Transformation). */
+  getGuideAnchor(): Vec2 | null { return this._guideOrigin; }
 
   /** ESC-Abbruch: Instanz-Transformation exakt auf den Ausgangszustand zurücksetzen. */
   _restoreLibraryEdit() {
@@ -358,8 +358,7 @@ export class SelectTool {
 
 
   private _clearTransformGuides() {
-    this.editGuideAnchors = [];
-    this.editParallelGuides = [];
+    this._guideOrigin = null;
   }
 
   // ── Marquee (Rahmen-Auswahl) ─────────────────────────────────────────────
@@ -2495,7 +2494,7 @@ export class SelectTool {
     this.app.hub.bindCommit(null);
   }
 
-  private _editGuideDefinitions(): { point: Vec2; dir: Vec2 }[] {
+[] {
     const defs: { point: Vec2; dir: Vec2 }[] = [];
     for (const anchor of this.editGuideAnchors) {
       defs.push({ point: anchor.point, dir: v(1, 0) });
@@ -2510,70 +2509,16 @@ export class SelectTool {
   /** Rechtsklick-Grundmuster wie beim Zeichnen: Punkt = H/V-Achsen,
    *  Kante = parallele Hilfslinie durch den aktuellen Transform-Anker. */
   private _toggleEditGuideFromSnap(snap: Snap | null, parallelOrigin?: Vec2 | null): boolean {
-    if (!snap?.world) return false;
-    if (snap.type === SnapType.POINT || snap.type === SnapType.GUIDE_POINT) {
-      const key = `${snap.world.x.toFixed(6)}_${snap.world.y.toFixed(6)}`;
-      const idx = this.editGuideAnchors.findIndex((a) => a.key === key);
-      if (idx >= 0) this.editGuideAnchors.splice(idx, 1);
-      else this.editGuideAnchors.push({ key, point: v(snap.world.x, snap.world.y) });
-      return true;
-    }
-    if (snap.type !== SnapType.LINE || !parallelOrigin) return false;
-    const a = snap.lineA ?? snap.segment?.a;
-    const b = snap.lineB ?? snap.segment?.b;
-    if (!a || !b) return false;
-    const dir = norm(sub(b, a));
-    if (Math.hypot(dir.x, dir.y) < 1e-9) return false;
-    const sourceKey = snap.segment?.id
-      ?? `${snap.hatch?.id ?? "line"}_${snap.edgeIndex ?? ""}_${dir.x.toFixed(5)}_${dir.y.toFixed(5)}`;
-    const key = `${sourceKey}_${parallelOrigin.x.toFixed(6)}_${parallelOrigin.y.toFixed(6)}`;
-    const idx = this.editParallelGuides.findIndex((g) => g.key === key);
-    if (idx >= 0) this.editParallelGuides.splice(idx, 1);
-    else this.editParallelGuides.push({ key, point: v(parallelOrigin.x, parallelOrigin.y), dir });
-    return true;
+    // Hilfslinien setzt nur der zentrale GuideInteractionController;
+    // hier wird nur der Bezugspunkt der Transformation gemeldet.
+    void snap;
+    this._guideOrigin = parallelOrigin ? v(parallelOrigin.x, parallelOrigin.y) : null;
+    return false;
   }
 
   /** Snap aus aktiven Edit-Hilfslinien. Null falls keine Definition oder Maus zu weit. */
   private _findEditGuideSnap(input: Input): Snap | null {
-    const defs = this._editGuideDefinitions();
-    if (defs.length === 0) return null;
-    const mouseS = v(input.mouse.sx, input.mouse.sy);
-    const mouseW = v(input.mouse.wx, input.mouse.wy);
-    const cam = this.app.camera;
-
-    let best: Snap | null = null;
-    let bestPx = Infinity;
-
-    // Schnittpunkte (höhere Priorität)
-    for (let i = 0; i < defs.length; i++) {
-      for (let j = i + 1; j < defs.length; j++) {
-        const ip = lineLineIntersectionInfinite(defs[i].point, defs[i].dir, defs[j].point, defs[j].dir);
-        if (!ip) continue;
-        const sp = cam.worldToScreen(ip.x, ip.y);
-        const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
-        if (px <= Defaults.snapPx && px < bestPx) {
-          bestPx = px;
-          best = { type: SnapType.GUIDE_POINT, world: v(ip.x, ip.y), segment: null, pointIndex: null, t: null, px } as any;
-        }
-      }
-    }
-    if (best) return best;
-
-    for (const def of defs) {
-      const proj = projectPointToInfiniteLine(mouseW, def.point, def.dir);
-      const sp = cam.worldToScreen(proj.q.x, proj.q.y);
-      const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
-      if (px > Defaults.snapPx) continue;
-      if (px < bestPx) {
-        bestPx = px;
-        const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
-        const d = norm(def.dir);
-        const lineA = sub(def.point, mul(d, span));
-        const lineB = add(def.point, mul(d, span));
-        best = { type: SnapType.GUIDE, world: v(proj.q.x, proj.q.y), segment: null, pointIndex: null, t: null, px, lineA, lineB } as any;
-      }
-    }
-    return best;
+    return this.app.globalGuides.findSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy), this.app.camera);
   }
 
   private _chooseTransformSnap(topologySnap: Snap | null, guideSnap: Snap | null): Snap | null {
@@ -2607,15 +2552,9 @@ export class SelectTool {
     parallelOrigin: Vec2 | null,
     allowOwnFallback = true,
   ): boolean {
-    if (!input.rightClicked) return false;
-    const mouseS = v(input.mouse.sx, input.mouse.sy);
-    const mouseW = v(input.mouse.wx, input.mouse.wy);
-    const foreignSnap = this.app.topology.findBestSnap(mouseS, mouseW, exclusions);
-    const ownSnap = allowOwnFallback && !foreignSnap
-      ? this.app.topology.findBestSnap(mouseS, mouseW)
-      : null;
-    const snap = foreignSnap ?? ownSnap ?? this._findEditGuideSnap(input);
-    return this._toggleEditGuideFromSnap(snap, parallelOrigin);
+    void input; void exclusions; void allowOwnFallback;
+    this._guideOrigin = parallelOrigin ? v(parallelOrigin.x, parallelOrigin.y) : null;
+    return false;
   }
 
   private _hitTestWithForegroundPriority(input: Input) {
@@ -2972,6 +2911,7 @@ export class SelectTool {
 
 
   update(input: Input) {
+    this._guideOrigin = null;
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
     const documentHubGuideSession = this.app.documentHubMode !== "none" && this.app.documentHubState.visible
@@ -4688,7 +4628,6 @@ export class SelectTool {
     }
 
     // Hilfslinien während Einzel-, Mehrfach- und Copy/Paste-Transformationen.
-    const editGuideDefs = this._editGuideDefinitions();
     const directTransformActive = this.app.dimensionHubMode === "move"
       || this.app.documentHubMode !== "none"
       || !!(this.dragDocId || this.dragFreeStrokeId
@@ -4707,35 +4646,6 @@ export class SelectTool {
       ctx.restore();
     }
 
-    if (editGuideDefs.length > 0 && (this.isEditing() || this.marqueeSelectedIds.length > 0 || directTransformActive)) {
-
-      ctx.save();
-      ctx.strokeStyle = "rgba(110,110,110,0.42)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 6]);
-      const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
-      for (const def of editGuideDefs) {
-        const d = norm(def.dir);
-        const a = sub(def.point, mul(d, span));
-        const b = add(def.point, mul(d, span));
-        const sa = cam.worldToScreen(a.x, a.y);
-        const sb = cam.worldToScreen(b.x, b.y);
-        ctx.beginPath();
-        ctx.moveTo(sa.x, sa.y);
-        ctx.lineTo(sb.x, sb.y);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-      // Anker-Marker
-      for (const a of this.editGuideAnchors) {
-        const s = cam.worldToScreen(a.point.x, a.point.y);
-        ctx.fillStyle = "rgba(110,110,110,0.85)";
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
 
 
     // Document-Drag-Snap-Marker
