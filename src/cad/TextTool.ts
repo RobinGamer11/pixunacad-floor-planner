@@ -9,7 +9,7 @@ import type { TextBox } from "./Scene";
 /**
  * TextTool — places new text boxes by clicking. Anchor = top-left.
  * Snaps to all existing snap points (segments/hatches/dimensions/textbox corners)
- * via TopologyEngine. Right-click on a snap point toggles a guide anchor (axis lock).
+ * via TopologyEngine. Right-click guides come from the central GuideInteractionController.
  *
  * After placing, the box is auto-selected and the inline HTML editor is opened
  * so the user can immediately type.

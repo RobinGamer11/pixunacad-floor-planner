@@ -68,6 +68,9 @@ export class RulerTool {
 
   isDrawing() { return this.phase === "end"; }
 
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor() { return this.phase === "end" ? this._anchor : null; }
+
   getCursor() {
     if (this.phase !== "ready") return "crosshair";
     return this._drag.hoverCursor(this.app.input) || "default";

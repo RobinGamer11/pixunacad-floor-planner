@@ -19,6 +19,9 @@ export class FreeDrawTool {
 
   private _drawing = false;
   private _points: Vec2[] = [];
+
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor(): Vec2 | null { return this._points.length ? this._points[this._points.length - 1] : null; }
   /** Pointer-Druck je gesammeltem Punkt (0–1). */
   private _pressures: number[] = [];
   private _lastSamplePx: { x: number; y: number } | null = null;

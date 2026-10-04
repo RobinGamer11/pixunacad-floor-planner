@@ -35,6 +35,9 @@ export class LibraryPlacementTool {
 
   get activeDefinitionId(): string | null { return this.activeDef?.id || null; }
 
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor(): Vec2 | null { return this.phase === "rotating" ? this.anchor : null; }
+
   /** Nur relevant, wenn tatsächlich platziert wird (siehe `beginPlacement`). */
   activate() {
     this.app.hub.hide();
