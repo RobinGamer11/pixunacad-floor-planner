@@ -152,6 +152,13 @@ export class HatchTool {
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
   /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
   getGuideAnchor() { return this.points.length ? this.points[this.points.length - 1] : null; }
+  /** Laufende Zeichnung (bestätigte Punkte/Kanten) als temporäre Guide-Geometrie – nur lesend. */
+  getGuideExtraEdges(): [Vec2, Vec2][] {
+    const out: [Vec2, Vec2][] = [];
+    for (let i = 0; i < this.points.length - 1; i++) out.push([this.points[i], this.points[i + 1]]);
+    return out;
+  }
+  getGuideExtraPoints(): Vec2[] { return [...this.points]; }
 
   protected _resetCircleState() {
     this.circleState = "idle";

@@ -9,6 +9,8 @@ export interface GuideToolContext {
   anchor: Vec2 | null;
   /** Zusätzliche temporäre Kanten (Vorschau/Entwurf), die nicht in der Topologie liegen. */
   extraEdges?: [Vec2, Vec2][];
+  /** Bereits gesetzte Punkte einer laufenden Zeichnung. */
+  extraPoints?: Vec2[];
 }
 
 /** Ziel eines Rechtsklicks (seiteneffektfrei ermittelt). */
@@ -19,7 +21,7 @@ export type GuideTarget =
 export interface GuideTopology {
   findBestSnap(mouseS: Vec2, mouseW: Vec2, exclusions?: any): any;
   /** Zentrale, schreibgeschützte Objektgeometrie (guideGeometry.ts). */
-  guideGeometry?(extraEdges?: [Vec2, Vec2][]): GuideGeometry;
+  guideGeometry?(extraEdges?: [Vec2, Vec2][], extraPoints?: Vec2[]): GuideGeometry;
 }
 
 export interface GuideCamera {
@@ -47,11 +49,16 @@ export function findGuideTarget(
   topo: GuideTopology, cam: GuideCamera, mouseS: Vec2, mouseW: Vec2, ctx: GuideToolContext = { anchor: null },
 ): GuideTarget | null {
   const extra = ctx.extraEdges || [];
+  const extraPts = ctx.extraPoints || [];
   const geom: GuideGeometry = topo.guideGeometry
-    ? topo.guideGeometry(extra)
-    : buildGuideGeometry({ scene: null, isVisible: () => true, extraEdges: extra });
+    ? topo.guideGeometry(extra, extraPts)
+    : buildGuideGeometry({ scene: null, isVisible: () => true, extraEdges: extra, extraPoints: extraPts });
+  const tempGeom = buildGuideGeometry({ scene: null, isVisible: () => true, extraEdges: extra, extraPoints: extraPts });
   const tolW = pxToWorld(cam, mouseS, mouseW, Defaults.snapPx ?? 10);
   const tight = Math.max(1e-6, tolW * 0.15);
+  // 1. Temporäre Punkte der laufenden Zeichnung haben Vorrang
+  const tp = nearestGuidePoint(tempGeom, mouseW, tolW);
+  if (tp) return { kind: "point", world: v(tp.world.x, tp.world.y), directions: incidentDirectionsAt(geom, tp.world, tight) };
   let snap: any = null;
   try { snap = topo.findBestSnap(mouseS, mouseW); } catch { snap = null; }
 

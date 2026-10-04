@@ -3595,10 +3595,12 @@ export class CadApp {
         let extraEdges: [Vec2, Vec2][] = [];
         try { anchor = tool?.getGuideAnchor?.() ?? null; } catch { anchor = null; }
         try { extraEdges = tool?.getGuideExtraEdges?.() ?? []; } catch { extraEdges = []; }
+        let extraPoints: Vec2[] = [];
+        try { extraPoints = tool?.getGuideExtraPoints?.() ?? []; } catch { extraPoints = []; }
         const handled = this.guideController.handleRightClick(
           { x: this.input.mouse.sx, y: this.input.mouse.sy },
           { x: this.input.mouse.wx, y: this.input.mouse.wy },
-          { anchor, extraEdges },
+          { anchor, extraEdges, extraPoints },
         );
         if (handled) this.input.rightClicked = false;
       }

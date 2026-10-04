@@ -387,11 +387,11 @@ export class TopologyEngine {
 
 
   /** Schreibgeschützte Hilfslinien-Geometrie aller sichtbaren Quellen (inkl. Bibliothek, Hintergrundseiten). */
-  guideGeometry(extraEdges: [Vec2, Vec2][] = []): GuideGeometry {
+  guideGeometry(extraEdges: [Vec2, Vec2][] = [], extraPoints: Vec2[] = []): GuideGeometry {
     const extraScenes: { id: string; type: GuideSourceType; scene: any }[] = [];
     for (const ls of this._libraryScenes() as any[]) extraScenes.push({ id: ls.instanceId ?? ls.id ?? "library", type: "library", scene: ls.scene });
     this.tracingSnapScenes.forEach((s, i) => extraScenes.push({ id: `tracing:${i}`, type: "line", scene: s }));
-    return buildGuideGeometry({ scene: this.scene, isVisible: (id) => this.labels.isVisible(id as any), extraScenes, extraEdges });
+    return buildGuideGeometry({ scene: this.scene, isVisible: (id) => this.labels.isVisible(id as any), extraScenes, extraEdges, extraPoints });
   }
 
   findBestSnap(mouseS: Vec2, mouseW: Vec2, exclusions?: SnapExclusions): Snap | null {
