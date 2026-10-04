@@ -1,5 +1,6 @@
 import { Defaults, SnapType } from "./constants";
 import { computeStairGeometry } from "./stairGeometry";
+import { buildGuideGeometry, type GuideGeometry, type GuideSourceType } from "./guideGeometry";
 import { Vec2, v, projectPointToSegment, projectPointToCurvedEdge } from "./geometry";
 import { Scene, Segment, Hatch } from "./Scene";
 import { Camera } from "./Camera";
@@ -384,6 +385,14 @@ export class TopologyEngine {
 
 
 
+
+  /** Schreibgeschützte Hilfslinien-Geometrie aller sichtbaren Quellen (inkl. Bibliothek, Hintergrundseiten). */
+  guideGeometry(extraEdges: [Vec2, Vec2][] = []): GuideGeometry {
+    const extraScenes: { id: string; type: GuideSourceType; scene: any }[] = [];
+    for (const ls of this._libraryScenes() as any[]) extraScenes.push({ id: ls.instanceId ?? ls.id ?? "library", type: "library", scene: ls.scene });
+    this.tracingSnapScenes.forEach((s, i) => extraScenes.push({ id: `tracing:${i}`, type: "line", scene: s }));
+    return buildGuideGeometry({ scene: this.scene, isVisible: (id) => this.labels.isVisible(id as any), extraScenes, extraEdges });
+  }
 
   findBestSnap(mouseS: Vec2, mouseW: Vec2, exclusions?: SnapExclusions): Snap | null {
     let best: Snap | null = null;

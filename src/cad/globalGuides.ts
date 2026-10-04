@@ -158,8 +158,11 @@ export class GlobalGuides {
     const s = this._s;
     if (!s.axes.size) return;
     ctx.save();
-    ctx.strokeStyle = "rgba(77,163,255,0.38)";
-    ctx.lineWidth = 1;
+    // Sichtbar auf hellem und dunklem Grund (vorher 0.38 → teils unsichtbar)
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "rgba(30,136,255,0.85)";
+    ctx.lineWidth = 1.25;
     ctx.setLineDash([5, 6]);
     const far = 1e6;
     for (const l of s.axes.values()) {
