@@ -27,6 +27,8 @@ import { GlobalGuides } from "./globalGuides";
 import { GuideInteractionController } from "./GuideInteractionController";
 import { Renderer, Selection, type SpreadNeighborInfo } from "./Renderer";
 import { LineHub } from "./LineHub";
+import { PropertyEditSession, installPropertyEditListeners } from "./propertyEdit";
+import { runWallTopologyMaintenance as _wallMaint } from "./wallTopologyMaintenance";
 import { PointEditMenu } from "./PointEditMenu";
 import { SelectTool } from "./SelectTool";
 import { LineTool } from "./LineTool";
@@ -589,6 +591,9 @@ export class CadApp {
   private _historyMax = 21;
   /** Solange true, werden keine automatischen History-Snapshots erzeugt (z. B. während Regler-Drag). */
   suspendHistory = false;
+  /** Offene Eigenschafts-Transaktion der Einstellungs-Controls (1 Undo je Bedienaktion). */
+  propertyEdit!: PropertyEditSession;
+  private _uninstallPropertyEdit: (() => void) | null = null;
   /** Offene zentrale Aktion (beginAction … commitAction/cancelAction). */
   private _actionDepth = 0;
   private _actionStartSnapshot: string | null = null;
@@ -632,6 +637,10 @@ export class CadApp {
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
+    hubRoot.setAttribute("data-no-property-edit", "");
+    pointEditRoot.setAttribute("data-no-property-edit", "");
+    this.propertyEdit = new PropertyEditSession(this);
+    if (typeof document !== "undefined") this._uninstallPropertyEdit = installPropertyEditListeners(this.propertyEdit);
 
     this.hub = new LineHub(hubRoot, hubLenInput, hubAngInput);
     this.pointEditMenu = new PointEditMenu(pointEditRoot, pointEditButtons);
@@ -1566,6 +1575,26 @@ export class CadApp {
       targets.push(o);
     }
     return { leader, targets };
+  }
+
+  /**
+   * Bewusste Ausnahme zur Geometrie-Sperre: Wanddicke gemeinsam für alle
+   * ausgewählten gleichartigen Wände. Nur thicknessM, Verlauf/Ecken/Bezugsseite
+   * bleiben je Wand erhalten; Topologie wird neu berechnet; 1 Undo-Schritt.
+   */
+  setBatchWallThickness(thicknessM: number): boolean {
+    const v = Math.max(0.001, Number(thicknessM));
+    if (!Number.isFinite(v)) return false;
+    const { targets } = this.getBatchEditTargets("wall");
+    if (!targets.length) return false;
+    this.beginAction();
+    try {
+      for (const w of targets) w.thicknessM = v;
+      _wallMaint(this.scene as any, targets);
+    } finally { this.commitAction(); }
+    try { (this as any).topology?.invalidate?.(); } catch {}
+    try { this.renderer.render(); } catch {}
+    return true;
   }
 
   /** Ebenenwechsel für Leader + gleichartige Auswahl über die passende assign…ToLabel()-Methode. */
@@ -3260,6 +3289,7 @@ export class CadApp {
   }
 
   setTool(id: string) {
+    try { this.propertyEdit?.flush(); } catch {}
     // Zuletzt gewähltes objektbezogenes Werkzeug merken. Der Wechsel zum
     // Auswahlwerkzeug (oder zu Radierer/Pipette) löscht diesen Filter NICHT —
     // er bestimmt, welche Objekte "Alles"/Strg+A auswählt.
@@ -4471,6 +4501,8 @@ export class CadApp {
   }
 
   destroy() {
+    try { this._uninstallPropertyEdit?.(); } catch {}
+    this._uninstallPropertyEdit = null;
     this._destroyed = true;
     cancelAnimationFrame(this._rafId);
     if (this._snapshotTimer != null) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }

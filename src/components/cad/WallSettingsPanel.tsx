@@ -99,7 +99,9 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
   const setThickness = (val: number) => {
     const v = Math.max(0.001, val);
     if (selectedWall) {
-      updateSelected(() => { selectedWall.thicknessM = v; });
+      // Mehrfachauswahl: Dicke auf alle gleichartigen Wände (zentrale Ausnahme).
+      app.setBatchWallThickness(v);
+      rerender();
     } else {
       // Eine gemeinsame Eingabe "Wanddicke": schreibt in die Dicke der aktuell
       // gewählten Wandart und hebt eine alte Override-Dicke auf.

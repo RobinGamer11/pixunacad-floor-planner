@@ -26,30 +26,19 @@ const PATTERNS: { value: StrokePatternKind; label: string }[] = [
   { value: "dotted", label: "Gepunktet" },
 ];
 
-/** Alle aktuell ausgewählten Objekte der jeweiligen Art. */
+/**
+ * Batch-Ziele über die zentrale Mehrfachauswahl: führendes Objekt zuerst,
+ * danach nur Objekte desselben konkreten Typs (Linie ≠ Hilfslinie,
+ * Polygon ≠ Schraffur), gesperrte Ebenen ausgenommen.
+ */
 function selectedTargets(app: any, kind: StrokeEffectKind): any[] {
-  if (!app) return [];
-  const sels: any[] = Array.isArray(app.selections) && app.selections.length
-    ? app.selections
-    : (app.selection ? [app.selection] : []);
-  const out: any[] = [];
-  for (const s of sels) {
-    if (kind === "line" && s?.segmentId) {
-      const o = app.scene?.getSegmentById?.(s.segmentId);
-      if (o) out.push(o);
-    } else if ((kind === "polygon" || kind === "hatch") && s?.hatchId) {
-      const o = app.scene?.getHatchById?.(s.hatchId);
-      if (o && (o.isPolygon === true) === (kind === "polygon")) out.push(o);
-    } else if (kind === "free") {
-      // Je nach Auswahlquelle heißt das Feld `freeId` (Klick) oder
-      // `freeStrokeId` (Rahmenauswahl/Edit-Target) — beide akzeptieren.
-      const id = s?.freeId || s?.freeStrokeId;
-      const o = id ? app.scene?.getFreeStrokeById?.(id) : null;
-      if (o) out.push(o);
-    }
-
-  }
-  return out;
+  if (!app?.getBatchEditTargets) return [];
+  const batchKind = kind === "line" ? "segment" : kind === "free" ? "freeStroke" : "hatch";
+  const { leader, targets } = app.getBatchEditTargets(batchKind);
+  if (!leader) return [];
+  if (kind === "line" && leader.isGuide === true) return [];
+  if ((kind === "polygon" || kind === "hatch") && (leader.isPolygon === true) !== (kind === "polygon")) return [];
+  return targets;
 }
 
 /**
@@ -163,7 +152,16 @@ export const StrokeEffectsSettings: React.FC<{
     rerender();
   };
 
-  const applyPattern = (patch: Partial<StrokePatternParams>) => {
+  // Einzelklicks (Knöpfe) = eigene Aktion; während eines Reglerzugs läuft
+  // bereits die zentrale Eigenschafts-Transaktion.
+  const inAction = (fn: () => void) => {
+    if (!app || targets.length === 0 || app.isActionOpen?.()) { fn(); return; }
+    app.beginAction?.();
+    try { fn(); } finally { app.commitAction?.(); }
+  };
+
+  const applyPattern = (patch: Partial<StrokePatternParams>) => inAction(() => applyPatternRaw(patch));
+  const applyPatternRaw = (patch: Partial<StrokePatternParams>) => {
     if (!app) return;
     if (targets.length === 0) {
       const d = app.strokeEffectDefaults?.[kind];
@@ -181,7 +179,8 @@ export const StrokeEffectsSettings: React.FC<{
     commit();
   };
 
-  const applyRoughen = (patch: Partial<RoughenParams>) => {
+  const applyRoughen = (patch: Partial<RoughenParams>) => inAction(() => applyRoughenRaw(patch));
+  const applyRoughenRaw = (patch: Partial<RoughenParams>) => {
     if (!app) return;
     if (targets.length === 0) {
       const d = app.strokeEffectDefaults?.[kind];
@@ -193,13 +192,10 @@ export const StrokeEffectsSettings: React.FC<{
   };
 
   // Zusammenhängende Reglerbewegung = genau ein Undo-Schritt.
-  const dragStart = () => { if (app) (app as any).suspendHistory = true; };
-  const dragEnd = () => {
-    if (!app) return;
-    (app as any).suspendHistory = false;
-    try { (app as any).commitHistorySnapshot?.(); } catch { /* noop */ }
-    commit();
-  };
+  // Reglerzüge laufen über die zentrale Eigenschafts-Transaktion der CadApp
+  // (pointerdown → begin, pointerup/change → commit, Escape → verwerfen).
+  const dragStart = () => {};
+  const dragEnd = () => { commit(); };
 
   // Strich-/Abstandsregler: Freihand arbeitet in der Projektmappe (eingebetteter
   // MiniCad) mit deutlich feineren Werten; in der CAD-Oberfläche bleibt der
@@ -213,7 +209,8 @@ export const StrokeEffectsSettings: React.FC<{
   const brushInfo = brushPresetInfo(activeBrush);
   const brushCharacter = pattern.brushCharacter ?? brushInfo?.character ?? 50;
 
-  const selectBrush = (id: string) => {
+  const selectBrush = (id: string) => inAction(() => selectBrushRaw(id));
+  const selectBrushRaw = (id: string) => {
     if (!id) {
       applyPattern({ kind: "solid" });
       applyBrushSizeDefaults(app, kind, "", targets);
@@ -309,7 +306,7 @@ export const StrokeEffectsSettings: React.FC<{
           <button
             key={p.value}
             type="button"
-            onClick={() => {
+            onClick={() => inAction(() => {
               const changed = pattern.kind !== p.value;
               applyPattern({ kind: p.value });
               // Jede Linienart bringt ihre eigene Strichstärke mit — ein
@@ -318,7 +315,7 @@ export const StrokeEffectsSettings: React.FC<{
                 applyBrushSizeDefaults(app, kind, "", targets);
                 commit();
               }
-            }}
+            })}
             className={`flex h-8 items-center justify-center rounded border px-2 text-[11px] transition-colors ${
               pattern.kind === p.value ? "bg-accent" : "hover:bg-muted"
             }`}
