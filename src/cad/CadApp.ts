@@ -3596,7 +3596,13 @@ export class CadApp {
         try { anchor = tool?.getGuideAnchor?.() ?? null; } catch { anchor = null; }
         try { extraEdges = tool?.getGuideExtraEdges?.() ?? []; } catch { extraEdges = []; }
         let extraPoints: Vec2[] = [];
-        try { extraPoints = tool?.getGuideExtraPoints?.() ?? []; } catch { extraPoints = []; }
+        try {
+          const xg = tool?.getGuideExtraGeometry?.();
+          if (xg) {
+            extraEdges = [...extraEdges, ...xg.edges.map((e: any) => [e.a, e.b] as [Vec2, Vec2])];
+            extraPoints = xg.points.map((p: any) => p.world);
+          }
+        } catch { extraPoints = []; }
         const handled = this.guideController.handleRightClick(
           { x: this.input.mouse.sx, y: this.input.mouse.sy },
           { x: this.input.mouse.wx, y: this.input.mouse.wy },
