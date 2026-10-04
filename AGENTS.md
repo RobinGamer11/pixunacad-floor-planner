@@ -43,3 +43,6 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Ausschnitt-Transformationen im Export laufen als Sitzung in `PlanController` (`_drag.preview`) – die Projection bleibt bis ✓/Enter unverändert, damit weder Cloud noch Verlauf Zwischenstände sehen.
 - Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges` – kein zweites Bedienkonzept.
 - Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M` je Auftritt) – Podeste wachsen nie automatisch, nur durch bewusste Eingabe.
+
+## Hilfslinien
+- Rechtsklick-Hilfslinien laufen nur über `GuideInteractionController` → `GlobalGuides` (Gruppen mit Referenzzählung, je Kontext `cad|export:sheet|plan`) – flüchtig, nie Cloud/Undo/Export, nie zwischen Blatt und Exportseite.
