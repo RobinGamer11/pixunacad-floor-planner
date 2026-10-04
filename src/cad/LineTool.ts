@@ -137,6 +137,8 @@ export class LineTool {
 
   finish() { this.cancel(); }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor() { return this.currentPoint; }
   isDrawing() {
     return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle";
   }

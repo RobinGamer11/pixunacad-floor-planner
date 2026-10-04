@@ -157,6 +157,8 @@ export class WallTool {
 
   finish() { this.cancel(); }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor() { return this.corners.length ? this.corners[this.corners.length - 1] : null; }
   isDrawing() { return this.state === "drawing"; }
 
   ownLineKind(): "main" | "sub" | "help" {

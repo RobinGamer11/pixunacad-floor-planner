@@ -24,6 +24,7 @@ import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
 import { migrateCadSnapshot } from "@/lib/persistence";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
+import { GuideInteractionController } from "./GuideInteractionController";
 import { Renderer, Selection, type SpreadNeighborInfo } from "./Renderer";
 import { LineHub } from "./LineHub";
 import { PointEditMenu } from "./PointEditMenu";
@@ -284,6 +285,13 @@ export class CadApp {
     return this.activePlanId ? `plan:${this.activePlanId}` : `sheet:${this.activeSheetId}`;
   }
 
+  /** Geltungsbereich der Hilfslinien: CAD-Blatt, Plan oder Exportseite — nie übergreifend. */
+  private _guideContextKey(): string {
+    let view = "cad";
+    try { if (new URLSearchParams(window.location.search).get("view") === "export") view = "export"; } catch {}
+    return `${view}:${this._rasterKey()}`;
+  }
+
   /** Rasterebenen der aktuell aktiven Zeichenfläche. */
   get rasterLayers(): RasterLayers {
     const key = this._rasterKey();
@@ -322,6 +330,7 @@ export class CadApp {
   topology: TopologyEngine;
   /** Globale Hilfslinien (Rechtsklick auf Fangpunkt) — für alle Werkzeuge. */
   globalGuides: GlobalGuides;
+  guideController!: GuideInteractionController;
   renderer: Renderer;
 
   /**
@@ -665,6 +674,7 @@ export class CadApp {
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
     this.globalGuides = new GlobalGuides();
     this.topology.guides = this.globalGuides;
+    this.guideController = new GuideInteractionController(this.globalGuides, this.topology as any, this.camera as any);
     this.renderer = new Renderer(this.ctx, this.camera, this.scene, this.labelManager);
 
     // Plan-Modus Controller (Step 4): Drop, Selektion, Drag, HUB.
@@ -3576,23 +3586,26 @@ export class CadApp {
       // werkzeugübergreifend. Linien-/Wandwerkzeug und der Punkt-Edit des
       // Auswahlwerkzeugs bringen eigene Hilfslinien mit und bleiben unberührt.
       // Rechtsklick beendet das fortlaufende Platzieren.
+      // Rechtsklick → Hilfslinien: ausschließlich über den zentralen
+      // GuideInteractionController (werkzeug- und objektübergreifend).
+      this.globalGuides.setContext(this._guideContextKey());
+      if (this.input.rightClicked) {
+        const tool: any = this.activeTool;
+        let anchor: Vec2 | null = null;
+        let extraEdges: [Vec2, Vec2][] = [];
+        try { anchor = tool?.getGuideAnchor?.() ?? null; } catch { anchor = null; }
+        try { extraEdges = tool?.getGuideExtraEdges?.() ?? []; } catch { extraEdges = []; }
+        const handled = this.guideController.handleRightClick(
+          { x: this.input.mouse.sx, y: this.input.mouse.sy },
+          { x: this.input.mouse.wx, y: this.input.mouse.wy },
+          { anchor, extraEdges },
+        );
+        if (handled) this.input.rightClicked = false;
+      }
+      // Rechtsklick ohne Hilfslinienziel beendet das fortlaufende Platzieren.
       if (this.input.rightClicked && this.multiPasteActive) {
         this.input.rightClicked = false;
         this.stopMultiPaste();
-      }
-
-      if (this.input.rightClicked) {
-        const ownGuides = this.activeTool === this.lineTool || this.activeTool === this.wallTool
-          || (this.activeTool === this.selectTool && this.selectTool.isEditing());
-        if (!ownGuides) {
-          const mS = { x: this.input.mouse.sx, y: this.input.mouse.sy };
-          const mW = { x: this.input.mouse.wx, y: this.input.mouse.wy };
-          const snap = this.topology.findBestSnap(mS, mW);
-          if (snap?.world && (snap.type === "POINT" || snap.type === "GUIDE_POINT")) {
-            this.globalGuides.toggleAt(snap.world);
-            this.input.rightClicked = false;
-          }
-        }
       }
 
       if (this.activePlanId) {
