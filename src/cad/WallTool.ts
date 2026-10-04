@@ -34,27 +34,8 @@ export interface WallToolSettings {
   patternAngleDeg: number;
 }
 
-interface GuideAnchor {
-  key: string;
-  segmentId?: string;
-  hatchId?: string;
-  wallId?: string;
-  pointIndex: number;
-  point: Vec2;
-}
 
-interface ParallelGuide {
-  key: string;
-  segmentId?: string;
-  hatchId?: string;
-  wallId?: string;
-  edgeIndex?: number;
-}
 
-interface GuideDef {
-  point: Vec2;
-  dir: Vec2;
-}
 
 export class WallTool {
   app: CadApp;
@@ -242,12 +223,6 @@ export class WallTool {
 
 
 
-  private _getGuideRenderSegment(point: Vec2, dir: Vec2) {
-    const cam = this.app.camera;
-    const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
-    const d = norm(dir);
-    return { a: sub(point, mul(d, span)), b: add(point, mul(d, span)) };
-  }
 
 
   private _findGuideSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {

@@ -15,22 +15,8 @@ import { findHybridEnclosingFace } from "./hybridFill";
 import { maybeRasterize } from "./rasterize";
 import { toast } from "sonner";
 
-interface GuideAnchor {
-  key: string;
-  point: Vec2;
-}
 
-interface ParallelGuide {
-  key: string;
-  segmentId?: string;
-  hatchId?: string;
-  edgeIndex?: number;
-}
 
-interface GuideDef {
-  point: Vec2;
-  dir: Vec2;
-}
 
 export type HatchDrawMode = "polygon" | "rectangle" | "circle" | "fill";
 
@@ -189,12 +175,6 @@ export class HatchTool {
 
 
 
-  private _getGuideRenderSegment(point: Vec2, dir: Vec2) {
-    const cam = this.app.camera;
-    const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
-    const d = norm(dir);
-    return { a: sub(point, mul(d, span)), b: add(point, mul(d, span)) };
-  }
 
 
   private _findGuideSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
