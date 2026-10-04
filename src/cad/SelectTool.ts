@@ -4892,12 +4892,14 @@ export class SelectTool {
 
   /** Abstand des Element-Mittelpunkts zum Startpunkt des Auswahlrahmens. */
   private _distToRectStart(pts: Vec2[]): number {
-    const s: any = (this as any).marqueeStart;
-    if (!s || !pts.length) return 0;
+    const s = this.marqueeStart; // Screen-Pixel
+    const cam: any = (this.app as any).camera;
+    if (!s || !pts.length || !cam?.screenToWorld) return 0;
     let cx = 0, cy = 0;
     for (const p of pts) { cx += p.x; cy += p.y; }
     cx /= pts.length; cy /= pts.length;
-    const sx = s.wx ?? s.x, sy = s.wy ?? s.y;
+    const w = cam.screenToWorld(s.x, s.y);
+    const sx = w?.x, sy = w?.y;
     if (!Number.isFinite(sx) || !Number.isFinite(sy)) return 0;
     return Math.hypot(cx - sx, cy - sy);
   }
