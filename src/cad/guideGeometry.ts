@@ -26,6 +26,8 @@ export interface GuideGeometrySources {
   extraScenes?: { id: string; type: GuideSourceType; scene: any }[];
   /** Temporäre Kanten (Vorschau / Exportrand). */
   extraEdges?: [Vec2, Vec2][];
+  /** Temporäre Punkte (laufende Zeichnung). */
+  extraPoints?: Vec2[];
 }
 
 const dirKey = (d: Vec2) => { const c = canonicalDir(d); return `${c.x.toFixed(4)}_${c.y.toFixed(4)}`; };
@@ -94,6 +96,7 @@ export function buildGuideGeometry(src: GuideGeometrySources): GuideGeometry {
   addScene(b, src.scene, src.isVisible);
   for (const x of src.extraScenes || []) addScene(b, x.scene, src.isVisible, x.type, x.id);
   for (const [a, c] of src.extraEdges || []) b.edge(a, c, "extra", "extra");
+  for (const p of src.extraPoints || []) b.point(p, "extra", "extra");
   return b.result();
 }
 
