@@ -18,7 +18,6 @@ export class TextTool {
   app: CadApp;
   id = ToolIds.TEXT;
 
-  guideAnchors: { key: string; point: Vec2 }[] = [];
   hoverSnapWorld: Vec2 | null = null;
 
   // Drag-create state (Modus "Text passt sich Rahmen an")
@@ -31,7 +30,6 @@ export class TextTool {
   }
 
   activate() {
-    this.guideAnchors = [];
     this.hoverSnapWorld = null;
     this._dragStart = null;
     this._dragEnd = null;
@@ -45,7 +43,6 @@ export class TextTool {
   }
 
   cancel() {
-    this.guideAnchors = [];
     this.hoverSnapWorld = null;
     this._dragStart = null;
     this._dragEnd = null;
@@ -78,19 +75,6 @@ export class TextTool {
     this.hoverSnapWorld = snap ? v(snap.world.x, snap.world.y) : null;
     if (snap) p = v(snap.world.x, snap.world.y);
 
-    // Apply guide-anchor axis locks (X/Y from any anchor, by screen distance)
-    let bestX: number | null = null, bestY: number | null = null;
-    let bestXPx = Infinity, bestYPx = Infinity;
-    for (const anchor of this.guideAnchors) {
-      const s = this.app.camera.worldToScreen(anchor.point.x, anchor.point.y);
-      const dx = Math.abs(s.x - input.mouse.sx);
-      if (dx <= Defaults.snapPx && dx < bestXPx) { bestXPx = dx; bestX = anchor.point.x; }
-      const dy = Math.abs(s.y - input.mouse.sy);
-      if (dy <= Defaults.snapPx && dy < bestYPx) { bestYPx = dy; bestY = anchor.point.y; }
-    }
-    if (bestX != null) p.x = bestX;
-    if (bestY != null) p.y = bestY;
-
     return p;
   }
 
@@ -103,13 +87,6 @@ export class TextTool {
 
     const anchor = this._previewAnchor(input);
 
-    // Right-click on a snap point toggles a guide anchor
-    if (input.rightClicked && this.hoverSnapWorld) {
-      const key = `${this.hoverSnapWorld.x.toFixed(6)}_${this.hoverSnapWorld.y.toFixed(6)}`;
-      const idx = this.guideAnchors.findIndex(a => a.key === key);
-      if (idx >= 0) this.guideAnchors.splice(idx, 1);
-      else this.guideAnchors.push({ key, point: v(this.hoverSnapWorld.x, this.hoverSnapWorld.y) });
-    }
 
     if (input.doubleClicked) {
       const box = this._hitTextBox(input);
@@ -207,23 +184,6 @@ export class TextTool {
   /* ---- Overlay ---- */
 
   private _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
-    // Guide lines (full viewport cross at each anchor)
-    if (this.guideAnchors.length > 0) {
-      ctx.save();
-      ctx.strokeStyle = "rgba(110,110,110,0.38)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 6]);
-      for (const a of this.guideAnchors) {
-        const s = cam.worldToScreen(a.point.x, a.point.y);
-        ctx.beginPath();
-        ctx.moveTo(0, s.y); ctx.lineTo(this.app.renderer.vw, s.y);
-        ctx.moveTo(s.x, 0); ctx.lineTo(s.x, this.app.renderer.vh);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-      ctx.restore();
-    }
-
     // Snap indicator
     if (this.hoverSnapWorld) {
       const s = cam.worldToScreen(this.hoverSnapWorld.x, this.hoverSnapWorld.y);
