@@ -164,11 +164,10 @@ export class GlobalGuides {
     ctx.strokeStyle = "rgba(30,136,255,0.85)";
     ctx.lineWidth = 1.25;
     ctx.setLineDash([5, 6]);
-    const far = 1e6;
     for (const l of s.axes.values()) {
-      const a = cam.worldToScreen(l.point.x - l.dir.x * far, l.point.y - l.dir.y * far);
-      const b = cam.worldToScreen(l.point.x + l.dir.x * far, l.point.y + l.dir.y * far);
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      const seg = clipInfiniteLineToRect(cam, l.point, l.dir, _vw, _vh);
+      if (!seg) continue;
+      ctx.beginPath(); ctx.moveTo(seg[0].x, seg[0].y); ctx.lineTo(seg[1].x, seg[1].y); ctx.stroke();
     }
     ctx.setLineDash([]);
     ctx.fillStyle = "rgba(77,163,255,0.95)";
