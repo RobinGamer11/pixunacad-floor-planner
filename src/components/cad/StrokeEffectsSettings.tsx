@@ -209,7 +209,8 @@ export const StrokeEffectsSettings: React.FC<{
   const brushInfo = brushPresetInfo(activeBrush);
   const brushCharacter = pattern.brushCharacter ?? brushInfo?.character ?? 50;
 
-  const selectBrush = (id: string) => {
+  const selectBrush = (id: string) => inAction(() => selectBrushRaw(id));
+  const selectBrushRaw = (id: string) => {
     if (!id) {
       applyPattern({ kind: "solid" });
       applyBrushSizeDefaults(app, kind, "", targets);
@@ -305,7 +306,7 @@ export const StrokeEffectsSettings: React.FC<{
           <button
             key={p.value}
             type="button"
-            onClick={() => {
+            onClick={() => inAction(() => {
               const changed = pattern.kind !== p.value;
               applyPattern({ kind: p.value });
               // Jede Linienart bringt ihre eigene Strichstärke mit — ein
@@ -314,7 +315,7 @@ export const StrokeEffectsSettings: React.FC<{
                 applyBrushSizeDefaults(app, kind, "", targets);
                 commit();
               }
-            }}
+            })}
             className={`flex h-8 items-center justify-center rounded border px-2 text-[11px] transition-colors ${
               pattern.kind === p.value ? "bg-accent" : "hover:bg-muted"
             }`}
