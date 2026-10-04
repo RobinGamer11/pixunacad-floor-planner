@@ -168,7 +168,12 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
         <select
           value={labelValue}
           onChange={(e) => {
-            if (st) { (app.scene as any).assignStairsToLabel([st.id], e.target.value); app.commitHistorySnapshot(); }
+            if (st) {
+              const ids = new Set<string>([st.id]);
+              for (const m of ((app as any).selectTool?.marqueeSelectedIds ?? [])) if (m.kind === "stair") ids.add(m.id);
+              (app.scene as any).assignStairsToLabel([...ids], e.target.value);
+              app.commitHistorySnapshot();
+            }
             else (app as any).setActiveDrawLabelId(e.target.value);
             (app as any).refreshLabelUI?.();
             app.renderer.render();

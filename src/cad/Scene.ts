@@ -1796,6 +1796,8 @@ export class Scene {
   getWallsByLabelId(labelId: string): Wall[] { return this.walls.filter(w => w.labelId === labelId); }
   removeWallsByLabelId(labelId: string) { this.walls = this.walls.filter(w => w.labelId !== labelId); this.markWallsDirty(); }
   reassignWallsLabel(oldId: string, newId: string) { for (const w of this.walls) if (w.labelId === oldId) w.labelId = newId; this.markWallsDirty(); }
+  assignWallsToLabel(ids: string[], newId: string) { const set = new Set(ids); for (const w of this.walls) if (set.has(w.id)) w.labelId = newId; this.markWallsDirty(); }
+  assignFreeStrokesToLabel(ids: string[], newId: string) { const set = new Set(ids); for (const s of this.freeStrokes) if (set.has(s.id)) s.labelId = newId; }
 
   /**
    * Splittet eine Wand exakt am Punkt p (muss auf einer Edge liegen). Erzeugt zwei neue

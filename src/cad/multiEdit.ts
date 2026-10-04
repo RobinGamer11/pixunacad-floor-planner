@@ -6,9 +6,16 @@
  * Position/Größe der einzelnen Objekte nicht angleichen.
  */
 
-const GEOMETRY_KEYS = new Set([
+/**
+ * Niemals gespiegelt: Identität, Geometrie, Inhalte und Ebene. `labelId`
+ * läuft ausschließlich über `CadApp.assignBatchToLabel` (assign…ToLabel).
+ */
+export const GEOMETRY_KEYS = new Set([
   "id", "a", "b", "x", "y", "points", "holes", "center", "widthM", "heightM",
   "rotationRad", "p1", "p2", "placementPoint", "bulge", "bulges", "holeBulges",
+  "labelId", "text", "html", "content", "runs", "cells", "rows", "cols",
+  "colWidths", "rowHeights", "formulas", "path", "corners", "src", "dataUrl",
+  "mask", "pixels", "stepDistancesM", "offset", "offsetM",
 ]);
 
 export function mirrorProxy<T extends object>(primary: T, siblings: T[]): T {
