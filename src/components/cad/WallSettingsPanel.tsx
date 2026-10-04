@@ -56,6 +56,18 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
     if (!selectedWall) return;
     apply();
     runWallTopologyMaintenance(app.scene, [selectedWall]);
+    app.commitHistorySnapshot?.();
+    rerender();
+  };
+
+  /** Reine Darstellungseigenschaft auf Leader + alle ausgewählten Wände
+   *  (Dicke/Bezugsseite/Art bleiben Leader-only, da sie Geometrie bestimmen). */
+  const updateAllSelected = (apply: (w: any) => void) => {
+    const { targets } = app.getBatchEditTargets("wall");
+    if (!targets.length) return;
+    for (const w of targets) apply(w);
+    runWallTopologyMaintenance(app.scene, targets);
+    app.commitHistorySnapshot?.();
     rerender();
   };
 
@@ -99,45 +111,41 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
 
 
   const setColor = (color: string) => {
-    if (selectedWall) updateSelected(() => { selectedWall.color = color; });
+    if (selectedWall) updateAllSelected(w => { w.color = color; });
     else update({ color });
   };
 
   const setFillColor = (fillColor: string) => {
-    if (selectedWall) updateSelected(() => { selectedWall.fillColor = fillColor; });
+    if (selectedWall) updateAllSelected(w => { w.fillColor = fillColor; });
     else update({ fillColor, fillColorAuto: false });
   };
 
   const setPattern = (patternId: string) => {
-    if (selectedWall) updateSelected(() => { (selectedWall as any).patternId = patternId; });
+    if (selectedWall) updateAllSelected(w => { w.patternId = patternId; });
     else update({ patternId } as any);
   };
 
   const setPatternScale = (patternScale: number) => {
     const val = Math.max(0.1, Math.min(10, patternScale || 1));
-    if (selectedWall) updateSelected(() => { (selectedWall as any).patternScale = val; });
+    if (selectedWall) updateAllSelected(w => { w.patternScale = val; });
     else update({ patternScale: val } as any);
   };
 
   const setPatternAngle = (val: number) => {
     const deg = Math.max(-180, Math.min(180, Math.round(Number.isFinite(val) ? val : 0)));
-    const walls = app.getSelectedWalls?.() ?? (selectedWall ? [selectedWall] : []);
-    if (walls.length > 0) {
-      updateSelected(() => { for (const w of walls) (w as any).patternAngleDeg = deg; });
-    } else {
-      update({ patternAngleDeg: deg } as any);
-    }
+    if (selectedWall) updateAllSelected(w => { w.patternAngleDeg = deg; });
+    else update({ patternAngleDeg: deg } as any);
   };
 
   const setPatternAlign = (val: boolean) => {
-    if (selectedWall) updateSelected(() => { (selectedWall as any).patternAlignToWall = val; });
+    if (selectedWall) updateAllSelected(w => { w.patternAlignToWall = val; });
     else update({ patternAlignToWall: val } as any);
   };
 
   const setLabel = (labelId: string) => {
     if (selectedWall) {
-      updateSelected(() => { selectedWall.labelId = labelId; });
-      app.refreshLabelUI();
+      app.assignBatchToLabel("wall", labelId);
+      rerender();
     } else {
       update({ labelId });
     }

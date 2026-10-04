@@ -3231,7 +3231,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     const app = appRef.current;
                     const doc = app?.scene.getDocumentById(docSelected.id);
                     if (!app || !doc) return;
-                    doc.labelId = e.target.value;
+                    if (!app.assignBatchToLabel("document", e.target.value)) {
+                      app.scene.assignDocumentsToLabel([doc.id], e.target.value);
+                      app.commitHistorySnapshot();
+                    }
                     app.refreshLabelUI();
                     app.renderer.render();
                     setDocLabelTick((x) => x + 1);
