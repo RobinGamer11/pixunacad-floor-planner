@@ -690,51 +690,21 @@ export class StairTool {
     } catch { return direction; }
   }
 
-  /**
-   * Rechtsklick in allen Treppenschritten: Fangpunkte setzt CadApp bereits als
-   * globale Hilfslinie; hier kommt die parallele Hilfslinie zu einer Kante dazu
-   * (bestehende GlobalGuides, keine eigene Treppen-Hilfslinienlogik).
-   */
-  private _handleRightClick(input: Input): boolean {
-    if (!input.rightClicked) return false;
-    const guides = (this.app as any).globalGuides;
-    if (!guides?.toggleLine) return false;
-    const mS = { x: input.mouse.sx, y: input.mouse.sy }, mW = { x: input.mouse.wx, y: input.mouse.wy };
-    let edge: [P, P] | null = null;
-    try {
-      const snap = (this.app as any).topology?.findBestSnap?.(mS, mW);
-      if (snap?.lineA && snap?.lineB) edge = [snap.lineA, snap.lineB];
-    } catch { /* optional */ }
-    if (!edge) {
-      // Temporäre Kanten (Startkante, Vorschau/Entwurf) sind nicht in der Topologie.
-      const cands: [P, P][] = [];
-      const se = this._startEdge(); if (se) cands.push(se);
-      if (this._draft) for (const e of stairEditableEdges(this._draft)) cands.push([e.a, e.b]);
-      let bd = 10;
-      for (const [a, b] of cands) {
-        const sa = this.app.camera.worldToScreen(a.x, a.y), sb = this.app.camera.worldToScreen(b.x, b.y);
-        const dx = sb.x - sa.x, dy = sb.y - sa.y, L2 = dx * dx + dy * dy || 1;
-        const t = Math.max(0, Math.min(1, ((mS.x - sa.x) * dx + (mS.y - sa.y) * dy) / L2));
-        const d = Math.hypot(sa.x + dx * t - mS.x, sa.y + dy * t - mS.y);
-        if (d < bd) { bd = d; edge = [a, b]; }
-      }
-    }
-    if (!edge) return false;
-    // Durch den aktuellen Bezugspunkt (letzter Referenzpunkt/Startpunkt/Griff), sonst durch die Kante selbst.
-    const sel = this.selectedHandle();
-    const through: P = (this.phase === "path" && this._path.length ? this._path[this._path.length - 1] : null)
-      ?? (this.phase === "dir" || this.phase === "side" ? this._start : null)
-      ?? (this.phase === "edit" && sel ? sel.pos : null)
-      ?? edge[0];
-    guides.toggleLine(through, { x: edge[1].x - edge[0].x, y: edge[1].y - edge[0].y });
-    input.rightClicked = false;
-    return true;
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor(): P | null {
+    if (this.phase === "edit") return null;
+    return this._path.length ? this._path[this._path.length - 1] : this._start;
+  }
+
+  /** Temporäre Kanten (Startkante) als Hilfslinienziele. */
+  getGuideExtraEdges(): [P, P][] {
+    const se = this._startEdge();
+    return se ? [se] : [];
   }
 
   update(input: Input) {
     const pressed = input.clicked;
     this._shift = !!input.keys?.shift;
-    this._handleRightClick(input);
     if (this.phase === "edit") { this._updateEdit(input); return; }
     this._setCursor("default");
 

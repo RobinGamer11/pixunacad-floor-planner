@@ -169,6 +169,8 @@ export class HatchTool {
 
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
   resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor() { return this.points.length ? this.points[this.points.length - 1] : null; }
 
   protected _resetCircleState() {
     this.circleState = "idle";
