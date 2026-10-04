@@ -14,25 +14,8 @@ import { maybeRasterize } from "./rasterize";
 export type LineDrawMode = "polyline" | "rectangle" | "circle";
 
 
-interface GuideAnchor {
-  key: string;
-  segmentId?: string;
-  hatchId?: string;
-  pointIndex: number;
-  point: Vec2;
-}
 
-interface ParallelGuide {
-  key: string;
-  segmentId?: string;
-  hatchId?: string;
-}
 
-interface GuideDef {
-  point: Vec2;
-  dir: Vec2;
-  parallelSourceSegmentId?: string;
-}
 
 export class LineTool {
   app: CadApp;
@@ -48,8 +31,6 @@ export class LineTool {
   hubLengthM: number | null = null;
   hubAngleDeg: number | null = null;
 
-  guideAnchors: GuideAnchor[] = [];
-  parallelGuideSegments: ParallelGuide[] = [];
 
   spaceShiftLocked = false;
   spaceShiftLockedAngleDeg: number | null = null;
@@ -83,7 +64,6 @@ export class LineTool {
   }
 
   activate() {
-    this.resetGuides();
     this.app.hub.bindCommit((vals) => this._applyHubValues(vals));
     this.state = "idle";
     this.currentPoint = null;
@@ -104,7 +84,6 @@ export class LineTool {
   }
 
   cancel() {
-    this.resetGuides();
     this.state = "idle";
     this.currentPoint = null;
     this.snap = null;
@@ -136,7 +115,6 @@ export class LineTool {
   }
 
   finish() { this.cancel(); }
-  resetGuides() { this.guideAnchors = []; this.parallelGuideSegments = []; }
   /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
   getGuideAnchor() { return this.currentPoint; }
   isDrawing() {
@@ -351,53 +329,10 @@ export class LineTool {
   }
 
 
-  private _makeAnchorKey(id: string, pointIndex: number) { return `${id}__${pointIndex}`; }
-  private _makeParallelKey(id: string) { return `${id}`; }
-
-  private _toggleGuideAnchorFromSnap(snap: Snap) {
-    if (!snap || snap.type !== SnapType.POINT) return;
-    if (snap.segment) {
-      const key = this._makeAnchorKey(snap.segment.id, snap.pointIndex!);
-      const idx = this.guideAnchors.findIndex(a => a.key === key);
-      if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
-      this.guideAnchors.push({ key, segmentId: snap.segment.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
-    } else if (snap.hatch) {
-      const key = this._makeAnchorKey(snap.hatch.id, snap.pointIndex!);
-      const idx = this.guideAnchors.findIndex(a => a.key === key);
-      if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
-      this.guideAnchors.push({ key, hatchId: snap.hatch.id, pointIndex: snap.pointIndex!, point: v(snap.world.x, snap.world.y) });
-    }
-  }
-
-  /** Toggle einer Anker-Hilfslinie genau durch den aktuell gesetzten
-   *  Anfangspunkt der laufenden Zeichenoperation. */
-  private _toggleCurrentPointGuide() {
-    if (!this.currentPoint) return;
-    const key = `__current__${this.currentPoint.x.toFixed(6)}_${this.currentPoint.y.toFixed(6)}`;
-    const idx = this.guideAnchors.findIndex((a) => a.key === key);
-    if (idx >= 0) { this.guideAnchors.splice(idx, 1); return; }
-    this.guideAnchors.push({
-      key,
-      pointIndex: -1,
-      point: v(this.currentPoint.x, this.currentPoint.y),
-    });
-  }
 
 
-  private _toggleParallelGuideFromSnap(snap: Snap) {
-    if (!snap || snap.type !== SnapType.LINE || !this.currentPoint) return;
-    if (snap.segment) {
-      const key = this._makeParallelKey(snap.segment.id);
-      const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
-      if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
-      this.parallelGuideSegments.push({ key, segmentId: snap.segment.id });
-    } else if (snap.hatch && snap.edgeIndex != null) {
-      const key = this._makeParallelKey(`hatch_${snap.hatch.id}_${snap.edgeIndex}`);
-      const idx = this.parallelGuideSegments.findIndex(g => g.key === key);
-      if (idx >= 0) { this.parallelGuideSegments.splice(idx, 1); return; }
-      this.parallelGuideSegments.push({ key, hatchId: snap.hatch.id });
-    }
-  }
+
+
 
   private _getReferenceSegment() {
     if (this.snap && this.snap.segment) return this.snap.segment;
@@ -409,114 +344,12 @@ export class LineTool {
     return null;
   }
 
-  private _buildGuideDefinitions(): GuideDef[] {
-    const defs: GuideDef[] = [];
-    const refSeg = this._getReferenceSegment();
-    const refDir = refSeg ? norm(sub(refSeg.b, refSeg.a)) : null;
-    const refPerp = refDir ? v(-refDir.y, refDir.x) : null;
 
-    for (const anchor of this.guideAnchors) {
-      const p = anchor.point;
-      defs.push({ point: p, dir: v(1, 0) });
-      defs.push({ point: p, dir: v(0, 1) });
-      if (refDir) defs.push({ point: p, dir: refDir });
-      if (refPerp) defs.push({ point: p, dir: refPerp });
-    }
 
-    if (this.currentPoint) {
-      for (const item of this.parallelGuideSegments) {
-        if (item.segmentId) {
-          const seg = this.app.scene.getSegmentById(item.segmentId);
-          if (!seg) continue;
-          const dir = norm(sub(seg.b, seg.a));
-          defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir, parallelSourceSegmentId: seg.id });
-        } else if (item.hatchId) {
-          // Use the snap's lineA/lineB stored via the key to recover edge direction
-          // For hatch parallel guides, we stored the edge info in the snap at toggle time
-          // Re-derive from hatch edges
-          const hatch = this.app.scene.getHatchById(item.hatchId);
-          if (!hatch) continue;
-          const edges = this.app.scene.getHatchEdges().filter(e => e.hatch.id === item.hatchId);
-          // Find the edge matching the key
-          const keyMatch = item.key.match(/hatch_.*_(\d+)$/);
-          if (keyMatch) {
-            const edgeIdx = parseInt(keyMatch[1]);
-            const edge = edges.find(e => e.edgeIndex === edgeIdx);
-            if (edge) {
-              const dir = norm(sub(edge.b, edge.a));
-              defs.push({ point: v(this.currentPoint.x, this.currentPoint.y), dir });
-            }
-          }
-        }
-      }
-    }
 
-    return defs;
-  }
-
-  private _buildGuideIntersections(guideDefs: GuideDef[]): Vec2[] {
-    const points: Vec2[] = [];
-    for (let i = 0; i < guideDefs.length; i++) {
-      for (let j = i + 1; j < guideDefs.length; j++) {
-        const g1 = guideDefs[i];
-        const g2 = guideDefs[j];
-        const ip = lineLineIntersectionInfinite(g1.point, g1.dir, g2.point, g2.dir);
-        if (!ip) continue;
-        let duplicate = false;
-        for (const p of points) { if (dist(p, ip) <= 1e-6) { duplicate = true; break; } }
-        if (!duplicate) points.push(ip);
-      }
-    }
-    return points;
-  }
-
-  private _getGuideRenderSegment(point: Vec2, dir: Vec2) {
-    const cam = this.app.camera;
-    const span = (Math.hypot(this.app.renderer.vw, this.app.renderer.vh) / cam.scale) * 1.5;
-    const d = norm(dir);
-    return { a: sub(point, mul(d, span)), b: add(point, mul(d, span)) };
-  }
-
-  private _findGuideIntersectionSnap(mouseS: Vec2): Snap | null {
-    const defs = this._buildGuideDefinitions();
-    const intersections = this._buildGuideIntersections(defs);
-    let best: Snap | null = null;
-    let bestPx = Infinity;
-
-    for (const p of intersections) {
-      const px = this.app.topology._worldToMousePx(p, mouseS);
-      if (px > Defaults.snapPx) continue;
-      if (px < bestPx) {
-        bestPx = px;
-        best = { type: SnapType.GUIDE_POINT, world: v(p.x, p.y), segment: null, pointIndex: null, t: null, px };
-      }
-    }
-    return best;
-  }
 
   private _findGuideSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
-    let best: Snap | null = this._findGuideIntersectionSnap(mouseS);
-    let bestScore = best ? best.px - 50 : Infinity;
-
-    const defs = this._buildGuideDefinitions();
-    for (const def of defs) {
-      const proj = projectPointToInfiniteLine(mouseW, def.point, def.dir);
-      const sp = this.app.camera.worldToScreen(proj.q.x, proj.q.y);
-      const px = Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y);
-      if (px > Defaults.snapPx) continue;
-
-      const seg = this._getGuideRenderSegment(def.point, def.dir);
-      const score = 500 + px;
-
-      if (score < bestScore) {
-        bestScore = score;
-        best = {
-          type: SnapType.GUIDE, world: v(proj.q.x, proj.q.y), segment: null, pointIndex: null, t: null, px,
-          lineA: seg.a, lineB: seg.b, guidePoint: def.point, guideDir: def.dir
-        };
-      }
-    }
-    return best;
+    return (this.app as any).globalGuides?.findSnap(mouseS, mouseW, this.app.camera) ?? null;
   }
 
   private _findLineToolSnap(input: Input): Snap | null {
@@ -709,22 +542,6 @@ export class LineTool {
     this._refreshHoverSegment();
     this._syncSpaceShiftLock(input);
 
-    if (input.rightClicked) {
-      // Anfangspunkt (currentPoint) der aktuell gezeichneten Linie: erlaubt
-      // eine Anker-Hilfslinie durch genau diesen Punkt — auch wenn er noch
-      // nicht als Segment im Scene-Graph existiert.
-      if (this.state === "drawing" && this.currentPoint) {
-        const worldTol = Defaults.snapPx / Math.max(1e-6, this.app.camera.scale);
-        const dx = input.mouse.wx - this.currentPoint.x;
-        const dy = input.mouse.wy - this.currentPoint.y;
-        if (Math.hypot(dx, dy) <= worldTol) {
-          this._toggleCurrentPointGuide();
-          return;
-        }
-      }
-      if (this.snap && this.snap.type === SnapType.POINT) { this._toggleGuideAnchorFromSnap(this.snap); return; }
-      if (this.snap && this.snap.type === SnapType.LINE) { this._toggleParallelGuideFromSnap(this.snap); return; }
-    }
 
     if (this.drawMode === "rectangle") {
       if (this.rectState !== "idle") {
@@ -801,52 +618,6 @@ export class LineTool {
   }
 
 
-  private _drawGuideDefinitions(ctx: CanvasRenderingContext2D, cam: any) {
-    const defs = this._buildGuideDefinitions();
-    if (defs.length === 0) return;
-
-    ctx.save();
-    ctx.strokeStyle = "rgba(77,163,255,0.42)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([5, 5]);
-
-    for (const def of defs) {
-      const seg = this._getGuideRenderSegment(def.point, def.dir);
-      const a = cam.worldToScreen(seg.a.x, seg.a.y);
-      const b = cam.worldToScreen(seg.b.x, seg.b.y);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-    }
-
-    ctx.setLineDash([]);
-    ctx.restore();
-
-    ctx.save();
-    ctx.fillStyle = "rgba(77,163,255,0.95)";
-    ctx.strokeStyle = "rgba(255,255,255,0.95)";
-    ctx.lineWidth = 1.5;
-
-    for (const anchor of this.guideAnchors) {
-      const s = cam.worldToScreen(anchor.point.x, anchor.point.y);
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    const intersections = this._buildGuideIntersections(defs);
-    for (const p of intersections) {
-      const s = cam.worldToScreen(p.x, p.y);
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    ctx.restore();
-  }
 
   /** Vorschau für Rechteck-/Kreis-Modus. */
   private _drawShapePreview(ctx: CanvasRenderingContext2D, cam: any) {
@@ -897,7 +668,6 @@ export class LineTool {
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
 
-    this._drawGuideDefinitions(ctx, cam);
 
     if (this.snap) {
       if ((this.snap.type === SnapType.LINE || this.snap.type === SnapType.GUIDE) && this.snap.lineA && this.snap.lineB) {

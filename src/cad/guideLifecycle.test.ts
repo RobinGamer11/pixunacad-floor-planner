@@ -1,3 +1,5 @@
+import { GlobalGuides } from "./globalGuides";
+import { GuideInteractionController } from "./GuideInteractionController";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { PointEditAction, SelectionType, SnapType } from "./constants";
 import { Camera } from "./Camera";
@@ -35,6 +37,9 @@ function fakeElement<T extends HTMLElement>(): T {
     removeEventListener: vi.fn(),
     appendChild: vi.fn(),
     getBoundingClientRect: () => ({ width: 0, height: 0, left: 0, top: 0 }),
+    setAttribute: vi.fn(),
+    getAttribute: () => null,
+    removeAttribute: vi.fn(),
   } as unknown as T;
 }
 
@@ -342,32 +347,27 @@ describe("Hilfslinien-Lebenszyklus", () => {
     const camera = new Camera();
     camera.scale = 100;
     const topology = new TopologyEngine(scene, camera, new LabelManager());
+    const guides = new GlobalGuides();
     const selectTool = new SelectTool({
       scene,
       camera,
       topology,
+      globalGuides: guides,
       renderer: { vw: 800, vh: 600 },
     } as unknown as import("./CadApp").CadApp);
-    const toggleGuide = Reflect.get(selectTool, "_tryToggleTransformGuide")
-      .bind(selectTool) as (
-        input: unknown,
-        exclusions: { segmentIds: Set<string> },
-        origin: { x: number; y: number },
-      ) => boolean;
     const findTransformSnap = Reflect.get(selectTool, "_findTransformSnap")
       .bind(selectTool) as (
         input: unknown,
         exclusions: { segmentIds: Set<string> },
       ) => { type: string; world: { x: number; y: number } } | null;
 
-    expect(toggleGuide({
-      rightClicked: true,
-      mouse: { sx: 0, sy: 0, wx: 0, wy: 0 },
-    }, { segmentIds: new Set([selected.id]) }, v(0, 2))).toBe(true);
-    expect(selectTool.editParallelGuides).toHaveLength(1);
+    const controller = new GuideInteractionController(guides, topology, camera);
+    const edgeS = camera.worldToScreen(1.5, 0);
+    expect(controller.handleRightClick(edgeS, v(1.5, 0), { anchor: v(0, 2) })).toBe(true);
+    expect(guides.lines).toHaveLength(1);
 
     const snap = findTransformSnap({
-      mouse: { sx: 30, sy: 202, wx: 0.3, wy: 2.02 },
+      mouse: { sx: camera.worldToScreen(0.3, 2.02).x, sy: camera.worldToScreen(0.3, 2.02).y, wx: 0.3, wy: 2.02 },
     }, { segmentIds: new Set([selected.id]) });
     expect(snap?.type).toBe(SnapType.GUIDE);
     expect(snap?.world.y).toBeCloseTo(2, 6);
@@ -423,14 +423,13 @@ describe("Hilfslinien-Lebenszyklus", () => {
     const selectTool = new SelectTool(app as unknown as import("./CadApp").CadApp);
     const confirmed = scene.createSegment(v(0, 0), v(2, 0));
     selectTool.groupAnchor = v(99, 99);
-    selectTool.editGuideAnchors = [{ key: "alt", point: v(99, 99) }];
 
     selectTool.beginPasteFloat([{ kind: "segment", id: confirmed.id }]);
 
     expect(selectTool.pasteFloatActive).toBe(true);
     expect(selectTool.groupDragActive).toBe(true);
     expect(selectTool.groupAnchor).toBeNull();
-    expect(selectTool.editGuideAnchors).toEqual([]);
+    expect(selectTool.getGuideAnchor()).toBeNull();
     expect(confirmed.a).toEqual(v(8, 10));
     expect(confirmed.b).toEqual(v(10, 10));
     expect(selectTool.confirmPasteFloat()).toBe(true);
