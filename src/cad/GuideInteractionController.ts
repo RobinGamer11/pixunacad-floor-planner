@@ -68,6 +68,9 @@ export function findGuideTarget(
   }
   const gp = nearestGuidePoint(geom, mouseW, tolW);
   if (gp) return { kind: "point", world: v(gp.world.x, gp.world.y), directions: incidentDirectionsAt(geom, gp.world, tight) };
+  // Temporäre Kanten der laufenden Zeichnung wie Kanten fertiger Objekte
+  const te = nearestGuideEdge(tempGeom, mouseW, tolW);
+  if (te) return { kind: "edge", world: te.world, dir: te.dir };
   if (snap?.world && isEdge(snap.type) && snap.lineA && snap.lineB) {
     return { kind: "edge", world: v(snap.world.x, snap.world.y), dir: v(snap.lineB.x - snap.lineA.x, snap.lineB.y - snap.lineA.y) };
   }

@@ -1,3 +1,4 @@
+import { buildGuideGeometry, type GuideGeometry } from "./guideGeometry";
 import { drawSnapDot } from "./snapDraw";
 import { Defaults, SnapType } from "./constants";
 import {
@@ -152,13 +153,12 @@ export class HatchTool {
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
   /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
   getGuideAnchor() { return this.points.length ? this.points[this.points.length - 1] : null; }
-  /** Laufende Zeichnung (bestätigte Punkte/Kanten) als temporäre Guide-Geometrie – nur lesend. */
-  getGuideExtraEdges(): [Vec2, Vec2][] {
-    const out: [Vec2, Vec2][] = [];
-    for (let i = 0; i < this.points.length - 1; i++) out.push([this.points[i], this.points[i + 1]]);
-    return out;
+  /** Laufende Zeichnung (gesetzte Punkte + bestätigte Kanten) als temporäre Guide-Geometrie – nur lesend. */
+  getGuideExtraGeometry(): GuideGeometry {
+    const edges: [Vec2, Vec2][] = [];
+    for (let i = 0; i < this.points.length - 1; i++) edges.push([this.points[i], this.points[i + 1]]);
+    return buildGuideGeometry({ scene: null, isVisible: () => true, extraEdges: edges, extraPoints: this.points });
   }
-  getGuideExtraPoints(): Vec2[] { return [...this.points]; }
 
   protected _resetCircleState() {
     this.circleState = "idle";
