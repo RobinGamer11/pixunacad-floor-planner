@@ -180,3 +180,26 @@ export class GlobalGuides {
     ctx.restore();
   }
 }
+
+/**
+ * Unendliche Gerade `point + t·dir` auf die sichtbare Fläche (0..vw, 0..vh) clippen.
+ * Gilt für jede Richtung (H, V, schräg) – keine verkürzten Strecken.
+ */
+export function clipInfiniteLineToRect(
+  cam: { worldToScreen(x: number, y: number): { x: number; y: number } },
+  point: Vec2, dir: Vec2, vw: number, vh: number,
+): [{ x: number; y: number }, { x: number; y: number }] | null {
+  const p = cam.worldToScreen(point.x, point.y);
+  const q = cam.worldToScreen(point.x + dir.x, point.y + dir.y);
+  const dx = q.x - p.x, dy = q.y - p.y;
+  if (Math.hypot(dx, dy) < 1e-12) return null;
+  const pad = 2, x0 = -pad, y0 = -pad, x1 = vw + pad, y1 = vh + pad;
+  let tMin = -Infinity, tMax = Infinity;
+  const clip = (d: number, lo: number, hi: number, o: number) => {
+    if (Math.abs(d) < 1e-12) return o >= lo && o <= hi;
+    let a = (lo - o) / d, b = (hi - o) / d; if (a > b) [a, b] = [b, a];
+    tMin = Math.max(tMin, a); tMax = Math.min(tMax, b); return tMin <= tMax;
+  };
+  if (!clip(dx, x0, x1, p.x) || !clip(dy, y0, y1, p.y)) return null;
+  return [{ x: p.x + dx * tMin, y: p.y + dy * tMin }, { x: p.x + dx * tMax, y: p.y + dy * tMax }];
+}
