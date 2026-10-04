@@ -173,6 +173,56 @@ export class WallTool {
     return this.app.activeDrawLabelId || Defaults.defaultLabelId;
   }
 
+  /** Markiert Sub-Linien-Snaps als fixierte Kanten-Andockpunkte: Der Punkt
+   * bleibt dort liegen, wird aber später nicht mit der Host-Wand mitgezogen. */
+  private _anchorFromSnap(snap: Snap | null): import("./Scene").WallCornerAnchor | null {
+    if (!snap || !snap.wallId || snap.wallLine !== "sub") return null;
+    if (snap.type === SnapType.POINT && snap.pointIndex != null && snap.pointIndex >= 0) {
+      return { kind: "subMiter", hostWallId: snap.wallId, hostCornerIndex: snap.pointIndex };
+    }
+    if (snap.type === SnapType.LINE && snap.edgeIndex != null && snap.t != null) {
+      return { kind: "subEdge", hostWallId: snap.wallId, hostEdgeIndex: snap.edgeIndex, t: snap.t };
+    }
+    return null;
+  }
+
+  private _createSingleWall(a: Vec2, b: Vec2, anchorA: import("./Scene").WallCornerAnchor | null = null, anchorB: import("./Scene").WallCornerAnchor | null = null) {
+    const labelId = this._resolveLabelId();
+    const newWall = this.app.scene.createWall({
+      kind: this.settings.kind,
+      thicknessM: this.getThickness(),
+      referenceSide: this.settings.referenceSide,
+      corners: [v(a.x, a.y), v(b.x, b.y)],
+      cornerAnchors: [anchorA, anchorB],
+      customName: this.settings.customName,
+      color: this.settings.color,
+      fillColor: this.settings.fillColor,
+      labelId,
+      patternId: this.settings.patternId,
+      patternScale: this.settings.patternScale,
+      patternAlignToWall: this.settings.patternAlignToWall,
+      patternAngleDeg: this.settings.patternAngleDeg,
+    });
+    this._runConnectionPipeline(newWall);
+    this.app.refreshLabelUI?.();
+    return newWall;
+  }
+
+
+  private _runConnectionPipeline(newWall: import("./Scene").Wall) {
+    trimWallEndpointsToNeighbors(this.app.scene, newWall);
+    runWallTopologyMaintenance(this.app.scene, [newWall]);
+  }
+
+  cycleReferenceSide() {
+    const order: WallReferenceSide[] = ["outer", "center", "inner"];
+    const i = order.indexOf(this.settings.referenceSide);
+    this.settings.referenceSide = order[(i + 1) % order.length];
+    this.app.refreshLabelUI?.();
+  }
+
+  /* ===== Hilfslinien / Parallel-Anker ===== */
+
 
 
   /** Liefert die Richtung der zuletzt aktiv hervorgehobenen Linie als Referenz für Space-Ortho. */

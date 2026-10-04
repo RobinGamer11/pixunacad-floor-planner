@@ -164,6 +164,19 @@ export class HatchTool {
   }
 
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
+  /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
+  getGuideAnchor() { return this.points.length ? this.points[this.points.length - 1] : null; }
+
+  protected _resetCircleState() {
+    this.circleState = "idle";
+    this.circleCenter = null;
+    this.circleRadiusM = 0;
+    this.circleStartAngleDeg = 0;
+    this.circleEndAngleDeg = 0;
+  }
+
+  /* ---- Guide system (identical pattern to LineTool) ---- */
+
 
 
 
@@ -847,6 +860,15 @@ export class HatchTool {
     this._openHubWithCurrentPreview();
     return true;
   }
+
+  /** Called by CadApp on Enter key while in arc state to commit a full circle. */
+  finishCircleFromKey() {
+    if (this.drawMode === "circle" && this.circleState === "arc") {
+      this._finishCircle(true);
+    }
+  }
+
+  /* ---- Overlay Drawing ---- */
 
 
   _drawOverlay(ctx: CanvasRenderingContext2D, cam: any) {
