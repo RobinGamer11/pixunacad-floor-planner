@@ -4977,6 +4977,9 @@ export class SelectTool {
       ["tableId", "table"],
       ["documentId", "document"],
       ["freeStrokeId", "freeStroke"],
+      ["wallId", "wall"],
+      ["libraryInstanceId", "library"],
+      ["stairId", "stair"],
     ];
     for (const [prop, kind] of map) {
       const id = sel[prop];
