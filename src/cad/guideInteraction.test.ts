@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GlobalGuides } from "./globalGuides";
 import { GuideInteractionController, guideAxesFor } from "./GuideInteractionController";
+import { buildGuideGeometry } from "./guideGeometry";
 
 const cam = { worldToScreen: (x: number, y: number) => ({ x: x * 100, y: y * 100 }), screenToWorld: (x: number, y: number) => ({ x: x / 100, y: y / 100 }) };
 // Eine Linie (0,0)→(1,1); Fangpunkt (0,0)
@@ -12,6 +13,8 @@ const topo = {
     if (Math.hypot(q.x - mw.x, q.y - mw.y) * 100 < 10) return { type: "LINE", world: q, lineA: { x: 0, y: 0 }, lineB: { x: 1, y: 1 } };
     return null;
   },
+  // Echte Objektgeometrie statt Ring-Probeabfragen
+  guideGeometry: (extra: any[] = []) => buildGuideGeometry({ scene: { segments: [{ id: "s", a: { x: 0, y: 0 }, b: { x: 1, y: 1 } }] }, isVisible: () => true, extraEdges: extra }),
 };
 
 describe("Zentrale Hilfslinien", () => {
