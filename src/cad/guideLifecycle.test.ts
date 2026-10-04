@@ -37,6 +37,9 @@ function fakeElement<T extends HTMLElement>(): T {
     removeEventListener: vi.fn(),
     appendChild: vi.fn(),
     getBoundingClientRect: () => ({ width: 0, height: 0, left: 0, top: 0 }),
+    setAttribute: vi.fn(),
+    getAttribute: () => null,
+    removeAttribute: vi.fn(),
   } as unknown as T;
 }
 
