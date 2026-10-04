@@ -2048,10 +2048,8 @@ export class CadApp {
 
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
-      const selTable = this.getSelectedTable();
-      if (selTable) { selTable.labelId = nextId; this.refreshLabelUI(); return; }
-      const sel = this.getEditTextBox();
-      if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
+      if (this.getSelectedTable()) { if (this.assignBatchToLabel("table", nextId)) return; }
+      else if (this.assignBatchToLabel("textBox", nextId)) return;
       if (this.selectedLabelId) {
         const groupIds = this.scene.getTextBoxesByLabelId(this.selectedLabelId).map(t => t.id);
         if (groupIds.length > 0) {
@@ -2286,13 +2284,7 @@ export class CadApp {
     this.lineIdSelect.addEventListener("change", () => {
       const nextId = this.lineIdSelect.value || Defaults.defaultLabelId;
       // Einzel-Objekt-Auswahl: nur dieses Objekt umhängen, keine Gruppen-Selektion auslösen.
-      const singleSel = this.getEditSegment();
-      if (singleSel) {
-        this.scene.assignSegmentsToLabel([singleSel.id], nextId);
-        singleSel.labelId = nextId;
-        this.refreshLabelUI();
-        return;
-      }
+      if (this.assignBatchToLabel("segment", nextId)) return;
       // Gruppen-Auswahl (über IdPanel-Klick) → ganze Gruppe umhängen.
       if (this.selectedLabelId) {
         const groupIds = this.scene.getSegmentsByLabelId(this.selectedLabelId).map(s => s.id);
@@ -2350,13 +2342,7 @@ export class CadApp {
   private _setupHatchSettingsPanel() {
     this.hatchIdSelect.addEventListener("change", () => {
       const nextId = this.hatchIdSelect.value || Defaults.defaultLabelId;
-      const singleSel = this.getEditHatch();
-      if (singleSel) {
-        this.scene.assignHatchesToLabel([singleSel.id], nextId);
-        singleSel.labelId = nextId;
-        this.refreshLabelUI();
-        return;
-      }
+      if (this.assignBatchToLabel("hatch", nextId)) return;
       if (this.selectedLabelId) {
         const groupIds = this.scene.getHatchesByLabelId(this.selectedLabelId).map(h => h.id);
         if (groupIds.length > 0) {
@@ -3350,8 +3336,7 @@ export class CadApp {
 
     r.idSelect.addEventListener("change", () => {
       const nextId = r.idSelect.value || Defaults.defaultLabelId;
-      const sel = this.getEditDimension();
-      if (sel) { sel.labelId = nextId; this.refreshLabelUI(); return; }
+      if (this.assignBatchToLabel("dimension", nextId)) return;
       if (this.selectedLabelId) {
         const groupIds = this.scene.getDimensionsByLabelId(this.selectedLabelId).map(d => d.id);
         if (groupIds.length > 0) {
