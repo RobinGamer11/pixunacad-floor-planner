@@ -2494,18 +2494,6 @@ export class SelectTool {
     this.app.hub.bindCommit(null);
   }
 
-[] {
-    const defs: { point: Vec2; dir: Vec2 }[] = [];
-    for (const anchor of this.editGuideAnchors) {
-      defs.push({ point: anchor.point, dir: v(1, 0) });
-      defs.push({ point: anchor.point, dir: v(0, 1) });
-    }
-    for (const guide of this.editParallelGuides) {
-      defs.push({ point: guide.point, dir: guide.dir });
-    }
-    return defs;
-  }
-
   /** Rechtsklick-Grundmuster wie beim Zeichnen: Punkt = H/V-Achsen,
    *  Kante = parallele Hilfslinie durch den aktuellen Transform-Anker. */
   private _toggleEditGuideFromSnap(snap: Snap | null, parallelOrigin?: Vec2 | null): boolean {
