@@ -349,7 +349,7 @@ export class LineTool {
 
 
   private _findGuideSnap(mouseS: Vec2, mouseW: Vec2): Snap | null {
-    return this.app.globalGuides.findSnap(mouseS, mouseW, this.app.camera);
+    return (this.app as any).globalGuides?.findSnap(mouseS, mouseW, this.app.camera) ?? null;
   }
 
   private _findLineToolSnap(input: Input): Snap | null {

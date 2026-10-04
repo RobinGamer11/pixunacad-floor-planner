@@ -2506,7 +2506,7 @@ export class SelectTool {
 
   /** Snap aus aktiven Edit-Hilfslinien. Null falls keine Definition oder Maus zu weit. */
   private _findEditGuideSnap(input: Input): Snap | null {
-    return this.app.globalGuides.findSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy), this.app.camera);
+    return (this.app as any).globalGuides?.findSnap(v(input.mouse.sx, input.mouse.sy), v(input.mouse.wx, input.mouse.wy), this.app.camera) ?? null;
   }
 
   private _chooseTransformSnap(topologySnap: Snap | null, guideSnap: Snap | null): Snap | null {
