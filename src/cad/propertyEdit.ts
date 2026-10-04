@@ -65,7 +65,12 @@ function idOf(el: HTMLInputElement): string {
  * → commit, Escape → cancel (Ausgangszustand, kein Undo-Schritt).
  */
 export function installPropertyEditListeners(session: PropertyEditSession, doc: Document = document): () => void {
-  const begin = (e: Event) => { const el = trackedInput(e.target); if (el) session.begin(idOf(el)); };
+  const begin = (e: Event) => {
+    const el = trackedInput(e.target);
+    if (el) session.begin(idOf(el));
+    // Klick außerhalb (z. B. Zeichenfläche = Auswahlwechsel): offene Aktion abschließen.
+    else if (e.type === "pointerdown" && session.activeControl) session.flush();
+  };
   const commit = (e: Event) => {
     const el = trackedInput(e.target);
     if (!el) return;

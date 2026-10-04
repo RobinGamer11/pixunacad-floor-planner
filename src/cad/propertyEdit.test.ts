@@ -65,4 +65,47 @@ describe("Eigenschafts-Transaktion bei Mehrfachauswahl", () => {
     expect(host.history.length).toBe(2);
     off();
   });
+
+  it("Dicke auf mehreren Linien und Schraffurfarbe: je ein Undo, Geometrie bleibt", () => {
+    const a: any = { id: "a", thicknessM: 0.01, points: [{ x: 0, y: 0 }] };
+    const b: any = { id: "b", thicknessM: 0.05, points: [{ x: 9, y: 9 }] };
+    const host = makeHost([a, b]);
+    const s = new PropertyEditSession(host);
+    const p = mirrorProxy(a, [b]);
+    for (const t of [0.02, 0.03, 0.04]) s.update("t", () => { p.thicknessM = t; });
+    s.update("c", () => { p.color = "#0f0"; });
+    s.commit("c");
+    expect(host.history.length).toBe(3);
+    expect(b.points).toEqual([{ x: 9, y: 9 }]);
+    host.undo();
+    expect([a.thicknessM, b.thicknessM]).toEqual([0.04, 0.04]);
+    host.undo();
+    expect([a.thicknessM, b.thicknessM]).toEqual([0.01, 0.05]);
+  });
+
+  it("Freihand-Aufrauen gemeinsam, Pfade bleiben individuell", () => {
+    const a: any = { id: "a", roughen: { enabled: false }, path: [{ x: 0, y: 0 }] };
+    const b: any = { id: "b", roughen: { enabled: false }, path: [{ x: 3, y: 1 }] };
+    const host = makeHost([a, b]);
+    const s = new PropertyEditSession(host);
+    s.update("r", () => { for (const o of [a, b]) o.roughen = { ...o.roughen, enabled: true }; });
+    s.commit();
+    expect([a.roughen.enabled, b.roughen.enabled]).toEqual([true, true]);
+    expect(b.path).toEqual([{ x: 3, y: 1 }]);
+    expect(host.history.length).toBe(2);
+  });
+
+  it("Klick außerhalb eines Feldes schließt offene Aktion ab", () => {
+    const obj: any = { color: "#000" };
+    const host = makeHost([obj]);
+    const s = new PropertyEditSession(host);
+    const off = installPropertyEditListeners(s);
+    const c = document.createElement("input"); c.type = "color"; document.body.appendChild(c);
+    c.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    obj.color = "#f00";
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(s.activeControl).toBeNull();
+    expect(host.history.length).toBe(2);
+    off();
+  });
 });
