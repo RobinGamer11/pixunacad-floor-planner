@@ -20,7 +20,7 @@ import { textStyleFontSizePt, ptToCssPx, ANNOTATION_M_PER_MM } from "./textTypog
 import { TableTool } from "./TableTool";
 import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
-import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
+import { RasterLayers, RasterTileStore, cadRasterPxPerM } from "./RasterLayers";
 import { migrateCadSnapshot } from "@/lib/persistence";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
@@ -1214,7 +1214,7 @@ export class CadApp {
     while (this._history.length > this._historyMax) this._history.shift();
     this._historyIndex = this._history.length - 1;
     this._lastSnapshot = snap;
-    this._rasterTileStore.prune(this._history);
+    this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
     this._emitHistoryChange();
   }
 
@@ -1306,7 +1306,7 @@ export class CadApp {
     this._lastSnapshot = snap;
     this._history = [snap];
     this._historyIndex = 0;
-    this._rasterTileStore.prune(this._history);
+    this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
     this.onHistoryChange?.(false, false);
   }
 
