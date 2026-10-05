@@ -20,9 +20,11 @@ function makeDoc(): any {
 
 describe("Altdaten: frühere Hintergrundentfernung", () => {
   it("veraltete Felder werden beim Laden verworfen, das Bild bleibt", () => {
-    const rd: any = restoreOneScene({
+    const scene = new Scene();
+    restoreOneScene(scene, {
       documents: [{ ...makeDoc(), bgRemoval: { enabled: true, hasMaskEdits: true, fgMaskDataUrl: "data:image/png;base64,MASK" } }],
-    } as any, new Scene()).documents[0];
+    } as any);
+    const rd: any = scene.documents.find((d: any) => d.id === "doc-1");
     expect(rd).toBeTruthy();
     expect(rd.src).toBe("data:image/png;base64,AAAA");
     expect(rd.bgRemoval).toBeUndefined();
