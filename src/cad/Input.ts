@@ -357,7 +357,10 @@ export class Input {
       // Kontakte, die auf dem Tablet-Hilfsrad (oder anderer Overlay-UI) enden,
       // dürfen einen laufenden Stift-Strich nicht abbrechen.
       const tgt = e.target as Element | null;
-      if (tgt && typeof tgt.closest === "function" && tgt.closest('[data-tablet-aid="true"]')) return;
+      // Der zeichnende Pointer selbst muss aber IMMER loslassen dürfen –
+      // sonst bleibt die linke Taste dauerhaft „gedrückt“ und der Verlauf hängt.
+      if (tgt && typeof tgt.closest === "function" && tgt.closest('[data-tablet-aid="true"]')
+        && e.pointerId !== this._drawPointerId) return;
 
       if (e.pointerType === "touch") {
         this._touches.delete(e.pointerId);
@@ -389,6 +392,20 @@ export class Input {
     window.addEventListener("pointerup", onPointerUp);
     window.addEventListener("pointercancel", onPointerUp);
     this._cleanups.push(() => window.removeEventListener("pointerup", onPointerUp));
+    // Fokusverlust / verlorener Pointer-Capture: keinen gedrückten Zustand zurücklassen.
+    const releaseAll = () => {
+      this.mouse.left = false; this.mouse.mid = false; this.mouse.right = false;
+      this._drawPointerId = null; this._touches.clear(); this._touchPanId = null;
+      this._pinchLastDist = 0; this._panning = false; this.isPanning = false;
+    };
+    const onLostCapture = (e: PointerEvent) => { if (e.pointerId === this._drawPointerId) { this.mouse.left = false; this._drawPointerId = null; } };
+    const onVis = () => { if (document.hidden) releaseAll(); };
+    window.addEventListener("blur", releaseAll);
+    document.addEventListener("visibilitychange", onVis);
+    c.addEventListener("lostpointercapture", onLostCapture);
+    this._cleanups.push(() => window.removeEventListener("blur", releaseAll));
+    this._cleanups.push(() => document.removeEventListener("visibilitychange", onVis));
+    this._cleanups.push(() => c.removeEventListener("lostpointercapture", onLostCapture));
     this._cleanups.push(() => window.removeEventListener("pointercancel", onPointerUp));
 
     const onAux = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };

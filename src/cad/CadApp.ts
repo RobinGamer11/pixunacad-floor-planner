@@ -3281,6 +3281,7 @@ export class CadApp {
 
   setTool(id: string) {
     try { this.propertyEdit?.flush(); } catch {}
+    try { this.settleHistoryState(); } catch {}
     // Zuletzt gewähltes objektbezogenes Werkzeug merken. Der Wechsel zum
     // Auswahlwerkzeug (oder zu Radierer/Pipette) löscht diesen Filter NICHT —
     // er bestimmt, welche Objekte "Alles"/Strg+A auswählt.
