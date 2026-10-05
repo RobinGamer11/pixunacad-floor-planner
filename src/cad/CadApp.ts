@@ -4485,7 +4485,7 @@ export class CadApp {
     for (const sheet of this.sheetManager.list()) {
       if (sheet.id === this.activeSheetId) continue;
       const state = this.sheetOverlayStore.get(sheet.id);
-      if (!state || state.mode === "none") continue;
+      if (!state || state.mode === "none" || state.opacity <= 0) continue;
       const sc = this.scenesById.get(sheet.id);
       if (!sc) continue;
       overlays.push({

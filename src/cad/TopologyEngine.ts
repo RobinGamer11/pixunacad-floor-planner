@@ -390,6 +390,7 @@ export class TopologyEngine {
   guideGeometry(extraEdges: [Vec2, Vec2][] = [], extraPoints: Vec2[] = []): GuideGeometry {
     const extraScenes: { id: string; type: GuideSourceType; scene: any }[] = [];
     for (const ls of this._libraryScenes() as any[]) extraScenes.push({ id: ls.instanceId ?? ls.id ?? "library", type: "library", scene: ls.scene });
+    this.overlayScenes.forEach((s, i) => extraScenes.push({ id: `sheet-overlay:${i}`, type: "extra", scene: s }));
     this.tracingSnapScenes.forEach((s, i) => extraScenes.push({ id: `tracing:${i}`, type: "line", scene: s }));
     return buildGuideGeometry({ scene: this.scene, isVisible: (id) => this.labels.isVisible(id as any), extraScenes, extraEdges, extraPoints });
   }
