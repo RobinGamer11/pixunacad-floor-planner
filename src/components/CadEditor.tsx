@@ -1,3 +1,4 @@
+import { TrashIcon } from "@/lib/trashIcon";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
@@ -53,7 +54,6 @@ import { HelpOverlay } from "@/components/workspace/HelpOverlay";
 import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
-import { BgRemoveSection } from "@/components/cad/BgRemoveSection";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
 import { CanvasFabBar, LayerFab, LayersHelpCard, LayersPanelTitle } from "@/components/cad/LayerHelp";
@@ -1093,7 +1093,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           const doc = app.scene.getDocumentById(sel.documentId);
           if (doc) {
             setDocSelected(prev => (prev && prev.id === doc.id && prev.widthM === doc.widthM && prev.heightM === doc.heightM && prev.importScaleDenom === doc.importScaleDenom) ? prev : { id: doc.id, name: doc.name, widthM: doc.widthM, heightM: doc.heightM, importScaleDenom: doc.importScaleDenom, kind: doc.kind, pdfSourceB64: doc.pdfSourceB64 || null });
-            const sig = `${(doc as any).activeFilterId || ""}|${(doc as any).opacity ?? 1}|${JSON.stringify((doc as any).bgRemoval || null)}|${JSON.stringify(((doc as any).filters || []).map((f: any) => [f.id, f.name, f.mode, f.tintColor, f.bwThreshold, f.freeRemaps || null, f.adjust || null]))}`;
+            const sig = `${(doc as any).activeFilterId || ""}|${(doc as any).opacity ?? 1}|${JSON.stringify(((doc as any).filters || []).map((f: any) => [f.id, f.name, f.mode, f.tintColor, f.bwThreshold, f.freeRemaps || null, f.adjust || null]))}`;
             setDocFilterSig(prev => prev === sig ? prev : sig);
           } else {
             setDocSelected(prev => prev ? null : prev);
@@ -2001,7 +2001,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button ref={pointInsertPointBtnRef} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={pointBulgeBtnRef} title="Kante wölben (rein-/rauswölben)">◠</button>
           <button ref={pointSplitBtnRef} title="Aufschneiden (Punkt setzen, teilt in zwei verbundene Objekte)">✂</button>
-          <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
+          <button ref={pointDeleteBtnRef} title="Löschen" aria-label="Löschen"><TrashIcon /></button>
         </div>
 
         {/* Text Editor Toolbar (floating) */}
@@ -3354,10 +3354,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
                 <FlipSection engine={appRef.current} docId={docSelected.id} />
 
-                {/* Eigener Bereich direkt unter „Bild spiegeln“ */}
-                <BgRemoveSection app={appRef.current} docId={docSelected.id} sig={docFilterSig} />
 
-                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="filters" showBgRemove={false} />
+                <DocumentFilterPanel app={appRef.current} docId={docSelected.id} sig={docFilterSig} part="filters" />
 
               </div>
             </div>

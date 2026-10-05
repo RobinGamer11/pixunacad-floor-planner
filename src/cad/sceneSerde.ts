@@ -209,7 +209,6 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
       opacity: typeof d.opacity === "number" ? d.opacity : undefined,
       filters: Array.isArray(d.filters) ? d.filters : undefined,
       activeFilterId: d.activeFilterId || null,
-      bgRemoval: d.bgRemoval || undefined,
       anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
       warpCorners: Array.isArray(d.warpCorners) ? d.warpCorners : null,
       flipX: !!d.flipX,

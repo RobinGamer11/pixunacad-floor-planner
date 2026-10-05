@@ -12,7 +12,6 @@ import { Maximize2, Ruler as RulerIcon } from "lucide-react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
-import { BgRemoveSection } from "@/components/cad/BgRemoveSection";
 import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
@@ -68,8 +67,6 @@ export function CadDocumentInspector({ engine }: Props) {
           // Signatur nur für externe Änderungen/Synchronisierung — enthält den
           // vollständigen veränderlichen Filterzustand inkl. adjust.
           const sig = `${doc.activeFilterId || ""}|${doc.opacity ?? 1}|${JSON.stringify(
-            doc.bgRemoval || null,
-          )}|${JSON.stringify(
             (doc.filters || []).map((f: any) => [
               f.id, f.name, f.mode, f.tintColor, f.bwThreshold, f.freeRemaps || null, f.adjust || null,
             ]),
@@ -208,10 +205,8 @@ export function CadDocumentInspector({ engine }: Props) {
 
       <FlipSection engine={engine} docId={sel.id} />
 
-      {/* Eigener Bereich direkt unter „Bild spiegeln“ */}
-      <BgRemoveSection app={engine as any} docId={sel.id} sig={filterSig} />
 
-      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} part="filters" showBgRemove={false} />
+      <DocumentFilterPanel app={engine as any} docId={sel.id} sig={filterSig} part="filters" />
 
       <div
         className="text-[10px] leading-relaxed pt-1.5 text-muted-foreground"

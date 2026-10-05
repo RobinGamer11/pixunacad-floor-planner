@@ -131,7 +131,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 
 ## CAD-Bedienung Tablet – Stand
 - [x] Maßkette verschieben als Transform-Sitzung: Symbol = scharfstellen, erster Kontakt greift nur (kein Sprung), Vorschau rein visuell (`Renderer.dimensionMovePreview`), Speichern nur per „✓ Fixieren“/Enter mit genau einem Undo-Schritt, Esc/Abbrechen stellt die Ausgangslage her, Finger anheben bestätigt nie
-- [x] „Hintergrund entfernen“ als eigener An/Aus-Bereich unter „Bild spiegeln“ (`BgRemoveSection`): `enabled` = Bereich offen, `hasMaskEdits` = einzige Anwendungsmarkierung; Einschalten schneidet nichts weg; Maske + Flag werden gespeichert/synchronisiert; An/Aus, „Automatisch erkennen“, „Maske zurücksetzen“ und jeder Pinselstrich je genau ein Undo-Schritt
+- [x] „Hintergrund entfernen“ vollständig entfernt (Funktion, Renderer-Masken, Speicherung); alte Felder werden beim Laden verworfen
 - [x] Bildbearbeitung auf dem Tablet wieder vertikal scrollbar (keine pauschalen Stop-Propagation-Handler im Filterbereich)
 - [ ] Abnahme auf echtem Tablet (Nutzer)
 

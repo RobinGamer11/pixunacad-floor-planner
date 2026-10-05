@@ -47,7 +47,7 @@ const STYLE_KEYS: Record<PickKind, string[]> = {
   // Tabelle: nur der Darstellungsstil, niemals Zelleninhalte.
   table: ["style"],
   // Dokument: nur sichtbare Bilddarstellung, niemals Inhalt oder Zuschnitt.
-  document: ["opacity", "filters", "activeFilterId", "bgRemoval", "displayGradient"],
+  document: ["opacity", "filters", "activeFilterId", "displayGradient"],
 };
 
 

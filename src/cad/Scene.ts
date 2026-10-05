@@ -551,12 +551,6 @@ export class DocumentObject {
   filters: import("./documentFilters").DocumentFilter[];
   /** Aktiver Filter (id) oder null = Original. */
   activeFilterId: string | null;
-  /** Hintergrund-Ausschnitt-Einstellungen (Magic-Wand + Pinsel + FG/BG-Einfärbung). */
-  bgRemoval?: import("./documentBgRemove").BgRemoval;
-  /** Runtime-Cache: FG-Maske als Canvas (weiß = Vordergrund). Nicht serialisiert. */
-  _bgFgMask?: HTMLCanvasElement | null;
-  /** Runtime-Revision (Cache-Invalidierung). */
-  _bgMaskRev?: number;
   /** Runtime-Flag: Dokument existiert nur als Snap-/Hub-Quelle (z. B. Projektmappen-PDF),
    *  Bild wird NICHT gezeichnet, Serialisierung überspringt es. Nicht persistiert. */
   _snapOnly?: boolean;
@@ -573,7 +567,7 @@ export class DocumentObject {
   displayGradient?: DisplayGradient;
 
 
-  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, bgRemoval, anchors, warpCorners, flipX, flipY, displayGradient }: {
+  constructor({ id, name, kind, src, pageIndex, position, widthM, heightM, rotationRad, pixelWidth, pixelHeight, labelId, importScaleDenom, eraseMaskDataUrl, pdfSourceB64, guideEdges, cropM, opacity, filters, activeFilterId, anchors, warpCorners, flipX, flipY, displayGradient }: {
     id: string; name?: string; kind?: "image" | "pdf-page"; src: string;
     pageIndex?: number; position: Vec2; widthM: number; heightM: number;
     rotationRad?: number; pixelWidth?: number; pixelHeight?: number; labelId?: string;
@@ -584,7 +578,6 @@ export class DocumentObject {
     opacity?: number;
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
-    bgRemoval?: import("./documentBgRemove").BgRemoval;
     anchors?: { x: number; y: number }[];
     warpCorners?: { x: number; y: number }[] | null;
     flipX?: boolean;
@@ -623,9 +616,6 @@ export class DocumentObject {
     this.opacity = typeof opacity === "number" ? Math.max(0, Math.min(1, opacity)) : 1;
     this.filters = Array.isArray(filters) ? filters.map(f => ({ ...f })) : [];
     this.activeFilterId = activeFilterId || null;
-    this.bgRemoval = bgRemoval ? { ...bgRemoval } : undefined;
-    this._bgFgMask = null;
-    this._bgMaskRev = 0;
     this.anchors = Array.isArray(anchors)
       ? anchors
           .map((a) => ({ x: Math.max(0, Math.min(1, a?.x ?? 0)), y: Math.max(0, Math.min(1, a?.y ?? 0)) }))
@@ -1299,7 +1289,6 @@ export class Scene {
     opacity?: number;
     filters?: import("./documentFilters").DocumentFilter[];
     activeFilterId?: string | null;
-    bgRemoval?: import("./documentBgRemove").BgRemoval;
     anchors?: { x: number; y: number }[];
     warpCorners?: { x: number; y: number }[] | null;
     flipX?: boolean;

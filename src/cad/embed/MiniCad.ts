@@ -1480,7 +1480,6 @@ export class MiniCad {
           opacity: d.opacity,
           filters: d.filters ? d.filters.map((f) => ({ ...f })) : [],
           activeFilterId: d.activeFilterId,
-          bgRemoval: d.bgRemoval,
           anchors: (d.anchors || []).map((a) => ({ x: a.x, y: a.y })),
           warpCorners: (d as any).warpCorners ? (d as any).warpCorners.map((c: any) => ({ x: c.x, y: c.y })) : null,
           flipX: !!(d as any).flipX,
@@ -1611,7 +1610,6 @@ export class MiniCad {
             opacity: d.opacity,
             filters: d.filters,
             activeFilterId: d.activeFilterId,
-            bgRemoval: d.bgRemoval,
             anchors: Array.isArray(d.anchors) ? d.anchors : undefined,
             warpCorners: Array.isArray((d as any).warpCorners) ? (d as any).warpCorners : null,
             flipX: !!(d as any).flipX,
@@ -2064,7 +2062,7 @@ export class MiniCad {
             importScaleDenom: d.importScaleDenom, eraseMaskDataUrl: d.eraseMaskDataUrl,
             pdfSourceB64: d.pdfSourceB64, guideEdges: d.guideEdges, cropM: d.cropM,
             opacity: d.opacity, filters: d.filters, activeFilterId: d.activeFilterId,
-            bgRemoval: d.bgRemoval, anchors: d.anchors, warpCorners: d.warpCorners,
+            anchors: d.anchors, warpCorners: d.warpCorners,
             flipX: d.flipX, flipY: d.flipY,
           }) });
         }

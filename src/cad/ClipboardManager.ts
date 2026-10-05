@@ -153,7 +153,7 @@ const DOC_FIELDS = [
   "name", "kind", "src", "pageIndex", "widthM", "heightM", "rotationRad",
   "pixelWidth", "pixelHeight", "labelId", "importScaleDenom", "eraseMaskDataUrl",
   "pdfSourceB64", "guideEdges", "cropM", "opacity", "filters", "activeFilterId",
-  "bgRemoval", "anchors", "warpCorners", "flipX", "flipY", "displayGradient",
+  "anchors", "warpCorners", "flipX", "flipY", "displayGradient",
 ];
 
 const DOOR_FIELDS = [
