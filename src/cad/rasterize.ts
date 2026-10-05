@@ -346,15 +346,10 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
     const b = worldBounds(app, input);
     if (!b) return null;
 
-    let pxPerM = targetPxPerM(app);
+    const pxPerM = targetPxPerM(app);
     let wPx = Math.ceil(b.w * pxPerM);
     let hPx = Math.ceil(b.h * pxPerM);
-    if (wPx * hPx > MAX_PIXELS) {
-      const k = Math.sqrt(MAX_PIXELS / (wPx * hPx));
-      pxPerM *= k;
-      wPx = Math.max(1, Math.floor(wPx * k));
-      hPx = Math.max(1, Math.floor(hPx * k));
-    }
+    if (wPx * hPx > MAX_PIXELS) throw new RasterTooLargeError(wPx, hPx);
     wPx = Math.max(1, wPx);
     hPx = Math.max(1, hPx);
 
@@ -439,6 +434,7 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
     return doc;
   } catch (e) {
     console.error("rasterizeObject failed:", e);
+    notifyRasterFailure(e);
     return null;
   }
 }
