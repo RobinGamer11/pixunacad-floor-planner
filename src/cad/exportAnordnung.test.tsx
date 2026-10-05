@@ -132,6 +132,7 @@ describe("CAD: Transparentpause als vollständige Fangquelle", () => {
     const topo = new TopologyEngine(scene, camera, new LabelManager());
     const bg = new Scene();
     bg.createWall({
+      kind: "outer",
       corners: [v(1, 1), v(3, 1)],
       thicknessM: 0.24,
       referenceSide: "center",
