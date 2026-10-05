@@ -22,6 +22,28 @@ export type RasterInput =
 /** Maximale Bildgröße in Pixeln (Speicherschutz). */
 const MAX_PIXELS = 48_000_000;
 
+/** Arbeitsfläche je Teilbereich beim Einbrennen in Rasterebenen (≈ 64 MB RGBA). */
+export const RASTER_CHUNK_PIXELS = 16_000_000;
+
+export class RasterTooLargeError extends Error {
+  constructor(public wPx: number, public hPx: number) {
+    super(`Rasterfläche zu groß (${wPx} × ${hPx} px)`);
+  }
+}
+
+function notifyRasterFailure(e: unknown) {
+  const msg = e instanceof RasterTooLargeError
+    ? "Das Objekt ist für die Pixel-Umwandlung zu groß. Es bleibt als Vektorobjekt erhalten."
+    : "Pixel-Umwandlung fehlgeschlagen. Das Projekt bleibt unverändert.";
+  try { void import("sonner").then(({ toast }) => toast.error(msg)); } catch { /* optional */ }
+}
+
+/** Gibt den Speicher eines Hilfs-Canvas sofort frei. */
+function freeCanvas(c: HTMLCanvasElement | null | undefined) {
+  if (!c) return;
+  try { c.width = 0; c.height = 0; } catch { /* noop */ }
+}
+
 /** true, wenn der aktuelle Zeichenmodus Pixel ist. */
 export function isPixelDrawMode(app: any): boolean {
   return !!app && (app as any).defaultDrawRasterMode === "pixel";
@@ -166,20 +188,18 @@ export function renderObjectToCanvas(
   input: RasterInput,
   /** Feste Zielauflösung (px pro Weltmeter); sonst aus den Pixel-Einstellungen. */
   pxPerMOverride?: number,
+  /** Nur diesen Weltausschnitt rendern (Teilbereich für große Objekte). */
+  boundsOverride?: { x: number; y: number; w: number; h: number },
 ): RasterRenderResult | null {
   if (!app || !app.scene || !app.renderer) return null;
-  const b = worldBounds(app, input);
+  const b = boundsOverride || worldBounds(app, input);
   if (!b) return null;
 
-  let pxPerM = pxPerMOverride && pxPerMOverride > 0 ? pxPerMOverride : targetPxPerM(app);
+  const pxPerM = pxPerMOverride && pxPerMOverride > 0 ? pxPerMOverride : targetPxPerM(app);
   let wPx = Math.ceil(b.w * pxPerM);
   let hPx = Math.ceil(b.h * pxPerM);
-  if (wPx * hPx > MAX_PIXELS) {
-    const k = Math.sqrt(MAX_PIXELS / (wPx * hPx));
-    pxPerM *= k;
-    wPx = Math.max(1, Math.floor(wPx * k));
-    hPx = Math.max(1, Math.floor(hPx * k));
-  }
+  // Keine stille Qualitätsminderung: zu große Flächen werden abgelehnt.
+  if (wPx * hPx > MAX_PIXELS) throw new RasterTooLargeError(wPx, hPx);
   wPx = Math.max(1, wPx);
   hPx = Math.max(1, hPx);
 
@@ -229,6 +249,7 @@ export function renderObjectToCanvas(
       c2ctx.imageSmoothingEnabled = false;
       c2ctx.drawImage(canvas, trim.x, trim.y, trim.w, trim.h, 0, 0, trim.w, trim.h);
       outCanvas = c2;
+      freeCanvas(canvas);
       outWPx = trim.w;
       outHPx = trim.h;
       outX = b.x + trim.x / pxPerM;
@@ -256,25 +277,58 @@ export function rasterizeIntoLayer(app: any, input: RasterInput): boolean {
   if (input.type === "segment" && input.obj.isGuide) return false;
   const layers = app?.rasterLayers;
   if (!layers?.get) return false;
+  const probeLabel = (input.obj as any).labelId || Defaults.defaultLabelId;
+  const layer = layers.get(probeLabel, true);
+  if (!layer) return false;
+  const b = worldBounds(app, input);
+  if (!b) return false;
+  // Alle Teilbereiche zuerst vollständig rendern, erst dann einbrennen und das
+  // Vektororiginal entfernen. Bei Fehlern bleibt nichts Halbfertiges zurück.
+  const chunks = rasterChunks(b, layer.pxPerM, layer.tileWorld);
+  const rendered: RasterRenderResult[] = [];
   try {
-    const probeLabel = (input.obj as any).labelId || Defaults.defaultLabelId;
-    // Auflösung der Rasterebene (feste Papier-DPI, zoom-unabhängig).
-    const layer = layers.get(probeLabel, true);
-    if (!layer) return false;
-    const res = renderObjectToCanvas(app, input, layer.pxPerM);
-    if (!res) return false;
-    layer.blit(res.canvas, res.x, res.y, res.w, res.h);
-    removeFromApp(app, input);
-    try { app.clearSelection?.(); } catch { /* optional */ }
-    try { app.requestRender?.(); } catch { /* optional */ }
-    try { app.renderer?.render?.(); } catch { /* optional */ }
-    try { app.refreshLabelUI?.(); } catch { /* optional */ }
-    try { app.commitHistorySnapshot?.(); } catch { /* optional */ }
-    return true;
+    for (const c of chunks) {
+      const res = renderObjectToCanvas(app, input, layer.pxPerM, c);
+      if (res) rendered.push(res);
+    }
   } catch (e) {
+    for (const r of rendered) freeCanvas(r.canvas);
     console.error("rasterizeIntoLayer failed:", e);
-    return false;
+    notifyRasterFailure(e);
+    return true; // kontrolliert abgelehnt: Vektorobjekt bleibt, kein Bild-Fallback
   }
+  if (!rendered.length) return false;
+  for (const r of rendered) { layer.blit(r.canvas, r.x, r.y, r.w, r.h); freeCanvas(r.canvas); }
+  removeFromApp(app, input);
+  try { app.clearSelection?.(); } catch { /* optional */ }
+  try { app.requestRender?.(); } catch { /* optional */ }
+  try { app.renderer?.render?.(); } catch { /* optional */ }
+  try { app.refreshLabelUI?.(); } catch { /* optional */ }
+  try { app.commitHistorySnapshot?.(); } catch { /* optional */ }
+  return true;
+}
+
+/**
+ * Teilt ein Weltrechteck in Teilbereiche entlang des Kachelrasters, sodass
+ * jeder Teilbereich höchstens RASTER_CHUNK_PIXELS umfasst. Grenzen liegen auf
+ * ganzen Kachelpixeln → nahtlos.
+ */
+export function rasterChunks(b: { x: number; y: number; w: number; h: number }, pxPerM: number, tileWorld: number) {
+  const total = Math.ceil(b.w * pxPerM) * Math.ceil(b.h * pxPerM);
+  if (total <= RASTER_CHUNK_PIXELS) return [b];
+  const tilePx = Math.max(1, Math.round(tileWorld * pxPerM));
+  const tilesPerChunk = Math.max(1, Math.floor(Math.sqrt(RASTER_CHUNK_PIXELS) / tilePx));
+  const step = tilesPerChunk * tileWorld;
+  const x0 = Math.floor(b.x / tileWorld) * tileWorld, y0 = Math.floor(b.y / tileWorld) * tileWorld;
+  const out: { x: number; y: number; w: number; h: number }[] = [];
+  for (let y = y0; y < b.y + b.h; y += step) {
+    for (let x = x0; x < b.x + b.w; x += step) {
+      const cx = Math.max(x, b.x), cy = Math.max(y, b.y);
+      const cw = Math.min(x + step, b.x + b.w) - cx, ch = Math.min(y + step, b.y + b.h) - cy;
+      if (cw > 0 && ch > 0) out.push({ x: cx, y: cy, w: cw, h: ch });
+    }
+  }
+  return out;
 }
 
 /**
