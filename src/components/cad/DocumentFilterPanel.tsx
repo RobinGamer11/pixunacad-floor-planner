@@ -284,55 +284,6 @@ export function DocumentFilterPanel({ app, docId, sig, part = "all" }: Props) {
 }
 
 
-export function ToolBtn({ active, onClick, label, title }: { active: boolean; onClick: () => void; label: string; title?: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className="cad-toolbar-btn h-9 px-2 text-[11px] font-medium justify-center"
-      style={{
-        borderColor: active ? "hsl(var(--primary))" : undefined,
-        background: active ? "hsl(var(--primary) / 0.15)" : undefined,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-export function ColorAlphaRow({ label, color, alpha, onChange, hint }: {
-  label: string; color: string | null; alpha: number;
-  onChange: (color: string | null, alpha: number) => void;
-  hint?: string;
-}) {
-  const transparent = color === null;
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
-        <span title={hint}>{label}</span>
-        <label className="flex items-center gap-1 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-          <input type="checkbox" checked={transparent} onChange={(e) => onChange(e.target.checked ? null : (color || "#ffffff"), alpha)} />
-          <span>Transparent</span>
-        </label>
-      </div>
-      {!transparent && (
-        <div className="flex items-center gap-2">
-          <input type="color" value={color || "#ffffff"} onChange={(e) => onChange(e.target.value, alpha)} className="w-8 h-7 rounded border cursor-pointer" />
-          <input type="text" value={color || "#ffffff"} onChange={(e) => onChange(e.target.value, alpha)} className="flex-1 bg-transparent border rounded px-2 py-1 text-xs" />
-        </div>
-      )}
-      <div className="flex items-center justify-between text-[11px]">
-        <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Deckkraft</span>
-        <span style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{Math.round(alpha * 100)} %</span>
-      </div>
-      <input type="range" min={0} max={1} step={0.01} value={alpha}
-        onChange={(e) => onChange(color, parseFloat(e.target.value))}
-        className="pixuna-range w-full" />
-    </div>
-  );
-}
-
 function FilterButton(props: {
   active: boolean; name: string; swatches: string[];
   onSelect: () => void;

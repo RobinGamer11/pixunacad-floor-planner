@@ -939,20 +939,6 @@ export class CadApp {
           try { maskUrl = d._eraseMask.toDataURL("image/png"); d.eraseMaskDataUrl = maskUrl; d._eraseMaskDirty = false; }
           catch { /* ignore */ }
         }
-        // BgRemoval: Flag UND tatsächliche Maske exportieren, damit nach
-        // Neuladen/Cloud-Abgleich exakt dieselbe Fläche entfernt bleibt.
-        let bgClone: any = undefined;
-        const anyD = d as any;
-        if (anyD.bgRemoval) {
-          if (typeof anyD.bgRemoval.hasMaskEdits !== "boolean") {
-            anyD.bgRemoval.hasMaskEdits = !!anyD.bgRemoval.fgMaskDataUrl;
-          }
-          bgClone = { ...anyD.bgRemoval };
-          if (anyD.bgRemoval.hasMaskEdits && anyD._bgFgMask) {
-            try { bgClone.fgMaskDataUrl = (anyD._bgFgMask as HTMLCanvasElement).toDataURL("image/png"); }
-            catch { /* ignore */ }
-          }
-        }
         return {
           id: d.id, name: d.name, kind: d.kind, src: d.src, pageIndex: d.pageIndex,
           position: { x: d.position.x, y: d.position.y },
