@@ -1258,6 +1258,29 @@ export class CadApp {
 
   isActionOpen() { return this._actionDepth > 0; }
 
+  /**
+   * Eine abgeschlossene Benutzerhandlung (Strich fertig, Objekt platziert …)
+   * = genau ein Undo-Schritt. Verschachtelte Schritte (z. B. Rastern im
+   * Pixelmodus) gehen in derselben äußeren Aktion auf. Wirft fn, wird alles
+   * zurückgenommen – keine Teiländerungen im Projekt.
+   */
+  runAction<T>(fn: () => T): T | undefined {
+    this.beginAction();
+    let ok = false;
+    try { const r = fn(); ok = true; return r; }
+    catch (e) { console.error("Aktion abgebrochen:", e); return undefined; }
+    finally { if (ok) this.commitAction(); else this.cancelAction(); }
+  }
+
+  /**
+   * Sicherheitsnetz: keine offene Aktion und kein hängendes suspendHistory
+   * über Werkzeug-/Blattwechsel oder Fokusverlust hinaus.
+   */
+  settleHistoryState() {
+    if (this._actionDepth > 0) this.commitAction();
+    if (this._actionDepth === 0 && this.suspendHistory) this.suspendHistory = false;
+  }
+
   private _emitHistoryChange() {
     this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
     this._emitPlanUiChange?.();

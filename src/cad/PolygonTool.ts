@@ -54,13 +54,17 @@ export class PolygonTool extends HatchTool {
     const style = (this.app as any).getCurrentPolygonStyle?.() ?? {};
     const shapeMode: PolygonDrawMode =
       this.drawMode === "rectangle" || this.drawMode === "circle" ? this.drawMode : "polygon";
-    const poly = (this.app as any).scene.createPolygon(points, {
-      ...style,
-      ...((this.app as any).getStrokeEffectDefaults?.("polygon") ?? {}),
-      shapeMode,
-      closed: shapeMode === "polygon" ? closed : true,
+    let poly: any = null;
+    (this.app as any).runAction(() => {
+      poly = (this.app as any).scene.createPolygon(points, {
+        ...style,
+        ...((this.app as any).getStrokeEffectDefaults?.("polygon") ?? {}),
+        shapeMode,
+        closed: shapeMode === "polygon" ? closed : true,
+      });
+      maybeRasterize(this.app, { type: "hatch", obj: poly });
     });
-    maybeRasterize(this.app, { type: "hatch", obj: poly });
+    if (!poly) return;
     (this.app as any).notifyPolygonCreated?.(poly);
   }
 

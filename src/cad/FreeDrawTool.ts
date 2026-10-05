@@ -134,13 +134,16 @@ export class FreeDrawTool {
         this._lastSamplePx = null;
         this.app.hub.hide();
         if (pts.length >= 2 && this._pathLength(pts) > 1e-4) {
-          const stroke = this.app.scene.createFreeStroke(pts, {
-            ...this._currentStyle(),
-            pressures,
-            autoShape: useAuto,
-            autoShapeSource: useAuto ? raw : null,
+          const style = this._currentStyle();
+          this.app.runAction(() => {
+            const stroke = this.app.scene.createFreeStroke(pts, {
+              ...style,
+              pressures,
+              autoShape: useAuto,
+              autoShapeSource: useAuto ? raw : null,
+            });
+            maybeRasterize(this.app, { type: "free", obj: stroke });
           });
-          maybeRasterize(this.app, { type: "free", obj: stroke });
           this.app.refreshLabelUI?.();
         }
 
