@@ -1,8 +1,8 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
 ## Aktuelle Korrekturen
-- [ ] Projekt-bearbeiten-Inhalt ausschließlich zwischen fester Kopf- und Fußzeile scrollen
-- [ ] Sichtbare CAD-Transparentpausen vollständig als schreibgeschützte Fang- und Hilfslinienquelle nutzen
+- [x] Projekt-bearbeiten-Inhalt ausschließlich zwischen fester Kopf- und Fußzeile scrollen
+- [x] Sichtbare CAD-Transparentpausen vollständig als schreibgeschützte Fang- und Hilfslinienquelle nutzen
 
 ## Bibliothek – Bedienungsdetails
 - [x] Primär- und Sekundäraktionen klar hervorheben
