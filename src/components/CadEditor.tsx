@@ -1,3 +1,4 @@
+import { TrashIcon } from "@/lib/trashIcon";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
@@ -2000,7 +2001,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <button ref={pointInsertPointBtnRef} title="Neuen Fangpunkt auf der Kante setzen">＋</button>
           <button ref={pointBulgeBtnRef} title="Kante wölben (rein-/rauswölben)">◠</button>
           <button ref={pointSplitBtnRef} title="Aufschneiden (Punkt setzen, teilt in zwei verbundene Objekte)">✂</button>
-          <button ref={pointDeleteBtnRef} title="Löschen">🗑</button>
+          <button ref={pointDeleteBtnRef} title="Löschen" aria-label="Löschen"><TrashIcon /></button>
         </div>
 
         {/* Text Editor Toolbar (floating) */}

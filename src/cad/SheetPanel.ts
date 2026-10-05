@@ -1,3 +1,4 @@
+import { TRASH_ICON_SVG } from "@/lib/trashIcon";
 import { SheetManager, SheetOverlayStore, OverlayMode, OverlayColors } from "./SheetManager";
 
 /**
@@ -237,7 +238,8 @@ export class SheetPanel {
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "sheet-icon-btn icon-only";
       deleteBtn.title = isLastSheet ? "Mindestens ein Blatt erforderlich" : "Löschen";
-      deleteBtn.textContent = "🗑";
+      deleteBtn.innerHTML = TRASH_ICON_SVG;
+      deleteBtn.setAttribute("aria-label", "Blatt löschen");
       deleteBtn.disabled = isLastSheet;
       deleteBtn.style.opacity = isLastSheet ? "0.35" : "1";
       deleteBtn.addEventListener("click", (e) => {
