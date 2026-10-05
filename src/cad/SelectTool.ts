@@ -13,7 +13,7 @@ import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometr
 import type { TextBox } from "./Scene";
 import { instanceCornersWorld, pointInInstanceBounds } from "./library/libraryGeometry";
 import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld, documentEdgeMidpointsWorld, documentAnchorsWorld } from "./documentGeometry";
-import { pointInDocumentVisible } from "./documentBgRemove";
+import { pointInDocumentVisible } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
 import { buildWallSolidRing, buildHealedWallSolidRing } from "./wallSolid";
 import { runWallTopologyMaintenance } from "./wallTopologyMaintenance";
@@ -142,8 +142,6 @@ export class SelectTool {
   dragDimGrabDy = 0;
   private dimensionHubGuideOrigin: Vec2 | null = null;
   /** Läuft gerade ein zusammenhängender Pinselstrich (ein Verlaufsschritt)? */
-  private _bgBrushStrokeActive = false;
-  private _bgBrushStrokeDocId: string | null = null;
 
   // Bibliotheksinstanz Drag-State (Translate)
   /* Bibliotheksobjekte werden NICHT mehr direkt per Linksklick gezogen. Die
@@ -3333,7 +3331,6 @@ export class SelectTool {
         || this.rotateTextBoxId);
       const anyEdit = this.isEditing();
       const specialMode = this.app.dimensionHubMode === "move"
-        || !!this.app.bgRemoveInteraction
         || this.app.documentHubMode !== "none";
       const blocked = anyDrag || anyEdit || specialMode || input.isPanning || input.keys.space;
 

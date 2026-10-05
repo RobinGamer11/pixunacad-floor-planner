@@ -386,13 +386,6 @@ export class CadApp {
    *  verschieben/drehen/skalieren. */
   documentHubMode: "none" | "move" | "rotate" | "scale" | "crop" = "none";
 
-  /** Aktive Hintergrund-Ausschnitt-Interaktion (aus DocumentFilterPanel gesetzt).
-   *  Wird von SelectTool bei Klick/Drag über dem Ziel-Dokument verarbeitet. */
-  bgRemoveInteraction: null | {
-    docId: string;
-    tool: "wand" | "brush";
-    target: "fg" | "bg";
-  } = null;
   /** Erster Referenz-Klick für Rotate/Scale (Welt-Koordinate). */
   documentHubFirstClick: { x: number; y: number } | null = null;
 
@@ -972,7 +965,6 @@ export class CadApp {
           opacity: (d as any).opacity,
           filters: ((d as any).filters || []).map((f: any) => ({ ...f })),
           activeFilterId: (d as any).activeFilterId || null,
-          bgRemoval: bgClone,
           anchors: ((d as any).anchors || []).map((a: any) => ({ x: a.x, y: a.y })),
           warpCorners: (d as any).warpCorners ? (d as any).warpCorners.map((c: any) => ({ x: c.x, y: c.y })) : null,
           flipX: !!(d as any).flipX,
@@ -1379,15 +1371,6 @@ export class CadApp {
 
   /* ---- Selection ---- */
   setSelection(selection: Selection | null) {
-    // Hintergrund-Ausschnitt-Interaktion beenden, sobald die Auswahl das
-    // zugehörige Dokument verlässt (oder komplett verschwindet). So kann der
-    // User das Bild frei an- und abwählen, ohne dass jeder Klick weiter malt.
-    if (this.bgRemoveInteraction) {
-      const stillOnSameDoc = !!selection
-        && (selection as any).type === "document"
-        && (selection as any).documentId === this.bgRemoveInteraction.docId;
-      if (!stillOnSameDoc) this.bgRemoveInteraction = null;
-    }
     // Tabellen-Zellmodus endet, sobald die Auswahl diese Tabelle verlässt
     // (freie Fläche, anderes Objekt oder andere Tabelle).
     if (this.tableEditId) {
@@ -2742,7 +2725,6 @@ export class CadApp {
         if (this.dimensionMoveActive) this.cancelDimensionMove();
         this.dimensionHubMode = "none";
         this.documentHubMode = "none";
-        this.bgRemoveInteraction = null;
         this.measureFinishHubState = { visible: false, screenX: 0, screenY: 0 };
         this.globalGuides.clear();
         try { this.hub?.hide?.(); } catch {}
