@@ -52,6 +52,28 @@ export function clipSegment(a: { x: number; y: number }, b: { x: number; y: numb
 }
 
 type Pt = { x: number; y: number };
+/** Sutherland–Hodgman: Fläche auf Beschneidungsrechteck begrenzen. */
+export function clipPolygonToBox(poly: Pt[], b: Box): Pt[] {
+  const bb = boxOf(poly);
+  if (bb.x0 >= b.x0 && bb.x1 <= b.x1 && bb.y0 >= b.y0 && bb.y1 <= b.y1) return poly;
+  let out = poly;
+  const edges: [(p: Pt) => boolean, (a: Pt, c: Pt) => Pt][] = [
+    [(p) => p.x >= b.x0, (a, c) => ({ x: b.x0, y: a.y + (c.y - a.y) * (b.x0 - a.x) / (c.x - a.x) })],
+    [(p) => p.x <= b.x1, (a, c) => ({ x: b.x1, y: a.y + (c.y - a.y) * (b.x1 - a.x) / (c.x - a.x) })],
+    [(p) => p.y >= b.y0, (a, c) => ({ x: a.x + (c.x - a.x) * (b.y0 - a.y) / (c.y - a.y), y: b.y0 })],
+    [(p) => p.y <= b.y1, (a, c) => ({ x: a.x + (c.x - a.x) * (b.y1 - a.y) / (c.y - a.y), y: b.y1 })],
+  ];
+  for (const [inside, cut] of edges) {
+    const inp = out; out = [];
+    for (let i = 0; i < inp.length; i++) {
+      const cur = inp[i], prev = inp[(i + inp.length - 1) % inp.length];
+      if (inside(cur)) { if (!inside(prev)) out.push(cut(prev, cur)); out.push(cur); }
+      else if (inside(prev)) out.push(cut(prev, cur));
+    }
+    if (!out.length) return out;
+  }
+  return out;
+}
 function ringArea(r: Pt[]) { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j].x + r[i].x) * (r[j].y - r[i].y); return Math.abs(a / 2); }
 function pointInRing(p: Pt, r: Pt[]) {
   let c = false;
@@ -314,8 +336,9 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     // Mehrere Teilpfade: innenliegende Ringe werden Löcher (statt die
     // Aussparung vollflächig zu übermalen).
     for (const f of groupFillRings(currentPath.filter((s) => s.length >= 3))) {
-      if (clipBox && !boxesOverlap(boxOf(f.points), clipBox)) continue;
-      result.hatches.push({ points: f.points, ...(f.holes.length ? { holes: f.holes } : {}), fillColor, strokeColor: fillColor });
+      let pts = f.points;
+      if (clipBox) { pts = clipPolygonToBox(pts, clipBox); if (pts.length < 3) continue; }
+      result.hatches.push({ points: pts, ...(f.holes.length ? { holes: f.holes } : {}), fillColor, strokeColor: fillColor });
     }
   };
 
