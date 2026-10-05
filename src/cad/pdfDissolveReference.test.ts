@@ -50,7 +50,7 @@ describe("Referenz-PDF Grundriss Praxis Grande", () => {
 });
 
 import { clipSegment, clipPolygonToBox, groupFillRings } from "./pdfVectorExtract";
-import { pdfDashToPattern } from "./pdfTextFit";
+import { pdfDashToPattern } from "./pdfDash";
 describe("PDF-Hilfsgeometrie", () => {
   const box = { x0: 0, y0: 0, x1: 10, y1: 10 };
   it("beschneidet Linien und Flächen am Clip-Rahmen", () => {

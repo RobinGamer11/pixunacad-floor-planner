@@ -1,4 +1,5 @@
-import { fitPdfTextBox, pdfDashToPattern } from "./pdfTextFit";
+import { fitPdfTextBox } from "./pdfTextFit";
+import { pdfDashToPattern } from "./pdfDash";
 import { pdfFontPtToCadPt } from "./textTypography";
 import { Defaults, SelectionType, SnapType } from "./constants";
 import { v, Vec2, dist, orthoSnapFromA } from "./geometry";
