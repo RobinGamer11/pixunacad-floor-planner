@@ -167,3 +167,6 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Gewendelt/Podest-Wahl unter „Gewendelte Stufen“ mit Anzahl und Mindestauftritt; Geschosshöhe direkt unter Schrittmaßregel
 - [x] Warnung je Zustand einmal oben; Schritt 02 fängt den Gegenpunkt der Startkante bei Maus, Finger und Stift
 - [ ] Platzierung und Einstellungen auf echtem Tablet abnehmen (Nutzer)
+- [x] Gemeinsamer Aktionsablauf: `CadApp.runAction` (1 Undo, Fehler = vollständige Rücknahme); Freihand, Linie, Polygon, Schraffur, Füllen, Wand, Text-Rastern angebunden; hängende Druckzustände (Hilfsrad, Fokusverlust, Capture) behoben
+- [ ] Punkt 2 Rest: 250-ms-Fallback-Snapshot ablösen (große Rasterstände), Gerätetests
+- [ ] Punkt 3 Tablet/Handy (Kopfzeilen-Geste), Punkt 4 Pixelmodus-Speicher, Punkt 5 PDF-Auflösung (Referenz-PDF fehlt)

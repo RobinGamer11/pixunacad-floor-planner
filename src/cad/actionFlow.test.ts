@@ -9,7 +9,7 @@ function makeApp() {
     _actionDepth: 0, _actionPrevSuspend: false, _actionStartSnapshot: null,
     _isRestoring: false, _destroyed: false, suspendHistory: false, contentRevision: 0,
     input: { mouse: {}, isPanning: false }, selectTool: { isEditing: () => false },
-    documentTool: {}, stairTool: null, activeTool: null,
+    documentTool: {}, stairTool: { undoStep: () => false }, activeTool: null,
     _serializeScene: () => JSON.stringify(state.items),
     _restoreScene: (s: string) => { state.items = JSON.parse(s); },
     _emitHistoryChange: () => {},
