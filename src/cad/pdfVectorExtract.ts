@@ -12,7 +12,8 @@ import { Defaults } from "./constants";
 import { loadPdfDocFromB64, loadPdfJs } from "./documentImport";
 
 export interface DissolvedPdfResult {
-  segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number }[];
+  segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number;
+    /** Strichelung in Seiten-pt (wirksam, inkl. Transformation); fehlt = durchgezogen. */ dashPt?: number[] }[];
   hatches: { points: { x: number; y: number }[]; fillColor: string; strokeColor: string }[];
   texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; /** Schriftgröße in PDF-Punkten der Seite (ohne Mindestwert). */ fontSizePdfPt: number; text: string; color: string;
     /** Drehung der Grundlinie in PDF-Raum (rad, gegen den Uhrzeigersinn). */ angleRad?: number;
@@ -23,6 +24,32 @@ export interface DissolvedPdfResult {
 
 /** PDF-Hairline (Breite 0) = dünnster Strich. */
 export const HAIRLINE_PT = 0.1;
+
+type Box = { x0: number; y0: number; x1: number; y1: number };
+function boxOf(pts: { x: number; y: number }[]): Box {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of pts) { if (p.x < x0) x0 = p.x; if (p.y < y0) y0 = p.y; if (p.x > x1) x1 = p.x; if (p.y > y1) y1 = p.y; }
+  return { x0, y0, x1, y1 };
+}
+function intersectBox(a: Box, b: Box): Box {
+  return { x0: Math.max(a.x0, b.x0), y0: Math.max(a.y0, b.y0), x1: Math.min(a.x1, b.x1), y1: Math.min(a.y1, b.y1) };
+}
+function boxesOverlap(a: Box, b: Box) { return a.x0 <= b.x1 && a.x1 >= b.x0 && a.y0 <= b.y1 && a.y1 >= b.y0; }
+/** Liang-Barsky: Strecke auf Rechteck beschneiden (null = komplett außerhalb). */
+export function clipSegment(a: { x: number; y: number }, b: { x: number; y: number }, r: Box): [{ x: number; y: number }, { x: number; y: number }] | null {
+  const eps = 1e-6;
+  let t0 = 0, t1 = 1;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const ps = [-dx, dx, -dy, dy], qs = [a.x - (r.x0 - eps), (r.x1 + eps) - a.x, a.y - (r.y0 - eps), (r.y1 + eps) - a.y];
+  for (let i = 0; i < 4; i++) {
+    const p = ps[i], q = qs[i];
+    if (p === 0) { if (q < 0) return null; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return null; if (t > t0) t0 = t; }
+    else { if (t < t0) return null; if (t < t1) t1 = t; }
+  }
+  return [{ x: a.x + t0 * dx, y: a.y + t0 * dy }, { x: a.x + t1 * dx, y: a.y + t1 * dy }];
+}
 
 interface Mat2x3 { a: number; b: number; c: number; d: number; e: number; f: number }
 const ID: Mat2x3 = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -189,6 +216,12 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   let fillSpecial = false;
   let strokeSpecial = false;
   let lineWidth = 1; // in user units
+  let dashArr: number[] = [];
+  /** Aktueller Beschneidungsrahmen in Seiten-pt (null = keiner). */
+  let clipBox: Box | null = null;
+  let pendingClip = false;
+  const clipStack: (Box | null)[] = [];
+  const dashStack: number[][] = [];
   /** fillColor zum Zeitpunkt jeder Text-Show-Op (Reihenfolge wie in der opList). */
   const textOpFillColors: string[] = [];
   /** Text pro Show-Op (ohne Leerzeichen) für die positionsgenaue Farbzuordnung. */
@@ -221,15 +254,30 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   const emitStroke = () => {
     flushSubpath();
     if (strokeSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
+    const s = Math.sqrt(Math.abs(ctm.a * ctm.d - ctm.b * ctm.c)) || 1;
+    const dashPt = dashArr.length && dashArr.some((d) => d > 0) ? dashArr.map((d) => d * s) : undefined;
     for (const sub of currentPath) {
       for (let i = 1; i < sub.length; i++) {
+        const c = clipBox ? clipSegment(sub[i - 1], sub[i], clipBox) : [sub[i - 1], sub[i]];
+        if (!c) continue;
         result.segments.push({
-          a: sub[i - 1], b: sub[i],
+          a: c[0], b: c[1],
           color: strokeColor,
           thicknessM: effectiveStrokePt() * Defaults.documentMetersPerPdfPt,
+          ...(dashPt ? { dashPt } : {}),
         });
       }
     }
+  };
+
+  /** W/W* n: Beschneidungsrahmen = Schnitt mit Hüllrechteck des Pfads. */
+  const applyPendingClip = () => {
+    if (!pendingClip) return;
+    pendingClip = false;
+    const pts = [...currentPath.flat(), ...currentSub];
+    if (!pts.length) return;
+    const b = boxOf(pts);
+    clipBox = clipBox ? intersectBox(clipBox, b) : b;
   };
 
   const emitFill = () => {
@@ -238,6 +286,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     if (fillSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
     for (const sub of currentPath) {
       if (sub.length >= 3) {
+        if (clipBox && !boxesOverlap(boxOf(sub), clipBox)) continue;
         // Reine Füllung: Rand in Füllfarbe (keine fremde Randfarbe); umrandete
         // Flächen erhalten ihre Kontur zusätzlich als Linien in Konturfarbe.
         // Reine Füllung ohne Rand (strokeWidthPx 0); Konturen kommen nur aus Stroke-Ops als Linien.
@@ -319,6 +368,11 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   for (let k = 0; k < fns.length; k++) {
     const fn = fns[k];
     const a = args[k] || [];
+    if (fn === OPS.save) { clipStack.push(clipBox); dashStack.push(dashArr); }
+    else if (fn === OPS.restore) { if (clipStack.length) clipBox = clipStack.pop()!; if (dashStack.length) dashArr = dashStack.pop()!; }
+    if (fn === OPS.clip || fn === OPS.eoClip) pendingClip = true;
+    else if (fn === OPS.setDash) dashArr = Array.isArray(a[0]) ? a[0].map(Number).filter(Number.isFinite) : [];
+    if (fn === OPS.endPath || fn === OPS.stroke || fn === OPS.fill || fn === OPS.eoFill || fn === OPS.fillStroke || fn === OPS.eoFillStroke || fn === OPS.closeStroke || fn === OPS.closeFillStroke || fn === OPS.closeEOFillStroke) applyPendingClip();
     if (fn === OPS.save) { ctmStack.push({ ...ctm }); colorStack.push({ fill: fillColor, stroke: strokeColor, lw: lineWidth, fs: fillSpecial, ss: strokeSpecial }); }
     else if (fn === OPS.restore) {
       if (ctmStack.length) ctm = ctmStack.pop()!;
