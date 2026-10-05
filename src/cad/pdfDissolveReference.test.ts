@@ -34,9 +34,37 @@ describe("Referenz-PDF Grundriss Praxis Grande", () => {
     console.log("Textproben:", JSON.stringify(r.texts.slice(0, 12).map((t) => [t.text, +(t.fontSizePdfPt).toFixed(2), +(t.angleRad || 0).toFixed(2), +(t.widthPdfPt || 0).toFixed(1)])));
   }, 30000);
 
+  it("übernimmt keine unsichtbaren Flächen (Deckkraft 0) und behält graue Wandflächen", async () => {
+    const r = await extractPdfPageVectors(b64, 0);
+    const area = (p: { x: number; y: number }[]) => Math.abs(p.reduce((s, q, i) => { const o = p[(i + p.length - 1) % p.length]; return s + o.x * q.y - q.x * o.y; }, 0) / 2);
+    expect(r.hatches.some((h) => area(h.points) > 900_000)).toBe(false);
+    expect(r.hatches.filter((h) => h.fillColor === "#5f5f5f").length).toBeGreaterThan(100);
+    expect(r.texts.filter((t) => Math.abs((t.angleRad || 0) - Math.PI / 2) < 0.01).length).toBeGreaterThan(50);
+  }, 30000);
+
   it("liefert Texte mit Breite und Drehung", async () => {
     const r = await extractPdfPageVectors(b64, 0);
     expect(r.texts.length).toBeGreaterThan(5);
     for (const t of r.texts) expect(Number.isFinite(t.angleRad)).toBe(true);
   }, 30000);
+});
+
+import { clipSegment, clipPolygonToBox, groupFillRings } from "./pdfVectorExtract";
+import { pdfDashToPattern } from "./pdfTextFit";
+describe("PDF-Hilfsgeometrie", () => {
+  const box = { x0: 0, y0: 0, x1: 10, y1: 10 };
+  it("beschneidet Linien und Flächen am Clip-Rahmen", () => {
+    expect(clipSegment({ x: -5, y: 5 }, { x: 5, y: 5 }, box)![0].x).toBeCloseTo(0);
+    expect(clipSegment({ x: -5, y: -5 }, { x: -1, y: -1 }, box)).toBe(null);
+    expect(clipPolygonToBox([{ x: -5, y: -5 }, { x: 5, y: -5 }, { x: 5, y: 5 }, { x: -5, y: 5 }], box).length).toBe(4);
+  });
+  it("innere Teilpfade werden Löcher", () => {
+    const sq = (a: number, b: number) => [{ x: a, y: a }, { x: b, y: a }, { x: b, y: b }, { x: a, y: b }];
+    const g = groupFillRings([sq(0, 10), sq(2, 8)]);
+    expect(g.length).toBe(1); expect(g[0].holes.length).toBe(1);
+  });
+  it("Strichelung wird in CAD-Linienart übersetzt", () => {
+    expect(pdfDashToPattern([3, 2], 0.001).kind).toBe("dashed");
+    expect(pdfDashToPattern([6, 2, 0, 2], 0.001).kind).toBe("dash-dot");
+  });
 });
