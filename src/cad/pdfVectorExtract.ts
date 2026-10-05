@@ -14,10 +14,15 @@ import { loadPdfDocFromB64, loadPdfJs } from "./documentImport";
 export interface DissolvedPdfResult {
   segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number }[];
   hatches: { points: { x: number; y: number }[]; fillColor: string; strokeColor: string }[];
-  texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; /** Schriftgröße in PDF-Punkten der Seite (ohne Mindestwert). */ fontSizePdfPt: number; text: string; color: string }[];
+  texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; /** Schriftgröße in PDF-Punkten der Seite (ohne Mindestwert). */ fontSizePdfPt: number; text: string; color: string;
+    /** Drehung der Grundlinie in PDF-Raum (rad, gegen den Uhrzeigersinn). */ angleRad?: number;
+    /** Breite des Textinhalts in PDF-pt laut PDF (inkl. Laufweite/Skalierung). */ widthPdfPt?: number }[];
   /** Anzahl nicht übertragbarer PDF-Spezialfüllungen/-konturen (Mesh-Verläufe, unbekannte Muster). Bleiben in der PDF-Unterlage sichtbar. */
   skippedSpecial?: number;
 }
+
+/** PDF-Hairline (Breite 0) = dünnster Strich. */
+export const HAIRLINE_PT = 0.1;
 
 interface Mat2x3 { a: number; b: number; c: number; d: number; e: number; f: number }
 const ID: Mat2x3 = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -201,6 +206,18 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     }
   };
 
+  /**
+   * Wirksame Strichbreite in Seiten-pt: Linienbreite × Skalierung der aktuellen
+   * Transformation (bei ungleichmäßiger Skalierung geometrisches Mittel).
+   * Breite 0 = PDF-Hairline → dünnster darstellbarer Strich (0,1 pt).
+   * Keine künstliche Mindeststärke.
+   */
+  const effectiveStrokePt = () => {
+    const s = Math.sqrt(Math.abs(ctm.a * ctm.d - ctm.b * ctm.c)) || 1;
+    const w = lineWidth * s;
+    return w > 0 ? w : HAIRLINE_PT;
+  };
+
   const emitStroke = () => {
     flushSubpath();
     if (strokeSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
@@ -209,7 +226,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
         result.segments.push({
           a: sub[i - 1], b: sub[i],
           color: strokeColor,
-          thicknessM: Math.max(0.0005, lineWidth * Defaults.documentMetersPerPdfPt),
+          thicknessM: effectiveStrokePt() * Defaults.documentMetersPerPdfPt,
         });
       }
     }
@@ -223,6 +240,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
       if (sub.length >= 3) {
         // Reine Füllung: Rand in Füllfarbe (keine fremde Randfarbe); umrandete
         // Flächen erhalten ihre Kontur zusätzlich als Linien in Konturfarbe.
+        // Reine Füllung ohne Rand (strokeWidthPx 0); Konturen kommen nur aus Stroke-Ops als Linien.
         result.hatches.push({ points: sub.slice(), fillColor, strokeColor: fillColor });
       }
     }
@@ -392,6 +410,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
       const t = item.transform; // [a, b, c, d, e, f] — PDF user space
       if (!t) return;
       const fontSizePt = Math.hypot(t[2], t[3]) || Math.abs(t[3]) || 10;
+      const angleRad = Math.atan2(t[1], t[0]) || 0;
       const widthPt = item.width || fontSizePt * Math.max(1, item.str.length) * 0.5;
       const heightPt = fontSizePt * 1.2;
       const col = colorForItem(idx, item.str);
@@ -403,6 +422,8 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
         fontSizePdfPt: fontSizePt,
         text: item.str,
         color: col,
+        angleRad,
+        widthPdfPt: item.width || 0,
       });
     });
   } catch { /* ignore */ }

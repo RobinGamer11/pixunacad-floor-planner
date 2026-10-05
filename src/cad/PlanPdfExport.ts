@@ -168,7 +168,7 @@ function drawProjectionToPdf(
       page.drawLine({
         start: { x: p0.x, y: p0.y },
         end: { x: p1.x, y: p1.y },
-        thickness: Math.max(0.2, thicknessMm * MM_TO_PT),
+        thickness: Math.max(0.1, thicknessMm * MM_TO_PT),
         color: rgb(col.r, col.g, col.b),
       });
     } else if (it.kind === "dimension-line" && it.a && it.b) {
