@@ -1,3 +1,4 @@
+import { fitPdfTextBox } from "./pdfTextFit";
 import { pdfFontPtToCadPt } from "./textTypography";
 import { Defaults, SelectionType, SnapType } from "./constants";
 import { v, Vec2, dist, orthoSnapFromA } from "./geometry";
@@ -828,7 +829,7 @@ export class DocumentTool {
           if (erasedAt(s.a.x, s.a.y) && erasedAt(s.b.x, s.b.y)) continue;
           if (erasedAt((s.a.x + s.b.x) / 2, (s.a.y + s.b.y) / 2)
             && (erasedAt(s.a.x, s.a.y) || erasedAt(s.b.x, s.b.y))) continue;
-          const seg: any = scene.createSegment(a, b, { color: s.color, thicknessM: Math.max(0.0005, s.thicknessM * sxFactor * PT_PER_M), labelId });
+          const seg: any = scene.createSegment(a, b, { color: s.color, thicknessM: s.thicknessM * sxFactor * PT_PER_M, labelId });
           if (seg?.id) segIds.push(seg.id);
         }
         for (const h of takeHatches) {
@@ -836,27 +837,30 @@ export class DocumentTool {
           if (h.points.length < 3) continue;
           if (isErased && h.points.every(p => erasedAt(p.x, p.y))) continue;
           const pts = h.points.map(p => toWorld(p.x, p.y));
-          const hh: any = scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, labelId, areaLabel: { show: false } });
+          const hh: any = scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, strokeWidthPx: 0, fillAlphaPct: 100, labelId, areaLabel: { show: false } });
           if (hh?.id) hatchIds.push(hh.id);
         }
         for (const t of takeTexts) {
           await step();
-          const widthPt = t.widthM * PT_PER_M;
-          const heightPt = t.heightM * PT_PER_M;
-          if (erasedAt(t.x + widthPt / 2, t.y + heightPt / 2)) continue;
-          const center = toWorld(t.x + widthPt / 2, t.y + heightPt / 2);
+          const sizePt = t.fontSizePdfPt ?? t.fontSizePx;
+          const ang = t.angleRad || 0;
+          const wPt = t.widthPdfPt || t.widthM * PT_PER_M;
+          // Prüfpunkt Radierung: Mitte des Textes entlang der Grundlinie.
+          const midX = t.x + Math.cos(ang) * wPt / 2, midY = t.y + Math.sin(ang) * wPt / 2;
+          if (erasedAt(midX, midY)) continue;
           const tb: any = scene.createTextBox(
-            center,
-            Math.max(0.005, widthPt * sxFactor),
-            Math.max(0.005, heightPt * sxFactor),
+            toWorld(t.x, t.y), 0.01, 0.01,
             {
-              // Gleiche Skalierungsgrundlage wie Linien/Flächen (sxFactor = m je PDF-pt).
-              fontSizePt: pdfFontPtToCadPt(t.fontSizePdfPt ?? t.fontSizePx, sxFactor, refPxPerM, textPtScale),
-              textColor: t.color, labelId, autoSize: false, bgAlphaPct: 0,
+              fontSizePt: pdfFontPtToCadPt(sizePt, sxFactor, refPxPerM, textPtScale),
+              textColor: t.color, labelId, autoSize: true, wrap: false, lineHeightPct: 100, bgAlphaPct: 0,
             } as any,
             t.text,
-            doc.rotationRad,
+            doc.rotationRad - ang,
           );
+          if (tb) fitPdfTextBox(tb, {
+            baseline: { x: t.x, y: t.y }, angleRad: ang, widthPt: wPt, sizePt,
+            toWorld, mPerPt: sxFactor, pxPerM: refPxPerM, fontScale: textPtScale,
+          });
           if (tb?.id) textIds.push(tb.id);
         }
       } catch (e: any) {
