@@ -27,7 +27,6 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
     el.style.touchAction = "none";
     el.style.overscrollBehavior = "contain";
 
-    const THRESHOLD = 5;
     let isDown = false;
     let moved = false;
     let startX = 0, startY = 0;
@@ -55,7 +54,7 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
       if (!isDown) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      if (!moved && Math.hypot(dx, dy) > THRESHOLD) {
+      if (!moved && dragExceedsThreshold(axisRef.current, dx, dy, el)) {
         moved = true;
         try { el.setPointerCapture(e.pointerId); } catch {}
       }
@@ -112,4 +111,23 @@ export function useDragScroll<T extends HTMLElement>(axis: "x" | "y" | "both" = 
   React.useEffect(() => () => { cleanupRef.current?.(); }, []);
 
   return attach;
+}
+
+/**
+ * Ein Ziehen gilt erst als Scrollen, wenn es entlang einer Achse läuft, in
+ * der der Container wirklich scrollen kann, und dort die Schwelle überschreitet.
+ * Leichte Fingerbewegungen quer zur Achse (z. B. beim Tippen auf Undo/Redo
+ * in der horizontalen Kopfzeile) unterdrücken den Klick dadurch nicht mehr.
+ */
+export const DRAG_SCROLL_THRESHOLD_PX = 10;
+export function dragExceedsThreshold(
+  axis: "x" | "y" | "both", dx: number, dy: number,
+  el: { scrollWidth: number; clientWidth: number; scrollHeight: number; clientHeight: number },
+): boolean {
+  const canX = axis !== "y" && el.scrollWidth > el.clientWidth + 1;
+  const canY = axis !== "x" && el.scrollHeight > el.clientHeight + 1;
+  const ax = Math.abs(dx), ay = Math.abs(dy);
+  if (canX && ax > DRAG_SCROLL_THRESHOLD_PX && ax >= ay) return true;
+  if (canY && ay > DRAG_SCROLL_THRESHOLD_PX && ay >= ax) return true;
+  return false;
 }
