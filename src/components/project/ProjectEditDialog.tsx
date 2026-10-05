@@ -227,16 +227,16 @@ export function ProjectEditDialog({ title, submitLabel, initial, project, onCanc
 
   return (
     <div
-      className="fixed inset-0 z-[130] flex items-start justify-center overflow-y-auto p-0 sm:p-6"
+      className="fixed inset-0 z-[130] flex items-start justify-center overflow-hidden p-0 sm:p-6"
       style={{ background: "rgba(0,0,0,0.5)" }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div
-        className="w-full sm:max-w-3xl min-h-full sm:min-h-0 sm:rounded-2xl shadow-xl flex flex-col"
+        className="w-full h-full min-h-0 sm:max-w-3xl sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-2xl shadow-xl flex flex-col overflow-hidden"
         style={{ background: "hsl(var(--surface))", border: "1px solid hsl(var(--hairline))" }}
       >
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 h-16 border-b"
+          className="z-10 shrink-0 flex items-center justify-between px-4 sm:px-6 h-16 border-b"
           style={{ background: "hsl(var(--surface))", borderColor: LINE }}
         >
           <div className="text-base font-semibold">{title}</div>
@@ -249,7 +249,7 @@ export function ProjectEditDialog({ title, submitLabel, initial, project, onCanc
           </button>
         </div>
 
-        <div className="flex-1 px-4 sm:px-6 py-5 space-y-4 pb-32 sm:pb-6">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-5 space-y-4">
           <Section title="Grunddaten">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Projektname *" value={d.name} onChange={(v) => set("name", v)} error={errors.name} />
@@ -359,7 +359,7 @@ export function ProjectEditDialog({ title, submitLabel, initial, project, onCanc
         </div>
 
         <div
-          className="sticky bottom-0 flex items-center justify-end gap-3 px-4 sm:px-6 py-4 border-t"
+          className="shrink-0 flex items-center justify-end gap-3 px-4 sm:px-6 py-4 border-t"
           style={{ background: "hsl(var(--surface))", borderColor: LINE }}
         >
           <button

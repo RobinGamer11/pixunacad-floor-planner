@@ -11,6 +11,7 @@ import { computeWallLines } from "./wallGeom";
 import { computeHealedWallLines } from "./wallHeal";
 import { doorGeometry } from "./doorGeom";
 import { getDimensionGeometry } from "./dimensionGeometry";
+import { collectSceneSnapGeometry } from "./tracingSnapGeometry";
 
 // Wall-Snap nutzt primär wall.corners (Bezugslinie); optional zusätzlich
 // die Sub-Linien-Eckpunkte/-Kanten (gegenüberliegende Wandkante), wenn das
@@ -390,6 +391,7 @@ export class TopologyEngine {
   guideGeometry(extraEdges: [Vec2, Vec2][] = [], extraPoints: Vec2[] = []): GuideGeometry {
     const extraScenes: { id: string; type: GuideSourceType; scene: any }[] = [];
     for (const ls of this._libraryScenes() as any[]) extraScenes.push({ id: ls.instanceId ?? ls.id ?? "library", type: "library", scene: ls.scene });
+    this.overlayScenes.forEach((s, i) => extraScenes.push({ id: `sheet-overlay:${i}`, type: "extra", scene: s }));
     this.tracingSnapScenes.forEach((s, i) => extraScenes.push({ id: `tracing:${i}`, type: "line", scene: s }));
     return buildGuideGeometry({ scene: this.scene, isVisible: (id) => this.labels.isVisible(id as any), extraScenes, extraEdges, extraPoints });
   }
@@ -604,50 +606,16 @@ export class TopologyEngine {
       }
     }
 
-    // Overlay-Sheets (Transparentpause) — nur Snap, nicht editierbar.
-    // Wir geben Punkte/Linien als „freie" Snaps zurück (segment/hatch=null), damit
-    // resolveSnapPoint() nichts splittet/inserted.
+    // Overlay-Sheets (Transparentpause) — dieselbe vollständige, schreibgeschützte
+    // Fanggeometrie wie im Export. Kein Werkzeug kann Quellobjekte verändern.
     for (const ovScene of this.overlayScenes) {
       if (!ovScene) continue;
-      // Punkte: Segment-Endpunkte
-      for (const seg of ovScene.segments) {
-        if (!this.labels.isVisible(seg.labelId)) continue;
-        considerPoint(seg.a, null, null, -1);
-        considerPoint(seg.b, null, null, -1);
-      }
-      // Punkte: Hatch-Punkte
-      for (const hatch of ovScene.hatches) {
-        if (!this.labels.isVisible(hatch.labelId)) continue;
-        for (const p of hatch.points) considerPoint(p, null, null, -1);
-      }
-      // Punkte: TextBox-Ecken
-      for (const box of ovScene.textBoxes) {
-        if (!this.labels.isVisible(box.labelId)) continue;
-        for (const c of boxCornersWorld(box)) considerPoint(c, null, null, -1);
-      }
-      // Punkte: Dimension-Endpunkte
-      for (const dim of ovScene.dimensions) {
-        if (!this.labels.isVisible(dim.labelId)) continue;
-        considerPoint(dim.p1, null, null, -1);
-        considerPoint(dim.p2, null, null, -1);
-      }
-      // Punkte: Document-Ecken/Mittelpunkte
-      for (const doc of ovScene.documents) {
-        if (!this.labels.isVisible(doc.labelId)) continue;
-        for (const c of documentCornersWorld(doc)) considerPoint(c, null, null, -1);
-        for (const m of documentEdgeMidpointsWorld(doc)) considerPoint(m, null, null, -1);
-        for (const a of documentAnchorsWorld(doc)) considerPoint(a, null, null, -1);
-      }
-      // Linien: Segmente
-      for (const seg of ovScene.segments) {
-        if (!this.labels.isVisible(seg.labelId)) continue;
-        considerLine(seg.a, seg.b, null, null);
-      }
-      // Linien: Hatch-Kanten
-      for (const edge of ovScene.getHatchEdges()) {
-        if (!this.labels.isVisible(edge.hatch.labelId)) continue;
-        considerLine(edge.a, edge.b, null, null);
-      }
+      const libraryScenes = this.librarySnaps
+        ? this.librarySnaps.scenesFor(ovScene, (id) => this.labels.isVisible(id)).map((entry) => entry.scene)
+        : [];
+      const geo = collectSceneSnapGeometry(ovScene, (id) => this.labels.isVisible(id), libraryScenes);
+      for (const point of geo.points) considerPoint(point, null, null, -1);
+      for (const [a, b] of geo.lines) considerLine(a, b, null, null);
     }
 
     // Transparenzpause im Export: sichtbare Hintergrundseiten liefern Fangpunkte

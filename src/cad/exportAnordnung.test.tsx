@@ -124,6 +124,46 @@ describe("Export: Transparenzpause als schreibgeschützte Fangquelle", () => {
   });
 });
 
+describe("CAD: Transparentpause als vollständige Fangquelle", () => {
+  it("fängt auch Wandkanten der sichtbaren Hintergrundseite und bietet sie nicht zur Bearbeitung an", () => {
+    const scene = new Scene();
+    const camera = new Camera();
+    camera.scale = 100; camera.offsetX = 500; camera.offsetY = 500;
+    const topo = new TopologyEngine(scene, camera, new LabelManager());
+    const bg = new Scene();
+    bg.createWall({
+      kind: "outer",
+      corners: [v(1, 1), v(3, 1)],
+      thicknessM: 0.24,
+      referenceSide: "center",
+      labelId: "default",
+    });
+    topo.overlayScenes = [bg];
+
+    const end = topo.findBestSnap(camera.worldToScreen(1, 1), v(1, 1));
+    const mid = topo.findBestSnap(camera.worldToScreen(2, 1), v(2, 1));
+
+    expect(end).toBeTruthy();
+    expect(mid).toBeTruthy();
+    expect(end?.segment).toBeNull();
+    expect(mid?.segment).toBeNull();
+    expect(scene.walls).toHaveLength(0);
+  });
+
+  it("stellt Hintergrundgeometrie auch der zentralen Hilfslinienlogik bereit", () => {
+    const scene = new Scene();
+    const topo = new TopologyEngine(scene, new Camera(), new LabelManager());
+    const bg = new Scene();
+    bg.createSegment(v(4, 2), v(6, 2));
+    topo.overlayScenes = [bg];
+
+    const guides = topo.guideGeometry();
+
+    expect(guides.points.some((p) => p.world.x === 4 && p.world.y === 2)).toBe(true);
+    expect(guides.edges.some((e) => e.a.x === 4 && e.b.x === 6)).toBe(true);
+  });
+});
+
 describe("Export: Namensschild einer Nachbarseite", () => {
   function setupName(drawing: boolean) {
     const { app, b } = makeApp(false);
