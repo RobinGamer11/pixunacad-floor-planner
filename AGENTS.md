@@ -47,3 +47,6 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 ## Hilfslinien
 - Hilfslinien-Geometrie (Punkte, Kanten, anliegende Achsen) liefert nur `src/cad/guideGeometry.ts` aus echter Objektgeometrie (über `TopologyEngine.guideGeometry`) – nie Probeabfragen, nie Werkzeug-Sonderlogik.
 - Rechtsklick-Hilfslinien laufen nur über `GuideInteractionController` → `GlobalGuides` (Gruppen mit Referenzzählung, je Kontext `cad|export:sheet|plan`) – flüchtig, nie Cloud/Undo/Export, nie zwischen Blatt und Exportseite.
+- Jede abgeschlossene Benutzerhandlung läuft über `CadApp.runAction` (bzw. begin/commit/cancelAction) – genau ein Undo-Schritt, Fehler nehmen alles zurück; die 250-ms-Erfassung ist nur Rückfallebene.
+- Verlaufsstände referenzieren Rasterkacheln nur über `RasterTileStore` (`rtile:<id>`, unveränderlich, `prune` nach jedem Push); Speichern/Cloud nutzen weiterhin die vollständige Serialisierung.
+- Rastern in Ebenen erfolgt in Teilbereichen (`rasterChunks`) und erst nach vollständigem Rendern; zu große Flächen werden mit Meldung abgelehnt, nie still verkleinert.

@@ -171,5 +171,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Punkt 2 Rest: 250-ms-Fallback-Snapshot ablösen (große Rasterstände), Gerätetests
 - [x] Punkt 3 Kopfzeilen-Geste achsen-/scrollabhängig
 - [x] Punkt 5 PDF: echte Strichbreiten (CTM, Hairline), Flächen ohne Rand, Texte ohne Umbruch/Abschneiden, Breite+Drehung wie Original; Referenztest
-- [ ] Punkt 5 Rest: Clipping, Strichelung, Linienenden noch nicht übernommen; visueller Vergleich im Browser offen
-- [ ] Punkt 4 Pixelmodus-Speicher (Kachel-Versionierung im Verlauf)
+- [x] Punkt 5 Rest: Clipping (Rechteck), Strichelung, Deckkraft, Löcher; Vergleichsbild erstellt
+- [ ] PDF: Linienenden/-verbindungen, nicht-rechteckige Clips, eingebettete Bilder (z. B. orange Fläche) – Einschränkung; Prüfung in der echten CAD-Ansicht offen
+- [x] Punkt 4 Pixelmodus: Kachel-Referenzen im Verlauf, Teilbereichs-Rastern, Ablehnung statt Qualitätsverlust, Puffer freigeben
+- [ ] Punkt 4: Belastungstest im Browser/Tablet
