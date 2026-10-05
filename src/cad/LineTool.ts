@@ -145,13 +145,15 @@ export class LineTool {
   private _createClosedPolygon(points: Vec2[]) {
     if (points.length < 2) return;
     const style = this.app.getCurrentLineStyle();
-    for (let i = 0; i < points.length; i++) {
-      const a = points[i];
-      const b = points[(i + 1) % points.length];
-      if (dist(a, b) < 1e-9) continue;
-      const seg = this.app.scene.createSegment(v(a.x, a.y), v(b.x, b.y), { ...style, ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
-      maybeRasterize(this.app, { type: "segment", obj: seg });
-    }
+    this.app.runAction(() => {
+      for (let i = 0; i < points.length; i++) {
+        const a = points[i];
+        const b = points[(i + 1) % points.length];
+        if (dist(a, b) < 1e-9) continue;
+        const seg = this.app.scene.createSegment(v(a.x, a.y), v(b.x, b.y), { ...style, ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
+        maybeRasterize(this.app, { type: "segment", obj: seg });
+      }
+    });
     this.app.clearSelection();
     this._resetRectState();
     this._resetCircleState();
@@ -596,8 +598,11 @@ export class LineTool {
       return;
     }
     if (dist(this.currentPoint!, point) < Defaults.minSegLenM) return;
-    const createdSeg = this.app.scene.createSegment(this.currentPoint!, point, { ...this.app.getCurrentLineStyle(), ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
-    maybeRasterize(this.app, { type: "segment", obj: createdSeg });
+    const from = this.currentPoint!;
+    this.app.runAction(() => {
+      const createdSeg = this.app.scene.createSegment(from, point, { ...this.app.getCurrentLineStyle(), ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
+      maybeRasterize(this.app, { type: "segment", obj: createdSeg });
+    });
     this.app.clearSelection();
     this.currentPoint = v(point.x, point.y);
     this.hubLocked = false;

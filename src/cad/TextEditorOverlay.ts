@@ -628,7 +628,7 @@ export class TextEditorOverlay {
     this.hide();
 
     // 4) Pixelmodus: fertigen Textkasten in ein Bildobjekt rastern.
-    maybeRasterize(this.app, { type: "text", obj: box });
+    (this.app as any).runAction ? (this.app as any).runAction(() => maybeRasterize(this.app, { type: "text", obj: box })) : maybeRasterize(this.app, { type: "text", obj: box });
   }
 
   hide() {

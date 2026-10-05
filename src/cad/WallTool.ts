@@ -169,6 +169,8 @@ export class WallTool {
 
   private _createSingleWall(a: Vec2, b: Vec2, anchorA: import("./Scene").WallCornerAnchor | null = null, anchorB: import("./Scene").WallCornerAnchor | null = null) {
     const labelId = this._resolveLabelId();
+    this.app.beginAction();
+    try {
     const newWall = this.app.scene.createWall({
       kind: this.settings.kind,
       thicknessM: this.getThickness(),
@@ -187,6 +189,7 @@ export class WallTool {
     this._runConnectionPipeline(newWall);
     this.app.refreshLabelUI?.();
     return newWall;
+    } finally { this.app.commitAction(); }
   }
 
 

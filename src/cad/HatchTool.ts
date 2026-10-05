@@ -512,8 +512,10 @@ export class HatchTool {
     }
 
     if (!carvedAsHole) {
-      const createdHatch = this.app.scene.createHatch(points, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
-      maybeRasterize(this.app, { type: "hatch", obj: createdHatch });
+      this.app.runAction(() => {
+        const createdHatch = this.app.scene.createHatch(points, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
+        maybeRasterize(this.app, { type: "hatch", obj: createdHatch });
+      });
     }
   }
 
@@ -788,8 +790,11 @@ export class HatchTool {
       });
       return;
     }
-    const filledHatch = this.app.scene.createHatch(loop, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
-    maybeRasterize(this.app, { type: "hatch", obj: filledHatch });
+    const fillLoop = loop;
+    this.app.runAction(() => {
+      const filledHatch = this.app.scene.createHatch(fillLoop, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
+      maybeRasterize(this.app, { type: "hatch", obj: filledHatch });
+    });
     this.app.clearSelection();
   }
 
