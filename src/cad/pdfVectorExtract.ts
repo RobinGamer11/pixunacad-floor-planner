@@ -14,7 +14,7 @@ import { loadPdfDocFromB64, loadPdfJs } from "./documentImport";
 export interface DissolvedPdfResult {
   segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number;
     /** Strichelung in Seiten-pt (wirksam, inkl. Transformation); fehlt = durchgezogen. */ dashPt?: number[] }[];
-  hatches: { points: { x: number; y: number }[]; fillColor: string; strokeColor: string }[];
+  hatches: { points: { x: number; y: number }[]; holes?: { x: number; y: number }[][]; fillColor: string; strokeColor: string }[];
   texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; /** Schriftgröße in PDF-Punkten der Seite (ohne Mindestwert). */ fontSizePdfPt: number; text: string; color: string;
     /** Drehung der Grundlinie in PDF-Raum (rad, gegen den Uhrzeigersinn). */ angleRad?: number;
     /** Breite des Textinhalts in PDF-pt laut PDF (inkl. Laufweite/Skalierung). */ widthPdfPt?: number }[];
@@ -49,6 +49,32 @@ export function clipSegment(a: { x: number; y: number }, b: { x: number; y: numb
     else { if (t < t0) return null; if (t < t1) t1 = t; }
   }
   return [{ x: a.x + t0 * dx, y: a.y + t0 * dy }, { x: a.x + t1 * dx, y: a.y + t1 * dy }];
+}
+
+type Pt = { x: number; y: number };
+function ringArea(r: Pt[]) { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j].x + r[i].x) * (r[j].y - r[i].y); return Math.abs(a / 2); }
+function pointInRing(p: Pt, r: Pt[]) {
+  let c = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    if ((r[i].y > p.y) !== (r[j].y > p.y) && p.x < ((r[j].x - r[i].x) * (p.y - r[i].y)) / (r[j].y - r[i].y) + r[i].x) c = !c;
+  }
+  return c;
+}
+/** Teilpfade einer Füllung → Außenringe mit Löchern (Verschachtelungstiefe gerade = Fläche, ungerade = Loch). */
+export function groupFillRings(subs: Pt[][]): { points: Pt[]; holes: Pt[][] }[] {
+  if (subs.length <= 1) return subs.map((s) => ({ points: s.slice(), holes: [] }));
+  const rings = subs.map((s) => ({ s, area: ringArea(s), depth: 0, parent: -1 })).sort((a, b) => b.area - a.area);
+  for (let i = 0; i < rings.length; i++) {
+    const probe = rings[i].s[0];
+    for (let k = i - 1; k >= 0; k--) {
+      if (rings[k].area > rings[i].area && pointInRing(probe, rings[k].s)) { rings[i].parent = k; rings[i].depth = rings[k].depth + 1; break; }
+    }
+  }
+  const out: { points: Pt[]; holes: Pt[][] }[] = [];
+  const outIdx = new Map<number, number>();
+  rings.forEach((r, i) => { if (r.depth % 2 === 0) { outIdx.set(i, out.length); out.push({ points: r.s.slice(), holes: [] }); } });
+  rings.forEach((r) => { if (r.depth % 2 === 1 && outIdx.has(r.parent)) out[outIdx.get(r.parent)!].holes.push(r.s.slice()); });
+  return out;
 }
 
 interface Mat2x3 { a: number; b: number; c: number; d: number; e: number; f: number }
@@ -284,14 +310,12 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     flushSubpath();
     // Verläufe/Muster ohne ermittelbare Farbe nicht als falsche Vollfläche ausgeben.
     if (fillSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
-    for (const sub of currentPath) {
-      if (sub.length >= 3) {
-        if (clipBox && !boxesOverlap(boxOf(sub), clipBox)) continue;
-        // Reine Füllung: Rand in Füllfarbe (keine fremde Randfarbe); umrandete
-        // Flächen erhalten ihre Kontur zusätzlich als Linien in Konturfarbe.
-        // Reine Füllung ohne Rand (strokeWidthPx 0); Konturen kommen nur aus Stroke-Ops als Linien.
-        result.hatches.push({ points: sub.slice(), fillColor, strokeColor: fillColor });
-      }
+    // Reine Füllung ohne Rand; Konturen kommen nur aus Stroke-Ops als Linien.
+    // Mehrere Teilpfade: innenliegende Ringe werden Löcher (statt die
+    // Aussparung vollflächig zu übermalen).
+    for (const f of groupFillRings(currentPath.filter((s) => s.length >= 3))) {
+      if (clipBox && !boxesOverlap(boxOf(f.points), clipBox)) continue;
+      result.hatches.push({ points: f.points, ...(f.holes.length ? { holes: f.holes } : {}), fillColor, strokeColor: fillColor });
     }
   };
 

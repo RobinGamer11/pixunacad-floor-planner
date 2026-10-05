@@ -837,7 +837,7 @@ export class DocumentTool {
           if (h.points.length < 3) continue;
           if (isErased && h.points.every(p => erasedAt(p.x, p.y))) continue;
           const pts = h.points.map(p => toWorld(p.x, p.y));
-          const hh: any = scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, strokeWidthPx: 0, fillAlphaPct: 100, labelId, areaLabel: { show: false } });
+          const hh: any = scene.createHatch(pts, { holes: h.holes?.map(r => r.map(p => toWorld(p.x, p.y))), fillColor: h.fillColor, strokeColor: h.strokeColor, strokeWidthPx: 0, fillAlphaPct: 100, labelId, areaLabel: { show: false } });
           if (hh?.id) hatchIds.push(hh.id);
         }
         for (const t of takeTexts) {
