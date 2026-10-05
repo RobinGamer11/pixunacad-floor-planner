@@ -14,7 +14,8 @@ import { loadPdfDocFromB64, loadPdfJs } from "./documentImport";
 export interface DissolvedPdfResult {
   segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number;
     /** Strichelung in Seiten-pt (wirksam, inkl. Transformation); fehlt = durchgezogen. */ dashPt?: number[] }[];
-  hatches: { points: { x: number; y: number }[]; holes?: { x: number; y: number }[][]; fillColor: string; strokeColor: string }[];
+  hatches: { points: { x: number; y: number }[]; holes?: { x: number; y: number }[][]; fillColor: string; strokeColor: string;
+    /** Deckkraft der Füllung (PDF ca), 0–1. */ fillAlpha?: number }[];
   texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; /** Schriftgröße in PDF-Punkten der Seite (ohne Mindestwert). */ fontSizePdfPt: number; text: string; color: string;
     /** Drehung der Grundlinie in PDF-Raum (rad, gegen den Uhrzeigersinn). */ angleRad?: number;
     /** Breite des Textinhalts in PDF-pt laut PDF (inkl. Laufweite/Skalierung). */ widthPdfPt?: number }[];
@@ -265,6 +266,8 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   let strokeSpecial = false;
   let lineWidth = 1; // in user units
   let dashArr: number[] = [];
+  let fillAlpha = 1, strokeAlpha = 1;
+  const alphaStack: [number, number][] = [];
   /** Aktueller Beschneidungsrahmen in Seiten-pt (null = keiner). */
   let clipBox: Box | null = null;
   let pendingClip = false;
@@ -302,6 +305,7 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   const emitStroke = () => {
     flushSubpath();
     if (strokeSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
+    if (strokeAlpha <= 0.005) return;
     const s = Math.sqrt(Math.abs(ctm.a * ctm.d - ctm.b * ctm.c)) || 1;
     const dashPt = dashArr.length && dashArr.some((d) => d > 0) ? dashArr.map((d) => d * s) : undefined;
     for (const sub of currentPath) {
@@ -332,13 +336,15 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
     flushSubpath();
     // Verläufe/Muster ohne ermittelbare Farbe nicht als falsche Vollfläche ausgeben.
     if (fillSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
+    // Unsichtbare Füllung (Deckkraft 0) nicht als deckende Fläche übernehmen.
+    if (fillAlpha <= 0.005) return;
     // Reine Füllung ohne Rand; Konturen kommen nur aus Stroke-Ops als Linien.
     // Mehrere Teilpfade: innenliegende Ringe werden Löcher (statt die
     // Aussparung vollflächig zu übermalen).
     for (const f of groupFillRings(currentPath.filter((s) => s.length >= 3))) {
       let pts = f.points;
       if (clipBox) { pts = clipPolygonToBox(pts, clipBox); if (pts.length < 3) continue; }
-      result.hatches.push({ points: pts, ...(f.holes.length ? { holes: f.holes } : {}), fillColor, strokeColor: fillColor });
+      result.hatches.push({ points: pts, ...(f.holes.length ? { holes: f.holes } : {}), fillColor, strokeColor: fillColor, ...(fillAlpha < 0.999 ? { fillAlpha } : {}) });
     }
   };
 
@@ -415,6 +421,14 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   for (let k = 0; k < fns.length; k++) {
     const fn = fns[k];
     const a = args[k] || [];
+    if (fn === OPS.setGState && Array.isArray(a[0])) {
+      for (const kv of a[0]) {
+        if (kv?.[0] === "ca" && Number.isFinite(kv[1])) fillAlpha = kv[1];
+        if (kv?.[0] === "CA" && Number.isFinite(kv[1])) strokeAlpha = kv[1];
+      }
+    }
+    if (fn === OPS.save) alphaStack.push([fillAlpha, strokeAlpha]);
+    else if (fn === OPS.restore && alphaStack.length) [fillAlpha, strokeAlpha] = alphaStack.pop()!;
     if (fn === OPS.save) { clipStack.push(clipBox); dashStack.push(dashArr); }
     else if (fn === OPS.restore) { if (clipStack.length) clipBox = clipStack.pop()!; if (dashStack.length) dashArr = dashStack.pop()!; }
     if (fn === OPS.clip || fn === OPS.eoClip) pendingClip = true;
