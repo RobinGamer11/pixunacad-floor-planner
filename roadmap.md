@@ -169,4 +169,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Platzierung und Einstellungen auf echtem Tablet abnehmen (Nutzer)
 - [x] Gemeinsamer Aktionsablauf: `CadApp.runAction` (1 Undo, Fehler = vollständige Rücknahme); Freihand, Linie, Polygon, Schraffur, Füllen, Wand, Text-Rastern angebunden; hängende Druckzustände (Hilfsrad, Fokusverlust, Capture) behoben
 - [ ] Punkt 2 Rest: 250-ms-Fallback-Snapshot ablösen (große Rasterstände), Gerätetests
-- [ ] Punkt 3 Tablet/Handy (Kopfzeilen-Geste), Punkt 4 Pixelmodus-Speicher, Punkt 5 PDF-Auflösung (Referenz-PDF fehlt)
+- [x] Punkt 3 Kopfzeilen-Geste achsen-/scrollabhängig
+- [x] Punkt 5 PDF: echte Strichbreiten (CTM, Hairline), Flächen ohne Rand, Texte ohne Umbruch/Abschneiden, Breite+Drehung wie Original; Referenztest
+- [ ] Punkt 5 Rest: Clipping, Strichelung, Linienenden noch nicht übernommen; visueller Vergleich im Browser offen
+- [ ] Punkt 4 Pixelmodus-Speicher (Kachel-Versionierung im Verlauf)
