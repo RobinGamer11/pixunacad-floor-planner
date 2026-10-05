@@ -1,4 +1,5 @@
 import { fitPdfTextBox } from "./pdfTextFit";
+import { pdfDashToPattern } from "./pdfDash";
 import { pdfFontPtToCadPt } from "./textTypography";
 import { Defaults, SelectionType, SnapType } from "./constants";
 import { v, Vec2, dist, orthoSnapFromA } from "./geometry";
@@ -829,7 +830,7 @@ export class DocumentTool {
           if (erasedAt(s.a.x, s.a.y) && erasedAt(s.b.x, s.b.y)) continue;
           if (erasedAt((s.a.x + s.b.x) / 2, (s.a.y + s.b.y) / 2)
             && (erasedAt(s.a.x, s.a.y) || erasedAt(s.b.x, s.b.y))) continue;
-          const seg: any = scene.createSegment(a, b, { color: s.color, thicknessM: s.thicknessM * sxFactor * PT_PER_M, labelId });
+          const seg: any = scene.createSegment(a, b, { color: s.color, thicknessM: s.thicknessM * sxFactor * PT_PER_M, labelId, ...(s.dashPt ? { strokePattern: pdfDashToPattern(s.dashPt, sxFactor) } : {}) } as any);
           if (seg?.id) segIds.push(seg.id);
         }
         for (const h of takeHatches) {
@@ -837,7 +838,7 @@ export class DocumentTool {
           if (h.points.length < 3) continue;
           if (isErased && h.points.every(p => erasedAt(p.x, p.y))) continue;
           const pts = h.points.map(p => toWorld(p.x, p.y));
-          const hh: any = scene.createHatch(pts, { fillColor: h.fillColor, strokeColor: h.strokeColor, strokeWidthPx: 0, fillAlphaPct: 100, labelId, areaLabel: { show: false } });
+          const hh: any = scene.createHatch(pts, { holes: h.holes?.map(r => r.map(p => toWorld(p.x, p.y))), fillColor: h.fillColor, strokeColor: h.strokeColor, strokeWidthPx: 0, fillAlphaPct: Math.round((h.fillAlpha ?? 1) * 100), labelId, areaLabel: { show: false } });
           if (hh?.id) hatchIds.push(hh.id);
         }
         for (const t of takeTexts) {

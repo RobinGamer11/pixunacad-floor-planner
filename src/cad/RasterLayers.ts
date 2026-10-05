@@ -130,6 +130,8 @@ interface RasterTile {
   ctx: CanvasRenderingContext2D;
   /** Gecachte PNG-DataURL (null = neu erzeugen). */
   dataUrl: string | null;
+  /** Unveränderliche Version im gemeinsamen Kachelspeicher (null = geändert). */
+  sid?: number | null;
   /** true, solange das Restore-Bild noch lädt. */
   loading: boolean;
   /** true, wenn die Kachel seit dem letzten Radieren leer sein könnte. */
@@ -217,7 +219,7 @@ export class RasterLayer {
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(src, gx - tile.tx * this.tilePx, gy - tile.ty * this.tilePx, src.width, src.height);
       ctx.restore();
-      tile.dataUrl = null;
+      tile.dataUrl = null; tile.sid = null;
     });
   }
 
@@ -259,7 +261,7 @@ export class RasterLayer {
       ctx.arc(px, py, pr, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-      tile.dataUrl = null;
+      tile.dataUrl = null; tile.sid = null;
       tile.maybeEmpty = true;
     });
     this.pruneEmptyTiles();
@@ -340,10 +342,16 @@ export class RasterLayer {
    * - inhaltsgleiche Kacheln werden nur einmal als PNG abgelegt und sonst per
    *   `ref` referenziert (keine Bildduplikate).
    */
-  serialize(): RasterLayerJSON | null {
+  serialize(store?: RasterTileStore): RasterLayerJSON | null {
     const tiles: RasterTileJSON[] = [];
     const seen = new Map<string, number>();
     const push = (tile: RasterTile, src: string) => {
+      if (store) {
+        // Verlauf: nur unveränderliche Kachel-Referenz, Bilddaten liegen einmal im Speicher.
+        if (tile.sid == null || store.get(tile.sid) !== src) tile.sid = store.put(src);
+        tiles.push({ tx: tile.tx, ty: tile.ty, src: RasterTileStore.ref(tile.sid) });
+        return;
+      }
       const hit = seen.get(src);
       if (hit !== undefined) { tiles.push({ tx: tile.tx, ty: tile.ty, ref: hit }); return; }
       seen.set(src, tiles.length);
@@ -375,15 +383,18 @@ export class RasterLayer {
   }
 
   /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
-  restore(json: RasterLayerJSON, onReady?: () => void) {
+  restore(json: RasterLayerJSON, onReady?: () => void, store?: RasterTileStore) {
     this.strokeCount = Math.max(0, json.strokeCount ?? (json.tiles?.length ? 1 : 0));
     const list = json.tiles || [];
     for (const t of list) {
       // `ref` verweist auf eine inhaltsgleiche Kachel (Dedupe beim Speichern).
-      const src = t.src ?? (typeof t.ref === "number" ? list[t.ref]?.src : undefined);
+      const raw = t.src ?? (typeof t.ref === "number" ? list[t.ref]?.src : undefined);
+      const sid = RasterTileStore.parse(raw);
+      const src = sid != null ? store?.get(sid) : raw;
       if (!src) continue;
       const tile = this._tile(t.tx, t.ty, true)!;
       tile.dataUrl = src;
+      tile.sid = sid;
       tile.loading = true;
       const img = new Image();
       img.onload = () => {
@@ -497,22 +508,22 @@ export class RasterLayers {
     this.layers.clear();
   }
 
-  serialize(): RasterLayerJSON[] {
+  serialize(store?: RasterTileStore): RasterLayerJSON[] {
     const out: RasterLayerJSON[] = [];
     for (const layer of this.layers.values()) {
-      const json = layer.serialize();
+      const json = layer.serialize(store);
       if (json) out.push(json);
     }
     return out;
   }
 
-  restore(data: RasterLayerJSON[] | null | undefined) {
+  restore(data: RasterLayerJSON[] | null | undefined, store?: RasterTileStore) {
     this.clear();
     if (!Array.isArray(data)) return;
     for (const json of data) {
       if (!json?.labelId) continue;
       const layer = new RasterLayer(json.labelId, json.pxPerM || this.pxPerM, json.tilePx || RASTER_TILE_PX);
-      layer.restore(json, () => this.onReady?.());
+      layer.restore(json, () => this.onReady?.(), store);
       this.layers.set(json.labelId, layer);
     }
   }
@@ -520,5 +531,33 @@ export class RasterLayers {
   /** Alle Ebenen-IDs mit Rasterinhalt (für die Boundary-Analyse). */
   labelIds(): string[] {
     return [...this.layers.keys()];
+  }
+}
+
+/**
+ * Gemeinsamer, unveränderlicher Kachelspeicher für den Verlauf: jede
+ * kodierte Kachelversion liegt genau einmal im Speicher; Verlaufsstände
+ * enthalten nur "rtile:<id>"-Referenzen. Spätere Striche erzeugen neue
+ * Versionen und überschreiben nie alte Undo-Stände.
+ */
+export class RasterTileStore {
+  private map = new Map<number, string>();
+  private next = 1;
+  static PREFIX = "rtile:";
+  static ref(id: number) { return RasterTileStore.PREFIX + id; }
+  static parse(src: string | undefined | null): number | null {
+    if (typeof src !== "string" || !src.startsWith(RasterTileStore.PREFIX)) return null;
+    const n = Number(src.slice(RasterTileStore.PREFIX.length));
+    return Number.isFinite(n) ? n : null;
+  }
+  put(dataUrl: string): number { const id = this.next++; this.map.set(id, dataUrl); return id; }
+  get(id: number): string | undefined { return this.map.get(id); }
+  get size() { return this.map.size; }
+  /** Gibt alle Versionen frei, die in keinem der Stände mehr vorkommen. */
+  prune(snapshots: string[]) {
+    const used = new Set<number>();
+    const re = /"rtile:(\d+)"/g;
+    for (const s of snapshots) { let m: RegExpExecArray | null; while ((m = re.exec(s))) used.add(Number(m[1])); }
+    for (const id of [...this.map.keys()]) if (!used.has(id)) this.map.delete(id);
   }
 }

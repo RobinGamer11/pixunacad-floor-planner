@@ -35,15 +35,17 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`) – sonst fehlen sie auf dem zweiten Gerät.
 - `ProjectAccess.cloud` und `.shared` sind getrennt; Realtime/Präsenz/Sperren nur bei weiteren Personen – keine Team-Kosten für Solo-Projekte.
 - Papierkorb folgt `network_projects.deleted_at` über `src/lib/cloudTrash.ts` – gelöschte Projekte kehren nicht zurück.
-- Export ist dieselbe `CadApp` (`?view=export`), Mutationen nur über `CadApp.mutatePlans`; Details in `docs/export-architecture.md`.
+- Export = dieselbe `CadApp` (`?view=export`), Mutationen nur `CadApp.mutatePlans` (s. `docs/export-architecture.md`).
 - Export-Bedienzustände sind lokal/flüchtig, nie Cloud/Undo/Snapshot/localStorage; Fangpunkte von Hintergrundseiten nur über `TopologyEngine.tracingSnapScenes`.
 - Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt nur den Projekt-Payload (nie CAD/Export).
 - Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
-- Treppen-Bedienknöpfe (Häkchen, Bezug A/B) sind DOM-Elemente über der Zeichenfläche – ihre Position wird nie Geometrie; Werkzeugwechsel setzt den Cursor zentral in `CadApp.setTool` zurück.
-- Ausschnitt-Transformationen im Export laufen als Sitzung in `PlanController` (`_drag.preview`) – die Projection bleibt bis ✓/Enter unverändert, damit weder Cloud noch Verlauf Zwischenstände sehen.
+- Treppen-Knöpfe sind DOM über der Zeichenfläche, nie Geometrie; Cursor-Reset zentral in `CadApp.setTool`.
+- Export-Ausschnitte transformieren als Sitzung in `PlanController` (`_drag.preview`); Projection erst bei ✓/Enter geändert.
 - Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges` – kein zweites Bedienkonzept.
 - Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M` je Auftritt) – Podeste wachsen nie automatisch, nur durch bewusste Eingabe.
 
 ## Hilfslinien
 - Hilfslinien-Geometrie (Punkte, Kanten, anliegende Achsen) liefert nur `src/cad/guideGeometry.ts` aus echter Objektgeometrie (über `TopologyEngine.guideGeometry`) – nie Probeabfragen, nie Werkzeug-Sonderlogik.
 - Rechtsklick-Hilfslinien laufen nur über `GuideInteractionController` → `GlobalGuides` (Gruppen mit Referenzzählung, je Kontext `cad|export:sheet|plan`) – flüchtig, nie Cloud/Undo/Export, nie zwischen Blatt und Exportseite.
+- Benutzerhandlung = `CadApp.runAction` → 1 Undo, Fehler = volle Rücknahme.
+- Verlauf referenziert Rasterkacheln nur via `RasterTileStore`; Speichern/Cloud voll. Rastern in `rasterChunks`, zu groß = Meldung, nie verkleinern.

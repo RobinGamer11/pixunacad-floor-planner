@@ -20,7 +20,7 @@ import { textStyleFontSizePt, ptToCssPx, ANNOTATION_M_PER_MM } from "./textTypog
 import { TableTool } from "./TableTool";
 import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
-import { RasterLayers, cadRasterPxPerM } from "./RasterLayers";
+import { RasterLayers, RasterTileStore, cadRasterPxPerM } from "./RasterLayers";
 import { migrateCadSnapshot } from "@/lib/persistence";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
@@ -1013,7 +1013,12 @@ export class CadApp {
   }
 
 
-  private _serializeScene(): string {
+  /** Verlaufs-Kachelspeicher: Pixeldaten liegen einmal im Speicher, Stände referenzieren nur. */
+  private _rasterTileStore = new RasterTileStore();
+  /** Kompakter Stand für Verlauf/Vergleich (Rasterkacheln als Referenz). */
+  private _snapHistory(): string { return this._serializeScene(true); }
+
+  private _serializeScene(forHistory = false): string {
     const scenesObj: Record<string, any> = {};
     for (const [id, sc] of this.scenesById.entries()) {
       scenesObj[id] = this._serializeOneScene(sc);
@@ -1045,7 +1050,7 @@ export class CadApp {
       rasterLayersByKey: (() => {
         const out: Record<string, any> = {};
         for (const [key, layers] of this._rasterLayersByKey.entries()) {
-          const json = layers.serialize();
+          const json = layers.serialize(forHistory ? this._rasterTileStore : undefined);
           if (json.length > 0) out[key] = json;
         }
         return out;
@@ -1067,7 +1072,7 @@ export class CadApp {
         for (const key of Object.keys(raster)) {
           const layers = new RasterLayers();
           layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
-          layers.restore(raster[key]);
+          layers.restore(raster[key], this._rasterTileStore);
           this._rasterLayersByKey.set(key, layers);
         }
       }
@@ -1155,12 +1160,12 @@ export class CadApp {
     this.activePlanId = keptPlanId;
     this._applyPlanModeToRenderer();
     this.refreshPlanUI();
-    this._lastSnapshot = this._serializeScene();
+    this._lastSnapshot = this._snapHistory();
     this._isRestoring = false;
   }
 
   private _initHistory() {
-    this._lastSnapshot = this._serializeScene();
+    this._lastSnapshot = this._snapHistory();
     this._history = [this._lastSnapshot];
     this._historyIndex = 0;
     this._emitHistoryChange();
@@ -1179,7 +1184,7 @@ export class CadApp {
     if ((this.documentTool as any)?.dissolving) return;
 
     if (this._actionDepth > 0) return;
-    this._pushHistory(this._serializeScene());
+    this._pushHistory(this._snapHistory());
   }
 
   /** Erzwingt einen History-Push der aktuellen Scene (für Plan-Operationen). */
@@ -1187,7 +1192,7 @@ export class CadApp {
     if (this._isRestoring || this._destroyed) return;
     // Innerhalb einer offenen Aktion entsteht der Schritt erst bei commitAction().
     if (this._actionDepth > 0) return;
-    this._pushHistory(this._serializeScene());
+    this._pushHistory(this._snapHistory());
   }
 
   /** Zentraler Push: verwirft den Redo-Zweig, begrenzt auf 21 Zustände. */
@@ -1209,6 +1214,7 @@ export class CadApp {
     while (this._history.length > this._historyMax) this._history.shift();
     this._historyIndex = this._history.length - 1;
     this._lastSnapshot = snap;
+    this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
     this._emitHistoryChange();
   }
 
@@ -1223,7 +1229,7 @@ export class CadApp {
     if (this._actionDepth === 0) {
       // Noch nicht erfasste Vorher-Änderungen zuerst als eigenen Schritt sichern.
       if (!this._isRestoring) {
-        const pre = this._serializeScene();
+        const pre = this._snapHistory();
         this._pushHistory(pre);
       }
       this._actionStartSnapshot = this._lastSnapshot;
@@ -1241,7 +1247,7 @@ export class CadApp {
     this._actionStartSnapshot = null;
     if (this._isRestoring || this._destroyed) return;
     (this as any)._changeDirty = true;
-    this._pushHistory(this._serializeScene());
+    this._pushHistory(this._snapHistory());
   }
 
   cancelAction() {
@@ -1250,7 +1256,7 @@ export class CadApp {
     this.suspendHistory = this._actionPrevSuspend;
     const start = this._actionStartSnapshot;
     this._actionStartSnapshot = null;
-    if (start && !this._destroyed && start !== this._serializeScene()) {
+    if (start && !this._destroyed && start !== this._snapHistory()) {
       this._restoreScene(start);
       this._lastSnapshot = start;
     }
@@ -1295,11 +1301,12 @@ export class CadApp {
    */
   markExternalChange() {
     if (this._destroyed) return;
-    const snap = this._serializeScene();
+    const snap = this._snapHistory();
     if (snap === this._lastSnapshot) return;
     this._lastSnapshot = snap;
     this._history = [snap];
     this._historyIndex = 0;
+    this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
     this.onHistoryChange?.(false, false);
   }
 
@@ -4467,7 +4474,7 @@ export class CadApp {
       this.applyDefaultSheetView();
     }
     // History-Snapshot triggern, damit Sheetwechsel nicht als "keine Änderung" gewertet wird.
-    this._lastSnapshot = this._serializeScene();
+    this._lastSnapshot = this._snapHistory();
   }
 
   /** Aktualisiert die Liste der Overlay-Scenes für Renderer & Topology. */

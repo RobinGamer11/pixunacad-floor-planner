@@ -49,3 +49,4 @@ export function fitPdfTextBox(box: TextBox, o: {
   // Danach fixe Box: Inhalt passt bereits vollständig hinein.
   style.autoSize = false;
 }
+

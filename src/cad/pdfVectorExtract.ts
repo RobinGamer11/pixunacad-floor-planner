@@ -12,8 +12,10 @@ import { Defaults } from "./constants";
 import { loadPdfDocFromB64, loadPdfJs } from "./documentImport";
 
 export interface DissolvedPdfResult {
-  segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number }[];
-  hatches: { points: { x: number; y: number }[]; fillColor: string; strokeColor: string }[];
+  segments: { a: { x: number; y: number }; b: { x: number; y: number }; color: string; thicknessM: number;
+    /** Strichelung in Seiten-pt (wirksam, inkl. Transformation); fehlt = durchgezogen. */ dashPt?: number[] }[];
+  hatches: { points: { x: number; y: number }[]; holes?: { x: number; y: number }[][]; fillColor: string; strokeColor: string;
+    /** Deckkraft der Füllung (PDF ca), 0–1. */ fillAlpha?: number }[];
   texts: { x: number; y: number; widthM: number; heightM: number; fontSizePx: number; /** Schriftgröße in PDF-Punkten der Seite (ohne Mindestwert). */ fontSizePdfPt: number; text: string; color: string;
     /** Drehung der Grundlinie in PDF-Raum (rad, gegen den Uhrzeigersinn). */ angleRad?: number;
     /** Breite des Textinhalts in PDF-pt laut PDF (inkl. Laufweite/Skalierung). */ widthPdfPt?: number }[];
@@ -23,6 +25,80 @@ export interface DissolvedPdfResult {
 
 /** PDF-Hairline (Breite 0) = dünnster Strich. */
 export const HAIRLINE_PT = 0.1;
+
+type Box = { x0: number; y0: number; x1: number; y1: number };
+function boxOf(pts: { x: number; y: number }[]): Box {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of pts) { if (p.x < x0) x0 = p.x; if (p.y < y0) y0 = p.y; if (p.x > x1) x1 = p.x; if (p.y > y1) y1 = p.y; }
+  return { x0, y0, x1, y1 };
+}
+function intersectBox(a: Box, b: Box): Box {
+  return { x0: Math.max(a.x0, b.x0), y0: Math.max(a.y0, b.y0), x1: Math.min(a.x1, b.x1), y1: Math.min(a.y1, b.y1) };
+}
+function boxesOverlap(a: Box, b: Box) { return a.x0 <= b.x1 && a.x1 >= b.x0 && a.y0 <= b.y1 && a.y1 >= b.y0; }
+/** Liang-Barsky: Strecke auf Rechteck beschneiden (null = komplett außerhalb). */
+export function clipSegment(a: { x: number; y: number }, b: { x: number; y: number }, r: Box): [{ x: number; y: number }, { x: number; y: number }] | null {
+  const eps = 1e-6;
+  let t0 = 0, t1 = 1;
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const ps = [-dx, dx, -dy, dy], qs = [a.x - (r.x0 - eps), (r.x1 + eps) - a.x, a.y - (r.y0 - eps), (r.y1 + eps) - a.y];
+  for (let i = 0; i < 4; i++) {
+    const p = ps[i], q = qs[i];
+    if (p === 0) { if (q < 0) return null; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return null; if (t > t0) t0 = t; }
+    else { if (t < t0) return null; if (t < t1) t1 = t; }
+  }
+  return [{ x: a.x + t0 * dx, y: a.y + t0 * dy }, { x: a.x + t1 * dx, y: a.y + t1 * dy }];
+}
+
+type Pt = { x: number; y: number };
+/** Sutherland–Hodgman: Fläche auf Beschneidungsrechteck begrenzen. */
+export function clipPolygonToBox(poly: Pt[], b: Box): Pt[] {
+  const bb = boxOf(poly);
+  if (bb.x0 >= b.x0 && bb.x1 <= b.x1 && bb.y0 >= b.y0 && bb.y1 <= b.y1) return poly;
+  let out = poly;
+  const edges: [(p: Pt) => boolean, (a: Pt, c: Pt) => Pt][] = [
+    [(p) => p.x >= b.x0, (a, c) => ({ x: b.x0, y: a.y + (c.y - a.y) * (b.x0 - a.x) / (c.x - a.x) })],
+    [(p) => p.x <= b.x1, (a, c) => ({ x: b.x1, y: a.y + (c.y - a.y) * (b.x1 - a.x) / (c.x - a.x) })],
+    [(p) => p.y >= b.y0, (a, c) => ({ x: a.x + (c.x - a.x) * (b.y0 - a.y) / (c.y - a.y), y: b.y0 })],
+    [(p) => p.y <= b.y1, (a, c) => ({ x: a.x + (c.x - a.x) * (b.y1 - a.y) / (c.y - a.y), y: b.y1 })],
+  ];
+  for (const [inside, cut] of edges) {
+    const inp = out; out = [];
+    for (let i = 0; i < inp.length; i++) {
+      const cur = inp[i], prev = inp[(i + inp.length - 1) % inp.length];
+      if (inside(cur)) { if (!inside(prev)) out.push(cut(prev, cur)); out.push(cur); }
+      else if (inside(prev)) out.push(cut(prev, cur));
+    }
+    if (!out.length) return out;
+  }
+  return out;
+}
+function ringArea(r: Pt[]) { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j].x + r[i].x) * (r[j].y - r[i].y); return Math.abs(a / 2); }
+function pointInRing(p: Pt, r: Pt[]) {
+  let c = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    if ((r[i].y > p.y) !== (r[j].y > p.y) && p.x < ((r[j].x - r[i].x) * (p.y - r[i].y)) / (r[j].y - r[i].y) + r[i].x) c = !c;
+  }
+  return c;
+}
+/** Teilpfade einer Füllung → Außenringe mit Löchern (Verschachtelungstiefe gerade = Fläche, ungerade = Loch). */
+export function groupFillRings(subs: Pt[][]): { points: Pt[]; holes: Pt[][] }[] {
+  if (subs.length <= 1) return subs.map((s) => ({ points: s.slice(), holes: [] }));
+  const rings = subs.map((s) => ({ s, area: ringArea(s), depth: 0, parent: -1 })).sort((a, b) => b.area - a.area);
+  for (let i = 0; i < rings.length; i++) {
+    const probe = rings[i].s[0];
+    for (let k = i - 1; k >= 0; k--) {
+      if (rings[k].area > rings[i].area && pointInRing(probe, rings[k].s)) { rings[i].parent = k; rings[i].depth = rings[k].depth + 1; break; }
+    }
+  }
+  const out: { points: Pt[]; holes: Pt[][] }[] = [];
+  const outIdx = new Map<number, number>();
+  rings.forEach((r, i) => { if (r.depth % 2 === 0) { outIdx.set(i, out.length); out.push({ points: r.s.slice(), holes: [] }); } });
+  rings.forEach((r) => { if (r.depth % 2 === 1 && outIdx.has(r.parent)) out[outIdx.get(r.parent)!].holes.push(r.s.slice()); });
+  return out;
+}
 
 interface Mat2x3 { a: number; b: number; c: number; d: number; e: number; f: number }
 const ID: Mat2x3 = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -189,6 +265,14 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   let fillSpecial = false;
   let strokeSpecial = false;
   let lineWidth = 1; // in user units
+  let dashArr: number[] = [];
+  let fillAlpha = 1, strokeAlpha = 1;
+  const alphaStack: [number, number][] = [];
+  /** Aktueller Beschneidungsrahmen in Seiten-pt (null = keiner). */
+  let clipBox: Box | null = null;
+  let pendingClip = false;
+  const clipStack: (Box | null)[] = [];
+  const dashStack: number[][] = [];
   /** fillColor zum Zeitpunkt jeder Text-Show-Op (Reihenfolge wie in der opList). */
   const textOpFillColors: string[] = [];
   /** Text pro Show-Op (ohne Leerzeichen) für die positionsgenaue Farbzuordnung. */
@@ -221,28 +305,46 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   const emitStroke = () => {
     flushSubpath();
     if (strokeSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
+    if (strokeAlpha <= 0.005) return;
+    const s = Math.sqrt(Math.abs(ctm.a * ctm.d - ctm.b * ctm.c)) || 1;
+    const dashPt = dashArr.length && dashArr.some((d) => d > 0) ? dashArr.map((d) => d * s) : undefined;
     for (const sub of currentPath) {
       for (let i = 1; i < sub.length; i++) {
+        const c = clipBox ? clipSegment(sub[i - 1], sub[i], clipBox) : [sub[i - 1], sub[i]];
+        if (!c) continue;
         result.segments.push({
-          a: sub[i - 1], b: sub[i],
+          a: c[0], b: c[1],
           color: strokeColor,
           thicknessM: effectiveStrokePt() * Defaults.documentMetersPerPdfPt,
+          ...(dashPt ? { dashPt } : {}),
         });
       }
     }
+  };
+
+  /** W/W* n: Beschneidungsrahmen = Schnitt mit Hüllrechteck des Pfads. */
+  const applyPendingClip = () => {
+    if (!pendingClip) return;
+    pendingClip = false;
+    const pts = [...currentPath.flat(), ...currentSub];
+    if (!pts.length) return;
+    const b = boxOf(pts);
+    clipBox = clipBox ? intersectBox(clipBox, b) : b;
   };
 
   const emitFill = () => {
     flushSubpath();
     // Verläufe/Muster ohne ermittelbare Farbe nicht als falsche Vollfläche ausgeben.
     if (fillSpecial) { result.skippedSpecial = (result.skippedSpecial || 0) + currentPath.length; return; }
-    for (const sub of currentPath) {
-      if (sub.length >= 3) {
-        // Reine Füllung: Rand in Füllfarbe (keine fremde Randfarbe); umrandete
-        // Flächen erhalten ihre Kontur zusätzlich als Linien in Konturfarbe.
-        // Reine Füllung ohne Rand (strokeWidthPx 0); Konturen kommen nur aus Stroke-Ops als Linien.
-        result.hatches.push({ points: sub.slice(), fillColor, strokeColor: fillColor });
-      }
+    // Unsichtbare Füllung (Deckkraft 0) nicht als deckende Fläche übernehmen.
+    if (fillAlpha <= 0.005) return;
+    // Reine Füllung ohne Rand; Konturen kommen nur aus Stroke-Ops als Linien.
+    // Mehrere Teilpfade: innenliegende Ringe werden Löcher (statt die
+    // Aussparung vollflächig zu übermalen).
+    for (const f of groupFillRings(currentPath.filter((s) => s.length >= 3))) {
+      let pts = f.points;
+      if (clipBox) { pts = clipPolygonToBox(pts, clipBox); if (pts.length < 3) continue; }
+      result.hatches.push({ points: pts, ...(f.holes.length ? { holes: f.holes } : {}), fillColor, strokeColor: fillColor, ...(fillAlpha < 0.999 ? { fillAlpha } : {}) });
     }
   };
 
@@ -319,6 +421,19 @@ export async function extractPdfPageVectors(sourceB64: string, pageIndex: number
   for (let k = 0; k < fns.length; k++) {
     const fn = fns[k];
     const a = args[k] || [];
+    if (fn === OPS.setGState && Array.isArray(a[0])) {
+      for (const kv of a[0]) {
+        if (kv?.[0] === "ca" && Number.isFinite(kv[1])) fillAlpha = kv[1];
+        if (kv?.[0] === "CA" && Number.isFinite(kv[1])) strokeAlpha = kv[1];
+      }
+    }
+    if (fn === OPS.save) alphaStack.push([fillAlpha, strokeAlpha]);
+    else if (fn === OPS.restore && alphaStack.length) [fillAlpha, strokeAlpha] = alphaStack.pop()!;
+    if (fn === OPS.save) { clipStack.push(clipBox); dashStack.push(dashArr); }
+    else if (fn === OPS.restore) { if (clipStack.length) clipBox = clipStack.pop()!; if (dashStack.length) dashArr = dashStack.pop()!; }
+    if (fn === OPS.clip || fn === OPS.eoClip) pendingClip = true;
+    else if (fn === OPS.setDash) dashArr = Array.isArray(a[0]) ? a[0].map(Number).filter(Number.isFinite) : [];
+    if (fn === OPS.endPath || fn === OPS.stroke || fn === OPS.fill || fn === OPS.eoFill || fn === OPS.fillStroke || fn === OPS.eoFillStroke || fn === OPS.closeStroke || fn === OPS.closeFillStroke || fn === OPS.closeEOFillStroke) applyPendingClip();
     if (fn === OPS.save) { ctmStack.push({ ...ctm }); colorStack.push({ fill: fillColor, stroke: strokeColor, lw: lineWidth, fs: fillSpecial, ss: strokeSpecial }); }
     else if (fn === OPS.restore) {
       if (ctmStack.length) ctm = ctmStack.pop()!;
