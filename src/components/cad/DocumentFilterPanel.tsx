@@ -21,8 +21,6 @@ interface Props {
   docId: string;
   /** Re-render-Trigger aus dem Polling. */
   sig: string;
-  /** „Hintergrund entfernen"-Abschnitt anzeigen. Default: true. */
-  showBgRemove?: boolean;
   /** Teilbereich: nur Transparenz, nur Bildbearbeitung oder beides. */
   part?: "all" | "opacity" | "filters";
 }
@@ -34,7 +32,7 @@ export type FilterChange = (
 
 const MODE_OPTIONS: DocumentFilterMode[] = ["adjust", "bw", "grayscale", "tint", "free"];
 
-export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all" }: Props) {
+export function DocumentFilterPanel({ app, docId, sig, part = "all" }: Props) {
   // Doc bei jedem Render frisch lesen (sig erzwingt Re-Render via parent state).
   void sig;
   const doc: any = app?.scene.getDocumentById(docId) || null;
@@ -208,9 +206,6 @@ export function DocumentFilterPanel({ app, docId, sig, showBgRemove, part = "all
               onDragEnd={endDrag}
             />
 
-            {/* „Hintergrund entfernen“ ist ein eigener Bereich unter
-                „Bild spiegeln“ (BgRemoveSection) und nicht mehr Teil der
-                Bildbearbeitung. */}
 
 
             {/* Filter-Liste */}

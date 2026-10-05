@@ -200,3 +200,18 @@ export function scaleDocumentAroundCenter(doc: DocumentObject, factor: number) {
   doc.position.x = cx - doc.widthM / 2;
   doc.position.y = cy - doc.heightM / 2;
 }
+
+/** Liegt ein Welt-Punkt im sichtbaren (zugeschnittenen) Bereich des Dokuments? */
+export function pointInDocumentVisible(p: Vec2, doc: DocumentObject): boolean {
+  const cx = doc.position.x + doc.widthM / 2;
+  const cy = doc.position.y + doc.heightM / 2;
+  const dx = p.x - cx, dy = p.y - cy;
+  const cos = Math.cos(-doc.rotationRad), sin = Math.sin(-doc.rotationRad);
+  const lx = dx * cos - dy * sin;
+  const ly = dx * sin + dy * cos;
+  const hx = doc.widthM / 2, hy = doc.heightM / 2;
+  const crop = (doc as any).cropM || { top: 0, right: 0, bottom: 0, left: 0 };
+  if (lx < -hx + (crop.left || 0) || lx > hx - (crop.right || 0)) return false;
+  if (ly < -hy + (crop.top || 0) || ly > hy - (crop.bottom || 0)) return false;
+  return true;
+}

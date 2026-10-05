@@ -2958,56 +2958,6 @@ export class SelectTool {
       }
     }
 
-    // Hintergrund-Ausschnitt-Interaktion (aktiviert via BgRemoveSection).
-    // Klick = Magic-Wand-Fill; Drag mit gedrückter Maustaste = Pinsel.
-    // Wichtig: Es wird nie still `enabled` gesetzt — nur ein bewusst
-    // eingeschalteter Bereich erlaubt Bearbeitung.
-    if (this._bgBrushStrokeActive && !input.mouse.left) {
-      // Zusammenhängender Pinselstrich beendet → genau ein Verlaufsschritt.
-      this._bgBrushStrokeActive = false;
-      const strokeDoc = this._bgBrushStrokeDocId
-        ? this.app.scene.getDocumentById(this._bgBrushStrokeDocId)
-        : null;
-      this._bgBrushStrokeDocId = null;
-      this.app.suspendHistory = false;
-      void import("./documentBgRemove").then(({ exportBgMaskDataUrl, applyMaskCropToDoc }) => {
-        if (strokeDoc) { applyMaskCropToDoc(strokeDoc); exportBgMaskDataUrl(strokeDoc); }
-        this.app.commitHistorySnapshot?.();
-      });
-    }
-    if (this.app.bgRemoveInteraction) {
-      const inter = this.app.bgRemoveInteraction;
-      const doc = this.app.scene.getDocumentById(inter.docId);
-      if (doc && (doc as any).bgRemoval?.enabled) {
-        const mouseW = v(input.mouse.wx, input.mouse.wy);
-        // Nur reagieren, wenn Cursor über dem Dokument ist.
-        if (pointInDocument(mouseW, doc)) {
-          if (inter.tool === "brush" && input.mouse.left && !this._bgBrushStrokeActive) {
-            this._bgBrushStrokeActive = true;
-            this._bgBrushStrokeDocId = doc.id;
-            this.app.suspendHistory = true;
-          }
-          void import("./documentBgRemove").then(({ ensureBgRemoval, floodFillAt, paintBrushAt, exportBgMaskDataUrl }) => {
-            const b = ensureBgRemoval(doc);
-            if (!b.enabled) return;
-            if (inter.tool === "wand") {
-              if (input.clicked) {
-                // Wegklicken/Wiederherstellen: ein Klick = ein Verlaufsschritt.
-                if (floodFillAt(doc, mouseW, b.tolerance, inter.target)) {
-                  exportBgMaskDataUrl(doc);
-                  this.app.commitHistorySnapshot?.();
-                }
-              }
-            } else if (inter.tool === "brush") {
-              if (input.mouse.left) {
-                paintBrushAt(doc, mouseW, b.brushRadiusM, inter.target);
-              }
-            }
-          });
-          return; // Andere Klicks/Drag-Handler blockieren.
-        }
-      }
-    }
 
 
 
