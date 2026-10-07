@@ -49,3 +49,4 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Rechtsklick-Hilfslinien laufen nur über `GuideInteractionController` → `GlobalGuides` (Gruppen mit Referenzzählung, je Kontext `cad|export:sheet|plan`) – flüchtig, nie Cloud/Undo/Export, nie zwischen Blatt und Exportseite.
 - Benutzerhandlung = `CadApp.runAction` → 1 Undo, Fehler = volle Rücknahme.
 - Verlauf: Kacheln nur via `RasterTileStore`. Pixel: Grenzen nur `raster/RasterPolicy`, Jobs atomar via `CadApp.commitRasterJob`; Ablehnung = Vektor bleibt.
+- Lokaler CAD-Stand: IndexedDB (`raster/localScenePersist.ts`, Format `RASTER_FORMAT`) ist maßgeblich; Pixel nur als Hash-Blobs im Manifest (`raster/rasterManifest.ts`), localStorage nur Vektorstand – höheres Format wird nie geladen/überschrieben.
