@@ -54,14 +54,19 @@ export function saveLocalScene(projectId: string, snap: string, revision: number
       const data = JSON.parse(job.snap);
       const raster = data.rasterLayersByKey;
       delete data.rasterLayersByKey;
-      // Vektorstand für ältere Clients/Vorschau (ohne Pixel).
-      try {
-        localStorage.setItem(legacyKey, JSON.stringify({ ...data, rasterLayersByKey: {}, rasterFormat: RASTER_FORMAT }));
-      } catch (e) { if (isQuotaError(e)) setStatus("quota", "Gerätespeicher (Browser) voll."); }
-      if (!localStoreAvailable()) { setStatus("error", "Lokaler Pixelspeicher nicht verfügbar."); return; }
+      if (!localStoreAvailable()) {
+        // Kein IndexedDB: bisheriger Weg (vollständiger Stand in localStorage).
+        try { localStorage.setItem(legacyKey, job.snap); setStatus("saved"); }
+        catch (e) { setStatus(isQuotaError(e) ? "quota" : "error", "Gerätespeicher voll."); }
+        return;
+      }
       const blobs = new Map<string, Blob>();
       data.rasterManifest = await toManifest(raster, job.revision, blobs);
       await saveProjectLocal({ projectId: job.projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson: JSON.stringify(data) }, blobs);
+      // Erst nach erfolgreichem IndexedDB-Commit: lesbarer Vektorstand ohne Pixel.
+      delete data.rasterManifest;
+      try { localStorage.setItem(legacyKey, JSON.stringify({ ...data, rasterLayersByKey: {}, rasterFormat: RASTER_FORMAT })); }
+      catch { /* Vektor-Fallback optional */ }
       setStatus("saved");
     } catch (e) {
       console.error("Lokales Speichern fehlgeschlagen:", e);

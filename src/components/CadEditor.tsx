@@ -890,12 +890,16 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     };
     // CAD-State pro Projekt aus localStorage wiederherstellen
     const persistKey = `pixuna.cad.${projectId ?? "default"}`;
+    let lastPersistRev = -1;
     const persist = () => {
       try {
         const snap = (app as any)._serializeScene?.();
         if (typeof snap !== "string") return;
-        localStorage.setItem(persistKey, snap);
-        if (projectId) {
+        const rev = (app as any).contentRevision ?? 0;
+        const changed = rev !== lastPersistRev;
+        lastPersistRev = rev;
+        if (changed) saveLocalScene(projectId ?? "default", snap, rev, persistKey);
+        if (projectId && changed) {
           try {
             const data = JSON.parse(snap);
             const list = Array.isArray(data.sheets) ? data.sheets : [];
@@ -967,6 +971,22 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const saved = localStorage.getItem(persistKey);
       if (saved) (app as any)._restoreScene?.(saved);
     } catch (e) { console.error("CAD restore failed:", e); }
+    // Maßgeblicher lokaler Stand (Format 2) liegt in IndexedDB.
+    {
+      const revAtStart = (app as any).contentRevision;
+      loadLocalScene(projectId ?? "default").then((res) => {
+        if (!res || (app as any)._destroyed) return;
+        // Hat der Nutzer inzwischen gezeichnet, nichts überschreiben.
+        if ((app as any).contentRevision !== revAtStart) return;
+        (app as any)._restoreScene?.(res.snapshot);
+        lastPersistRev = (app as any).contentRevision;
+        try { app.renderer?.render(); } catch {}
+        if (res.missing.length) toast({ title: "Pixelinhalte unvollständig", description: `${res.missing.length} Kachel(n) fehlen im Gerätespeicher.` });
+      }).catch((e) => console.error("Lokaler Stand nicht lesbar:", e));
+    }
+    const offSaveStatus = onLocalSaveStatus((s, d) => {
+      if (s === "quota" || s === "blocked" || s === "error") toast({ title: s === "blocked" ? "Speichern gesperrt" : "Speichern fehlgeschlagen", description: d, variant: "destructive" });
+    });
 
     app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); onHistoryChange?.(u, r); persist(); };
     // Periodischer Fallback (Sheet-Renames etc. pushen keine History).
