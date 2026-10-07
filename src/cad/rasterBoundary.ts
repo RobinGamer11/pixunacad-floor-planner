@@ -25,6 +25,8 @@ export interface BoundaryMask {
   alpha: Uint8Array;
   /** Schwelle, ab der ein Pixel als Grenze gilt. */
   threshold: number;
+  /** false, wenn Kacheln noch nachladen (Maske unvollständig, nicht verwertbar). */
+  complete: boolean;
   /** true, wenn der Weltpunkt in der Maske deckend (= Grenze) ist. */
   isBoundaryAt: (wx: number, wy: number) => boolean;
 }
@@ -87,8 +89,10 @@ export function buildRasterBoundaryMask(
   if (!ctx) return null;
   ctx.imageSmoothingEnabled = true;
 
+  let complete = true;
   for (const id of labelIds) {
-    rasterLayers?.get(id)?.drawIntoMask(ctx, x, y, w, h, pxPerM);
+    const l = rasterLayers?.get(id);
+    if (l && !l.drawIntoMask(ctx, x, y, w, h, pxPerM)) complete = false;
   }
   options.drawExtra?.(ctx, x, y, w, h, pxPerM);
 
@@ -105,10 +109,11 @@ export function buildRasterBoundaryMask(
     alpha[i] = a;
     if (!any && a >= threshold) any = true;
   }
-  if (!any) return null;
+  // Unvollständige Masken werden immer gemeldet – fehlende Kacheln ≠ leer.
+  if (!any && complete) return null;
 
   return {
-    canvas, x, y, w, h, pxPerM, wPx: cw, hPx: ch, alpha, threshold,
+    canvas, x, y, w, h, pxPerM, wPx: cw, hPx: ch, alpha, threshold, complete,
     isBoundaryAt: (wx: number, wy: number) => {
       const px = Math.floor((wx - x) * pxPerM);
       const py = Math.floor((wy - y) * pxPerM);

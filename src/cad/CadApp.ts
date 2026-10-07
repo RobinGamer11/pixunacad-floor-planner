@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { pageGuideSnapGeometry, paperMmToWorld } from "./pageGuides";
 import { cancelRasterJobs, newRasterActionId } from "./raster/RasterJobs";
 import { copyDisplayGradient } from "./displayGradient";
@@ -4422,6 +4423,13 @@ export class CadApp {
         if (!sc) return null;
         return this._serializeOneScene(sc);
       };
+      // Pixelkacheln vollständig laden – keine Lücken im PDF.
+      for (const layers of this._rasterLayersByKey.values()) {
+        if (!(await layers.whenLoaded())) {
+          toast.error("PDF-Export abgebrochen", { description: "Pixelbereiche konnten nicht vollständig geladen werden." });
+          return;
+        }
+      }
       const bytes = await exportPlansToPdf(
         sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h),
         (p) => p.spreadId ? { key: p.spreadId, rects: this.planManager.spreadRects(p.spreadId) } : null,

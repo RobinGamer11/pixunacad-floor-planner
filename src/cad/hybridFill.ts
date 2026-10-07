@@ -139,11 +139,17 @@ function rasterEdgesInWindow(
     alphaThreshold: 16,
   });
   if (!mask) return { edges: [], openEnds: [], pxPerM };
+  if (!mask.complete) throw new RasterNotReadyError();
 
   const { edges, openEnds } = vectorizeRasterBoundary(
     mask.alpha, mask.threshold, mask.wPx, mask.hPx, mask.x, mask.y, mask.pxPerM,
   );
   return { edges, openEnds, pxPerM: mask.pxPerM };
+}
+
+/** Pixelkacheln laden noch – Bereichserkennung wäre unzuverlässig. */
+export class RasterNotReadyError extends Error {
+  constructor() { super("raster-not-ready"); this.name = "RasterNotReadyError"; }
 }
 
 /* ------------------------------- Hauptpfad ------------------------------ */
