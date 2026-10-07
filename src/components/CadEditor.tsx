@@ -977,7 +977,17 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     {
       const revAtStart = (app as any).contentRevision;
       loadLocalScene(projectId ?? "default").then((res) => {
-        if (!res || (app as any)._destroyed) return;
+        if ((app as any)._destroyed) return;
+        if (!res) {
+          // Migration: Altstand (Pixel als Text in localStorage) sofort in den
+          // Gerätespeicher übernehmen. Der alte Stand wird erst nach
+          // erfolgreichem Schreiben ersetzt; bei Abbruch beim nächsten Öffnen erneut.
+          try {
+            const legacy = localStorage.getItem(persistKey);
+            if (legacy && legacy.includes("data:image")) { lastPersistRev = -1; persist(); }
+          } catch {}
+          return;
+        }
         // Hat der Nutzer inzwischen gezeichnet, nichts überschreiben.
         if ((app as any).contentRevision !== revAtStart) return;
         (app as any)._restoreScene?.(res.snapshot);

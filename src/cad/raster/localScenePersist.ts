@@ -67,9 +67,16 @@ export function saveLocalScene(projectId: string, snap: string, revision: number
       const raster = data.rasterLayersByKey;
       delete data.rasterLayersByKey;
       if (!localStoreAvailable()) {
-        // Kein IndexedDB: bisheriger Weg (vollständiger Stand in localStorage).
-        try { localStorage.setItem(legacyKey, job.snap); setStatus("saved"); }
-        catch (e) { setStatus(isQuotaError(e) ? "quota" : "error", "Gerätespeicher voll."); }
+        // Kein IndexedDB: Pixel werden NICHT mehr als Text in localStorage
+        // abgelegt (alter Data-URL-Weg entfernt). Vektorstand bleibt erhalten;
+        // vorhandene Alt-Pixel im Schlüssel werden nicht überschrieben.
+        const hasPixels = raster && Object.values(raster).some((l: any) => Array.isArray(l) && l.length);
+        let prev: any = null;
+        try { prev = JSON.parse(localStorage.getItem(legacyKey) || "null"); } catch {}
+        const keep = !hasPixels && prev?.rasterLayersByKey ? prev.rasterLayersByKey : {};
+        try { localStorage.setItem(legacyKey, JSON.stringify({ ...data, rasterLayersByKey: keep })); }
+        catch (e) { setStatus(isQuotaError(e) ? "quota" : "error", "Gerätespeicher voll."); return; }
+        setStatus(hasPixels ? "error" : "saved", hasPixels ? "Pixel können in diesem Browser nicht dauerhaft gespeichert werden (kein Gerätespeicher verfügbar)." : undefined);
         return;
       }
       const blobs = new Map<string, Blob>();
