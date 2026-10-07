@@ -81,3 +81,12 @@ export function getBlob(hash: string): Promise<Blob | undefined> {
 export function loadProjectLocal(projectId: string): Promise<LocalProjectRecord | undefined> {
   return getOne<LocalProjectRecord>(PROJECTS, projectId);
 }
+
+/** Legt heruntergeladene Blobs ab (inhaltsadressiert, idempotent). */
+export async function putBlobs(blobs: Map<string, Blob>): Promise<void> {
+  if (!blobs.size) return;
+  const db = await open();
+  const tx = db.transaction(BLOBS, "readwrite");
+  for (const [hash, blob] of blobs) tx.objectStore(BLOBS).put(blob, hash);
+  await done(tx);
+}

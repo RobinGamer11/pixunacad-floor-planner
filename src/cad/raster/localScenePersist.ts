@@ -6,6 +6,7 @@
  * - Versionsschutz: Ein Stand mit höherem Format wird weder geladen noch überschrieben.
  */
 import { RASTER_FORMAT, fromManifest, toManifest } from "./rasterManifest";
+import { pullRasterManifest, pushRasterManifestSoon } from "./rasterCloud";
 import { isQuotaError, loadProjectLocal, localStoreAvailable, saveProjectLocal } from "./LocalProjectStore";
 
 export type LocalSaveStatus = "idle" | "saving" | "saved" | "quota" | "error" | "blocked";
@@ -34,6 +35,14 @@ export async function loadLocalScene(projectId: string): Promise<LoadResult | nu
   }
   const data = JSON.parse(rec.sceneJson);
   const missing: string[] = [];
+  // Cloud ergänzt nur Blätter ohne lokalen Pixelstand – keine Vermischung je Blatt.
+  try {
+    const cloud = await pullRasterManifest(projectId);
+    if (cloud) {
+      data.rasterManifest ||= {};
+      for (const k of Object.keys(cloud)) if (!data.rasterManifest[k]?.length) data.rasterManifest[k] = cloud[k];
+    }
+  } catch (e) { console.warn("Pixel aus der Cloud nicht geladen:", e); }
   lastManifest.set(projectId, data.rasterManifest);
   data.rasterLayersByKey = await fromManifest(data.rasterManifest, missing);
   delete data.rasterManifest;
@@ -68,6 +77,7 @@ export function saveLocalScene(projectId: string, snap: string, revision: number
       const manifest = data.rasterManifest;
       await saveProjectLocal({ projectId: job.projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson: JSON.stringify(data) }, blobs);
       lastManifest.set(job.projectId, manifest);
+      pushRasterManifestSoon(job.projectId, manifest, job.revision);
       // Erst nach erfolgreichem IndexedDB-Commit: lesbarer Vektorstand ohne Pixel.
       delete data.rasterManifest;
       try { localStorage.setItem(legacyKey, JSON.stringify({ ...data, rasterLayersByKey: {}, rasterFormat: RASTER_FORMAT })); }

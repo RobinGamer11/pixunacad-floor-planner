@@ -1,3 +1,4 @@
+import { quotaMessage, uploadWithQuota } from "@/cad/raster/rasterCloud";
 /**
  * Paket 04–06 – gemeinsame Datenschicht für
  *   * Arbeitszeiten (`time_entries`)
@@ -697,12 +698,13 @@ export function useAttachments(projectId: string | undefined, itemId: string | u
     }
     const safeName = file.name.replace(/[^\w.\-]+/g, "_").slice(0, 120) || "datei";
     const path = `${projectId}/${itemId}/${Date.now()}-${safeName}`;
-    const { error: upErr } = await client.storage.from(ATTACHMENT_BUCKET).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-      contentType: file.type || undefined,
-    });
-    if (upErr) throw upErr;
+    // Kontrollierter Speicher: Reservierung → Upload → Bestätigung.
+    try {
+      await uploadWithQuota(projectId, ATTACHMENT_BUCKET, path, file, "attachment", undefined, file.type || undefined);
+    } catch (e) {
+      const q = quotaMessage(e);
+      throw q ? new Error(q.text) : e;
+    }
     const { error: err } = await client.from("contribution_attachments").insert({
       project_id: projectId,
       item_id: itemId,
