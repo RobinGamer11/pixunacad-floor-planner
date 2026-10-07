@@ -30,6 +30,7 @@
  */
 
 import type { Camera } from "./Camera";
+import { rasterResources, type ResidentTile } from "./raster/RasterResourceManager";
 
 /** Kantenlänge einer Kachel in Pixeln. */
 export const RASTER_TILE_PX = 512;
@@ -141,6 +142,11 @@ interface RasterTile {
   loading: boolean;
   /** true, wenn die Kachel seit dem letzten Radieren leer sein könnte. */
   maybeEmpty?: boolean;
+  /** Pixelpuffer vom RAM-Budget freigegeben; Quelle (`dataUrl`) bleibt. */
+  evicted?: boolean;
+  /** Änderungen, die nach dem (Nach-)Laden in Reihenfolge angewendet werden. */
+  pending?: ((ctx: CanvasRenderingContext2D) => void)[];
+  res: ResidentTile;
 }
 
 function makeTileCanvas(px: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
@@ -180,11 +186,77 @@ export class RasterLayer {
     let t = this.tiles.get(key);
     if (!t && create) {
       const { canvas, ctx } = makeTileCanvas(this.tilePx);
-      t = { tx, ty, canvas, ctx, dataUrl: null, loading: false };
+      const tile: RasterTile = { tx, ty, canvas, ctx, dataUrl: null, loading: false, res: null as unknown as ResidentTile };
+      const tilePx = this.tilePx;
+      tile.res = {
+        tilePx,
+        evict: () => {
+          if (tile.loading || tile.evicted || !tile.dataUrl || tile.pending?.length) return false;
+          tile.canvas.width = 0; tile.canvas.height = 0; tile.evicted = true;
+          return true;
+        },
+      };
+      t = tile;
       this.tiles.set(key, t);
+      rasterResources.touch(t.res);
     }
     return t || null;
   }
+
+  private _drop(key: string) {
+    const t = this.tiles.get(key);
+    if (t) rasterResources.release(t.res);
+    this.tiles.delete(key);
+  }
+
+  /** Lädt ein Bild in die Kachel und wendet danach offene Änderungen an. */
+  private _loadInto(tile: RasterTile, src: string, onReady?: () => void) {
+    tile.loading = true;
+    const img = new Image();
+    const done = (ok: boolean) => {
+      if (tile.canvas.width !== this.tilePx) { tile.canvas.width = this.tilePx; tile.canvas.height = this.tilePx; }
+      tile.evicted = false;
+      try {
+        tile.ctx.clearRect(0, 0, this.tilePx, this.tilePx);
+        if (ok) tile.ctx.drawImage(img, 0, 0, this.tilePx, this.tilePx);
+      } catch { /* Kachel bleibt leer */ }
+      const pend = tile.pending; tile.pending = undefined;
+      if (pend?.length) {
+        for (const fn of pend) { tile.ctx.save(); fn(tile.ctx); tile.ctx.restore(); }
+        tile.dataUrl = null; tile.sid = null;
+      }
+      tile.loading = false;
+      rasterResources.touch(tile.res);
+      onReady?.();
+    };
+    img.onload = () => done(true);
+    img.onerror = () => done(false);
+    img.src = src;
+  }
+
+  /** Lädt eine verdrängte Kachel bei Bedarf nach (Cache-Miss ≠ transparent). */
+  private _ensure(tile: RasterTile): boolean {
+    if (tile.evicted && !tile.loading && tile.dataUrl) this._loadInto(tile, tile.dataUrl, () => this.onTileReady?.());
+    if (tile.loading || tile.evicted) return false;
+    rasterResources.touch(tile.res);
+    return true;
+  }
+
+  /** Ändert eine Kachel; bei ladender/verdrängter Kachel wird nach dem Laden angewendet. */
+  private _mutate(tile: RasterTile, fn: (ctx: CanvasRenderingContext2D) => void) {
+    if (tile.loading || tile.evicted) {
+      (tile.pending ||= []).push(fn);
+      tile.sid = null;
+      this._ensure(tile);
+      return;
+    }
+    tile.ctx.save(); fn(tile.ctx); tile.ctx.restore();
+    tile.dataUrl = null; tile.sid = null;
+    rasterResources.touch(tile.res);
+  }
+
+  /** Re-Render nach dem Nachladen verdrängter Kacheln. */
+  onTileReady: (() => void) | null = null;
 
   /** Iteriert über alle Kacheln, die das Weltrechteck berühren. */
   private _forRect(
@@ -224,13 +296,12 @@ export class RasterLayer {
     const gx = Math.round(x * this.pxPerM);
     const gy = Math.round(y * this.pxPerM);
     this._forRect(x, y, w, h, true, (tile) => {
-      const ctx = tile.ctx;
-      ctx.save();
-      ctx.globalCompositeOperation = "source-over";
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(src, gx - tile.tx * this.tilePx, gy - tile.ty * this.tilePx, src.width, src.height);
-      ctx.restore();
-      tile.dataUrl = null; tile.sid = null;
+      const dx = gx - tile.tx * this.tilePx, dy = gy - tile.ty * this.tilePx;
+      this._mutate(tile, (ctx) => {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(src, dx, dy, src.width, src.height);
+      });
     });
   }
 
@@ -249,11 +320,10 @@ export class RasterLayer {
     // einer harten Kante.
     const outerR = mode === "smooth" ? r * (1 + 2 * soft) : r;
     this._forRect(cx - outerR, cy - outerR, outerR * 2, outerR * 2, false, (tile, ox, oy) => {
-      const ctx = tile.ctx;
+      this._mutate(tile, (ctx) => {
       const px = (cx - ox) * this.pxPerM;
       const py = (cy - oy) * this.pxPerM;
       const pr = outerR * this.pxPerM;
-      ctx.save();
       ctx.globalCompositeOperation = "destination-out";
       if (mode === "smooth") {
         const inner = r * this.pxPerM * Math.pow(1 - soft, 2);
@@ -271,8 +341,7 @@ export class RasterLayer {
       ctx.beginPath();
       ctx.arc(px, py, pr, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
-      tile.dataUrl = null; tile.sid = null;
+      });
       tile.maybeEmpty = true;
     });
     this.pruneEmptyTiles();
@@ -284,9 +353,9 @@ export class RasterLayer {
    */
   pruneEmptyTiles() {
     for (const [key, tile] of [...this.tiles]) {
-      if (!tile.maybeEmpty || tile.loading) continue;
+      if (!tile.maybeEmpty || tile.loading || tile.evicted) continue;
       tile.maybeEmpty = false;
-      if (this._isTileEmpty(tile)) this.tiles.delete(key);
+      if (this._isTileEmpty(tile)) this._drop(key);
     }
   }
 
@@ -303,7 +372,7 @@ export class RasterLayer {
     ctx.imageSmoothingEnabled = magnify <= 1.5;
     ctx.imageSmoothingQuality = "high";
     for (const tile of this.tiles.values()) {
-      if (tile.loading) continue;
+      if (!this._ensure(tile)) continue;
       const p = camera.worldToScreen(tile.tx * tw, tile.ty * tw);
       // Kanten auf ganze Bildschirmpixel runden: benachbarte Kacheln stoßen so
       // exakt aneinander, es entstehen weder Lücken noch Doppelkanten (Gitter).
@@ -315,15 +384,20 @@ export class RasterLayer {
     ctx.restore();
   }
 
+  /** Gibt alle Kacheln beim RAM-Budget frei. */
+  releaseAll() { for (const k of [...this.tiles.keys()]) this._drop(k); }
+
   hasContent(): boolean {
     return this.tiles.size > 0;
   }
 
   /** Prüft, ob an einem Weltpunkt deckende Pixel liegen (Boundary-Analyse). */
-  isOpaqueAt(x: number, y: number, threshold = 24): boolean {
+  /** null = Kachel noch nicht geladen (unbekannt, NICHT transparent). */
+  isOpaqueAt(x: number, y: number, threshold = 24): boolean | null {
     const tw = this.tileWorld;
     const tile = this._tile(Math.floor(x / tw), Math.floor(y / tw), false);
     if (!tile) return false;
+    if (!this._ensure(tile)) return null;
     const px = Math.floor((x - Math.floor(x / tw) * tw) * this.pxPerM);
     const py = Math.floor((y - Math.floor(y / tw) * tw) * this.pxPerM);
     try {
@@ -335,16 +409,19 @@ export class RasterLayer {
   }
 
   /** Zeichnet den Rasterinhalt eines Weltrechtecks in ein Analyse-Canvas. */
-  drawIntoMask(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, pxPerM: number) {
+  /** Liefert false, wenn Kacheln noch nachladen (Ergebnis unvollständig). */
+  drawIntoMask(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, pxPerM: number): boolean {
     const k = pxPerM / this.pxPerM;
+    let complete = true;
     this._forRect(x, y, w, h, false, (tile, ox, oy) => {
-      if (tile.loading) return;
+      if (!this._ensure(tile)) { complete = false; return; }
       ctx.drawImage(
         tile.canvas,
         (ox - x) * pxPerM, (oy - y) * pxPerM,
         this.tilePx * k, this.tilePx * k,
       );
     });
+    return complete;
   }
 
   /**
@@ -369,12 +446,12 @@ export class RasterLayer {
       tiles.push({ tx: tile.tx, ty: tile.ty, src });
     };
     for (const [key, tile] of [...this.tiles]) {
-      if (tile.loading) {
+      if (tile.loading || tile.evicted) {
         if (tile.dataUrl) push(tile, tile.dataUrl);
         continue;
       }
       if (!tile.dataUrl) {
-        if (this._isTileEmpty(tile)) { this.tiles.delete(key); continue; }
+        if (this._isTileEmpty(tile)) { this._drop(key); continue; }
         tile.dataUrl = tile.canvas.toDataURL("image/png");
       }
       push(tile, tile.dataUrl);
@@ -384,6 +461,7 @@ export class RasterLayer {
   }
 
   private _isTileEmpty(tile: RasterTile): boolean {
+    if (tile.evicted || tile.loading) return false;
     try {
       const data = tile.ctx.getImageData(0, 0, this.tilePx, this.tilePx).data;
       for (let i = 3; i < data.length; i += 4) if (data[i] > 2) return false;
@@ -395,7 +473,10 @@ export class RasterLayer {
 
   /** true, wenn die Kachel noch aus dem gespeicherten Stand nachlädt. */
   isTileLoading(tx: number, ty: number): boolean {
-    return !!this.tiles.get(this._key(tx, ty))?.loading;
+    const t = this.tiles.get(this._key(tx, ty));
+    if (!t) return false;
+    this._ensure(t); // verdrängte Kachel nachladen, sonst wartet der Aufrufer ewig
+    return t.loading || !!t.evicted;
   }
 
   /**
@@ -406,13 +487,11 @@ export class RasterLayer {
   applyTiles(entries: { tx: number; ty: number; image: CanvasImageSource }[]) {
     for (const e of entries) {
       const tile = this._tile(e.tx, e.ty, true)!;
-      const ctx = tile.ctx;
-      ctx.save();
-      ctx.globalCompositeOperation = "source-over";
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(e.image, 0, 0, this.tilePx, this.tilePx);
-      ctx.restore();
-      tile.dataUrl = null; tile.sid = null;
+      this._mutate(tile, (ctx) => {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(e.image, 0, 0, this.tilePx, this.tilePx);
+      });
     }
   }
 
@@ -432,18 +511,8 @@ export class RasterLayer {
       const tile = this._tile(t.tx, t.ty, true)!;
       tile.dataUrl = src;
       tile.sid = sid;
-      tile.loading = true;
-      const img = new Image();
-      img.onload = () => {
-        try {
-          tile.ctx.clearRect(0, 0, this.tilePx, this.tilePx);
-          tile.ctx.drawImage(img, 0, 0, this.tilePx, this.tilePx);
-        } catch { /* Kachel bleibt leer */ }
-        tile.loading = false;
-        onReady?.();
-      };
-      img.onerror = () => { tile.loading = false; onReady?.(); };
-      img.src = src;
+      this.onTileReady = onReady ?? this.onTileReady;
+      this._loadInto(tile, src, onReady);
     }
   }
 
@@ -487,6 +556,7 @@ export class RasterLayers {
     let l = this.layers.get(labelId);
     if (!l && create) {
       l = new RasterLayer(labelId, this.pxPerM);
+      l.onTileReady = () => this.onReady?.();
       this.layers.set(labelId, l);
     }
     return l || null;
@@ -542,6 +612,7 @@ export class RasterLayers {
 
   /** Löscht allen Rasterinhalt (z. B. vor `loadState`). */
   clear() {
+    for (const l of this.layers.values()) l.releaseAll();
     this.layers.clear();
   }
 
@@ -560,6 +631,7 @@ export class RasterLayers {
     for (const json of data) {
       if (!json?.labelId) continue;
       const layer = new RasterLayer(json.labelId, json.pxPerM || this.pxPerM, json.tilePx || RASTER_TILE_PX);
+      layer.onTileReady = () => this.onReady?.();
       layer.restore(json, () => this.onReady?.(), store);
       this.layers.set(json.labelId, layer);
     }
