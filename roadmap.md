@@ -178,7 +178,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 
 ## Pixelmodus speicherschonend (Auftrag 07.10.2026)
 - [x] Durchgang 1: eindeutige Ergebnisse, atomarer Job-Abschluss (1 Undo), sparse Kacheln, Temp-IndexedDB, Fortschritt/Abbrechen, kein Bild-Fallback, Qualitätsregler entfernt
-- [ ] Lokale Projektablage IndexedDB statt localStorage (Phase 3, inkl. Formatversion/Migration)
+- [ ] Lokale Projektablage IndexedDB statt localStorage (Phase 3, inkl. Formatversion/Migration) (Paket 1 Grundstand umgesetzt)
 - [ ] Manifestmodell solidFill/patternFill/paint/erase/checkpoint (Phase 4)
 - [ ] Gemischte Auflösungen + RAM-Budget/LRU (Phase 5; erst dann Auflösungsreduktion aktivieren)
 - [ ] Alle Rasterkonsumenten (Export, PDF, Ausschnitte, Analyse) (Phase 6)
