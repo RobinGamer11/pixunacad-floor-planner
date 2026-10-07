@@ -74,8 +74,12 @@ export async function tempDeleteAction(actionId: string): Promise<void> {
   } catch { /* temporär – beim nächsten Start bereinigt */ }
 }
 
-/** Entfernt Reste nicht mehr aktiver Jobs (z. B. nach Absturz/Neuladen). */
-export async function tempCleanup(activeIds: Set<string>): Promise<void> {
+/**
+ * Entfernt Reste nicht mehr aktiver Jobs (z. B. nach Absturz/Neuladen).
+ * Einträge jünger als `keepRecentMs` bleiben (ein anderer Tab kann sie nutzen).
+ */
+export async function tempCleanup(activeIds: Set<string>, keepRecentMs = 60 * 60 * 1000): Promise<void> {
+  const cutoff = Date.now() - keepRecentMs;
   try {
     const db = await open();
     const tx = db.transaction(STORE, "readwrite");
@@ -83,7 +87,8 @@ export async function tempCleanup(activeIds: Set<string>): Promise<void> {
     req.onsuccess = () => {
       const cur = req.result;
       if (!cur) return;
-      if (!activeIds.has((cur.value as any).actionId)) cur.delete();
+      const v = cur.value as any;
+      if (!activeIds.has(v.actionId) && !(v.at > cutoff)) cur.delete();
       cur.continue();
     };
     await done(tx);

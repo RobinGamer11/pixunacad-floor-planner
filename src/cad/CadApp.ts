@@ -1177,6 +1177,7 @@ export class CadApp {
     this._emitHistoryChange();
     // Poll for scene changes (cheap: short string compare on JSON)
     this._snapshotTimer = window.setInterval(() => this._maybeSnapshot(), 250);
+    void import("./raster/RasterTempStore").then((m) => m.rasterTempStoreAvailable() && m.tempCleanup(new Set())).catch(() => undefined);
   }
 
   private _maybeSnapshot() {
@@ -1336,6 +1337,8 @@ export class CadApp {
    * über Werkzeug-/Blattwechsel oder Fokusverlust hinaus.
    */
   settleHistoryState() {
+    // Laufende Rasterjobs liegen bewusst AUSSERHALB von _actionDepth: sie werden
+    // hier weder bestätigt noch abgebrochen, sondern schließen atomar selbst ab.
     if (this._actionDepth > 0) this.commitAction();
     if (this._actionDepth === 0 && this.suspendHistory) this.suspendHistory = false;
   }

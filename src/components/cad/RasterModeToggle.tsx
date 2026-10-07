@@ -137,69 +137,6 @@ export const RasterModeToggle: React.FC<Props> = ({ app, projectId }) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      {mode === "pixel" && (
-        <div className="mt-2 pt-2 space-y-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <label className="text-[11px]">Render-Qualität</label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min={600}
-                  max={2400}
-                  step={50}
-                  value={dpi}
-                  onChange={(event) => setDpi(Number(event.target.value))}
-                  onBlur={() => applyDpi(dpi)}
-                  onKeyDown={(event) => { if (event.key === "Enter") applyDpi(dpi); }}
-                  className="w-16 h-7 px-1 text-right text-[11px] rounded border bg-transparent"
-                  style={{ borderColor: "hsl(var(--hairline))" }}
-                />
-                <span className="text-[10px]">DPI</span>
-              </div>
-            </div>
-            <input
-              type="range"
-              min={600}
-              max={2400}
-              step={50}
-              value={Math.max(600, Math.min(2400, dpi || 600))}
-              onChange={(event) => applyDpi(Number(event.target.value))}
-              className="w-full"
-            />
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <label className="flex items-center gap-2 text-[11px] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={supersampling}
-                onChange={(event) => {
-                  const next = event.target.checked;
-                  setSupersampling(next);
-                  saveQuality({ supersampling: next });
-                }}
-              />
-              Supersampling
-            </label>
-            <select
-              value={supersamplingFactor}
-              disabled={!supersampling}
-              onChange={(event) => {
-                const next = Number(event.target.value) === 4 ? 4 : 2;
-                setSupersamplingFactor(next);
-                saveQuality({ factor: next });
-              }}
-              className="cad-settings-select h-7 w-auto disabled:opacity-40"
-            >
-              <option value={2}>2×</option>
-              <option value={4}>4×</option>
-            </select>
-          </div>
-          <div className="text-[10px] leading-tight" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-            Gilt projektweit für neu erzeugte Pixelobjekte. Höhere Werte benötigen mehr Speicher.
-          </div>
-        </div>
-      )}
     </div>
   );
 };
