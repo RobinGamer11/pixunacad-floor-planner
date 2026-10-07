@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
+import { LocalSaveIndicator } from "@/components/cad/LocalSaveIndicator";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import type { CadApp } from "@/cad/CadApp";
 import { getLocalActivePage, setLocalActivePage } from "@/lib/exportLocalState";
@@ -151,6 +152,7 @@ const CadPage = () => {
           presenting={presenting}
           helpOn={helpOn}
         />
+        {!presenting && <LocalSaveIndicator />}
         {presenting && (
           <button
             onClick={() => { setPresenting(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }}

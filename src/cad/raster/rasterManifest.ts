@@ -6,8 +6,8 @@
  * `solidFill`/`patternFill` = source-over, `erase` = destination-out und wirkt
  * damit nur auf Einträge davor, nie auf spätere Striche.
  *
- * Aktuell schreibt die App je Ebene einen `checkpoint` (vollständiger Stand);
- * die übrigen Arten sind im Format vorgesehen und werden gelesen.
+ * Gespeichert werden Checkpoints (voll oder nur geänderte Kacheln, verdichtet ab
+ * MAX_ENTRIES_PER_LAYER); paint/erase/Fills werden beim Laden zusammengesetzt.
  */
 import { getBlob, hasBlob } from "./LocalProjectStore";
 
@@ -53,7 +53,7 @@ const dataUrlHash = new Map<string, string>();
 async function srcToHash(src: string, newBlobs: Map<string, Blob>): Promise<string | null> {
   const known = urlToHash.get(src) ?? dataUrlHash.get(src);
   if (known) return known;
-  if (!src.startsWith("data:")) return null;
+  if (!src.startsWith("data:") && !src.startsWith("blob:")) return null;
   const blob = await (await fetch(src)).blob();
   const hash = await sha256Hex(await blob.arrayBuffer());
   if (dataUrlHash.size > 5000) dataUrlHash.clear();
@@ -63,11 +63,27 @@ async function srcToHash(src: string, newBlobs: Map<string, Blob>): Promise<stri
 }
 
 let entrySeq = 0;
+const newEntryId = () => `e-${Date.now().toString(36)}-${(++entrySeq).toString(36)}`;
+/** Ab so vielen Einträgen je Ebene wird zu einem Checkpoint verdichtet. */
+export const MAX_ENTRIES_PER_LAYER = 8;
+
+type Effective = Map<string, string>; // "tx,ty" -> hash (nur reine Checkpoint-Ketten)
+function effectiveTiles(lm: RasterLayerManifest): Effective | null {
+  const m: Effective = new Map();
+  for (const e of [...lm.entries].sort((a, b) => a.order - b.order)) {
+    if (e.kind !== "checkpoint") return null;
+    for (const t of e.tiles) m.set(`${t.tx},${t.ty}`, t.hash);
+  }
+  return m;
+}
+
 /**
  * Wandelt `rasterLayersByKey` (Szenen-JSON) in ein Manifest um. Neue Pixel
- * landen in `newBlobs`; die Szene selbst enthält danach keine Pixeldaten.
+ * landen in `newBlobs`. Mit `prev` werden nur geänderte Kacheln als neuer
+ * Teil-Checkpoint angehängt; entfernte Kacheln, Auflösungswechsel oder zu
+ * viele Einträge führen zu einem frischen vollständigen Checkpoint.
  */
-export async function toManifest(rasterByKey: Record<string, any[]> | undefined, revision: number, newBlobs: Map<string, Blob>): Promise<RasterManifest> {
+export async function toManifest(rasterByKey: Record<string, any[]> | undefined, revision: number, newBlobs: Map<string, Blob>, prev?: RasterManifest): Promise<RasterManifest> {
   const out: RasterManifest = {};
   for (const key of Object.keys(rasterByKey ?? {})) {
     const layers: RasterLayerManifest[] = [];
@@ -81,10 +97,23 @@ export async function toManifest(rasterByKey: Record<string, any[]> | undefined,
         if (hash) tiles.push({ tx: t.tx, ty: t.ty, hash });
       }
       if (!tiles.length) continue;
-      layers.push({
-        labelId: l.labelId, strokeCount: l.strokeCount ?? 1,
-        entries: [{ id: `cp-${Date.now().toString(36)}-${(++entrySeq).toString(36)}`, kind: "checkpoint", revision, order: 0, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles }],
-      });
+      const full = (): RasterManifestEntry[] => [{ id: newEntryId(), kind: "checkpoint", revision, order: 0, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles }];
+      const old = prev?.[key]?.find((x) => x.labelId === l.labelId);
+      let entries = full();
+      const eff = old ? effectiveTiles(old) : null;
+      const sameRes = old?.entries.every((e) => e.pxPerM === l.pxPerM && e.tilePx === l.tilePx);
+      if (old && eff && sameRes && old.entries.length < MAX_ENTRIES_PER_LAYER) {
+        const now = new Set(tiles.map((t) => `${t.tx},${t.ty}`));
+        const removed = [...eff.keys()].some((k) => !now.has(k));
+        if (!removed) {
+          const changed = tiles.filter((t) => eff.get(`${t.tx},${t.ty}`) !== t.hash);
+          const maxOrder = Math.max(...old.entries.map((e) => e.order));
+          entries = changed.length
+            ? [...old.entries, { id: newEntryId(), kind: "checkpoint", revision, order: maxOrder + 1, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles: changed }]
+            : old.entries;
+        }
+      }
+      layers.push({ labelId: l.labelId, strokeCount: l.strokeCount ?? 1, entries });
     }
     if (layers.length) out[key] = layers;
   }
@@ -101,11 +130,32 @@ async function urlFor(hash: string): Promise<string | null> {
   return url;
 }
 
+function loadImg(url: string): Promise<HTMLImageElement> {
+  return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+}
+
+/** Ops einer Kachel in Reihenfolge; checkpoint ersetzt, paint/fill = source-over, erase = destination-out. */
+async function composeTile(ops: { kind: RasterEntryKind; hash: string }[], tilePx: number): Promise<string | null> {
+  const start = ops.map((o) => o.kind).lastIndexOf("checkpoint");
+  const seq = start >= 0 ? ops.slice(start) : ops;
+  if (seq.length === 1 && seq[0].kind !== "erase") return urlFor(seq[0].hash);
+  const cv = document.createElement("canvas"); cv.width = cv.height = tilePx;
+  const ctx = cv.getContext("2d"); if (!ctx) return null;
+  for (const o of seq) {
+    const u = await urlFor(o.hash); if (!u) return null;
+    const img = await loadImg(u);
+    ctx.globalCompositeOperation = o.kind === "erase" ? "destination-out" : "source-over";
+    if (o.kind === "checkpoint") ctx.clearRect(0, 0, tilePx, tilePx);
+    ctx.drawImage(img, 0, 0, tilePx, tilePx);
+  }
+  const blob: Blob | null = await new Promise((r) => cv.toBlob(r, "image/png"));
+  return blob ? URL.createObjectURL(blob) : null;
+}
+
 /**
- * Manifest → `rasterLayersByKey` im bisherigen Laufzeitformat.
- * Fehlende Blobs = Kachel fehlt (gemeldet über `missing`), nie stilles Leeren.
- * Unterstützt derzeit nur Ebenen mit genau einem Checkpoint bzw. reinen
- * Mal-Einträgen gleicher Auflösung; sonst wird die Ebene als nicht ladbar gemeldet.
+ * Manifest → `rasterLayersByKey` im Laufzeitformat. Einträge werden je Kachel
+ * in Reihenfolge zusammengesetzt. Fehlende Blobs oder unterschiedliche
+ * Auflösungen innerhalb einer Ebene werden gemeldet (`missing`), nie still geleert.
  */
 export async function fromManifest(m: RasterManifest | undefined, missing: string[]): Promise<Record<string, any[]>> {
   const out: Record<string, any[]> = {};
@@ -113,16 +163,23 @@ export async function fromManifest(m: RasterManifest | undefined, missing: strin
     const layers: any[] = [];
     for (const lm of m![key]) {
       const entries = [...lm.entries].sort((a, b) => a.order - b.order);
-      const simple = entries.length === 1 && (entries[0].kind === "checkpoint" || entries[0].kind === "paint");
-      if (!simple) { missing.push(`${key}/${lm.labelId}: Mehrfacheinträge`); continue; }
-      const e = entries[0];
-      const tiles: any[] = [];
-      for (const t of e.tiles) {
-        const src = await urlFor(t.hash);
-        if (src) tiles.push({ tx: t.tx, ty: t.ty, src });
-        else missing.push(t.hash);
+      if (!entries.length) continue;
+      const { pxPerM, tilePx } = entries[0];
+      if (entries.some((e) => e.pxPerM !== pxPerM || e.tilePx !== tilePx)) { missing.push(`${key}/${lm.labelId}: gemischte Auflösung`); continue; }
+      const byTile = new Map<string, { tx: number; ty: number; ops: { kind: RasterEntryKind; hash: string }[] }>();
+      for (const e of entries) for (const t of e.tiles) {
+        const k = `${t.tx},${t.ty}`;
+        let g = byTile.get(k); if (!g) { g = { tx: t.tx, ty: t.ty, ops: [] }; byTile.set(k, g); }
+        g.ops.push({ kind: e.kind, hash: t.hash });
       }
-      layers.push({ labelId: lm.labelId, pxPerM: e.pxPerM, tilePx: e.tilePx, tiles, strokeCount: lm.strokeCount });
+      const tiles: any[] = [];
+      for (const g of byTile.values()) {
+        try {
+          const src = await composeTile(g.ops, tilePx);
+          if (src) tiles.push({ tx: g.tx, ty: g.ty, src }); else missing.push(`${g.tx},${g.ty}`);
+        } catch { missing.push(`${g.tx},${g.ty}`); }
+      }
+      layers.push({ labelId: lm.labelId, pxPerM, tilePx, tiles, strokeCount: lm.strokeCount });
     }
     out[key] = layers;
   }
