@@ -1,3 +1,5 @@
+import { toast } from "@/hooks/use-toast";
+import { saveLocalScene, loadLocalScene, onLocalSaveStatus } from "@/cad/raster/localScenePersist";
 import { TrashIcon } from "@/lib/trashIcon";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
