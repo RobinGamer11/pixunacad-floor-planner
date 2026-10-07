@@ -106,6 +106,8 @@ export function cadRasterPxPerMForReference(
 export interface RasterTileJSON {
   tx: number;
   ty: number;
+  /** Auflösungsfaktor dieser Kachel relativ zu `pxPerM` (fehlt = 1). Weltgröße bleibt gleich. */
+  s?: number;
   /** PNG-DataURL der Kachel (fehlt, wenn `ref` gesetzt ist). */
   src?: string;
   /**
@@ -147,6 +149,17 @@ interface RasterTile {
   /** Änderungen, die nach dem (Nach-)Laden in Reihenfolge angewendet werden. */
   pending?: ((ctx: CanvasRenderingContext2D) => void)[];
   res: ResidentTile;
+  /** Eigener Auflösungsfaktor (1 = Ebenenauflösung, <1 = gröber). */
+  s: number;
+}
+
+/** Zulässige Kachelauflösungsstufen (Halbierungen). */
+export const TILE_SCALES = [1, 0.5, 0.25, 0.125] as const;
+export function normTileScale(s: unknown): number {
+  const n = typeof s === "number" && s > 0 ? s : 1;
+  let best = 1;
+  for (const c of TILE_SCALES) if (Math.abs(c - n) < Math.abs(best - n)) best = c;
+  return best;
 }
 
 function makeTileCanvas(px: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
@@ -181,13 +194,20 @@ export class RasterLayer {
 
   private _key(tx: number, ty: number) { return `${tx},${ty}`; }
 
-  private _tile(tx: number, ty: number, create: boolean): RasterTile | null {
+  /** Pixelkantenlänge einer Kachel bei ihrer eigenen Auflösung. */
+  private _px(t: RasterTile): number { return Math.max(1, Math.round(this.tilePx * t.s)); }
+
+  /** Auflösungsfaktor einer belegten Kachel (null = keine Kachel). */
+  tileScale(tx: number, ty: number): number | null { return this.tiles.get(this._key(tx, ty))?.s ?? null; }
+
+  private _tile(tx: number, ty: number, create: boolean, scale = 1): RasterTile | null {
     const key = this._key(tx, ty);
     let t = this.tiles.get(key);
     if (!t && create) {
-      const { canvas, ctx } = makeTileCanvas(this.tilePx);
-      const tile: RasterTile = { tx, ty, canvas, ctx, dataUrl: null, loading: false, res: null as unknown as ResidentTile };
-      const tilePx = this.tilePx;
+      const sc = normTileScale(scale);
+      const { canvas, ctx } = makeTileCanvas(Math.max(1, Math.round(this.tilePx * sc)));
+      const tile: RasterTile = { tx, ty, canvas, ctx, dataUrl: null, loading: false, res: null as unknown as ResidentTile, s: sc };
+      const tilePx = Math.max(1, Math.round(this.tilePx * sc));
       tile.res = {
         tilePx,
         evict: () => {
@@ -214,11 +234,12 @@ export class RasterLayer {
     tile.loading = true;
     const img = new Image();
     const done = (ok: boolean) => {
-      if (tile.canvas.width !== this.tilePx) { tile.canvas.width = this.tilePx; tile.canvas.height = this.tilePx; }
+      const n = this._px(tile);
+      if (tile.canvas.width !== n) { tile.canvas.width = n; tile.canvas.height = n; }
       tile.evicted = false;
       try {
-        tile.ctx.clearRect(0, 0, this.tilePx, this.tilePx);
-        if (ok) tile.ctx.drawImage(img, 0, 0, this.tilePx, this.tilePx);
+        tile.ctx.clearRect(0, 0, n, n);
+        if (ok) tile.ctx.drawImage(img, 0, 0, n, n);
       } catch { /* Kachel bleibt leer */ }
       const pend = tile.pending; tile.pending = undefined;
       if (pend?.length) {
@@ -255,6 +276,14 @@ export class RasterLayer {
     rasterResources.touch(tile.res);
   }
 
+  /** Wendet `fn` in Ebenen-Pixelkoordinaten an; gröbere Kacheln werden passend skaliert. */
+  private _scaled(tile: RasterTile, fn: (ctx: CanvasRenderingContext2D) => void) {
+    return (ctx: CanvasRenderingContext2D) => {
+      if (tile.s !== 1) { ctx.scale(tile.s, tile.s); ctx.imageSmoothingEnabled = true; }
+      fn(ctx);
+    };
+  }
+
   /** Re-Render nach dem Nachladen verdrängter Kacheln. */
   onTileReady: (() => void) | null = null;
 
@@ -262,6 +291,7 @@ export class RasterLayer {
   private _forRect(
     x: number, y: number, w: number, h: number, create: boolean,
     cb: (tile: RasterTile, originX: number, originY: number) => void,
+    scale = 1,
   ) {
     const tw = this.tileWorld;
     const tx0 = Math.floor(x / tw), tx1 = Math.floor((x + w) / tw);
@@ -276,7 +306,7 @@ export class RasterLayer {
     }
     for (let ty = ty0; ty <= ty1; ty++) {
       for (let tx = tx0; tx <= tx1; tx++) {
-        const tile = this._tile(tx, ty, create);
+        const tile = this._tile(tx, ty, create, scale);
         if (!tile) continue;
         cb(tile, tx * tw, ty * tw);
       }
@@ -291,18 +321,18 @@ export class RasterLayer {
    * Sub-Pixel-Versatz neu abtasten — an den Kachelgrenzen entstünden dann
    * sichtbare Raster-/Gitterlinien.
    */
-  blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number, countStroke = true) {
+  blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number, countStroke = true, scale = 1) {
     if (countStroke) this.strokeCount += 1;
     const gx = Math.round(x * this.pxPerM);
     const gy = Math.round(y * this.pxPerM);
     this._forRect(x, y, w, h, true, (tile) => {
       const dx = gx - tile.tx * this.tilePx, dy = gy - tile.ty * this.tilePx;
-      this._mutate(tile, (ctx) => {
+      this._mutate(tile, this._scaled(tile, (ctx) => {
         ctx.globalCompositeOperation = "source-over";
-        ctx.imageSmoothingEnabled = false;
+        if (tile.s === 1) ctx.imageSmoothingEnabled = false;
         ctx.drawImage(src, dx, dy, src.width, src.height);
-      });
-    });
+      }));
+    }, scale);
   }
 
 
@@ -320,7 +350,7 @@ export class RasterLayer {
     // einer harten Kante.
     const outerR = mode === "smooth" ? r * (1 + 2 * soft) : r;
     this._forRect(cx - outerR, cy - outerR, outerR * 2, outerR * 2, false, (tile, ox, oy) => {
-      this._mutate(tile, (ctx) => {
+      this._mutate(tile, this._scaled(tile, (ctx) => {
       const px = (cx - ox) * this.pxPerM;
       const py = (cy - oy) * this.pxPerM;
       const pr = outerR * this.pxPerM;
@@ -341,7 +371,7 @@ export class RasterLayer {
       ctx.beginPath();
       ctx.arc(px, py, pr, 0, Math.PI * 2);
       ctx.fill();
-      });
+      }));
       tile.maybeEmpty = true;
     });
     this.pruneEmptyTiles();
@@ -398,10 +428,11 @@ export class RasterLayer {
     const tile = this._tile(Math.floor(x / tw), Math.floor(y / tw), false);
     if (!tile) return false;
     if (!this._ensure(tile)) return null;
-    const px = Math.floor((x - Math.floor(x / tw) * tw) * this.pxPerM);
-    const py = Math.floor((y - Math.floor(y / tw) * tw) * this.pxPerM);
+    const n = this._px(tile);
+    const px = Math.floor((x - Math.floor(x / tw) * tw) * this.pxPerM * tile.s);
+    const py = Math.floor((y - Math.floor(y / tw) * tw) * this.pxPerM * tile.s);
     try {
-      const d = tile.ctx.getImageData(Math.max(0, Math.min(this.tilePx - 1, px)), Math.max(0, Math.min(this.tilePx - 1, py)), 1, 1).data;
+      const d = tile.ctx.getImageData(Math.max(0, Math.min(n - 1, px)), Math.max(0, Math.min(n - 1, py)), 1, 1).data;
       return d[3] >= threshold;
     } catch {
       return false;
@@ -437,13 +468,14 @@ export class RasterLayer {
       if (store) {
         // Verlauf: nur unveränderliche Kachel-Referenz, Bilddaten liegen einmal im Speicher.
         if (tile.sid == null || store.get(tile.sid) !== src) tile.sid = store.put(src);
-        tiles.push({ tx: tile.tx, ty: tile.ty, src: RasterTileStore.ref(tile.sid) });
+        tiles.push({ tx: tile.tx, ty: tile.ty, ...(tile.s !== 1 ? { s: tile.s } : {}), src: RasterTileStore.ref(tile.sid) });
         return;
       }
+      const sc = tile.s !== 1 ? { s: tile.s } : {};
       const hit = seen.get(src);
-      if (hit !== undefined) { tiles.push({ tx: tile.tx, ty: tile.ty, ref: hit }); return; }
+      if (hit !== undefined && (tiles[hit].s ?? 1) === tile.s) { tiles.push({ tx: tile.tx, ty: tile.ty, ...sc, ref: hit }); return; }
       seen.set(src, tiles.length);
-      tiles.push({ tx: tile.tx, ty: tile.ty, src });
+      tiles.push({ tx: tile.tx, ty: tile.ty, ...sc, src });
     };
     for (const [key, tile] of [...this.tiles]) {
       if (tile.loading || tile.evicted) {
@@ -463,7 +495,8 @@ export class RasterLayer {
   private _isTileEmpty(tile: RasterTile): boolean {
     if (tile.evicted || tile.loading) return false;
     try {
-      const data = tile.ctx.getImageData(0, 0, this.tilePx, this.tilePx).data;
+      const n = this._px(tile);
+      const data = tile.ctx.getImageData(0, 0, n, n).data;
       for (let i = 3; i < data.length; i += 4) if (data[i] > 2) return false;
       return true;
     } catch {
@@ -491,13 +524,16 @@ export class RasterLayer {
    * in einem synchronen Schritt ein. Zählt NICHT als Strich – die Objektzählung
    * erfolgt einmal je Benutzeraktion über `noteStroke()`.
    */
-  applyTiles(entries: { tx: number; ty: number; image: CanvasImageSource }[]) {
+  applyTiles(entries: { tx: number; ty: number; image: CanvasImageSource; s?: number }[]) {
     for (const e of entries) {
-      const tile = this._tile(e.tx, e.ty, true)!;
+      // Neue Kachel übernimmt die Auflösung des Ergebnisses; bestehende Kacheln
+      // behalten ihre eigene (Inhalt wird nie umgerechnet).
+      const tile = this._tile(e.tx, e.ty, true, e.s ?? 1)!;
+      const n = this._px(tile);
       this._mutate(tile, (ctx) => {
         ctx.globalCompositeOperation = "source-over";
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(e.image, 0, 0, this.tilePx, this.tilePx);
+        ctx.imageSmoothingEnabled = (e.s ?? 1) !== tile.s;
+        ctx.drawImage(e.image, 0, 0, n, n);
       });
     }
   }
@@ -515,7 +551,7 @@ export class RasterLayer {
       const sid = RasterTileStore.parse(raw);
       const src = sid != null ? store?.get(sid) : raw;
       if (!src) continue;
-      const tile = this._tile(t.tx, t.ty, true)!;
+      const tile = this._tile(t.tx, t.ty, true, t.s ?? (typeof t.ref === "number" ? list[t.ref]?.s : undefined) ?? 1)!;
       tile.dataUrl = src;
       tile.sid = sid;
       this.onTileReady = onReady ?? this.onTileReady;
