@@ -74,7 +74,7 @@ export async function uploadWithQuota(
   if (error) throw error;
   const row = (Array.isArray(data) ? data[0] : data) as { asset_id: string; already_present: boolean };
   if (row.already_present) return row.asset_id;
-  const up = await c.storage.from(bucket).upload(path, blob, { upsert: false, contentType: contentType ?? blob.type || undefined });
+  const up = await c.storage.from(bucket).upload(path, blob, { upsert: false, contentType: (contentType ?? blob.type) || undefined });
   if (up.error && !/exists|Duplicate/i.test(up.error.message)) {
     await c.rpc("storage_cancel_upload", { _asset_id: row.asset_id });
     throw up.error;
