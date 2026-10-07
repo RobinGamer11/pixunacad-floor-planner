@@ -17,6 +17,8 @@ function setStatus(s: LocalSaveStatus, detail?: string) { status = s; for (const
 export function getLocalSaveStatus() { return status; }
 
 const blocked = new Set<string>();
+/** Zuletzt gespeichertes/geladenes Manifest je Projekt (Basis für Teil-Checkpoints). */
+const lastManifest = new Map<string, any>();
 
 export interface LoadResult { snapshot: string; missing: string[] }
 
@@ -32,6 +34,7 @@ export async function loadLocalScene(projectId: string): Promise<LoadResult | nu
   }
   const data = JSON.parse(rec.sceneJson);
   const missing: string[] = [];
+  lastManifest.set(projectId, data.rasterManifest);
   data.rasterLayersByKey = await fromManifest(data.rasterManifest, missing);
   delete data.rasterManifest;
   return { snapshot: JSON.stringify(data), missing };
@@ -61,8 +64,10 @@ export function saveLocalScene(projectId: string, snap: string, revision: number
         return;
       }
       const blobs = new Map<string, Blob>();
-      data.rasterManifest = await toManifest(raster, job.revision, blobs);
+      data.rasterManifest = await toManifest(raster, job.revision, blobs, lastManifest.get(job.projectId));
+      const manifest = data.rasterManifest;
       await saveProjectLocal({ projectId: job.projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson: JSON.stringify(data) }, blobs);
+      lastManifest.set(job.projectId, manifest);
       // Erst nach erfolgreichem IndexedDB-Commit: lesbarer Vektorstand ohne Pixel.
       delete data.rasterManifest;
       try { localStorage.setItem(legacyKey, JSON.stringify({ ...data, rasterLayersByKey: {}, rasterFormat: RASTER_FORMAT })); }
