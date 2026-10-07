@@ -1,0 +1,71 @@
+/**
+ * Lokales Speichern/Laden des CAD-Stands.
+ * - IndexedDB = maßgeblicher lokaler Stand (Format 2, Pixel als Blob-Manifest).
+ * - localStorage-Schlüssel bleibt als lesbarer Vektorstand für ältere Clients,
+ *   aber OHNE Pixeldaten (`rasterLayersByKey` leer, Hinweis `rasterFormat`).
+ * - Versionsschutz: Ein Stand mit höherem Format wird weder geladen noch überschrieben.
+ */
+import { RASTER_FORMAT, fromManifest, toManifest } from "./rasterManifest";
+import { isQuotaError, loadProjectLocal, localStoreAvailable, saveProjectLocal } from "./LocalProjectStore";
+
+export type LocalSaveStatus = "idle" | "saving" | "saved" | "quota" | "error" | "blocked";
+type Listener = (s: LocalSaveStatus, detail?: string) => void;
+const listeners = new Set<Listener>();
+let status: LocalSaveStatus = "idle";
+export function onLocalSaveStatus(l: Listener) { listeners.add(l); l(status); return () => { listeners.delete(l); }; }
+function setStatus(s: LocalSaveStatus, detail?: string) { status = s; for (const l of listeners) l(s, detail); }
+export function getLocalSaveStatus() { return status; }
+
+const blocked = new Set<string>();
+
+export interface LoadResult { snapshot: string; missing: string[] }
+
+/** Lädt den IndexedDB-Stand (oder null). Höheres Format → blockiert. */
+export async function loadLocalScene(projectId: string): Promise<LoadResult | null> {
+  if (!localStoreAvailable()) return null;
+  const rec = await loadProjectLocal(projectId);
+  if (!rec) return null;
+  if (rec.format > RASTER_FORMAT) {
+    blocked.add(projectId);
+    setStatus("blocked", "Dieser Stand stammt aus einer neueren Programmversion und wird nicht überschrieben.");
+    return null;
+  }
+  const data = JSON.parse(rec.sceneJson);
+  const missing: string[] = [];
+  data.rasterLayersByKey = await fromManifest(data.rasterManifest, missing);
+  delete data.rasterManifest;
+  return { snapshot: JSON.stringify(data), missing };
+}
+
+let chain: Promise<void> = Promise.resolve();
+let pending: { projectId: string; snap: string; revision: number } | null = null;
+
+/** Gebündelt: nur der jeweils neueste Stand wird geschrieben. */
+export function saveLocalScene(projectId: string, snap: string, revision: number, legacyKey: string) {
+  if (blocked.has(projectId)) return;
+  const first = !pending;
+  pending = { projectId, snap, revision };
+  if (!first) return;
+  chain = chain.then(async () => {
+    const job = pending; pending = null;
+    if (!job) return;
+    setStatus("saving");
+    try {
+      const data = JSON.parse(job.snap);
+      const raster = data.rasterLayersByKey;
+      delete data.rasterLayersByKey;
+      // Vektorstand für ältere Clients/Vorschau (ohne Pixel).
+      try {
+        localStorage.setItem(legacyKey, JSON.stringify({ ...data, rasterLayersByKey: {}, rasterFormat: RASTER_FORMAT }));
+      } catch (e) { if (isQuotaError(e)) setStatus("quota", "Gerätespeicher (Browser) voll."); }
+      if (!localStoreAvailable()) { setStatus("error", "Lokaler Pixelspeicher nicht verfügbar."); return; }
+      const blobs = new Map<string, Blob>();
+      data.rasterManifest = await toManifest(raster, job.revision, blobs);
+      await saveProjectLocal({ projectId: job.projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson: JSON.stringify(data) }, blobs);
+      setStatus("saved");
+    } catch (e) {
+      console.error("Lokales Speichern fehlgeschlagen:", e);
+      setStatus(isQuotaError(e) ? "quota" : "error", isQuotaError(e) ? "Gerätespeicher voll – Pixelstand nicht gespeichert." : "Lokales Speichern fehlgeschlagen.");
+    }
+  });
+}
