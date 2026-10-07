@@ -4,3 +4,4 @@
 - RAM: Kachelpuffer nur über `raster/RasterResourceManager` (LRU, nur saubere Kacheln verdrängbar); verdrängt = unbekannt, nie transparent; Änderungen an ladenden Kacheln laufen über die `pending`-Warteschlange.
 - Konsumenten: Masken melden `complete`; unvollständig = `RasterNotReadyError`, nie leer. Ausgaben (PDF) warten über `RasterLayers.whenLoaded`.
 - Auflösung je Kachel: Faktor `s` (Halbierungsstufen, Weltgröße gleich); bestehende Kacheln werden nie umgerechnet, Komposition nimmt die feinste Stufe. Automatische Reduktion nur über `RasterPolicy`.
+- Cloud: Manifeste nur über `raster/rasterCloud.ts` (`__raster__`-Seite, Revisionsprüfung), Kacheln/Anhänge nur via `uploadWithQuota` (Reservierung → Upload → Bestätigung); Manifest erst nach allen Kacheln. Cloud füllt nur Blätter ohne lokalen Pixelstand.
