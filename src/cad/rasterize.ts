@@ -12,6 +12,10 @@ import { Scene, type Segment, type FreeStroke, type Hatch, type TextBox, type Do
 import { LabelManager } from "./LabelManager";
 import { Renderer } from "./Renderer";
 import { Defaults } from "./constants";
+import { coveredTiles, type CoverageGeom, type TileKey } from "./raster/rasterCoverage";
+import { planRasterAction, RASTER_BUDGET } from "./raster/RasterPolicy";
+import { rasterTempStoreAvailable, tempPut, tempGet, tempDeleteAction } from "./raster/RasterTempStore";
+import { registerRasterJob, unregisterRasterJob, serializeOnLayer } from "./raster/RasterJobs";
 
 export type RasterInput =
   | { type: "segment"; obj: Segment }
@@ -268,44 +272,265 @@ export function renderObjectToCanvas(
   };
 }
 
-/**
- * Projektmappe: brennt das Vektorobjekt direkt in die Raster-Zeichenebene der
- * aktuell verwendeten Ebene ein. Es entsteht KEIN eigenes Bildobjekt — der
- * Strich wird Teil des Rasterinhalts dieser Ebene (nicht einzeln auswählbar).
- */
-export function rasterizeIntoLayer(app: any, input: RasterInput): boolean {
-  if (input.type === "segment" && input.obj.isGuide) return false;
-  const layers = app?.rasterLayers;
-  if (!layers?.get) return false;
-  const probeLabel = (input.obj as any).labelId || Defaults.defaultLabelId;
-  const layer = layers.get(probeLabel, true);
-  if (!layer) return false;
+/** Eindeutiges Ergebnis einer Pixel-Umwandlung. */
+export type RasterOutcome =
+  /** Sofort eingebrannt, Vektororiginal entfernt. */
+  | "ok"
+  /** Hintergrundjob gestartet; Vektor bleibt bis zum atomaren Abschluss. */
+  | "pending"
+  /** Kein Pixelvorgang nötig/möglich (z. B. Hilfslinie, leeres Ergebnis). */
+  | "skipped"
+  /** Bewusst abgelehnt (zu groß); Vektor bleibt unverändert. */
+  | "rejected"
+  /** Technischer Fehler; Vektor bleibt unverändert. */
+  | "failed";
+
+function toast(kind: "error" | "info", msg: string) {
+  try { void import("sonner").then(({ toast: t }) => (kind === "error" ? t.error(msg) : t(msg))); } catch { /* optional */ }
+}
+
+function sourceStillInScene(app: any, input: RasterInput): boolean {
+  const sc = app?.scene;
+  if (!sc) return false;
+  const list = input.type === "segment" ? sc.segments : input.type === "free" ? sc.freeStrokes : input.type === "hatch" ? sc.hatches : sc.textBoxes;
+  return Array.isArray(list) && list.includes(input.obj as any);
+}
+
+/** Tatsächlich belegte Geometrie für die Kachelermittlung. */
+function coverageOf(app: any, input: RasterInput): CoverageGeom | null {
   const b = worldBounds(app, input);
-  if (!b) return false;
-  // Alle Teilbereiche zuerst vollständig rendern, erst dann einbrennen und das
-  // Vektororiginal entfernen. Bei Fehlern bleibt nichts Halbfertiges zurück.
-  const chunks = rasterChunks(b, layer.pxPerM, layer.tileWorld);
-  const rendered: RasterRenderResult[] = [];
-  try {
-    for (const c of chunks) {
-      const res = renderObjectToCanvas(app, input, layer.pxPerM, c);
-      if (res) rendered.push(res);
-    }
-  } catch (e) {
-    for (const r of rendered) freeCanvas(r.canvas);
-    console.error("rasterizeIntoLayer failed:", e);
-    notifyRasterFailure(e);
-    return true; // kontrolliert abgelehnt: Vektorobjekt bleibt, kein Bild-Fallback
+  if (!b) return null;
+  const refRatio = Defaults.strokeWidthBaseScale / Math.max(1, (app?.renderer?.referencePxPerM || Defaults.strokeWidthBaseScale));
+  if (input.type === "segment") {
+    const s = input.obj;
+    const pad = Math.max((s.thicknessM || 0) * refRatio * 6, 0.02);
+    return { polylines: [{ pts: [s.a, s.b], pad }], polygons: [] };
   }
-  if (!rendered.length) return false;
-  for (const r of rendered) { layer.blit(r.canvas, r.x, r.y, r.w, r.h); freeCanvas(r.canvas); }
-  removeFromApp(app, input);
+  if (input.type === "free") {
+    const s = input.obj;
+    const pad = Math.max((s.thicknessM || 0) * refRatio * 4, 0.02);
+    return { polylines: [{ pts: s.points || [], pad }], polygons: [] };
+  }
+  if (input.type === "hatch") {
+    const h = input.obj as any;
+    const pad = Math.max(((h.strokeWidthPx || 0) * refRatio) / 80, 0.02);
+    const pts = h.points || [];
+    // Offene Polylinien (Polygonwerkzeug „Linie“) belegen nur ihren Verlauf.
+    if (h.closed === false) return { polylines: [{ pts, pad }], polygons: [] };
+    return { polylines: [{ pts: [...pts, pts[0]].filter(Boolean), pad }], polygons: [{ pts, pad }] };
+  }
+  // Text: gedrehtes Rechteck als Fläche.
+  const pts = [
+    { x: b.x, y: b.y }, { x: b.x + b.w, y: b.y }, { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h },
+  ];
+  return { polylines: [], polygons: [{ pts, pad: 0 }] };
+}
+
+/**
+ * Wiederverwendbarer Kachel-Renderer: EIN Arbeitscanvas in Kachelgröße für die
+ * gesamte Aktion. Kachelursprünge liegen auf ganzen Pixeln → nahtlos.
+ */
+class TileRenderer {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  private cam = new Camera();
+  private renderer: Renderer;
+  private origLabel: any;
+  constructor(private app: any, private input: RasterInput, private pxPerM: number, private tilePx: number) {
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = tilePx; this.canvas.height = tilePx;
+    const ctx = this.canvas.getContext("2d");
+    if (!ctx) throw new Error("Kein Zeichenkontext verfügbar");
+    this.ctx = ctx;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    this.cam.scale = pxPerM;
+    const scene = new Scene();
+    this.renderer = new Renderer(ctx, this.cam, scene, new LabelManager());
+    this.renderer.setViewport(tilePx, tilePx);
+    this.renderer.referencePxPerM = (app.renderer as any).referencePxPerM || Defaults.strokeWidthBaseScale;
+    this.renderer.transparentBackground = true;
+    this.renderer.gridSettings = { ...this.renderer.gridSettings, enabled: false };
+    this.renderer.planMode = null;
+    this.renderer.setSelection(null);
+    this.renderer.setExtraSelections([]);
+    pushToScene(scene, input);
+  }
+  /** Rendert Kachel (tx,ty); true, wenn sichtbare Pixel entstanden sind. */
+  render(tx: number, ty: number): boolean {
+    this.cam.offsetX = -tx * this.tilePx;
+    this.cam.offsetY = -ty * this.tilePx;
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.clearRect(0, 0, this.tilePx, this.tilePx);
+    this.origLabel = (this.input.obj as any).labelId;
+    (this.input.obj as any).labelId = Defaults.defaultLabelId;
+    try { this.renderer.render(); }
+    finally { (this.input.obj as any).labelId = this.origLabel; }
+    const data = this.ctx.getImageData(0, 0, this.tilePx, this.tilePx).data;
+    for (let i = 3; i < data.length; i += 4) if (data[i] > 0) return true;
+    return false;
+  }
+  copy(): HTMLCanvasElement {
+    const c = document.createElement("canvas");
+    c.width = this.tilePx; c.height = this.tilePx;
+    c.getContext("2d")!.drawImage(this.canvas, 0, 0);
+    return c;
+  }
+  dispose() { freeCanvas(this.canvas); }
+}
+
+function toBlob(c: HTMLCanvasElement): Promise<Blob> {
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error("PNG-Kodierung fehlgeschlagen"))), "image/png"));
+}
+const nextTick = () => new Promise<void>((r) => setTimeout(r, 0));
+
+function finishSync(app: any) {
   try { app.clearSelection?.(); } catch { /* optional */ }
   try { app.requestRender?.(); } catch { /* optional */ }
   try { app.renderer?.render?.(); } catch { /* optional */ }
   try { app.refreshLabelUI?.(); } catch { /* optional */ }
-  try { app.commitHistorySnapshot?.(); } catch { /* optional */ }
-  return true;
+}
+
+/**
+ * Brennt das Vektorobjekt kachelweise in die Rasterebene seiner Ebene ein.
+ * Es entsteht KEIN Bildobjekt. Nur die tatsächlich belegten Kacheln werden
+ * gerendert; leere Ergebnisse werden verworfen. Erst nach vollständigem Erfolg
+ * wird eingezeichnet und das Vektororiginal entfernt.
+ */
+export function rasterizeIntoLayer(app: any, input: RasterInput): RasterOutcome {
+  if (input.type === "segment" && input.obj.isGuide) return "skipped";
+  const layers = app?.rasterLayers;
+  if (!layers?.get) return "failed";
+  const probeLabel = (input.obj as any).labelId || Defaults.defaultLabelId;
+  const layer = layers.get(probeLabel, true);
+  if (!layer) return "failed";
+  const geom = coverageOf(app, input);
+  if (!geom) return "skipped";
+  const tiles = coveredTiles(geom, layer.tileWorld, RASTER_BUDGET.maxActionTiles);
+  const supportsJobs = typeof app?.commitRasterJob === "function";
+  const plan = tiles
+    ? planRasterAction({ layerPxPerM: layer.pxPerM, tilePx: layer.tilePx, touchedTiles: tiles.length, hasTempStore: rasterTempStoreAvailable(), supportsJobs })
+    : ({ ok: false, reason: "too-large", tiles: Infinity } as const);
+  if (!plan.ok || !tiles) {
+    toast("error", "Das Objekt ist für die Pixel-Umwandlung zu groß. Es bleibt als Vektorobjekt erhalten.");
+    return "rejected";
+  }
+  if (plan.mode === "sync") {
+    let tr: TileRenderer | null = null;
+    const staged: { tx: number; ty: number; image: HTMLCanvasElement }[] = [];
+    try {
+      if (tiles.some((t) => layer.isTileLoading(t.tx, t.ty))) {
+        // Gespeicherte Kachel lädt noch: nicht über einen unvollständigen Stand zeichnen.
+        return startRasterJob(app, input, layers, layer, tiles);
+      }
+      tr = new TileRenderer(app, input, layer.pxPerM, layer.tilePx);
+      for (const t of tiles) if (tr.render(t.tx, t.ty)) staged.push({ ...t, image: tr.copy() });
+    } catch (e) {
+      for (const s of staged) freeCanvas(s.image);
+      console.error("rasterizeIntoLayer failed:", e);
+      toast("error", "Pixel-Umwandlung fehlgeschlagen. Das Objekt bleibt als Vektorobjekt erhalten.");
+      return "failed";
+    } finally { tr?.dispose(); }
+    if (!staged.length) return "skipped";
+    layer.applyTiles(staged);
+    layer.noteStroke();
+    for (const s of staged) freeCanvas(s.image);
+    removeFromApp(app, input);
+    finishSync(app);
+    return "ok";
+  }
+  return startRasterJob(app, input, layers, layer, tiles);
+}
+
+/**
+ * Großer Pixelvorgang als Hintergrundjob: begrenztes Arbeitsbild, temporäre
+ * Ablage je Action-ID (IndexedDB), atomarer Abschluss über
+ * `app.commitRasterJob` (gleicher Undo-Schritt wie die auslösende Aktion).
+ */
+function startRasterJob(app: any, input: RasterInput, layers: any, layer: any, tiles: TileKey[]): RasterOutcome {
+  if (typeof app?.commitRasterJob !== "function") return "rejected";
+  const token: string | null = app.currentActionToken?.() ?? null;
+  const job = registerRasterJob(app);
+  const useIdb = rasterTempStoreAvailable();
+  const toastId = `raster-${job.id}`;
+  let lastShown = -1;
+  const show = (done: number, phase: string) => {
+    const pct = Math.floor((done / Math.max(1, tiles.length)) * 100);
+    if (pct === lastShown) return;
+    lastShown = pct;
+    void import("sonner").then(({ toast: t }) => t.loading(`${phase} … ${pct} %`, {
+      id: toastId,
+      action: { label: "Abbrechen", onClick: () => job.cancel("user") },
+    })).catch(() => undefined);
+  };
+  const dismiss = () => { void import("sonner").then(({ toast: t }) => t.dismiss(toastId)).catch(() => undefined); };
+
+  void serializeOnLayer(layer, async () => {
+    const memStaged: { tx: number; ty: number; image: HTMLCanvasElement }[] = [];
+    const keys: TileKey[] = [];
+    const decoded: { tx: number; ty: number; image: ImageBitmap | HTMLCanvasElement }[] = [];
+    let tr: TileRenderer | null = null;
+    let outcome: Exclude<RasterOutcome, "pending"> | "cancelled" = "failed";
+    try {
+      tr = new TileRenderer(app, input, layer.pxPerM, layer.tilePx);
+      for (let i = 0; i < tiles.length; i++) {
+        if (job.signal.cancelled) { outcome = "cancelled"; return; }
+        const t = tiles[i];
+        if (tr.render(t.tx, t.ty)) {
+          if (useIdb) { await tempPut(job.id, `${t.tx},${t.ty}`, await toBlob(tr.canvas)); keys.push(t); }
+          else memStaged.push({ ...t, image: tr.copy() });
+        }
+        show(i + 1, "Pixel werden berechnet");
+        if (i % 2 === 1) await nextTick();
+      }
+      tr.dispose(); tr = null;
+      if (job.signal.cancelled) { outcome = "cancelled"; return; }
+      if (!keys.length && !memStaged.length) { outcome = "skipped"; return; }
+      // Ausstehende gespeicherte Kacheln abwarten (nie über unvollständigen Stand).
+      for (let w = 0; [...keys, ...memStaged].some((t) => layer.isTileLoading(t.tx, t.ty)); w++) {
+        if (w > 200 || job.signal.cancelled) { outcome = job.signal.cancelled ? "cancelled" : "failed"; return; }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      for (let i = 0; i < keys.length; i++) {
+        if (job.signal.cancelled) { outcome = "cancelled"; return; }
+        const blob = await tempGet(job.id, `${keys[i].tx},${keys[i].ty}`);
+        if (!blob) throw new Error("Temporäre Kachel fehlt");
+        decoded.push({ ...keys[i], image: await createImageBitmap(blob) });
+      }
+      decoded.push(...memStaged);
+      // Nie in eine fremde offene Aktion einschachteln: warten, bis sie endet.
+      for (let w = 0; app.isActionOpen?.(); w++) {
+        if (job.signal.cancelled || app._destroyed) { outcome = "cancelled"; return; }
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      if (job.signal.cancelled || app._destroyed) { outcome = "cancelled"; return; }
+      // Zeichenfläche gewechselt oder Quelle inzwischen gelöscht → verwerfen.
+      if (app.rasterLayers !== layers || layers.get((input.obj as any).labelId || Defaults.defaultLabelId) !== layer || !sourceStillInScene(app, input)) {
+        outcome = "cancelled"; return;
+      }
+      const committed = app.commitRasterJob(token, () => {
+        layer.applyTiles(decoded);
+        layer.noteStroke();
+        removeFromApp(app, input);
+      });
+      if (!committed) { outcome = "failed"; return; }
+      finishSync(app);
+      outcome = "ok";
+    } catch (e) {
+      console.error("Rasterjob fehlgeschlagen:", e);
+      outcome = "failed";
+    } finally {
+      tr?.dispose();
+      for (const d of decoded) { if ("close" in d.image) (d.image as ImageBitmap).close(); else freeCanvas(d.image as HTMLCanvasElement); }
+      if (useIdb) void tempDeleteAction(job.id);
+      unregisterRasterJob(app, job);
+      dismiss();
+      if (outcome === "failed") toast("error", "Pixel-Umwandlung fehlgeschlagen. Das Objekt bleibt als Vektorobjekt erhalten.");
+      else if (outcome === "cancelled" && job.signal.reason === "user") toast("info", "Pixel-Umwandlung abgebrochen. Das Objekt bleibt als Vektorobjekt erhalten.");
+    }
+  });
+  show(0, "Pixel werden berechnet");
+  return "pending";
 }
 
 /**
@@ -440,16 +665,12 @@ export function rasterizeObject(app: any, input: RasterInput): DocumentObject | 
 }
 
 /**
- * Bequemer Hook für die Werkzeuge: rastert nur, wenn Pixelmodus aktiv ist.
- * - Projektmappe (MiniCad mit `rasterLayers`): direkt in die Raster-Ebene.
- * - CAD-Oberfläche: ebenfalls direkt in die Raster-Ebene (Fallback: Bildobjekt).
+ * Hook für die Werkzeuge: rastert nur im Pixelmodus, immer in die Rasterebene
+ * der Ebene. Kein Bildobjekt-Fallback – bei Ablehnung/Fehler bleibt der Vektor.
  */
-export function maybeRasterize(app: any, input: RasterInput): void {
-  if (!isPixelDrawMode(app)) return;
-  if (app?.rasterLayers?.get) {
-    if (rasterizeIntoLayer(app, input)) return;
-  }
-  rasterizeObject(app, input);
+export function maybeRasterize(app: any, input: RasterInput): RasterOutcome {
+  if (!isPixelDrawMode(app)) return "skipped";
+  return rasterizeIntoLayer(app, input);
 }
 
 /**
@@ -491,7 +712,8 @@ export function convertSelectionToPixel(app: any): boolean {
   const target = getConvertibleSelection(app);
   if (!target || "unsupported" in target) return false;
   if (!app?.rasterLayers?.get) return false;
-  const ok = rasterizeIntoLayer(app, target);
+  const outcome = rasterizeIntoLayer(app, target);
+  const ok = outcome === "ok" || outcome === "pending";
   if (ok) app.defaultDrawRasterMode = "pixel";
   return ok;
 }

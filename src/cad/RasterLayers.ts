@@ -123,6 +123,11 @@ export interface RasterLayerJSON {
   tiles: RasterTileJSON[];
 }
 
+/** Ausdrückliche Ablehnung eines zu großen Einzeichnungsbereichs. */
+export class RasterRegionTooLargeError extends Error {
+  constructor(public tiles: number) { super(`Rasterbereich zu groß (${tiles} Kacheln)`); }
+}
+
 interface RasterTile {
   tx: number;
   ty: number;
@@ -189,8 +194,14 @@ export class RasterLayer {
     const tw = this.tileWorld;
     const tx0 = Math.floor(x / tw), tx1 = Math.floor((x + w) / tw);
     const ty0 = Math.floor(y / tw), ty1 = Math.floor((y + h) / tw);
-    // Schutz gegen absurd große Bereiche (z. B. fehlerhafte Bounds).
-    if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 4096) return;
+    // Schutz gegen absurd große Bereiche (z. B. fehlerhafte Bounds). Beim
+    // Einzeichnen ist das eine ausdrückliche Ablehnung – nie ein stiller
+    // Teil-Erfolg. Große Pixelaktionen laufen kachelweise über `applyTiles`.
+    const count = (tx1 - tx0 + 1) * (ty1 - ty0 + 1);
+    if (!Number.isFinite(count) || count > 4096) {
+      if (create) throw new RasterRegionTooLargeError(count);
+      return;
+    }
     for (let ty = ty0; ty <= ty1; ty++) {
       for (let tx = tx0; tx <= tx1; tx++) {
         const tile = this._tile(tx, ty, create);
@@ -208,8 +219,8 @@ export class RasterLayer {
    * Sub-Pixel-Versatz neu abtasten — an den Kachelgrenzen entstünden dann
    * sichtbare Raster-/Gitterlinien.
    */
-  blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number) {
-    this.strokeCount += 1;
+  blit(src: HTMLCanvasElement, x: number, y: number, w: number, h: number, countStroke = true) {
+    if (countStroke) this.strokeCount += 1;
     const gx = Math.round(x * this.pxPerM);
     const gy = Math.round(y * this.pxPerM);
     this._forRect(x, y, w, h, true, (tile) => {
@@ -381,6 +392,32 @@ export class RasterLayer {
       return false;
     }
   }
+
+  /** true, wenn die Kachel noch aus dem gespeicherten Stand nachlädt. */
+  isTileLoading(tx: number, ty: number): boolean {
+    return !!this.tiles.get(this._key(tx, ty))?.loading;
+  }
+
+  /**
+   * Zeichnet fertig gerenderte Kachelinhalte (exakt kachelgroß, Kachelursprung)
+   * in einem synchronen Schritt ein. Zählt NICHT als Strich – die Objektzählung
+   * erfolgt einmal je Benutzeraktion über `noteStroke()`.
+   */
+  applyTiles(entries: { tx: number; ty: number; image: CanvasImageSource }[]) {
+    for (const e of entries) {
+      const tile = this._tile(e.tx, e.ty, true)!;
+      const ctx = tile.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(e.image, 0, 0, this.tilePx, this.tilePx);
+      ctx.restore();
+      tile.dataUrl = null; tile.sid = null;
+    }
+  }
+
+  /** Eine abgeschlossene Zeichenaktion = genau ein gezählter Rasterstrich. */
+  noteStroke() { this.strokeCount += 1; }
 
   /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
   restore(json: RasterLayerJSON, onReady?: () => void, store?: RasterTileStore) {

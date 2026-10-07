@@ -175,3 +175,13 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] PDF: Linienenden/-verbindungen, nicht-rechteckige Clips, eingebettete Bilder (z. B. orange Fläche) – Einschränkung; Prüfung in der echten CAD-Ansicht offen
 - [x] Punkt 4 Pixelmodus: Kachel-Referenzen im Verlauf, Teilbereichs-Rastern, Ablehnung statt Qualitätsverlust, Puffer freigeben
 - [ ] Punkt 4: Belastungstest im Browser/Tablet
+
+## Pixelmodus speicherschonend (Auftrag 07.10.2026)
+- [x] Durchgang 1: eindeutige Ergebnisse, atomarer Job-Abschluss (1 Undo), sparse Kacheln, Temp-IndexedDB, Fortschritt/Abbrechen, kein Bild-Fallback, Qualitätsregler entfernt
+- [ ] Lokale Projektablage IndexedDB statt localStorage (Phase 3, inkl. Formatversion/Migration)
+- [ ] Manifestmodell solidFill/patternFill/paint/erase/checkpoint (Phase 4)
+- [ ] Gemischte Auflösungen + RAM-Budget/LRU (Phase 5; erst dann Auflösungsreduktion aktivieren)
+- [ ] Alle Rasterkonsumenten (Export, PDF, Ausschnitte, Analyse) (Phase 6)
+- [ ] Atomarer Cloud-Manifest-Sync (Phase 7)
+- [ ] Serverquoten inkl. ausführbarem Uploadweg (Phase 8, braucht Betreiberwerte)
+- [ ] Bereinigung alter Schreibwege (Phase 9)
