@@ -48,4 +48,4 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Hilfslinien-Geometrie (Punkte, Kanten, anliegende Achsen) liefert nur `src/cad/guideGeometry.ts` aus echter Objektgeometrie (über `TopologyEngine.guideGeometry`) – nie Probeabfragen, nie Werkzeug-Sonderlogik.
 - Rechtsklick-Hilfslinien laufen nur über `GuideInteractionController` → `GlobalGuides` (Gruppen mit Referenzzählung, je Kontext `cad|export:sheet|plan`) – flüchtig, nie Cloud/Undo/Export, nie zwischen Blatt und Exportseite.
 - Benutzerhandlung = `CadApp.runAction` → 1 Undo, Fehler = volle Rücknahme.
-- Verlauf referenziert Rasterkacheln nur via `RasterTileStore`. Pixelaktionen: nur belegte Kacheln (`raster/rasterCoverage`), Grenzen nur `raster/RasterPolicy`, große als Job (Temp-IndexedDB) → atomar `CadApp.commitRasterJob`; abgelehnt = Vektor bleibt.
+- Verlauf: Rasterkacheln nur via `RasterTileStore`. Pixel: Grenzen nur `raster/RasterPolicy`, große Aktionen als Job → atomar `CadApp.commitRasterJob`; abgelehnt = Vektor bleibt.
