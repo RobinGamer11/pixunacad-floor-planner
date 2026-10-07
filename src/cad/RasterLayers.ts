@@ -474,7 +474,9 @@ export class RasterLayer {
   /** true, wenn die Kachel noch aus dem gespeicherten Stand nachlädt. */
   isTileLoading(tx: number, ty: number): boolean {
     const t = this.tiles.get(this._key(tx, ty));
-    return !!t && (t.loading || !!t.evicted);
+    if (!t) return false;
+    this._ensure(t); // verdrängte Kachel nachladen, sonst wartet der Aufrufer ewig
+    return t.loading || !!t.evicted;
   }
 
   /**
