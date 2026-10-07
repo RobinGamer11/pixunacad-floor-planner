@@ -15,7 +15,8 @@ export const RASTER_FORMAT = 2;
 
 export type RasterEntryKind = "solidFill" | "patternFill" | "paint" | "erase" | "checkpoint";
 
-export interface RasterTileRef { tx: number; ty: number; hash: string }
+/** `s` = Auflösungsfaktor der Kachel relativ zu `pxPerM` des Eintrags (fehlt = 1). */
+export interface RasterTileRef { tx: number; ty: number; hash: string; s?: number }
 
 export interface RasterManifestEntry {
   id: string;
@@ -94,7 +95,8 @@ export async function toManifest(rasterByKey: Record<string, any[]> | undefined,
         const src = t.src ?? (typeof t.ref === "number" ? list[t.ref]?.src : undefined);
         if (typeof src !== "string") continue;
         const hash = await srcToHash(src, newBlobs);
-        if (hash) tiles.push({ tx: t.tx, ty: t.ty, hash });
+        const sc = t.s ?? (typeof t.ref === "number" ? list[t.ref]?.s : undefined);
+        if (hash) tiles.push(sc && sc !== 1 ? { tx: t.tx, ty: t.ty, hash, s: sc } : { tx: t.tx, ty: t.ty, hash });
       }
       if (!tiles.length) continue;
       const full = (): RasterManifestEntry[] => [{ id: newEntryId(), kind: "checkpoint", revision, order: 0, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles }];
@@ -135,10 +137,16 @@ function loadImg(url: string): Promise<HTMLImageElement> {
 }
 
 /** Ops einer Kachel in Reihenfolge; checkpoint ersetzt, paint/fill = source-over, erase = destination-out. */
-async function composeTile(ops: { kind: RasterEntryKind; hash: string }[], tilePx: number): Promise<string | null> {
+type TileOp = { kind: RasterEntryKind; hash: string; s: number };
+/** Ergebnis: Bild-URL plus Auflösungsfaktor der zusammengesetzten Kachel. */
+async function composeTile(ops: TileOp[], tilePx: number): Promise<{ src: string; s: number } | null> {
   const start = ops.map((o) => o.kind).lastIndexOf("checkpoint");
   const seq = start >= 0 ? ops.slice(start) : ops;
-  if (seq.length === 1 && seq[0].kind !== "erase") return urlFor(seq[0].hash);
+  if (seq.length === 1 && seq[0].kind !== "erase") { const u = await urlFor(seq[0].hash); return u ? { src: u, s: seq[0].s } : null; }
+  // Feinste beteiligte Stufe: feinere Einträge werden nie vergröbert.
+  const s = Math.max(...seq.map((o) => o.s));
+  const px = Math.max(1, Math.round(tilePx * s));
+  tilePx = px;
   const cv = document.createElement("canvas"); cv.width = cv.height = tilePx;
   const ctx = cv.getContext("2d"); if (!ctx) return null;
   for (const o of seq) {
@@ -149,7 +157,7 @@ async function composeTile(ops: { kind: RasterEntryKind; hash: string }[], tileP
     ctx.drawImage(img, 0, 0, tilePx, tilePx);
   }
   const blob: Blob | null = await new Promise((r) => cv.toBlob(r, "image/png"));
-  return blob ? URL.createObjectURL(blob) : null;
+  return blob ? { src: URL.createObjectURL(blob), s } : null;
 }
 
 /**
@@ -164,19 +172,23 @@ export async function fromManifest(m: RasterManifest | undefined, missing: strin
     for (const lm of m![key]) {
       const entries = [...lm.entries].sort((a, b) => a.order - b.order);
       if (!entries.length) continue;
-      const { pxPerM, tilePx } = entries[0];
-      if (entries.some((e) => e.pxPerM !== pxPerM || e.tilePx !== tilePx)) { missing.push(`${key}/${lm.labelId}: gemischte Auflösung`); continue; }
-      const byTile = new Map<string, { tx: number; ty: number; ops: { kind: RasterEntryKind; hash: string }[] }>();
+      // Basis = feinste Auflösung; gröbere Einträge werden als Kachelfaktor
+      // geführt. Voraussetzung: identische Kachel-Weltgröße (gleiches Raster).
+      const base = entries.reduce((a, e) => (e.pxPerM > a.pxPerM ? e : a), entries[0]);
+      const { pxPerM, tilePx } = base;
+      const tw = tilePx / pxPerM;
+      if (entries.some((e) => Math.abs(e.tilePx / e.pxPerM - tw) > 1e-9 * tw)) { missing.push(`${key}/${lm.labelId}: unvereinbares Kachelraster`); continue; }
+      const byTile = new Map<string, { tx: number; ty: number; ops: TileOp[] }>();
       for (const e of entries) for (const t of e.tiles) {
         const k = `${t.tx},${t.ty}`;
         let g = byTile.get(k); if (!g) { g = { tx: t.tx, ty: t.ty, ops: [] }; byTile.set(k, g); }
-        g.ops.push({ kind: e.kind, hash: t.hash });
+        g.ops.push({ kind: e.kind, hash: t.hash, s: (t.s ?? 1) * (e.pxPerM / pxPerM) });
       }
       const tiles: any[] = [];
       for (const g of byTile.values()) {
         try {
-          const src = await composeTile(g.ops, tilePx);
-          if (src) tiles.push({ tx: g.tx, ty: g.ty, src }); else missing.push(`${g.tx},${g.ty}`);
+          const r = await composeTile(g.ops, tilePx);
+          if (r) tiles.push(r.s !== 1 ? { tx: g.tx, ty: g.ty, src: r.src, s: r.s } : { tx: g.tx, ty: g.ty, src: r.src }); else missing.push(`${g.tx},${g.ty}`);
         } catch { missing.push(`${g.tx},${g.ty}`); }
       }
       layers.push({ labelId: lm.labelId, pxPerM, tilePx, tiles, strokeCount: lm.strokeCount });
