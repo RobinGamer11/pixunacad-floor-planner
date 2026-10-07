@@ -1213,6 +1213,9 @@ export class CadApp {
 
   private _pushHistory(snap: string, token: string | null = null) {
     if (snap === this._lastSnapshot) return;
+    if (!Array.isArray(this._historyTokens) || this._historyTokens.length !== this._history.length) {
+      this._historyTokens = this._history.map(() => null);
+    }
     this.contentRevision++;
     if (this._historyIndex < this._history.length - 1) {
       this._history = this._history.slice(0, this._historyIndex + 1);
