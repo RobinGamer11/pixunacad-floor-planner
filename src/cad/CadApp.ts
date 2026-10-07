@@ -1,4 +1,5 @@
 import { pageGuideSnapGeometry, paperMmToWorld } from "./pageGuides";
+import { cancelRasterJobs, newRasterActionId } from "./raster/RasterJobs";
 import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
@@ -579,6 +580,10 @@ export class CadApp {
 
   // History (Undo/Redo)
   private _history: string[] = [];
+  /** Action-ID je Verlaufseintrag (parallel zu `_history`) für atomare Rasterabschlüsse. */
+  private _historyTokens: (string | null)[] = [];
+  /** Action-ID der aktuell offenen äußeren Aktion. */
+  private _actionToken: string | null = null;
   private _historyIndex = -1;
   /** 20 rückgängig machbare Handlungen + aktueller Ausgangsstand = 21 Zustände. */
   private _historyMax = 21;
@@ -1167,6 +1172,7 @@ export class CadApp {
   private _initHistory() {
     this._lastSnapshot = this._snapHistory();
     this._history = [this._lastSnapshot];
+    this._historyTokens = [null];
     this._historyIndex = 0;
     this._emitHistoryChange();
     // Poll for scene changes (cheap: short string compare on JSON)
@@ -1204,14 +1210,16 @@ export class CadApp {
   contentRevision = 0;
   bumpContentRevision() { this.contentRevision++; }
 
-  private _pushHistory(snap: string) {
+  private _pushHistory(snap: string, token: string | null = null) {
     if (snap === this._lastSnapshot) return;
     this.contentRevision++;
     if (this._historyIndex < this._history.length - 1) {
       this._history = this._history.slice(0, this._historyIndex + 1);
+      this._historyTokens = this._historyTokens.slice(0, this._historyIndex + 1);
     }
     this._history.push(snap);
-    while (this._history.length > this._historyMax) this._history.shift();
+    this._historyTokens.push(token);
+    while (this._history.length > this._historyMax) { this._history.shift(); this._historyTokens.shift(); }
     this._historyIndex = this._history.length - 1;
     this._lastSnapshot = snap;
     this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
@@ -1233,6 +1241,7 @@ export class CadApp {
         this._pushHistory(pre);
       }
       this._actionStartSnapshot = this._lastSnapshot;
+      this._actionToken = null;
       this._actionPrevSuspend = this.suspendHistory;
       this.suspendHistory = true;
     }
@@ -1245,14 +1254,58 @@ export class CadApp {
     if (this._actionDepth > 0) return;
     this.suspendHistory = this._actionPrevSuspend;
     this._actionStartSnapshot = null;
+    const token = this._actionToken;
+    this._actionToken = null;
     if (this._isRestoring || this._destroyed) return;
     (this as any)._changeDirty = true;
-    this._pushHistory(this._snapHistory());
+    this._pushHistory(this._snapHistory(), token);
+  }
+
+  /** Action-ID der offenen Aktion (für zugehörige Hintergrund-Rasterjobs). */
+  currentActionToken(): string | null {
+    if (this._actionDepth <= 0) return null;
+    if (!this._actionToken) this._actionToken = newRasterActionId();
+    return this._actionToken;
+  }
+
+  /**
+   * Atomarer Abschluss eines Hintergrund-Rasterjobs. Ist der oberste
+   * Verlaufseintrag noch die auslösende Aktion (und nichts dazwischen), wird
+   * das Ergebnis in genau diesen Schritt übernommen – eine Benutzeraktion
+   * bleibt EIN Undo-Schritt. Sonst entsteht ein eigener Schritt. Läuft gerade
+   * eine fremde Aktion, wird nichts eingeschachtelt (false).
+   */
+  commitRasterJob(token: string | null, apply: () => void): boolean {
+    if (this._destroyed || this._isRestoring || this._actionDepth > 0) return false;
+    const atTop = !!token
+      && this._historyIndex === this._history.length - 1
+      && this._historyTokens[this._historyIndex] === token
+      && this._snapHistory() === this._lastSnapshot;
+    if (!atTop) {
+      let ok = false;
+      this.runAction(() => { apply(); ok = true; });
+      return ok;
+    }
+    try { apply(); }
+    catch (e) {
+      console.error("Rasterabschluss fehlgeschlagen:", e);
+      this._restoreScene(this._lastSnapshot);
+      return false;
+    }
+    const snap = this._snapHistory();
+    this._history[this._historyIndex] = snap;
+    this._lastSnapshot = snap;
+    this.contentRevision++;
+    (this as any)._changeDirty = true;
+    this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
+    this._emitHistoryChange();
+    return true;
   }
 
   cancelAction() {
     if (this._actionDepth <= 0) return;
     this._actionDepth = 0;
+    this._actionToken = null;
     this.suspendHistory = this._actionPrevSuspend;
     const start = this._actionStartSnapshot;
     this._actionStartSnapshot = null;
@@ -1303,8 +1356,10 @@ export class CadApp {
     if (this._destroyed) return;
     const snap = this._snapHistory();
     if (snap === this._lastSnapshot) return;
+    cancelRasterJobs(this, "external");
     this._lastSnapshot = snap;
     this._history = [snap];
+    this._historyTokens = [null];
     this._historyIndex = 0;
     this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
     this.onHistoryChange?.(false, false);
@@ -1366,6 +1421,7 @@ export class CadApp {
   }
 
   undo() {
+    cancelRasterJobs(this, "undo");
     if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
     // Treppe: laufendes Zeichnen/Bewegen nimmt zuerst den lokalen Schritt zurück.
     if ((this.activeTool as any) === this.stairTool && this.stairTool.undoStep()) { this.renderer?.render?.(); return; }
@@ -1378,6 +1434,7 @@ export class CadApp {
   }
 
   redo() {
+    cancelRasterJobs(this, "redo");
     if (this._historyIndex >= this._history.length - 1) return;
     this._historyIndex++;
     this._restoreScene(this._history[this._historyIndex]);
@@ -4503,6 +4560,7 @@ export class CadApp {
     try { this._uninstallPropertyEdit?.(); } catch {}
     this._uninstallPropertyEdit = null;
     this._destroyed = true;
+    cancelRasterJobs(this, "unmount");
     cancelAnimationFrame(this._rafId);
     if (this._snapshotTimer != null) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }
     this.input.destroy();
