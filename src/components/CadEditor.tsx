@@ -899,7 +899,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         const changed = rev !== lastPersistRev;
         lastPersistRev = rev;
         if (changed) saveLocalScene(projectId ?? "default", snap, rev, persistKey);
-        if (projectId && changed) {
+        if (projectId) {
           try {
             const data = JSON.parse(snap);
             const list = Array.isArray(data.sheets) ? data.sheets : [];
@@ -1079,7 +1079,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
     return () => {
       window.removeEventListener("resize", onResize);
-      window.clearInterval(persistTimer);
+      window.clearInterval(persistTimer); offSaveStatus();
       try { persist(); } catch {}
       app.destroy();
       appRef.current = null;
