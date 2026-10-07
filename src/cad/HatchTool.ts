@@ -781,7 +781,14 @@ export class HatchTool {
     if (!loop || loop.length < 3) {
       const hasRaster = !!raster?.labelIds().some((id) => isVisible(id));
       if (hasRaster) {
-        loop = findHybridEnclosingFace(this.app.scene, raster, mouseW, { scope: "all", isVisible, extraScenes: libScenes });
+        try {
+          loop = findHybridEnclosingFace(this.app.scene, raster, mouseW, { scope: "all", isVisible, extraScenes: libScenes });
+        } catch (e) {
+          if ((e as Error)?.name !== "RasterNotReadyError") throw e;
+          raster?.whenLoaded(isVisible).then(() => this.app.renderer.requestDraw?.());
+          toast("Pixel werden noch geladen", { description: "Bitte gleich noch einmal klicken." });
+          return;
+        }
       }
     }
     if (!loop || loop.length < 3) {
