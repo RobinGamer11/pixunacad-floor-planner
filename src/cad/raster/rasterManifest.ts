@@ -53,7 +53,7 @@ const dataUrlHash = new Map<string, string>();
 async function srcToHash(src: string, newBlobs: Map<string, Blob>): Promise<string | null> {
   const known = urlToHash.get(src) ?? dataUrlHash.get(src);
   if (known) return known;
-  if (!src.startsWith("data:")) return null;
+  if (!src.startsWith("data:") && !src.startsWith("blob:")) return null;
   const blob = await (await fetch(src)).blob();
   const hash = await sha256Hex(await blob.arrayBuffer());
   if (dataUrlHash.size > 5000) dataUrlHash.clear();
