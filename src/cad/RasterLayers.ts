@@ -471,6 +471,13 @@ export class RasterLayer {
     }
   }
 
+  /** Stößt das Laden aller Kacheln an; true = alle sofort verfügbar. */
+  ensureAllLoaded(): boolean {
+    let ok = true;
+    for (const t of this.tiles.values()) if (!this._ensure(t)) ok = false;
+    return ok;
+  }
+
   /** true, wenn die Kachel noch aus dem gespeicherten Stand nachlädt. */
   isTileLoading(tx: number, ty: number): boolean {
     const t = this.tiles.get(this._key(tx, ty));
@@ -560,6 +567,22 @@ export class RasterLayers {
       this.layers.set(labelId, l);
     }
     return l || null;
+  }
+
+  /**
+   * Wartet, bis alle Kacheln (optional gefilterter Ebenen) geladen sind –
+   * für Ausgaben (PDF, Vorschau), die keinen Teilstand zeigen dürfen.
+   * false = Zeitlimit erreicht (Ergebnis wäre unvollständig).
+   */
+  async whenLoaded(filter?: (labelId: string) => boolean, timeoutMs = 15000): Promise<boolean> {
+    const until = Date.now() + timeoutMs;
+    for (;;) {
+      let ok = true;
+      for (const [id, l] of this.layers) if ((!filter || filter(id)) && !l.ensureAllLoaded()) ok = false;
+      if (ok) return true;
+      if (Date.now() > until) return false;
+      await new Promise((r) => setTimeout(r, 40));
+    }
   }
 
   hasAnyContent(): boolean {
