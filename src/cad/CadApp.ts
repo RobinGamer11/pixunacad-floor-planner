@@ -1,6 +1,5 @@
 import { toast } from "sonner";
 import { pageGuideSnapGeometry, paperMmToWorld } from "./pageGuides";
-import { cancelRasterJobs, newRasterActionId } from "./raster/RasterJobs";
 import { copyDisplayGradient } from "./displayGradient";
 import { Defaults, ToolIds, PointEditAction, SelectionType } from "./constants";
 import { clamp, v, Vec2 } from "./geometry";
@@ -22,7 +21,6 @@ import { textStyleFontSizePt, ptToCssPx, ANNOTATION_M_PER_MM } from "./textTypog
 import { TableTool } from "./TableTool";
 import { dominantRichStyle } from "./textDominantStyle";
 import { LabelManager } from "./LabelManager";
-import { RasterLayers, RasterTileStore, cadRasterPxPerM } from "./RasterLayers";
 import { migrateCadSnapshot } from "@/lib/persistence";
 import { TopologyEngine } from "./TopologyEngine";
 import { GlobalGuides } from "./globalGuides";
@@ -273,18 +271,8 @@ export class CadApp {
   defaultFreeImageRotate = Defaults.freeImageRotate;
   defaultFreeAutoShape = false;
 
-  /** Zeichenmodus: "vector" (parametrisch) oder "pixel" (Objekt wird beim
-   *  Fertigstellen zu einem Bild gerastert — wie in Malprogrammen). */
-  /**
-   * Raster-Zeichenebenen (Pixelmodus) — je Zeichenblatt bzw. Druckplan ein
-   * eigener Satz gekachelter Rasterebenen im selben Papier-Koordinatensystem
-   * wie die Vektorobjekte. Pixelstriche sind damit Teil der Ebene und nicht
-   * einzeln auswählbare Bildobjekte.
-   */
-  private _rasterLayersByKey = new Map<string, RasterLayers>();
-
-  /** Kontextschlüssel der aktuell sichtbaren Zeichenfläche. */
-  private _rasterKey(): string {
+  /** Schlüssel der aktuell sichtbaren Zeichenfläche (Blatt oder Exportseite). */
+  private _surfaceKey(): string {
     return this.activePlanId ? `plan:${this.activePlanId}` : `sheet:${this.activeSheetId}`;
   }
 
@@ -292,59 +280,8 @@ export class CadApp {
   private _guideContextKey(): string {
     let view = "cad";
     try { if (new URLSearchParams(window.location.search).get("view") === "export") view = "export"; } catch {}
-    return `${view}:${this._rasterKey()}`;
+    return `${view}:${this._surfaceKey()}`;
   }
-
-  /** Rasterebenen der aktuell aktiven Zeichenfläche. */
-  get rasterLayers(): RasterLayers {
-    const key = this._rasterKey();
-    let layers = this._rasterLayersByKey.get(key);
-    if (!layers) {
-      // Feste CAD-taugliche Grundqualität (600 dpi auf dem Papier, mit
-      // Untergrenze in px/Weltmeter). Da im CAD in echten Metern gezeichnet
-      // wird, wird die Papier-DPI durch den Zeichnungsmaßstab geteilt
-      // (1:100 ⇒ 1 Papiermeter = 100 Weltmeter). Der Zoom ändert daran nichts.
-      layers = new RasterLayers(cadRasterPxPerM());
-      layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
-      this._rasterLayersByKey.set(key, layers);
-    }
-    return layers;
-  }
-
-  /**
-   * Rasterinhalt eines Exportausschnitts: verknüpft = aktueller bestätigter
-   * Blattstand, eingefroren = beim Einfrieren gesicherte Kopie (`frozen:<id>`).
-   */
-  projectionRaster(proj: { id: string; mode?: string; sourceSheetId: string }): import("./PlanProjections").ProjectionRaster | null {
-    const key = proj.mode === "frozen" ? `frozen:${proj.id}` : `sheet:${proj.sourceSheetId}`;
-    const layers = this._rasterLayersByKey.get(key);
-    if (!layers || !layers.hasAnyContent()) return null;
-    return { layers, order: this.labelManager.list().map((g) => g.id), visible: (id) => this.labelManager.isVisible(id) };
-  }
-
-  /** Pixel direkt auf der Exportseite. */
-  planRaster(planId: string): import("./PlanProjections").ProjectionRaster | null {
-    const layers = this._rasterLayersByKey.get(`plan:${planId}`);
-    if (!layers || !layers.hasAnyContent()) return null;
-    return { layers, order: this.labelManager.list().map((g) => g.id), visible: (id) => this.labelManager.isVisible(id) };
-  }
-
-  /** Friert den Pixelstand eines Blatts für einen Ausschnitt ein (kodierte Kopie, keine Dekodierung). */
-  freezeProjectionRaster(projectionId: string, sheetId: string) {
-    const key = `frozen:${projectionId}`;
-    this._rasterLayersByKey.get(key)?.clear();
-    this._rasterLayersByKey.delete(key);
-    const src = this._rasterLayersByKey.get(`sheet:${sheetId}`);
-    if (!src || !src.hasAnyContent()) return;
-    const copy = new RasterLayers();
-    copy.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
-    copy.restore(src.serialize());
-    this._rasterLayersByKey.set(key, copy);
-  }
-
-  /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
-
-
 
   // Eraser-Defaults
   defaultEraserRadiusM = Defaults.eraserRadiusM;
@@ -608,10 +545,6 @@ export class CadApp {
 
   // History (Undo/Redo)
   private _history: string[] = [];
-  /** Action-ID je Verlaufseintrag (parallel zu `_history`) für atomare Rasterabschlüsse. */
-  private _historyTokens: (string | null)[] = [];
-  /** Action-ID der aktuell offenen äußeren Aktion. */
-  private _actionToken: string | null = null;
   private _historyIndex = -1;
   /** 20 rückgängig machbare Handlungen + aktueller Ausgangsstand = 21 Zustände. */
   private _historyMax = 21;
@@ -1046,12 +979,10 @@ export class CadApp {
   }
 
 
-  /** Verlaufs-Kachelspeicher: Pixeldaten liegen einmal im Speicher, Stände referenzieren nur. */
-  private _rasterTileStore = new RasterTileStore();
-  /** Kompakter Stand für Verlauf/Vergleich (Rasterkacheln als Referenz). */
-  private _snapHistory(): string { return this._serializeScene(true); }
+  /** Stand für Verlauf/Vergleich. */
+  private _snapHistory(): string { return this._serializeScene(); }
 
-  private _serializeScene(forHistory = false): string {
+  private _serializeScene(): string {
     const scenesObj: Record<string, any> = {};
     for (const [id, sc] of this.scenesById.entries()) {
       scenesObj[id] = this._serializeOneScene(sc);
@@ -1079,19 +1010,6 @@ export class CadApp {
         return out;
       })(),
       planOverlays: this.planOverlayStore.toJSON(),
-      // Rasterebenen (Pixelmodus) je Zeichenblatt/Druckplan.
-      rasterLayersByKey: (() => {
-        const out: Record<string, any> = {};
-        // Eingefrorene Pixelkopien nur, solange ihr Ausschnitt eingefroren ist.
-        const frozen = new Set<string>();
-        for (const pl of this.planManager.list()) for (const pr of pl.projections) if (pr.mode === "frozen") frozen.add(`frozen:${pr.id}`);
-        for (const [key, layers] of this._rasterLayersByKey.entries()) {
-          if (key.startsWith("frozen:") && !frozen.has(key)) continue;
-          const json = layers.serialize(forHistory ? this._rasterTileStore : undefined);
-          if (json.length > 0) out[key] = json;
-        }
-        return out;
-      })(),
     });
   }
 
@@ -1101,19 +1019,6 @@ export class CadApp {
     const data = migrateCadSnapshot(JSON.parse(snapshot));
     this._isRestoring = true;
     this.contentRevision++;
-    // Rasterebenen zuerst (Kacheln laden asynchron nach).
-    try {
-      this._rasterLayersByKey.clear();
-      const raster = data.rasterLayersByKey;
-      if (raster && typeof raster === "object") {
-        for (const key of Object.keys(raster)) {
-          const layers = new RasterLayers();
-          layers.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
-          layers.restore(raster[key], this._rasterTileStore);
-          this._rasterLayersByKey.set(key, layers);
-        }
-      }
-    } catch (e) { console.error("CadApp raster restore:", e); }
     // Restore labels first
     if (Array.isArray(data.labels) && (this.labelManager as any).restore) {
       try { (this.labelManager as any).restore(data.labels); } catch {}
@@ -1204,12 +1109,10 @@ export class CadApp {
   private _initHistory() {
     this._lastSnapshot = this._snapHistory();
     this._history = [this._lastSnapshot];
-    this._historyTokens = [null];
     this._historyIndex = 0;
     this._emitHistoryChange();
     // Poll for scene changes (cheap: short string compare on JSON)
     this._snapshotTimer = window.setInterval(() => this._maybeSnapshot(), 250);
-    void import("./raster/RasterTempStore").then((m) => m.rasterTempStoreAvailable() && m.tempCleanup(new Set())).catch(() => undefined);
   }
 
   private _maybeSnapshot() {
@@ -1243,22 +1146,16 @@ export class CadApp {
   contentRevision = 0;
   bumpContentRevision() { this.contentRevision++; }
 
-  private _pushHistory(snap: string, token: string | null = null) {
+  private _pushHistory(snap: string) {
     if (snap === this._lastSnapshot) return;
-    if (!Array.isArray(this._historyTokens) || this._historyTokens.length !== this._history.length) {
-      this._historyTokens = this._history.map(() => null);
-    }
     this.contentRevision++;
     if (this._historyIndex < this._history.length - 1) {
       this._history = this._history.slice(0, this._historyIndex + 1);
-      this._historyTokens = this._historyTokens.slice(0, this._historyIndex + 1);
     }
     this._history.push(snap);
-    this._historyTokens.push(token);
-    while (this._history.length > this._historyMax) { this._history.shift(); this._historyTokens.shift(); }
+    while (this._history.length > this._historyMax) this._history.shift();
     this._historyIndex = this._history.length - 1;
     this._lastSnapshot = snap;
-    this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
     this._emitHistoryChange();
   }
 
@@ -1277,7 +1174,6 @@ export class CadApp {
         this._pushHistory(pre);
       }
       this._actionStartSnapshot = this._lastSnapshot;
-      this._actionToken = null;
       this._actionPrevSuspend = this.suspendHistory;
       this.suspendHistory = true;
     }
@@ -1290,17 +1186,14 @@ export class CadApp {
     if (this._actionDepth > 0) return;
     this.suspendHistory = this._actionPrevSuspend;
     this._actionStartSnapshot = null;
-    const token = this._actionToken;
-    this._actionToken = null;
     if (this._isRestoring || this._destroyed) return;
     (this as any)._changeDirty = true;
-    this._pushHistory(this._snapHistory(), token);
+    this._pushHistory(this._snapHistory());
   }
 
   cancelAction() {
     if (this._actionDepth <= 0) return;
     this._actionDepth = 0;
-    this._actionToken = null;
     this.suspendHistory = this._actionPrevSuspend;
     const start = this._actionStartSnapshot;
     this._actionStartSnapshot = null;
@@ -1314,8 +1207,8 @@ export class CadApp {
 
   /**
    * Eine abgeschlossene Benutzerhandlung (Strich fertig, Objekt platziert …)
-   * = genau ein Undo-Schritt. Verschachtelte Schritte (z. B. Rastern im
-   * Pixelmodus) gehen in derselben äußeren Aktion auf. Wirft fn, wird alles
+   * = genau ein Undo-Schritt. Verschachtelte Schritte gehen in derselben
+   * äußeren Aktion auf. Wirft fn, wird alles
    * zurückgenommen – keine Teiländerungen im Projekt.
    */
   runAction<T>(fn: () => T): T | undefined {
@@ -1331,8 +1224,6 @@ export class CadApp {
    * über Werkzeug-/Blattwechsel oder Fokusverlust hinaus.
    */
   settleHistoryState() {
-    // Laufende Rasterjobs liegen bewusst AUSSERHALB von _actionDepth: sie werden
-    // hier weder bestätigt noch abgebrochen, sondern schließen atomar selbst ab.
     if (this._actionDepth > 0) this.commitAction();
     if (this._actionDepth === 0 && this.suspendHistory) this.suspendHistory = false;
   }
@@ -1353,12 +1244,9 @@ export class CadApp {
     if (this._destroyed) return;
     const snap = this._snapHistory();
     if (snap === this._lastSnapshot) return;
-    cancelRasterJobs(this, "external");
     this._lastSnapshot = snap;
     this._history = [snap];
-    this._historyTokens = [null];
     this._historyIndex = 0;
-    this._rasterTileStore.prune([...this._history, this._lastSnapshot]);
     this.onHistoryChange?.(false, false);
   }
 
@@ -1418,7 +1306,6 @@ export class CadApp {
   }
 
   undo() {
-    cancelRasterJobs(this, "undo");
     if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
     // Treppe: laufendes Zeichnen/Bewegen nimmt zuerst den lokalen Schritt zurück.
     if ((this.activeTool as any) === this.stairTool && this.stairTool.undoStep()) { this.renderer?.render?.(); return; }
@@ -1431,7 +1318,6 @@ export class CadApp {
   }
 
   redo() {
-    cancelRasterJobs(this, "redo");
     if (this._historyIndex >= this._history.length - 1) return;
     this._historyIndex++;
     this._restoreScene(this._history[this._historyIndex]);
@@ -3780,8 +3666,6 @@ export class CadApp {
         this.activeTool.update(this.input);
       }
 
-      // Rasterebenen der aktiven Zeichenfläche an den Renderer hängen.
-      this.renderer.rasterLayers = this.rasterLayers;
       this.renderer.wallEditActive = !!(this.selectTool && this.selectTool.isEditing());
       this.topology.priorityWallId = this.selectTool?.getPriorityWallId?.() || null;
 
@@ -4380,9 +4264,8 @@ export class CadApp {
     const sc = this.planScenesById.get(plan.id);
     if (!sc) return null;
     const json = this._serializeOneScene(sc);
-    const raster = this.planRaster(plan.id);
     const hasContent = Object.values(json || {}).some(v => Array.isArray(v) && v.length > 0);
-    if (!hasContent && !raster) return null;
+    if (!hasContent) return null;
     const { renderSceneRegionToCanvas } = await import("./SceneRegionRenderer");
     const pxPerMm = 200 / 25.4;
     const canvas = document.createElement("canvas");
@@ -4402,29 +4285,6 @@ export class CadApp {
         });
       } finally { setExportMode(was); }
     };
-    if (raster) {
-      // Vorhandene Ebenenreihenfolge (hinten → vorne): je Ebene erst Pixel, dann Vektoren.
-      const octx = canvas.getContext("2d")!;
-      const k = pxPerMm * 1000;
-      const rect = { x: -widthMm / 2000, y: -heightMm / 2000, w: widthMm / 1000, h: heightMm / 1000 };
-      const tmp = document.createElement("canvas");
-      try {
-        for (let i = labels.length - 1; i >= 0; i--) {
-          const id = labels[i].id;
-          if (!raster.visible(id)) continue;
-          const ok = await raster.layers.drawRegionAsync(octx, rect, k, (widthMm / 2) * pxPerMm, (heightMm / 2) * pxPerMm, (l) => l === id);
-          if (!ok) throw new Error("PIXUNA_RASTER_INCOMPLETE");
-          if (hasContent) {
-            tmp.width = canvas.width; tmp.height = canvas.height;
-            renderVectors(tmp, id);
-            octx.drawImage(tmp, 0, 0);
-          }
-        }
-      } catch (err) { canvas.width = 0; throw err; } finally { tmp.width = 0; tmp.height = 0; }
-      const b2: Blob | null = await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
-      canvas.width = 0;
-      return b2 ? new Uint8Array(await b2.arrayBuffer()) : null;
-    }
     renderVectors(canvas, null);
     const blob: Blob | null = await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
     return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
@@ -4442,12 +4302,9 @@ export class CadApp {
         if (!sc) return null;
         return this._serializeOneScene(sc);
       };
-      // Kein vorheriges Dekodieren aller Pixelkacheln: Ausgaben laden nur ihren
-      // Ausschnitt portionsweise (`RasterLayers.drawRegionAsync`).
       const bytes = await exportPlansToPdf(
         sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h),
         (p) => p.spreadId ? { key: p.spreadId, rects: this.planManager.spreadRects(p.spreadId) } : null,
-        (_p, proj) => this.projectionRaster(proj),
       );
 
       const ts = new Date();
@@ -4458,14 +4315,6 @@ export class CadApp {
         : `Druckplaene_${stamp}.pdf`;
       downloadPdfBytes(bytes, fname);
     } catch (err) {
-      if (String((err as Error)?.message).includes("PIXUNA_PATTERN_MISSING")) {
-        toast.error("PDF-Export abgebrochen", { description: "Benötigte Flächenmuster fehlen oder konnten nicht geladen werden – es wurde kein unvollständiges PDF erzeugt." });
-        return;
-      }
-      if (String((err as Error)?.message).includes("PIXUNA_RASTER_INCOMPLETE")) {
-        toast.error("PDF-Export abgebrochen", { description: "Pixelbereiche konnten nicht vollständig geladen werden – bitte erneut versuchen." });
-        return;
-      }
       console.error("[exportPlansPdf] PDF-Export fehlgeschlagen:", err);
       alert("PDF-Export fehlgeschlagen. Details in der Browser-Konsole.");
     }
@@ -4597,7 +4446,6 @@ export class CadApp {
     try { this._uninstallPropertyEdit?.(); } catch {}
     this._uninstallPropertyEdit = null;
     this._destroyed = true;
-    cancelRasterJobs(this, "unmount");
     cancelAnimationFrame(this._rafId);
     if (this._snapshotTimer != null) { clearInterval(this._snapshotTimer); this._snapshotTimer = null; }
     this.input.destroy();
