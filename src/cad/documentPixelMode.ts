@@ -1,22 +1,7 @@
 /**
- * PDF ⇄ Pixel-Umschaltung für Dokumente.
- *
- * Ein importiertes PDF liegt normalerweise als `kind: "pdf-page"` mit den
- * Original-Bytes (`pdfSourceB64`) in der Scene — es wird beim Zoomen als Vektor
- * neu gerendert und kann per "Auflösen" in CAD-Objekte zerlegt werden.
- *
- * Mit dem Schalter "Pixel" wird der aktuelle Zustand (inkl. Radierungen) in ein
- * hochaufgelöstes PNG eingebrannt (`kind: "image"`). Danach verhält sich das
- * Dokument wie ein importiertes Bild: der Radiergummi arbeitet inkl.
- * Smooth-Modus direkt auf den Pixeln.
- *
- * Zurück auf "Vektor" bleibt die Bearbeitung erhalten: aus dem Alpha-Kanal des
- * eingebrannten Bildes wird wieder eine Radiermaske erzeugt und auf das frisch
- * aus dem PDF gerenderte Vektorbild gelegt.
- *
- * Da die Umschaltung nur `kind`/`src`/`eraseMaskDataUrl` verändert, ist sie
- * ohne Schema-Änderung persistent: `pdfSourceB64 && kind === "image"` bedeutet
- * "PDF im Pixelmodus".
+ * Rückführung älterer PDF-Dokumente im früheren Pixelmodus
+ * (`pdfSourceB64 && kind === "image"`) auf Vektor sowie Radierprüfung für
+ * „Auflösen“. Neue Pixel-PDFs entstehen nicht mehr.
  */
 import { Defaults } from "./constants";
 import type { DocumentObject } from "./Scene";
