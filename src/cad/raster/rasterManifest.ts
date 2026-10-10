@@ -10,6 +10,7 @@
  * MAX_ENTRIES_PER_LAYER); paint/erase/Fills werden beim Laden zusammengesetzt.
  */
 import { getBlob, hasBlob } from "./LocalProjectStore";
+import type { CompactFillJSON } from "../RasterLayers";
 
 export const RASTER_FORMAT = 2;
 
@@ -28,6 +29,8 @@ export interface RasterManifestEntry {
   tiles: RasterTileRef[];
   /** nur patternFill: Muster einmal referenziert. */
   patternHash?: string;
+  /** nur solidFill: kompakte Flächenbeschreibung (Kontur, Löcher, Regel, Farbe, Alpha). */
+  fill?: CompactFillJSON;
 }
 
 export interface RasterLayerManifest { labelId: string; strokeCount: number; entries: RasterManifestEntry[] }
@@ -72,6 +75,7 @@ type Effective = Map<string, string>; // "tx,ty" -> hash (nur reine Checkpoint-K
 function effectiveTiles(lm: RasterLayerManifest): Effective | null {
   const m: Effective = new Map();
   for (const e of [...lm.entries].sort((a, b) => a.order - b.order)) {
+    if (e.kind === "solidFill") continue;
     if (e.kind !== "checkpoint") return null;
     for (const t of e.tiles) m.set(`${t.tx},${t.ty}`, t.hash);
   }
@@ -98,13 +102,15 @@ export async function toManifest(rasterByKey: Record<string, any[]> | undefined,
         const sc = t.s ?? (typeof t.ref === "number" ? list[t.ref]?.s : undefined);
         if (hash) tiles.push(sc && sc !== 1 ? { tx: t.tx, ty: t.ty, hash, s: sc } : { tx: t.tx, ty: t.ty, hash });
       }
-      if (!tiles.length) continue;
-      const full = (): RasterManifestEntry[] => [{ id: newEntryId(), kind: "checkpoint", revision, order: 0, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles }];
-      const old = prev?.[key]?.find((x) => x.labelId === l.labelId);
+      const fills: CompactFillJSON[] = Array.isArray(l.fills) ? l.fills : [];
+      if (!tiles.length && !fills.length) continue;
+      const full = (): RasterManifestEntry[] => tiles.length ? [{ id: newEntryId(), kind: "checkpoint", revision, order: 0, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles }] : [];
+      const oldRaw = prev?.[key]?.find((x) => x.labelId === l.labelId);
+      const old = oldRaw ? { ...oldRaw, entries: oldRaw.entries.filter((e) => e.kind !== "solidFill") } : undefined;
       let entries = full();
       const eff = old ? effectiveTiles(old) : null;
       const sameRes = old?.entries.every((e) => e.pxPerM === l.pxPerM && e.tilePx === l.tilePx);
-      if (old && eff && sameRes && old.entries.length < MAX_ENTRIES_PER_LAYER) {
+      if (old && old.entries.length && tiles.length && eff && sameRes && old.entries.length < MAX_ENTRIES_PER_LAYER) {
         const now = new Set(tiles.map((t) => `${t.tx},${t.ty}`));
         const removed = [...eff.keys()].some((k) => !now.has(k));
         if (!removed) {
@@ -115,6 +121,9 @@ export async function toManifest(rasterByKey: Record<string, any[]> | undefined,
             : old.entries;
         }
       }
+      // Kompakte Flächen: je Fläche ein solidFill-Eintrag ohne Pixeldaten.
+      const base = entries.length ? Math.max(...entries.map((e) => e.order)) + 1 : 0;
+      fills.forEach((f, i) => entries = [...entries, { id: f.id || newEntryId(), kind: "solidFill", revision, order: base + i, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles: [], fill: f }]);
       layers.push({ labelId: l.labelId, strokeCount: l.strokeCount ?? 1, entries });
     }
     if (layers.length) out[key] = layers;
@@ -170,8 +179,13 @@ export async function fromManifest(m: RasterManifest | undefined, missing: strin
   for (const key of Object.keys(m ?? {})) {
     const layers: any[] = [];
     for (const lm of m![key]) {
-      const entries = [...lm.entries].sort((a, b) => a.order - b.order);
-      if (!entries.length) continue;
+      const all = [...lm.entries].sort((a, b) => a.order - b.order);
+      const fills = all.filter((e) => e.kind === "solidFill" && e.fill).map((e) => e.fill!);
+      const entries = all.filter((e) => e.kind !== "solidFill");
+      if (!entries.length) {
+        if (fills.length) layers.push({ labelId: lm.labelId, pxPerM: all[0].pxPerM, tilePx: all[0].tilePx, tiles: [], fills, strokeCount: lm.strokeCount });
+        continue;
+      }
       // Basis = feinste Auflösung; gröbere Einträge werden als Kachelfaktor
       // geführt. Voraussetzung: identische Kachel-Weltgröße (gleiches Raster).
       const base = entries.reduce((a, e) => (e.pxPerM > a.pxPerM ? e : a), entries[0]);
@@ -191,7 +205,7 @@ export async function fromManifest(m: RasterManifest | undefined, missing: strin
           if (r) tiles.push(r.s !== 1 ? { tx: g.tx, ty: g.ty, src: r.src, s: r.s } : { tx: g.tx, ty: g.ty, src: r.src }); else missing.push(`${g.tx},${g.ty}`);
         } catch { missing.push(`${g.tx},${g.ty}`); }
       }
-      layers.push({ labelId: lm.labelId, pxPerM, tilePx, tiles, strokeCount: lm.strokeCount });
+      layers.push({ labelId: lm.labelId, pxPerM, tilePx, tiles, ...(fills.length ? { fills } : {}), strokeCount: lm.strokeCount });
     }
     out[key] = layers;
   }
