@@ -1215,7 +1215,8 @@ export class RasterLayers {
    */
   async drawRegionAsync(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, k: number, offX: number, offY: number, filter?: (labelId: string) => boolean, order?: string[]): Promise<boolean> {
     let ok = true;
-    const ids = order ? order.filter((id) => this.layers.has(id)) : [...this.layers.keys()];
+    // `order` wie LabelManager.list(): Index 0 = vorne → von hinten nach vorne zeichnen.
+    const ids = order ? order.filter((id) => this.layers.has(id)).reverse() : [...this.layers.keys()];
     for (const id of ids) {
       if (filter && !filter(id)) continue;
       if (!(await this.layers.get(id)!.drawRegionAsync(ctx, rect, k, offX, offY))) ok = false;

@@ -366,6 +366,8 @@ export async function exportPlansToPdf(
             page.drawImage(img, { x: r.x * MM_TO_PT, y: (pageH - r.y - r.height) * MM_TO_PT, width: size.width * MM_TO_PT, height: size.height * MM_TO_PT });
           }
         } catch (err) {
+          // Unvollständige Pixel/fehlende Muster brechen den Export ab.
+          if (/PIXUNA_(RASTER_INCOMPLETE|PATTERN_MISSING)/.test(String((err as Error)?.message))) throw err;
           console.warn("[PlanPdfExport] Anmerkungen fehlgeschlagen:", plan.id, err);
         }
       }
