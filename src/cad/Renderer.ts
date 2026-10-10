@@ -3,7 +3,6 @@ import { Defaults, SelectionType } from "./constants";
 import { Vec2, v, sub, add, mul, norm, perpLeft, len, clamp, rgbaFromHex, hexToRgba, polygonAreaAbs, polygonCentroid, tessellateWithBulges, hatchOuterRing, hatchHoleRings } from "./geometry";
 import { Camera } from "./Camera";
 import { metersToUnit, rulerSideOf, rulerTickStep, rulerUnitOf } from "./rulerModel";
-import type { RasterLayers } from "./RasterLayers";
 import { Scene, Hatch, Dimension, TextBox, DocumentObject, FreeStroke } from "./Scene";
 import { smoothChaikin } from "./freeGeom";
 import { applyStrokePattern, tracePathWithEffects, roughenPolyline, dashArrayPx, lineCapForPattern, dashOffsetPx, strokeWithBrushIfActive } from "./strokeEffects";
@@ -109,11 +108,6 @@ export class Renderer {
   /** Wenn true: kein Hintergrund füllen (Offscreen-Rasterisierung mit Alpha). */
   transparentBackground = false;
 
-  /**
-   * Optionale Raster-Zeichenebenen (Pixelmodus der Projektmappe). Wird von
-   * MiniCad gesetzt; in der großen CAD-Oberfläche bleibt sie null.
-   */
-  rasterLayers: RasterLayers | null = null;
 
   selectedLabelId: string | null = null;
   hoverSegmentId: string | null = null;
@@ -319,9 +313,6 @@ export class Renderer {
       // Dunkelmodus: Dokumente (JPG/PNG/PDF) werden in einem eigenen,
       // ungefilterten Durchgang gezeichnet — hier endet dieser Durchgang.
       if (this._darkPass === "docs") continue;
-      // Rasterinhalt dieser Ebene (Pixelmodus der Projektmappe): liegt über den
-      // Dokumenten, aber unter allen Vektorobjekten derselben Ebene.
-      this.rasterLayers?.drawLayer(this.ctx, this.camera, labelId);
       this._drawHatchesForLabel(labelId);
       this._drawWallsForLabel(labelId);
       this._drawDoorsForLabel(labelId);

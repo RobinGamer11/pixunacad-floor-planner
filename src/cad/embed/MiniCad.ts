@@ -32,7 +32,6 @@ import { IdPanel } from "../IdPanel";
 import { GlobalGuides } from "../globalGuides";
 import { TopologyEngine } from "../TopologyEngine";
 import { Renderer, type Selection } from "../Renderer";
-import { RasterLayers, cadRasterPxPerMForReference } from "../RasterLayers";
 import { mirrorProxy } from "../multiEdit";
 import { setStrokeAutoShape } from "../freeAutoShape";
 import { asObjectToolId, type ObjectToolId } from "../selectionTools";
@@ -230,14 +229,6 @@ export class MiniCad {
   defaultFreeImageSpacingM: number = Defaults.freeImageSpacingM;
   defaultFreeImageRotate: boolean = Defaults.freeImageRotate;
   defaultFreeAutoShape: boolean = false;
-  /** Zeichenmodus: "vector" oder "pixel" (Rasterung beim Fertigstellen). */
-
-  /**
-   * Raster-Zeichenebenen der Seite (Pixelmodus). Pro Ebene ein gekachelter
-   * Rasterinhalt im selben Papier-Koordinatensystem wie die Vektorobjekte.
-   */
-  readonly rasterLayers: RasterLayers;
-  /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
   // Radiergummi-Defaults.
   defaultEraserRadiusM: number = Defaults.eraserRadiusM;
   defaultEraserStrength: number = Defaults.eraserStrength;
@@ -376,13 +367,6 @@ export class MiniCad {
     this._onSelectionChange = init.onSelectionChange;
     
     this._strokeFactor = (this.basePxPerMm * 1000) / 80;
-    // Rasterqualität wie in der großen CAD-Oberfläche (cadRasterPxPerM()),
-    // umgerechnet auf die Papierskalierung der Projektmappe: MiniCad rendert
-    // mit `referencePxPerM = basePxPerMm * 1000` statt 80 px/m, ein Weltmeter
-    // ist hier ein PAPIER-Meter. So erhalten HatchTool und
-    // findHybridEnclosingFace() in beiden Oberflächen äquivalente
-    // Raster-Boundaries.
-    this.rasterLayers = new RasterLayers(cadRasterPxPerMForReference(this.basePxPerMm * 1000));
     this.defaultLineColor = init.defaultLineColor ?? Defaults.lineColor;
     this.defaultLineThicknessM = (init.defaultLineThicknessM ?? Defaults.lineThicknessM) * this._strokeFactor;
 
@@ -395,9 +379,6 @@ export class MiniCad {
     this.topology.guides = this.globalGuides;
     const ctx = this.dom.canvas.getContext("2d")!;
     this.renderer = new Renderer(ctx, this.camera, this.scene, this.labelManager);
-    // Rasterinhalt in die normale Ebenenreihenfolge des Renderers einhängen.
-    this.renderer.rasterLayers = this.rasterLayers;
-    this.rasterLayers.onReady = () => { try { this.renderer.render(); } catch { /* noop */ } };
     // Wichtig: Text/Stroke-Skalierung an Seitengröße (echte mm) ausrichten,
     // damit ein 16-px-Text auch 16 px auf der Seite ist (statt riesig).
     this.renderer.referencePxPerM = this.basePxPerMm * 1000;
@@ -1360,8 +1341,6 @@ export class MiniCad {
       version: 5,
 
       labels: this.labelManager.list(),
-      // Rasterebenen (Pixelmodus) — leere Ebenen entfallen automatisch.
-      rasterLayers: this.rasterLayers.serialize(),
       segments: this.scene.segments
         .filter((s) => s.labelId !== this._frameLabelId && s.labelId !== this._extRectLabelId && s.labelId !== this._ghostLabelId)
         .map((s) => ({
@@ -1489,8 +1468,6 @@ export class MiniCad {
     if (!input) return;
     // Zentrale Schema-Migration (additiv) vor dem Deserialisieren.
     const data = migrateSceneData(input);
-    // Rasterinhalt zuerst wiederherstellen (lädt Kacheln asynchron nach).
-    try { this.rasterLayers.restore(data.rasterLayers); } catch (e) { console.error("MiniCad raster restore:", e); }
     if (Array.isArray(data.labels) && data.labels.length > 0) {
       try { this.labelManager.restore(data.labels); } catch {}
     }
@@ -1830,7 +1807,6 @@ export class MiniCad {
     this.scene.freeStrokes = [];
     this.scene.hatches = [];
     this.scene.documents = this.scene.documents.filter(keepDoc);
-    this.rasterLayers.clear();
     try { this._restore(data); } catch (e) { console.error("MiniCad loadState:", e); }
     this._changeDirty = false;
     this._lastSig = this._sceneSignature();
