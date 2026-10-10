@@ -32,6 +32,7 @@
 import type { Camera } from "./Camera";
 import { rasterResources, type ResidentTile } from "./raster/RasterResourceManager";
 import { segmentHitsRect } from "./raster/rasterCoverage";
+import { resolveTileSrc } from "./raster/lazyTileSrc";
 
 /**
  * Kompakte Vollfläche (Manifest `solidFill`): Kontur + Löcher + Füllregel +
@@ -194,6 +195,8 @@ interface RasterTile {
   evicted?: boolean;
   /** Änderungen, die nach dem (Nach-)Laden in Reihenfolge angewendet werden. */
   pending?: ((ctx: CanvasRenderingContext2D) => void)[];
+  /** Zeitpunkt des letzten fehlgeschlagenen Ladeversuchs (Kachel bleibt unbekannt). */
+  failedAt?: number;
   res: ResidentTile;
   /** Eigener Auflösungsfaktor (1 = Ebenenauflösung, <1 = gröber). */
   s: number;
@@ -377,13 +380,16 @@ export class RasterLayer {
       onReady?.();
     };
     img.onload = () => done(true);
-    img.onerror = () => done(false);
-    img.src = src;
+    img.onerror = () => fail();
+    // Nicht ladbar ≠ leer: Kachel bleibt verdrängt (unbekannt), offene
+    // Änderungen bleiben erhalten; nächster Bedarf versucht es erneut.
+    const fail = () => { tile.loading = false; tile.failedAt = Date.now(); };
+    resolveTileSrc(src).then((u) => { if (u) img.src = u; else fail(); }, fail);
   }
 
   /** Lädt eine verdrängte Kachel bei Bedarf nach (Cache-Miss ≠ transparent). */
   private _ensure(tile: RasterTile): boolean {
-    if (tile.evicted && !tile.loading && tile.dataUrl) this._loadInto(tile, tile.dataUrl, () => this.onTileReady?.());
+    if (tile.evicted && !tile.loading && tile.dataUrl && !(tile.failedAt && Date.now() - tile.failedAt < 5000)) this._loadInto(tile, tile.dataUrl, () => this.onTileReady?.());
     if (tile.loading || tile.evicted) return false;
     rasterResources.touch(tile.res);
     return true;
@@ -524,6 +530,14 @@ export class RasterLayer {
     if (this.tiles.size === 0) return;
     const tw = this.tileWorld;
     const sizePx = tw * camera.scale;
+    // Sichtbarer Weltbereich + 1 Kachel Rand: nur diese Kacheln werden geladen.
+    const m = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
+    const sx = m && m.a ? Math.abs(m.a) : 1, sy = m && m.d ? Math.abs(m.d) : 1;
+    const vw = ctx.canvas.width / sx, vh = ctx.canvas.height / sy;
+    const k = camera.scale || 1;
+    const wx0 = -camera.offsetX / k, wy0 = -camera.offsetY / k;
+    const tx0 = Math.floor(wx0 / tw) - 1, ty0 = Math.floor(wy0 / tw) - 1;
+    const tx1 = Math.floor((wx0 + vw / k) / tw) + 1, ty1 = Math.floor((wy0 + vh / k) / tw) + 1;
     ctx.save();
     // Beim Vergrößern über die gespeicherte Rasterauflösung hinaus würde die
     // Glättung nur verwaschen — ab ~1,5-facher Vergrößerung wird pixelgenau
@@ -532,6 +546,7 @@ export class RasterLayer {
     ctx.imageSmoothingEnabled = magnify <= 1.5;
     ctx.imageSmoothingQuality = "high";
     for (const tile of this.tiles.values()) {
+      if (tile.tx < tx0 || tile.tx > tx1 || tile.ty < ty0 || tile.ty > ty1) continue;
       if (!this._ensure(tile)) continue;
       const p = camera.worldToScreen(tile.tx * tw, tile.ty * tw);
       // Kanten auf ganze Bildschirmpixel runden: benachbarte Kacheln stoßen so
@@ -539,7 +554,6 @@ export class RasterLayer {
       const x0 = Math.round(p.x), y0 = Math.round(p.y);
       const x1 = Math.round(p.x + sizePx), y1 = Math.round(p.y + sizePx);
       ctx.drawImage(tile.canvas, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
-
     }
     ctx.restore();
   }
@@ -676,12 +690,6 @@ export class RasterLayer {
     }
   }
 
-  /** Stößt das Laden aller Kacheln an; true = alle sofort verfügbar. */
-  ensureAllLoaded(): boolean {
-    let ok = true;
-    for (const t of this.tiles.values()) if (!this._ensure(t)) ok = false;
-    return ok;
-  }
 
   /** true, wenn die Kachel noch aus dem gespeicherten Stand nachlädt. */
   isTileLoading(tx: number, ty: number): boolean {
@@ -750,7 +758,11 @@ export class RasterLayer {
     try {
       if (tile) {
         if (!tile.loading && !tile.evicted) ctx.drawImage(tile.canvas, 0, 0, n, n);
-        else if (tile.dataUrl) ctx.drawImage(await loadImg(tile.dataUrl), 0, 0, n, n);
+        else if (tile.dataUrl) {
+          const u = await resolveTileSrc(tile.dataUrl);
+          if (!u) throw new Error("Kachel nicht verfügbar");
+          ctx.drawImage(await loadImg(u), 0, 0, n, n);
+        }
         else throw new Error("Kachel nicht verfügbar");
       }
       for (const f of fills) this._paintFill(ctx, f, ox, oy, this.pxPerM * sc);
@@ -790,12 +802,17 @@ export class RasterLayer {
   /** Eine abgeschlossene Zeichenaktion = genau ein gezählter Rasterstrich. */
   noteStroke() { this.strokeCount += 1; }
 
-  /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
+  /**
+   * Übernimmt Kacheln aus JSON nur als REFERENZ: keine Dekodierung beim
+   * Öffnen. Jede Kachel gilt als verdrängt (= unbekannt, nie leer) und wird
+   * erst geladen, wenn sie gezeichnet, bearbeitet oder ausgegeben wird.
+   */
   restore(json: RasterLayerJSON, onReady?: () => void, store?: RasterTileStore) {
     this.strokeCount = Math.max(0, json.strokeCount ?? (json.tiles?.length ? 1 : 0));
     // Flächen zuerst (ohne Materialisierung – `mat` stammt aus dem Stand).
     this._materializing = true;
     try { for (const f of json.fills ?? []) this.addFill(f); } finally { this._materializing = false; }
+    if (onReady) this.onTileReady = onReady;
     const list = json.tiles || [];
     for (const t of list) {
       // `ref` verweist auf eine inhaltsgleiche Kachel (Dedupe beim Speichern).
@@ -806,9 +823,51 @@ export class RasterLayer {
       const tile = this._tile(t.tx, t.ty, true, t.s ?? (typeof t.ref === "number" ? list[t.ref]?.s : undefined) ?? 1)!;
       tile.dataUrl = src;
       tile.sid = sid;
-      this.onTileReady = onReady ?? this.onTileReady;
-      this._loadInto(tile, src, onReady);
+      tile.canvas.width = 0; tile.canvas.height = 0;
+      tile.evicted = true;
+      rasterResources.release(tile.res);
     }
+  }
+
+  /** true, solange eine angeforderte Kachel dieser Ebene noch lädt. */
+  isLoading(): boolean {
+    for (const t of this.tiles.values()) if (t.loading) return true;
+    return false;
+  }
+
+  /**
+   * Portionsweise Ausgabe eines Weltrechtecks (PDF, Vorschau, Analyse):
+   * Kacheln werden in Gruppen innerhalb des halben RAM-Budgets geladen,
+   * gezeichnet und danach wieder verdrängbar gemacht. Nie das ganze Projekt
+   * dekodiert. false = Kachel nicht ladbar (Ergebnis unvollständig).
+   */
+  async drawRegionAsync(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, k: number, offX: number, offY: number): Promise<boolean> {
+    const vw = Math.ceil(ctx.canvas.width), vh = Math.ceil(ctx.canvas.height);
+    this._drawFills(ctx, k, offX, offY, vw, vh);
+    const tw = this.tileWorld;
+    const inRect = [...this.tiles.values()].filter((t) => {
+      const x0 = t.tx * tw, y0 = t.ty * tw;
+      return x0 + tw > rect.x && x0 < rect.x + rect.w && y0 + tw > rect.y && y0 < rect.y + rect.h;
+    });
+    const perBatch = Math.max(1, Math.floor(rasterResources.budget / 2 / Math.max(1, this.tilePx * this.tilePx * 4)));
+    let ok = true;
+    for (let i = 0; i < inRect.length; i += perBatch) {
+      const batch = inRect.slice(i, i + perBatch);
+      for (const t of batch) this._ensure(t);
+      const until = Date.now() + 15000;
+      while (batch.some((t) => t.loading)) {
+        if (Date.now() > until) return false;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      for (const t of batch) {
+        if (t.evicted || t.loading) { if (!this._ensure(t)) { ok = false; continue; } }
+        const x0 = Math.round(t.tx * tw * k + offX), y0 = Math.round(t.ty * tw * k + offY);
+        const x1 = Math.round((t.tx + 1) * tw * k + offX), y1 = Math.round((t.ty + 1) * tw * k + offY);
+        ctx.drawImage(t.canvas, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+      }
+      rasterResources.trim();
+    }
+    return ok;
   }
 
   /**
@@ -865,21 +924,6 @@ export class RasterLayers {
     return l || null;
   }
 
-  /**
-   * Wartet, bis alle Kacheln (optional gefilterter Ebenen) geladen sind –
-   * für Ausgaben (PDF, Vorschau), die keinen Teilstand zeigen dürfen.
-   * false = Zeitlimit erreicht (Ergebnis wäre unvollständig).
-   */
-  async whenLoaded(filter?: (labelId: string) => boolean, timeoutMs = 15000): Promise<boolean> {
-    const until = Date.now() + timeoutMs;
-    for (;;) {
-      let ok = true;
-      for (const [id, l] of this.layers) if ((!filter || filter(id)) && !l.ensureAllLoaded()) ok = false;
-      if (ok) return true;
-      if (Date.now() > until) return false;
-      await new Promise((r) => setTimeout(r, 40));
-    }
-  }
 
   hasAnyContent(): boolean {
     for (const l of this.layers.values()) if (l.hasContent()) return true;
@@ -941,6 +985,8 @@ export class RasterLayers {
       const json = layer.serialize(store);
       if (json) out.push(json);
     }
+    // Nach dem Kodieren sind geänderte Kacheln wieder sauber → verdrängbar.
+    rasterResources.trim();
     return out;
   }
 
@@ -954,6 +1000,36 @@ export class RasterLayers {
       layer.restore(json, () => this.onReady?.(), store);
       this.layers.set(json.labelId, layer);
     }
+  }
+
+  /** true, solange irgendeine angeforderte Kachel noch lädt. */
+  isLoading(): boolean {
+    for (const l of this.layers.values()) if (l.isLoading()) return true;
+    return false;
+  }
+
+  /** Wartet, bis alle bereits ANGEFORDERTEN Kacheln geladen sind (lädt nichts zusätzlich). */
+  async whenIdle(timeoutMs = 15000): Promise<boolean> {
+    const until = Date.now() + timeoutMs;
+    while (this.isLoading()) {
+      if (Date.now() > until) return false;
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    return true;
+  }
+
+  /**
+   * Zeichnet ein Weltrechteck aller (gefilterten) Ebenen portionsweise in
+   * `ctx` (Abbildung Bildschirm = Welt * k + off). Siehe `RasterLayer.drawRegionAsync`.
+   */
+  async drawRegionAsync(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, k: number, offX: number, offY: number, filter?: (labelId: string) => boolean, order?: string[]): Promise<boolean> {
+    let ok = true;
+    const ids = order ? order.filter((id) => this.layers.has(id)) : [...this.layers.keys()];
+    for (const id of ids) {
+      if (filter && !filter(id)) continue;
+      if (!(await this.layers.get(id)!.drawRegionAsync(ctx, rect, k, offX, offY))) ok = false;
+    }
+    return ok;
   }
 
   /** Alle Ebenen-IDs mit Rasterinhalt (für die Boundary-Analyse). */

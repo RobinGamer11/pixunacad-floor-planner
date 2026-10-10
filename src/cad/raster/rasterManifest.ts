@@ -11,6 +11,7 @@
  */
 import { getBlob, hasBlob } from "./LocalProjectStore";
 import type { CompactFillJSON } from "../RasterLayers";
+import { isLazySrc, registerLazySrc, resolveTileSrc } from "./lazyTileSrc";
 
 export const RASTER_FORMAT = 2;
 
@@ -56,7 +57,18 @@ const dataUrlHash = new Map<string, string>();
 
 async function srcToHash(src: string, newBlobs: Map<string, Blob>): Promise<string | null> {
   const known = urlToHash.get(src) ?? dataUrlHash.get(src);
-  if (known) return known;
+  // Bekannter Hash: Blob kann inzwischen bereinigt sein → dann erneut ablegen.
+  if (known && !isLazySrc(src)) {
+    if (!newBlobs.has(known) && !(await hasBlob(known))) newBlobs.set(known, await (await fetch(src)).blob());
+    return known;
+  }
+  if (isLazySrc(src)) {
+    // Verzögert zusammengesetzte Kachel: erst jetzt (beim Speichern) erzeugen.
+    const u = await resolveTileSrc(src);
+    if (!u) return null;
+    const h = await srcToHash(u, newBlobs);
+    return h;
+  }
   if (!src.startsWith("data:") && !src.startsWith("blob:")) return null;
   const blob = await (await fetch(src)).blob();
   const hash = await sha256Hex(await blob.arrayBuffer());
@@ -201,6 +213,16 @@ export async function fromManifest(m: RasterManifest | undefined, missing: strin
       const tiles: any[] = [];
       for (const g of byTile.values()) {
         try {
+          const start = g.ops.map((o) => o.kind).lastIndexOf("checkpoint");
+          const seq = start >= 0 ? g.ops.slice(start) : g.ops;
+          if (seq.length > 1 || seq[0]?.kind === "erase") {
+            // Mehrstufige Kachel: NICHT beim Öffnen dekodieren – nur Referenz.
+            const ops = seq;
+            const s = Math.max(...ops.map((o) => o.s));
+            const src = registerLazySrc(async () => (await composeTile(ops, tilePx))?.src ?? null);
+            tiles.push(s !== 1 ? { tx: g.tx, ty: g.ty, src, s } : { tx: g.tx, ty: g.ty, src });
+            continue;
+          }
           const r = await composeTile(g.ops, tilePx);
           if (r) tiles.push(r.s !== 1 ? { tx: g.tx, ty: g.ty, src: r.src, s: r.s } : { tx: g.tx, ty: g.ty, src: r.src }); else missing.push(`${g.tx},${g.ty}`);
         } catch { missing.push(`${g.tx},${g.ty}`); }
@@ -211,3 +233,21 @@ export async function fromManifest(m: RasterManifest | undefined, missing: strin
   }
   return out;
 }
+
+/** Alle Pixel-Hashes eines Manifests (Kacheln + Muster). */
+export function manifestHashes(m: RasterManifest | undefined | null, into = new Set<string>()): Set<string> {
+  for (const key of Object.keys(m ?? {})) for (const l of m![key] ?? []) for (const e of l.entries ?? []) {
+    for (const t of e.tiles ?? []) into.add(t.hash);
+    if (e.patternHash) into.add(e.patternHash);
+  }
+  return into;
+}
+
+/** Hashes, die diese Sitzung im Speicher hält (Undo/Redo, laufende Aktionen, offene Saves). */
+export function sessionHashes(): Set<string> {
+  return new Set([...urlToHash.values(), ...dataUrlHash.values(), ...pinned]);
+}
+const pinned = new Set<string>();
+/** Schützt Hashes vorübergehend vor der Bereinigung (z. B. während eines Speichervorgangs). */
+export function pinHashes(h: Iterable<string>) { for (const x of h) pinned.add(x); }
+export function unpinHashes(h: Iterable<string>) { for (const x of h) pinned.delete(x); }

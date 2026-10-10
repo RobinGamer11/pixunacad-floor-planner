@@ -484,6 +484,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const leftRailScroll = useDragScroll<HTMLElement>("y");
   // Outside-Klick und ESC schließen das Werkzeug-Flyout — siehe RailFlyout.
   const [canUndo, setCanUndo] = useState(false);
+  /** Maßgeblicher Projektstand (Gerät/Cloud) lädt noch → keine Bearbeitung. */
+  const [projectLoading, setProjectLoading] = useState(true);
   const [canRedo, setCanRedo] = useState(false);
   const [hatchDrawMode, setHatchDrawMode] = useState<HatchDrawMode>("polygon");
   // Letzter Zeichen-Modus innerhalb der "Linie"-Variante (Linie/Freihand/Radiergummi).
@@ -986,9 +988,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     // Maßgeblicher lokaler Stand (Format 2) liegt in IndexedDB.
     {
       const revAtStart = (app as any).contentRevision;
+      setProjectLoading(true);
+      // Tastenkürzel (Rückgängig, Löschen …) während des Ladens abfangen.
+      const blockKeys = (e: KeyboardEvent) => { if (initialLoading && !(e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable]")) { e.stopImmediatePropagation(); e.preventDefault(); } };
+      window.addEventListener("keydown", blockKeys, true);
+      const unlock = () => { initialLoading = false; setProjectLoading(false); window.removeEventListener("keydown", blockKeys, true); };
       loadLocalScene(projectId ?? "default").then((res) => {
+        unlock();
         if ((app as any)._destroyed) return;
-        initialLoading = false;
         if (!res) {
           // Migration: Altstand (Pixel als Text in localStorage) sofort in den
           // Gerätespeicher übernehmen. Der alte Stand wird erst nach
@@ -1014,10 +1021,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         }
         try { app.renderer?.render(); } catch {}
         if (res.missing.length) toast({ title: "Pixelinhalte unvollständig", description: `${res.missing.length} Kachel(n) fehlen im Gerätespeicher.` });
+        if (res.conflicts.length) toast({ title: "Pixel-Konflikt", description: "Pixel wurden auch auf einem anderen Gerät geändert. Beide Stände sind erhalten; hier wird dein lokaler Stand gezeigt.", variant: "destructive" });
       }).catch((e) => {
         // Höhere Formatversion: Projekt bleibt gesperrt (initialLoading bleibt true → kein Überschreiben).
-        if (String(e?.message).includes("PIXUNA_FORMAT_NEWER")) return;
-        initialLoading = false;
+        if (String(e?.message).includes("PIXUNA_FORMAT_NEWER")) { setProjectLoading(false); window.removeEventListener("keydown", blockKeys, true); return; }
+        unlock();
         console.error("Lokaler Stand nicht lesbar:", e);
       });
     }
@@ -2132,6 +2140,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
+        {projectLoading && (
+          <div className="absolute inset-0 z-[45] flex items-center justify-center bg-background/40 cursor-wait" onPointerDownCapture={(e) => e.stopPropagation()}>
+            <div className="rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground">Projekt wird geladen …</div>
+          </div>
+        )}
         {exportMode && cadApp && !presenting && <SpreadHandles app={cadApp} />}
 
         {/* Tabellen-Objekte (DOM-Overlay über dem Canvas) */}
