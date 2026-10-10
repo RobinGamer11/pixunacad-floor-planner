@@ -17,7 +17,9 @@ import { rgbaFromHex } from "./geometry";
 import { modelToPaperFactor, normalizeScaleDen } from "@/lib/scale";
 
 export interface ProjectionItem {
-  kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line";
+  kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line" | "raster-bounds";
+  /** CAD-Ebene des Quellobjekts (für die Ebenenreihenfolge im Ausschnitt). */
+  labelId?: string;
   // segment
   a?: { x: number; y: number };
   b?: { x: number; y: number };
@@ -44,6 +46,7 @@ export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
   for (const h of snapshot.hatches || []) {
     items.push({
       kind: "hatch",
+      labelId: h.labelId,
       points: (h.points || []).map((p: any) => ({ x: p.x, y: p.y })),
       fillColor: h.fillColor,
       strokeColor: h.strokeColor,
@@ -54,6 +57,7 @@ export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
   for (const s of snapshot.segments || []) {
     items.push({
       kind: "segment",
+      labelId: s.labelId,
       a: { x: s.a.x, y: s.a.y },
       b: { x: s.b.x, y: s.b.y },
       color: s.color,
@@ -64,6 +68,7 @@ export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
     // Vereinfachung in der Projektion: zeichne nur die Maßlinie zwischen p1 und p2.
     items.push({
       kind: "dimension-line",
+      labelId: d.labelId,
       a: { x: d.p1.x, y: d.p1.y },
       b: { x: d.p2.x, y: d.p2.y },
       color: d.lineColor || "#222",
@@ -72,6 +77,7 @@ export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
   for (const t of snapshot.textBoxes || []) {
     items.push({
       kind: "textbox-rect",
+      labelId: t.labelId,
       center: { x: t.center.x, y: t.center.y },
       widthM: t.widthM,
       heightM: t.heightM,
@@ -81,6 +87,7 @@ export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
   for (const doc of snapshot.documents || []) {
     items.push({
       kind: "document-rect",
+      labelId: doc.labelId,
       center: { x: doc.position.x + doc.widthM / 2, y: doc.position.y + doc.heightM / 2 },
       widthM: doc.widthM,
       heightM: doc.heightM,
@@ -101,7 +108,7 @@ export function itemsBoundsM(items: ProjectionItem[]): { minX: number; minY: num
     if (y > maxY) maxY = y;
   };
   for (const it of items) {
-    if (it.kind === "segment" || it.kind === "dimension-line") {
+    if (it.kind === "segment" || it.kind === "dimension-line" || it.kind === "raster-bounds") {
       if (it.a) acc(it.a.x, it.a.y);
       if (it.b) acc(it.b.x, it.b.y);
     } else if (it.kind === "hatch") {
@@ -164,6 +171,33 @@ export interface ProjectionRaster {
   layers: import("./RasterLayers").RasterLayers;
   order: string[];
   visible: (labelId: string) => boolean;
+}
+
+/**
+ * Ergänzt die Items um die Ausdehnung des sichtbaren Rasterinhalts (Kacheln +
+ * kompakte Flächen), damit Ausschnittsgröße und reine Pixelblätter stimmen.
+ */
+export function withRasterBounds(items: ProjectionItem[], raster: ProjectionRaster | null | undefined): ProjectionItem[] {
+  const b = raster?.layers.contentBoundsWorld((id) => raster.visible(id));
+  if (!b || !(b.w > 0 || b.h > 0)) return items;
+  return [...items, { kind: "raster-bounds", a: { x: b.x, y: b.y }, b: { x: b.x + b.w, y: b.y + b.h } }];
+}
+
+/**
+ * Zeichenfolge eines Ausschnitts nach der vorhandenen CAD-Ebenenreihenfolge
+ * (wie `Renderer._drawByLabelOrder`: hinten → vorne, je Ebene erst Pixel,
+ * dann Vektoren). Objekte ohne bekannte Ebene folgen zuletzt.
+ */
+export function projectionDrawSteps(items: ProjectionItem[], raster: ProjectionRaster): { rasterLabel: string | null; items: ProjectionItem[] }[] {
+  const known = new Set(raster.order);
+  const steps: { rasterLabel: string | null; items: ProjectionItem[] }[] = [];
+  for (let i = raster.order.length - 1; i >= 0; i--) {
+    const id = raster.order[i];
+    const vis = raster.visible(id);
+    steps.push({ rasterLabel: vis ? id : null, items: items.filter((it) => it.labelId === id) });
+  }
+  steps.push({ rasterLabel: null, items: items.filter((it) => !it.labelId || !known.has(it.labelId)) });
+  return steps;
 }
 
 /** Padding um die Items-BBox in Plan-mm — damit der blaue Auswahlrahmen Luft hat
@@ -258,17 +292,13 @@ export function drawProjection(
     y: offY + y * itemScalePxPerSheetM,
   });
 
-  if (raster) {
-    // Sichtbarer Blattbereich = Zuschnitt im Blattsystem → nur diese Kacheln laden.
-    const s = itemScalePxPerSheetM || 1;
-    const view = { x: (clipL - offX) / s, y: (clipT - offY) / s, w: (clipR - clipL) / s, h: (clipB - clipT) / s };
-    for (const id of raster.order) {
-      if (!raster.visible(id)) continue;
-      raster.layers.get(id)?.drawMapped(ctx, s, offX, offY, view);
-    }
-  }
-
-  for (const it of items) {
+  const s = itemScalePxPerSheetM || 1;
+  const view = { x: (clipL - offX) / s, y: (clipT - offY) / s, w: (clipR - clipL) / s, h: (clipB - clipT) / s };
+  const steps = raster ? projectionDrawSteps(items, raster) : [{ rasterLabel: null, items }];
+  for (const step of steps) {
+  // Sichtbarer Blattbereich = Zuschnitt im Blattsystem → nur diese Kacheln laden.
+  if (raster && step.rasterLabel) raster.layers.get(step.rasterLabel)?.drawMapped(ctx, s, offX, offY, view);
+  for (const it of step.items) {
     if (it.kind === "hatch" && it.points && it.points.length >= 3) {
       const fillAlpha = (it.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
       ctx.beginPath();
@@ -326,6 +356,7 @@ export function drawProjection(
       }
       ctx.restore();
     }
+  }
   }
 
   ctx.restore();
