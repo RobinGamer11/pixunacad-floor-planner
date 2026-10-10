@@ -197,3 +197,8 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] startRasterJob ohne decoded-Sammlung; Budget bis zum Commit
 - [x] Undo: Zeichnen + Rasterabschluss als eine Aktion, ohne Nachtrag in fertige Schritte (Schritt wartet auf Jobabschluss)
 - [ ] Speichermessung → Projekt-/Kontolimit in SQL eintragen (blockiert durch offene Punkte oben)
+
+## Pixelmodus Paket B
+- [x] Speicherprobe mit vielen Pixelobjekten (scripts/storage_probe.py, docs/storage-probe.md)
+- [x] Projekt 50 MB / Konto 150 MB in SQL und Client eingetragen
+- [ ] SQL-Datei manuell in Supabase anwenden (durch den Nutzer)

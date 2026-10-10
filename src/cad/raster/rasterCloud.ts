@@ -25,6 +25,9 @@ export type RasterCloudStatus = "off" | "syncing" | "synced" | "quota" | "unconf
 /** Muss mit `storage_quota_settings.file_bytes` / Bucketlimits übereinstimmen. */
 export const MAX_UPLOAD_BYTES = 10_000_000;
 export const MAX_TILE_UPLOAD_BYTES = 2_000_000;
+/** Gleiche Werte wie storage_quota_settings (Speicherprobe); Server bleibt maßgeblich. */
+export const PROJECT_QUOTA_BYTES = 50_000_000;
+export const ACCOUNT_QUOTA_BYTES = 150_000_000;
 type L = (s: RasterCloudStatus, detail?: string) => void;
 const listeners = new Set<L>();
 let status: RasterCloudStatus = "off";

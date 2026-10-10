@@ -59,8 +59,12 @@ alter table public.storage_quota_settings add column if not exists reservation_t
 insert into public.storage_quota_settings (id) values (true) on conflict do nothing;
 
 -- Startprofil. Effektive Dateigrenze = global_bytes − global_reserve_bytes = 700.000.000 Bytes.
--- project_bytes/account_bytes: siehe Abschnitt 9 (nach Speichermessung gesetzt).
+-- project_bytes/account_bytes aus der Speicherprobe (scripts/storage_probe.py, docs/storage-probe.md):
+--   Stress-Pixelprojekt 700 Kacheln ≈ 7,2 MB; × 2 (Browser-PNG weniger dicht) × 3 (Verlauf bis zur
+--   Verdichtung) ≈ 43 MB → Projekt 50 MB. Konto 150 MB = 3 Stressprojekte oder ~50 typische.
 update public.storage_quota_settings set
+  project_bytes        =   50000000,
+  account_bytes        =  150000000,
   global_bytes         = 1000000000,
   global_reserve_bytes =  300000000,
   file_bytes           =   10000000,
