@@ -25,16 +25,6 @@ import { getOrCreateDocMask } from "./documentMask";
 /** Maximale Kantenlänge des eingebrannten Pixelbildes. */
 const MAX_BAKE_PX = 4096;
 
-/** true, wenn das Dokument aus einem PDF stammt (also umschaltbar ist). */
-export function isPdfBackedDocument(doc: DocumentObject | null | undefined): boolean {
-  return !!doc && !!doc.pdfSourceB64;
-}
-
-/** true, wenn ein PDF-Dokument aktuell im Pixelmodus liegt. */
-export function isDocumentPixelMode(doc: DocumentObject | null | undefined): boolean {
-  return !!doc && !!doc.pdfSourceB64 && doc.kind === "image";
-}
-
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();

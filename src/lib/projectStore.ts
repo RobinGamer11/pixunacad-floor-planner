@@ -210,11 +210,6 @@ export interface ProjectSettings {
   timelinePosition?: "top" | "bottom";
   /** Projektbezogene Schnellhilfe in CAD, Export und Board. Fehlend bedeutet initial aktiv. */
   helpOn?: boolean;
-  /** Zielauflösung für neu erzeugte Pixelobjekte. */
-  pixelRenderDpi?: number;
-  /** Optionales zusätzliches Supersampling vor dem PNG-Zuschnitt. */
-  pixelSupersampling?: boolean;
-  pixelSupersamplingFactor?: 2 | 4;
 }
 
 export interface Project {
