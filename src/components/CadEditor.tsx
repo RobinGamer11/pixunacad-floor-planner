@@ -893,14 +893,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     // CAD-State pro Projekt aus localStorage wiederherstellen
     const persistKey = `pixuna.cad.${projectId ?? "default"}`;
     let lastPersistRev = -1;
+    let inFlightRev = -1;
+    // Projektöffnung = Laden: bis IndexedDB/Cloud geantwortet haben, wird der
+    // vorläufige localStorage-Vektorstand nie zurückgeschrieben.
+    let initialLoading = true;
     const persist = () => {
       try {
+        if (initialLoading) return;
+        // Revisionsprüfung VOR der teuren Serialisierung.
+        const rev = (app as any).contentRevision ?? 0;
+        if (rev === lastPersistRev || rev === inFlightRev) return;
         const snap = (app as any)._serializeScene?.();
         if (typeof snap !== "string") return;
-        const rev = (app as any).contentRevision ?? 0;
-        const changed = rev !== lastPersistRev;
-        lastPersistRev = rev;
-        if (changed) saveLocalScene(projectId ?? "default", snap, rev, persistKey);
+        inFlightRev = rev;
+        // Erst nach bestätigtem Schreiben gilt die Revision als gespeichert.
+        saveLocalScene(projectId ?? "default", snap, rev, persistKey).then((ok) => {
+          if (inFlightRev === rev) inFlightRev = -1;
+          if (ok) lastPersistRev = Math.max(lastPersistRev, rev);
+        });
         if (projectId) {
           try {
             const data = JSON.parse(snap);
