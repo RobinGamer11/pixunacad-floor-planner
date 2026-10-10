@@ -14,6 +14,12 @@ export interface LocalProjectRecord {
   savedAt: number;
   /** Szene ohne Pixeldaten; Rasterinhalt als Manifest mit Hash-Referenzen. */
   sceneJson: string;
+  /** Zuletzt bestätigte Cloudrevision je Blatt-Key (Basis der Konfliktprüfung). */
+  cloudBase?: Record<string, number>;
+  /** Persistente Outbox: Keys mit lokalen, noch nicht veröffentlichten Änderungen. */
+  dirtyKeys?: string[];
+  /** Bei beidseitiger Änderung erhaltener Cloudstand je Key (lokal bleibt maßgeblich). */
+  conflicts?: Record<string, { revision: number; layers: unknown }>;
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -89,4 +95,39 @@ export async function putBlobs(blobs: Map<string, Blob>): Promise<void> {
   const tx = db.transaction(BLOBS, "readwrite");
   for (const [hash, blob] of blobs) tx.objectStore(BLOBS).put(blob, hash);
   await done(tx);
+}
+
+/** Liest, ändert und schreibt einen Projektdatensatz in EINER Transaktion. */
+export async function patchProjectLocal(projectId: string, fn: (rec: LocalProjectRecord | undefined) => LocalProjectRecord | null): Promise<LocalProjectRecord | null> {
+  const db = await open();
+  const tx = db.transaction(PROJECTS, "readwrite");
+  const st = tx.objectStore(PROJECTS);
+  let out: LocalProjectRecord | null = null;
+  const req = st.get(projectId);
+  req.onsuccess = () => { out = fn(req.result as LocalProjectRecord | undefined); if (out) st.put(out); };
+  await done(tx);
+  return out;
+}
+
+/**
+ * Löscht Blobs, auf die kein gespeicherter Projektstand (inkl. Outbox und
+ * Konfliktstände) und nichts aus `keep` (Sitzung: Undo/Redo, laufende Jobs,
+ * offene Speichervorgänge) mehr verweist. Läuft in einer Transaktion über
+ * beide Speicher – parallele Speichervorgänge werden davor oder danach serialisiert.
+ */
+export async function gcBlobs(keep: Set<string>, hashesOfRecord: (rec: LocalProjectRecord) => Iterable<string>): Promise<number> {
+  const db = await open();
+  const tx = db.transaction([BLOBS, PROJECTS], "readwrite");
+  let removed = 0;
+  const all = tx.objectStore(PROJECTS).getAll();
+  all.onsuccess = () => {
+    const used = new Set(keep);
+    for (const rec of all.result as LocalProjectRecord[]) { try { for (const h of hashesOfRecord(rec)) used.add(h); } catch { return tx.abort(); } }
+    const keys = tx.objectStore(BLOBS).getAllKeys();
+    keys.onsuccess = () => {
+      for (const k of keys.result) if (!used.has(String(k))) { tx.objectStore(BLOBS).delete(k); removed++; }
+    };
+  };
+  await done(tx);
+  return removed;
 }
