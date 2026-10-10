@@ -11,7 +11,6 @@ import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
 import { findEnclosingFace } from "./hatchFill";
-import { findHybridEnclosingFace } from "./hybridFill";
 
 import { toast } from "sonner";
 
@@ -767,31 +766,15 @@ export class HatchTool {
 
   private _onFillClick(input: Input) {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
-    const raster = this.app.rasterLayers;
     const isVisible = (id: string) => this.app.labelManager.isVisible(id);
     // Bibliotheksobjekte begrenzen die Füllung wie normale Geometrie; sie
     // werden dabei ausschließlich gelesen und bleiben unverändert.
     const libScenes = (this.app.topology.librarySnaps?.scenesFor(this.app.scene, isVisible) || []).map((e) => e.scene);
-    // Reihenfolge: 1) exakter Vektorpfad (DCEL) — liefert wenige, originale
-    // Punkte. 2) Nur wenn dort kein geschlossener Bereich gefunden wird und
-    // sichtbarer Rasterinhalt existiert, greift die hybride Rasteranalyse.
-    let loop: ReturnType<typeof findEnclosingFace> = findEnclosingFace(this.app.scene, mouseW, libScenes);
-    if (!loop || loop.length < 3) {
-      const hasRaster = !!raster?.labelIds().some((id) => isVisible(id));
-      if (hasRaster) {
-        try {
-          loop = findHybridEnclosingFace(this.app.scene, raster, mouseW, { scope: "all", isVisible, extraScenes: libScenes });
-        } catch (e) {
-          if ((e as Error)?.name !== "RasterNotReadyError") throw e;
-          raster?.whenIdle().then(() => (this.app.renderer as any).requestDraw?.());
-          toast("Pixel werden noch geladen", { description: "Bitte gleich noch einmal klicken." });
-          return;
-        }
-      }
-    }
+    // Exakter Vektorpfad (DCEL) — liefert wenige, originale Punkte.
+    const loop = findEnclosingFace(this.app.scene, mouseW, libScenes);
     if (!loop || loop.length < 3) {
       toast.error("Bereich nicht geschlossen", {
-        description: "Klicke in einen vollständig von Linien, Wänden oder Pixelstrichen umschlossenen Bereich.",
+        description: "Klicke in einen vollständig von Linien oder Wänden umschlossenen Bereich.",
       });
       return;
     }

@@ -147,13 +147,10 @@ export class IdPanel {
       // Bilder/PDFs zählen genauso als Objekte dieser Bezeichnungs-ID.
       let docCount = 0;
       try { docCount = this.app.scene.getDocumentsByLabelId?.(group.id).length ?? 0; } catch {}
-      // Rasterinhalt (Pixelmodus der Projektmappe) zählt ebenfalls als Objekte.
-      let rasterCount = 0;
-      try { rasterCount = (this.app as any).rasterLayers?.get?.(group.id)?.strokeCount ?? 0; } catch {}
       const stairCount = this.app.scene.getStairsByLabelId(group.id).length;
       let extraCount = 0;
       try { extraCount = (this.app as any).externalLabelCounter?.(group.id) ?? 0; } catch {}
-      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount + stairCount + docCount + rasterCount + extraCount;
+      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount + stairCount + docCount + extraCount;
       const row = document.createElement("div");
       row.className = "id-row";
       row.dataset.id = group.id;

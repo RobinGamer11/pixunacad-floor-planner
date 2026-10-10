@@ -27,7 +27,6 @@ function quantKey(p: Vec2): string {
 
 /**
  * Sammelt alle Vektorkanten der Szene, die als Füllbegrenzung gelten.
- * Wird auch von der hybriden Vektor/Raster-Analyse (`hybridFill.ts`) genutzt.
  *
  * `extraScenes` sind zusätzliche, schreibgeschützte Weltszenen — z. B. die
  * aufgelöste Geometrie platzierter Bibliotheksobjekte. Deren Konturen

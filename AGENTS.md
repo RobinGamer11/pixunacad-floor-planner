@@ -41,11 +41,13 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
 - Treppen-Knöpfe sind DOM über der Zeichenfläche, nie Geometrie; Cursor-Reset zentral in `CadApp.setTool`.
 - Export-Ausschnitte transformieren als Sitzung in `PlanController` (`_drag.preview`); Projection erst bei ✓/Enter geändert.
-- Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges` – kein zweites Bedienkonzept.
+- Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges`.
 - Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M` je Auftritt) – Podeste wachsen nie automatisch, nur durch bewusste Eingabe.
 
 ## Hilfslinien
 - Hilfslinien-Geometrie (Punkte, Kanten, anliegende Achsen) liefert nur `src/cad/guideGeometry.ts` aus echter Objektgeometrie (über `TopologyEngine.guideGeometry`) – nie Probeabfragen, nie Werkzeug-Sonderlogik.
 - Rechtsklick-Hilfslinien laufen nur über `GuideInteractionController` → `GlobalGuides` (Gruppen mit Referenzzählung, je Kontext `cad|export:sheet|plan`) – flüchtig, nie Cloud/Undo/Export, nie zwischen Blatt und Exportseite.
 - Benutzerhandlung = `CadApp.runAction` → 1 Undo, Fehler = volle Rücknahme.
-- Pixel/Raster-Regeln: siehe `src/cad/raster/AGENTS.md`.
+
+## Speicher
+- Gezeichnetes nur Vektor (Pixel nur in Importen). Lokaler Stand nur via `cad/persist/localScenePersist.ts`, Anhänge nur via `lib/storageQuota.ts` (Grenzen = SQL v2).
