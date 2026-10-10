@@ -520,7 +520,7 @@ export class RasterLayer {
 
   /** Zeichnet den Rasterinhalt in den Viewport (Bildschirm-Canvas). */
   draw(ctx: CanvasRenderingContext2D, camera: Camera) {
-    this._drawFills(ctx, camera.scale, camera.offsetX, camera.offsetY, ctx.canvas?.width ?? 0, ctx.canvas?.height ?? 0);
+    this._drawFills(ctx, camera.scale, camera.offsetX, camera.offsetY, 0, 0);
     if (this.tiles.size === 0) return;
     const tw = this.tileWorld;
     const sizePx = tw * camera.scale;
