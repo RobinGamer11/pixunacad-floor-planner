@@ -8,7 +8,8 @@ const LABEL: Record<LocalSaveStatus, string> = {
 };
 const CLOUD: Record<RasterCloudStatus, string> = {
   off: "", syncing: "Pixel: Cloud …", synced: "Pixel in Cloud", quota: "Cloud-Speicher voll",
-  unconfigured: "Pixel nur lokal (Cloud-Limits fehlen)", conflict: "Pixel-Konflikt", error: "Pixel-Cloud fehlgeschlagen",
+  unconfigured: "Lokal gespeichert – Cloud-Einrichtung fehlt", conflict: "Pixel-Konflikt", error: "Pixel-Cloud fehlgeschlagen",
+  "setup-missing": "Lokal gespeichert – Cloud-Einrichtung fehlt", forbidden: "Pixel nur lokal (keine Cloud-Berechtigung)", offline: "Offline – Pixel nur lokal",
 };
 
 /** Dauerhafte Anzeige: lokaler Gerätestand und getrennt der Cloud-Stand der Pixel. */
