@@ -30,7 +30,7 @@ export interface RasterManifestEntry {
   tiles: RasterTileRef[];
   /** nur patternFill: Muster einmal referenziert. */
   patternHash?: string;
-  /** nur solidFill: kompakte Flächenbeschreibung (Kontur, Löcher, Regel, Farbe, Alpha). */
+  /** solidFill/patternFill: kompakte Flächenbeschreibung (Kontur, Löcher, Regel, Farbe, Alpha, Mustertransformation). */
   fill?: CompactFillJSON;
 }
 
@@ -87,7 +87,7 @@ type Effective = Map<string, string>; // "tx,ty" -> hash (nur reine Checkpoint-K
 function effectiveTiles(lm: RasterLayerManifest): Effective | null {
   const m: Effective = new Map();
   for (const e of [...lm.entries].sort((a, b) => a.order - b.order)) {
-    if (e.kind === "solidFill") continue;
+    if (e.kind === "solidFill" || e.kind === "patternFill") continue;
     if (e.kind !== "checkpoint") return null;
     for (const t of e.tiles) m.set(`${t.tx},${t.ty}`, t.hash);
   }
@@ -118,7 +118,7 @@ export async function toManifest(rasterByKey: Record<string, any[]> | undefined,
       if (!tiles.length && !fills.length) continue;
       const full = (): RasterManifestEntry[] => tiles.length ? [{ id: newEntryId(), kind: "checkpoint", revision, order: 0, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles }] : [];
       const oldRaw = prev?.[key]?.find((x) => x.labelId === l.labelId);
-      const old = oldRaw ? { ...oldRaw, entries: oldRaw.entries.filter((e) => e.kind !== "solidFill") } : undefined;
+      const old = oldRaw ? { ...oldRaw, entries: oldRaw.entries.filter((e) => e.kind !== "solidFill" && e.kind !== "patternFill") } : undefined;
       let entries = full();
       const eff = old ? effectiveTiles(old) : null;
       const sameRes = old?.entries.every((e) => e.pxPerM === l.pxPerM && e.tilePx === l.tilePx);
@@ -133,9 +133,18 @@ export async function toManifest(rasterByKey: Record<string, any[]> | undefined,
             : old.entries;
         }
       }
-      // Kompakte Flächen: je Fläche ein solidFill-Eintrag ohne Pixeldaten.
+      // Kompakte Flächen: je Fläche ein solidFill-/patternFill-Eintrag ohne
+      // Flächenpixel. Eigene Musterbilder liegen einmal je Inhalt als Blob.
       const base = entries.length ? Math.max(...entries.map((e) => e.order)) + 1 : 0;
-      fills.forEach((f, i) => entries = [...entries, { id: f.id || newEntryId(), kind: "solidFill", revision, order: base + i, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles: [], fill: f }]);
+      for (let i = 0; i < fills.length; i++) {
+        const f = fills[i];
+        if (f.pattern) {
+          const { src, ...pat } = f.pattern;
+          const ph = src ? await srcToHash(src, newBlobs) : pat.hash;
+          if (src && !ph) continue; // Musterbild nicht lesbar: nie ohne Muster speichern
+          entries = [...entries, { id: f.id || newEntryId(), kind: "patternFill", revision, order: base + i, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles: [], ...(ph ? { patternHash: ph } : {}), fill: { ...f, pattern: { ...pat, ...(ph ? { hash: ph } : {}) } } }];
+        } else entries = [...entries, { id: f.id || newEntryId(), kind: "solidFill", revision, order: base + i, pxPerM: l.pxPerM, tilePx: l.tilePx, tiles: [], fill: f }];
+      }
       layers.push({ labelId: l.labelId, strokeCount: l.strokeCount ?? 1, entries });
     }
     if (layers.length) out[key] = layers;
@@ -192,8 +201,17 @@ export async function fromManifest(m: RasterManifest | undefined, missing: strin
     const layers: any[] = [];
     for (const lm of m![key]) {
       const all = [...lm.entries].sort((a, b) => a.order - b.order);
-      const fills = all.filter((e) => e.kind === "solidFill" && e.fill).map((e) => e.fill!);
-      const entries = all.filter((e) => e.kind !== "solidFill");
+      const fills: CompactFillJSON[] = [];
+      for (const e of all) {
+        if ((e.kind !== "solidFill" && e.kind !== "patternFill") || !e.fill) continue;
+        const ph = e.patternHash ?? e.fill.pattern?.hash;
+        if (e.kind === "patternFill" && ph) {
+          const u = await urlFor(ph);
+          if (!u) { missing.push(`${key}/${lm.labelId}: Musterbild ${ph}`); }
+          fills.push({ ...e.fill, pattern: { ...e.fill.pattern!, hash: ph, ...(u ? { src: u } : {}) } });
+        } else fills.push(e.fill);
+      }
+      const entries = all.filter((e) => e.kind !== "solidFill" && e.kind !== "patternFill");
       if (!entries.length) {
         if (fills.length) layers.push({ labelId: lm.labelId, pxPerM: all[0].pxPerM, tilePx: all[0].tilePx, tiles: [], fills, strokeCount: lm.strokeCount });
         continue;

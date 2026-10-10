@@ -541,6 +541,8 @@ export interface HatchPatternOptions {
   color: string;
   alpha: number;
   lineWidthPx: number;
+  /** Fertiges Musterbild (eigene Muster aus dem Projektstand), statt per ID nachzuschlagen. */
+  tileOverride?: HTMLCanvasElement | HTMLImageElement;
 }
 
 
@@ -568,7 +570,7 @@ export function fillWithHatchPattern(
   const kAvg = k * Math.sqrt(stretch);
   const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, kAvg)));
   const lwTile = Math.round(lwRaw * 4) / 4; // quantisiert -> stabiler Kachel-Cache
-  const tile = getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
+  const tile = opt.tileOverride ?? getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
   if (!pat) return;
   // Bildkacheln können in Originalauflösung vorliegen → auf Kachelbreite normieren.

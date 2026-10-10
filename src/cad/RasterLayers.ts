@@ -33,6 +33,9 @@ import type { Camera } from "./Camera";
 import { rasterResources, type ResidentTile } from "./raster/RasterResourceManager";
 import { segmentHitsRect } from "./raster/rasterCoverage";
 import { resolveTileSrc } from "./raster/lazyTileSrc";
+import { fillWithHatchPattern, type HatchPatternId } from "./hatchPatterns";
+import { getCustomPatternImage, isCustomPatternId } from "./customHatchPatterns";
+import { getImagePattern, isImagePatternId } from "./builtinImagePatterns";
 
 /**
  * Kompakte Vollfläche (Manifest `solidFill`): Kontur + Löcher + Füllregel +
@@ -47,10 +50,89 @@ export interface CompactFillJSON {
   color: string;
   alpha: number;
   mat?: string[];
+  /** Manifest `patternFill`: Muster über der Grundfläche (sonst reine Vollfläche). */
+  pattern?: CompactPatternJSON;
+}
+/**
+ * Mustertransformation in Weltkoordinaten. Eingebaute Muster sind über `id`
+ * referenziert (Bild liegt in der App); eigene Musterbilder liegen genau
+ * einmal je Inhalt als Blob (`hash`, Laufzeit-`src`).
+ */
+export interface CompactPatternJSON {
+  id: string;
+  scale: number;
+  angleDeg: number;
+  skewDeg: number;
+  stretch: number;
+  color: string;
+  /** Strichbreite in Weltmetern (zoom-/auflösungsunabhängig). */
+  lineWidthM: number;
+  /** Musteranker in Weltkoordinaten. */
+  ax: number;
+  ay: number;
+  /** nur eigene Bildmuster: Bildquelle (data:/blob:) bzw. Inhaltshash im Manifest. */
+  src?: string;
+  hash?: string;
 }
 interface CompactFill extends Omit<CompactFillJSON, "mat"> {
   mat: Set<string>;
   bbox: { x0: number; y0: number; x1: number; y1: number };
+  img?: HTMLImageElement | null;
+}
+
+/** Bild eines eigenen Musters (einmal je Quelle geladen). */
+const patternImages = new Map<string, HTMLImageElement>();
+function patternImage(src: string): HTMLImageElement | null {
+  let img = patternImages.get(src);
+  if (!img) {
+    img = new Image();
+    patternImages.set(src, img);
+    resolveTileSrc(src).then((u) => { if (u) img!.src = u; });
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+/** true, wenn das Muster der Fläche ohne Nachladen zeichnbar ist. */
+function fillReady(f: CompactFill): boolean {
+  const p = f.pattern;
+  if (!p) return true;
+  if (p.src) return !!patternImage(p.src);
+  if (isCustomPatternId(p.id)) return !!getCustomPatternImage(p.id);
+  if (isImagePatternId(p.id)) return !!getImagePattern(p.id);
+  return true;
+}
+/**
+ * Zeichnet eine kompakte Fläche (Grundfarbe + optional Muster) mit der
+ * Abbildung ctx = Welt * k + off. Setzt `fillReady` voraus.
+ */
+function paintCompactFill(ctx: CanvasRenderingContext2D, f: CompactFill, k: number, offX: number, offY: number) {
+  ctx.save();
+  ctx.globalCompositeOperation = "source-over";
+  ctx.beginPath();
+  for (const r of f.rings) {
+    if (r.length < 3) continue;
+    ctx.moveTo(r[0].x * k + offX, r[0].y * k + offY);
+    for (let i = 1; i < r.length; i++) ctx.lineTo(r[i].x * k + offX, r[i].y * k + offY);
+    ctx.closePath();
+  }
+  if (f.alpha > 0) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, f.alpha));
+    ctx.fillStyle = f.color;
+    ctx.fill(f.rule);
+  }
+  const p = f.pattern;
+  if (p) {
+    ctx.globalAlpha = 1;
+    ctx.clip(f.rule);
+    const bx = f.bbox.x0 * k + offX, by = f.bbox.y0 * k + offY;
+    const tile = p.src ? patternImage(p.src) : null;
+    fillWithHatchPattern(ctx, { x: bx - 2, y: by - 2, w: (f.bbox.x1 - f.bbox.x0) * k + 4, h: (f.bbox.y1 - f.bbox.y0) * k + 4 },
+      { x: p.ax * k + offX, y: p.ay * k + offY }, k, {
+        patternId: p.id as HatchPatternId, scale: p.scale, angleDeg: p.angleDeg, skewDeg: p.skewDeg, stretch: p.stretch,
+        color: p.color, alpha: 1, lineWidthPx: Math.max(0.6, p.lineWidthM * k),
+        ...(tile ? { tileOverride: tile } : {}),
+      } as any);
+  }
+  ctx.restore();
 }
 function fillBBox(rings: { x: number; y: number }[][]) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -197,6 +279,8 @@ interface RasterTile {
   pending?: ((ctx: CanvasRenderingContext2D) => void)[];
   /** Zeitpunkt des letzten fehlgeschlagenen Ladeversuchs (Kachel bleibt unbekannt). */
   failedAt?: number;
+  /** >0, solange ein Musterbild für die Materialisierung noch lädt. */
+  patternWait?: number;
   res: ResidentTile;
   /** Eigener Auflösungsfaktor (1 = Ebenenauflösung, <1 = gröber). */
   s: number;
@@ -266,7 +350,7 @@ export class RasterLayer {
       tile.res = {
         tilePx,
         evict: () => {
-          if (tile.loading || tile.evicted || !tile.dataUrl || tile.pending?.length) return false;
+          if (tile.loading || tile.evicted || !tile.dataUrl || tile.pending?.length || tile.patternWait) return false;
           tile.canvas.width = 0; tile.canvas.height = 0; tile.evicted = true;
           return true;
         },
@@ -281,24 +365,8 @@ export class RasterLayer {
   private _bump(key: string) { this.ver.set(key, (this.ver.get(key) ?? 0) + 1); }
   tileVersion(tx: number, ty: number): number { return this.ver.get(this._key(tx, ty)) ?? 0; }
 
-  /** Zeichnet die Fläche in Ebenen-Pixelkoordinaten der Kachel (Ursprung ox/oy). */
-  private _traceFill(ctx: CanvasRenderingContext2D, f: CompactFill, ox: number, oy: number, k: number) {
-    ctx.beginPath();
-    for (const r of f.rings) {
-      if (r.length < 3) continue;
-      ctx.moveTo((r[0].x - ox) * k, (r[0].y - oy) * k);
-      for (let i = 1; i < r.length; i++) ctx.lineTo((r[i].x - ox) * k, (r[i].y - oy) * k);
-      ctx.closePath();
-    }
-  }
   private _paintFill(ctx: CanvasRenderingContext2D, f: CompactFill, ox: number, oy: number, k: number) {
-    ctx.save();
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = Math.max(0, Math.min(1, f.alpha));
-    ctx.fillStyle = f.color;
-    this._traceFill(ctx, f, ox, oy, k);
-    ctx.fill(f.rule);
-    ctx.restore();
+    paintCompactFill(ctx, f, k, -ox * k, -oy * k);
   }
 
   /**
@@ -312,10 +380,35 @@ export class RasterLayer {
     const todo = this.fills.filter((f) => !f.mat.has(key) && fillHitsRect(f, ox, oy, ox + tw, oy + tw));
     if (!todo.length) return;
     for (const f of todo) f.mat.add(key);
+    // Musterbild noch nicht geladen: Kachel wartet (unbekannt, nie leer);
+    // Materialisierung und alle späteren Änderungen laufen danach in Reihenfolge.
+    if (todo.some((f) => !fillReady(f))) this._waitForPatterns(tile, todo);
     this._materializing = true;
     try {
       this._mutate(tile, this._scaled(tile, (ctx) => { for (const f of todo) this._paintFill(ctx, f, ox, oy, this.pxPerM); }));
     } finally { this._materializing = false; }
+  }
+
+  private _waitForPatterns(tile: RasterTile, todo: CompactFill[]) {
+    tile.patternWait = (tile.patternWait ?? 0) + 1;
+    const started = Date.now();
+    const poll = () => {
+      if (!todo.every(fillReady) && Date.now() - started < 60_000) { setTimeout(poll, 100); return; }
+      tile.patternWait = Math.max(0, (tile.patternWait ?? 1) - 1);
+      this._flushPending(tile);
+      this.onTileReady?.();
+    };
+    setTimeout(poll, 0);
+  }
+
+  /** Wendet wartende Änderungen an, sobald die Kachel vollständig bereit ist. */
+  private _flushPending(tile: RasterTile) {
+    if (tile.loading || tile.evicted || tile.patternWait) { if (tile.evicted && !tile.patternWait) this._ensure(tile); return; }
+    const pend = tile.pending; tile.pending = undefined;
+    if (!pend?.length) return;
+    for (const fn of pend) { tile.ctx.save(); fn(tile.ctx); tile.ctx.restore(); }
+    tile.dataUrl = null; tile.sid = null;
+    rasterResources.touch(tile.res);
   }
 
   /** Legt Kacheln an, wo Flächen im Rechteck noch nicht materialisiert sind. */
@@ -343,7 +436,8 @@ export class RasterLayer {
   addFill(json: CompactFillJSON) {
     const rings = (json.rings || []).filter((r) => Array.isArray(r) && r.length >= 3).map((r) => r.map((p) => ({ x: p.x, y: p.y })));
     if (!rings.length) return;
-    const f: CompactFill = { id: json.id, rings, rule: json.rule === "nonzero" ? "nonzero" : "evenodd", color: json.color, alpha: json.alpha, mat: new Set(json.mat ?? []), bbox: fillBBox(rings) };
+    const f: CompactFill = { id: json.id, rings, rule: json.rule === "nonzero" ? "nonzero" : "evenodd", color: json.color, alpha: json.alpha, mat: new Set(json.mat ?? []), bbox: fillBBox(rings), ...(json.pattern ? { pattern: { ...json.pattern } } : {}) };
+    if (f.pattern?.src) patternImage(f.pattern.src); // früh nachladen
     this.fills.push(f);
     this.fillsVersion++;
     for (const t of [...this.tiles.values()]) this._materialize(t);
@@ -370,12 +464,9 @@ export class RasterLayer {
         tile.ctx.clearRect(0, 0, n, n);
         if (ok) tile.ctx.drawImage(img, 0, 0, n, n);
       } catch { /* Kachel bleibt leer */ }
-      const pend = tile.pending; tile.pending = undefined;
-      if (pend?.length) {
-        for (const fn of pend) { tile.ctx.save(); fn(tile.ctx); tile.ctx.restore(); }
-        tile.dataUrl = null; tile.sid = null;
-      }
       tile.loading = false;
+      tile.failedAt = undefined;
+      this._flushPending(tile);
       rasterResources.touch(tile.res);
       onReady?.();
     };
@@ -390,7 +481,7 @@ export class RasterLayer {
   /** Lädt eine verdrängte Kachel bei Bedarf nach (Cache-Miss ≠ transparent). */
   private _ensure(tile: RasterTile): boolean {
     if (tile.evicted && !tile.loading && tile.dataUrl && !(tile.failedAt && Date.now() - tile.failedAt < 5000)) this._loadInto(tile, tile.dataUrl, () => this.onTileReady?.());
-    if (tile.loading || tile.evicted) return false;
+    if (tile.loading || tile.evicted || tile.patternWait) return false;
     rasterResources.touch(tile.res);
     return true;
   }
@@ -399,7 +490,7 @@ export class RasterLayer {
   private _mutate(tile: RasterTile, fn: (ctx: CanvasRenderingContext2D) => void) {
     this._materialize(tile);
     this._bump(this._key(tile.tx, tile.ty));
-    if (tile.loading || tile.evicted) {
+    if (tile.loading || tile.evicted || tile.patternWait) {
       (tile.pending ||= []).push(fn);
       tile.sid = null;
       this._ensure(tile);
@@ -526,36 +617,57 @@ export class RasterLayer {
 
   /** Zeichnet den Rasterinhalt in den Viewport (Bildschirm-Canvas). */
   draw(ctx: CanvasRenderingContext2D, camera: Camera) {
-    this._drawFills(ctx, camera.scale, camera.offsetX, camera.offsetY, 0, 0);
-    if (this.tiles.size === 0) return;
-    const tw = this.tileWorld;
-    const sizePx = tw * camera.scale;
-    // Sichtbarer Weltbereich + 1 Kachel Rand: nur diese Kacheln werden geladen.
     const m = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
     const sx = m && m.a ? Math.abs(m.a) : 1, sy = m && m.d ? Math.abs(m.d) : 1;
-    const vw = ctx.canvas.width / sx, vh = ctx.canvas.height / sy;
     const k = camera.scale || 1;
-    const wx0 = -camera.offsetX / k, wy0 = -camera.offsetY / k;
-    const tx0 = Math.floor(wx0 / tw) - 1, ty0 = Math.floor(wy0 / tw) - 1;
-    const tx1 = Math.floor((wx0 + vw / k) / tw) + 1, ty1 = Math.floor((wy0 + vh / k) / tw) + 1;
+    const vw = ctx.canvas.width / sx, vh = ctx.canvas.height / sy;
+    this.drawMapped(ctx, k, camera.offsetX, camera.offsetY, { x: -camera.offsetX / k, y: -camera.offsetY / k, w: vw / k, h: vh / k });
+  }
+
+  /**
+   * Synchrones Zeichnen mit Abbildung ctx = Welt * k + off (Bildschirm,
+   * CAD-Ausschnitt auf Exportseite). Lädt nur Kacheln im sichtbaren
+   * Weltrechteck `view` (+1 Kachel Rand) nach.
+   */
+  drawMapped(ctx: CanvasRenderingContext2D, k: number, offX: number, offY: number, view: { x: number; y: number; w: number; h: number }) {
+    this._drawFills(ctx, k, offX, offY, 0, 0);
+    if (this.tiles.size === 0) return;
+    const tw = this.tileWorld;
+    const tx0 = Math.floor(view.x / tw) - 1, ty0 = Math.floor(view.y / tw) - 1;
+    const tx1 = Math.floor((view.x + view.w) / tw) + 1, ty1 = Math.floor((view.y + view.h) / tw) + 1;
     ctx.save();
     // Beim Vergrößern über die gespeicherte Rasterauflösung hinaus würde die
     // Glättung nur verwaschen — ab ~1,5-facher Vergrößerung wird pixelgenau
     // gezeichnet. Die gespeicherte Qualität bleibt davon unberührt.
-    const magnify = camera.scale / this.pxPerM;
+    const magnify = k / this.pxPerM;
     ctx.imageSmoothingEnabled = magnify <= 1.5;
     ctx.imageSmoothingQuality = "high";
     for (const tile of this.tiles.values()) {
       if (tile.tx < tx0 || tile.tx > tx1 || tile.ty < ty0 || tile.ty > ty1) continue;
       if (!this._ensure(tile)) continue;
-      const p = camera.worldToScreen(tile.tx * tw, tile.ty * tw);
-      // Kanten auf ganze Bildschirmpixel runden: benachbarte Kacheln stoßen so
-      // exakt aneinander, es entstehen weder Lücken noch Doppelkanten (Gitter).
-      const x0 = Math.round(p.x), y0 = Math.round(p.y);
-      const x1 = Math.round(p.x + sizePx), y1 = Math.round(p.y + sizePx);
-      ctx.drawImage(tile.canvas, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+      this._blitTile(ctx, tile, k, offX, offY);
     }
     ctx.restore();
+  }
+
+  /**
+   * Kachel auf ganze Zielpixel gerundet zeichnen und um 1 px überlappen:
+   * Die Glättung tastet am Kachelrand sonst Transparenz ab – sichtbare
+   * Haarlinien an Kachel-/Materialisierungsgrenzen.
+   */
+  private _blitTile(ctx: CanvasRenderingContext2D, tile: RasterTile, k: number, offX: number, offY: number) {
+    const tw = this.tileWorld;
+    const x0 = Math.round(tile.tx * tw * k + offX), y0 = Math.round(tile.ty * tw * k + offY);
+    const x1 = Math.round((tile.tx + 1) * tw * k + offX), y1 = Math.round((tile.ty + 1) * tw * k + offY);
+    const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+    const n = tile.canvas.width;
+    if (n > 2 && w > 2) {
+      // 1 Zielpixel Überlappung aus dem eigenen Inhalt (Rand um einen Quellpixel wiederholt).
+      const e = n / w;
+      ctx.drawImage(tile.canvas, 0, 0, n, n, x0, y0, w, h);
+      ctx.drawImage(tile.canvas, n - e, 0, e, n, x1, y0, 1, h);
+      ctx.drawImage(tile.canvas, 0, n - e, n, e, x0, y1, w, 1);
+    } else ctx.drawImage(tile.canvas, x0, y0, w, h);
   }
 
   /**
@@ -563,35 +675,39 @@ export class RasterLayer {
    * bereits materialisierte Kacheln – deren Inhalt kommt aus der Kachel.
    * Abbildung: Bildschirm = Welt * k + (offX, offY).
    */
-  private _drawFills(ctx: CanvasRenderingContext2D, k: number, offX: number, offY: number, vw: number, vh: number) {
-    if (!this.fills.length) return;
+  private _drawFills(ctx: CanvasRenderingContext2D, k: number, offX: number, offY: number, vw: number, vh: number): boolean {
+    if (!this.fills.length) return true;
     const tw = this.tileWorld;
     const vx0 = -offX / k, vy0 = -offY / k, vx1 = (vw - offX) / k, vy1 = (vh - offY) / k;
+    let ok = true;
     for (const f of this.fills) {
       if (vw > 0 && (f.bbox.x1 < vx0 || f.bbox.x0 > vx1 || f.bbox.y1 < vy0 || f.bbox.y0 > vy1)) continue;
+      if (!fillReady(f)) { ok = false; this._retryFills(); continue; }
       ctx.save();
       if (f.mat.size) {
+        // Deckende Flächen laufen 1 px unter materialisierte Kacheln (keine
+        // Haarlinie); halbtransparente stoßen exakt an (keine doppelte Deckung).
+        const inset = f.alpha >= 0.999 && !f.pattern ? 1 : 0;
         ctx.beginPath();
         ctx.rect(-1e7, -1e7, 2e7, 2e7);
         for (const key of f.mat) {
           const [tx, ty] = key.split(",").map(Number);
           const x0 = Math.round(tx * tw * k + offX), y0 = Math.round(ty * tw * k + offY);
           const x1 = Math.round((tx + 1) * tw * k + offX), y1 = Math.round((ty + 1) * tw * k + offY);
-          ctx.rect(x0, y0, x1 - x0, y1 - y0);
+          ctx.rect(x0 + inset, y0 + inset, Math.max(0, x1 - x0 - 2 * inset), Math.max(0, y1 - y0 - 2 * inset));
         }
         ctx.clip("evenodd");
       }
-      ctx.globalAlpha = Math.max(0, Math.min(1, f.alpha));
-      ctx.fillStyle = f.color;
-      ctx.beginPath();
-      for (const r of f.rings) {
-        ctx.moveTo(r[0].x * k + offX, r[0].y * k + offY);
-        for (let i = 1; i < r.length; i++) ctx.lineTo(r[i].x * k + offX, r[i].y * k + offY);
-        ctx.closePath();
-      }
-      ctx.fill(f.rule);
+      paintCompactFill(ctx, f, k, offX, offY);
       ctx.restore();
     }
+    return ok;
+  }
+
+  private _fillRetry: ReturnType<typeof setTimeout> | null = null;
+  private _retryFills() {
+    if (this._fillRetry) return;
+    this._fillRetry = setTimeout(() => { this._fillRetry = null; this.onTileReady?.(); }, 150);
   }
 
   /** Gibt alle Kacheln beim RAM-Budget frei. */
@@ -608,7 +724,11 @@ export class RasterLayer {
     const tile = this._tile(Math.floor(x / tw), Math.floor(y / tw), false);
     if (!tile) {
       const key = this._key(Math.floor(x / tw), Math.floor(y / tw));
-      return this.fills.some((f) => !f.mat.has(key) && f.alpha * 255 >= threshold && insideFill(f, x, y));
+      const hit = this.fills.filter((f) => !f.mat.has(key) && insideFill(f, x, y));
+      if (hit.some((f) => f.alpha * 255 >= threshold)) return true;
+      // Muster ohne deckende Grundfläche: Linienlage erst nach Laden bekannt.
+      if (hit.some((f) => f.pattern && !fillReady(f))) return null;
+      return false;
     }
     if (!this._ensure(tile)) return null;
     const n = this._px(tile);
@@ -626,8 +746,7 @@ export class RasterLayer {
   /** Liefert false, wenn Kacheln noch nachladen (Ergebnis unvollständig). */
   drawIntoMask(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, pxPerM: number): boolean {
     const k = pxPerM / this.pxPerM;
-    let complete = true;
-    this._drawFills(ctx, pxPerM, -x * pxPerM, -y * pxPerM, Math.ceil(w * pxPerM), Math.ceil(h * pxPerM));
+    let complete = this._drawFills(ctx, pxPerM, -x * pxPerM, -y * pxPerM, Math.ceil(w * pxPerM), Math.ceil(h * pxPerM));
     this._forRect(x, y, w, h, false, (tile, ox, oy) => {
       if (!this._ensure(tile)) { complete = false; return; }
       ctx.drawImage(
@@ -674,7 +793,7 @@ export class RasterLayer {
     }
     if (tiles.length === 0 && !this.fills.length) return null;
     const out: RasterLayerJSON = { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles, strokeCount: this.strokeCount };
-    if (this.fills.length) out.fills = this.fills.map((f) => ({ id: f.id, rings: f.rings, rule: f.rule, color: f.color, alpha: f.alpha, mat: [...f.mat] }));
+    if (this.fills.length) out.fills = this.fills.map((f) => ({ id: f.id, rings: f.rings, rule: f.rule, color: f.color, alpha: f.alpha, mat: [...f.mat], ...(f.pattern ? { pattern: f.pattern } : {}) }));
     return out;
   }
 
@@ -765,6 +884,10 @@ export class RasterLayer {
         }
         else throw new Error("Kachel nicht verfügbar");
       }
+      for (const until = Date.now() + 15000; !fills.every(fillReady);) {
+        if (Date.now() > until) throw new Error("Musterbild nicht verfügbar");
+        await new Promise((r) => setTimeout(r, 50));
+      }
       for (const f of fills) this._paintFill(ctx, f, ox, oy, this.pxPerM * sc);
       const url = URL.createObjectURL(blob);
       try { ctx.drawImage(await loadImg(url), 0, 0, n, n); } finally { URL.revokeObjectURL(url); }
@@ -843,6 +966,10 @@ export class RasterLayer {
    */
   async drawRegionAsync(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, k: number, offX: number, offY: number): Promise<boolean> {
     const vw = Math.ceil(ctx.canvas.width), vh = Math.ceil(ctx.canvas.height);
+    for (const until = Date.now() + 15000; !this.fills.every(fillReady);) {
+      if (Date.now() > until) return false;
+      await new Promise((r) => setTimeout(r, 50));
+    }
     this._drawFills(ctx, k, offX, offY, vw, vh);
     const tw = this.tileWorld;
     const inRect = [...this.tiles.values()].filter((t) => {
@@ -855,15 +982,13 @@ export class RasterLayer {
       const batch = inRect.slice(i, i + perBatch);
       for (const t of batch) this._ensure(t);
       const until = Date.now() + 15000;
-      while (batch.some((t) => t.loading)) {
+      while (batch.some((t) => t.loading || t.patternWait)) {
         if (Date.now() > until) return false;
         await new Promise((r) => setTimeout(r, 20));
       }
       for (const t of batch) {
-        if (t.evicted || t.loading) { if (!this._ensure(t)) { ok = false; continue; } }
-        const x0 = Math.round(t.tx * tw * k + offX), y0 = Math.round(t.ty * tw * k + offY);
-        const x1 = Math.round((t.tx + 1) * tw * k + offX), y1 = Math.round((t.ty + 1) * tw * k + offY);
-        ctx.drawImage(t.canvas, x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+        if (!this._ensure(t)) { ok = false; continue; }
+        this._blitTile(ctx, t, k, offX, offY);
       }
       rasterResources.trim();
     }
