@@ -2,7 +2,12 @@
  * Cloud-Abgleich der Pixel-Manifeste (Paket 3).
  *
  * - Manifest je Blatt-Key als eigenes Objekt (`sheet_id = __raster__`,
- *   `object_kind = rasterManifest`) über `cad_write_object` mit Revisionsprüfung.
+ *   `object_kind = rasterManifest`). Alle offenen Keys eines Projekts werden
+ *   gemeinsam über `raster_publish_manifests` veröffentlicht: Revisionsprüfung
+ *   aller Keys, Schreiben und Assetreferenzen in EINER Transaktion – Referenzen
+ *   leitet der Server aus dem gespeicherten Manifest ab (kein Sitzungswissen).
+ * - Outbox (`dirtyKeys`) und bestätigte Revision (`cloudBase`) liegen im
+ *   lokalen Projektdatensatz und überstehen Neustart/Offline.
  *   Sitzungen ignorieren diese Seite (keine Szene), `decideOpen` bleibt unberührt.
  * - Kacheln als inhaltsadressierte Assets `<projectId>/<hash>.png` im Bucket
  *   `raster-tiles`; jeder Upload braucht vorher eine Serverreservierung
@@ -247,7 +252,17 @@ async function fetchCloudKeys(projectId: string, keys: string[]): Promise<Record
  * Server liefert Löschkandidaten (Status `deleting`), Client entfernt die
  * Dateien, Server gibt das Budget erst nach geprüfter Entfernung frei.
  */
-export async function runStorageCleanup(projectId: string, batch = 50): Promise<number> {
+export async function runStorageCleanup(projectId: string, batch = 50, maxRounds = 20): Promise<number> {
+  let total = 0;
+  for (let i = 0; i < maxRounds; i++) {
+    const n = await cleanupBatch(projectId, batch);
+    total += n;
+    if (n < batch) break;
+  }
+  return total;
+}
+
+async function cleanupBatch(projectId: string, batch: number): Promise<number> {
   const c = getNetworkClient();
   if (!c) return 0;
   try {
