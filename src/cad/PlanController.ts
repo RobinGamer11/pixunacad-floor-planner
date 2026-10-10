@@ -140,6 +140,9 @@ export class PlanController {
     if (!proj) return false;
     const scene = this.app.scenesById.get(proj.sourceSheetId);
     const snap = scene ? (this.app as any)._serializeOneScene(scene) : null;
+    // Pixel gehören zum eingefrorenen Stand: Kopie der Rasterebenen (nur
+    // kodierte Referenzen, keine Dekodierung) unter eigenem Schlüssel.
+    (this.app as any).freezeProjectionRaster?.(projectionId, proj.sourceSheetId);
     this.app.planManager.updateProjection(planId, projectionId, { mode: "frozen", sceneSnapshot: snap });
     this._itemsCache.delete(projectionId);
     return true;
@@ -274,7 +277,7 @@ export class PlanController {
       const items = this.getItems(proj);
       const isSel = proj.id === this.selectedProjectionId;
       const isHov = proj.id === this.hoverProjectionId && !isSel;
-      drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
+      drawProjection(ctx, this.app.camera, items, proj, isSel, isHov, (this.app as any).projectionRaster?.(real) ?? null);
       if (this.isSourceMissing(real)) {
         const sc = this.app.camera.worldToScreen(proj.x / 1000, proj.y / 1000);
         ctx.save();

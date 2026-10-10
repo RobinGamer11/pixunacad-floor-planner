@@ -312,6 +312,37 @@ export class CadApp {
     return layers;
   }
 
+  /**
+   * Rasterinhalt eines Exportausschnitts: verknüpft = aktueller bestätigter
+   * Blattstand, eingefroren = beim Einfrieren gesicherte Kopie (`frozen:<id>`).
+   */
+  projectionRaster(proj: { id: string; mode?: string; sourceSheetId: string }): import("./PlanProjections").ProjectionRaster | null {
+    const key = proj.mode === "frozen" ? `frozen:${proj.id}` : `sheet:${proj.sourceSheetId}`;
+    const layers = this._rasterLayersByKey.get(key);
+    if (!layers || !layers.hasAnyContent()) return null;
+    return { layers, order: this.labelManager.list().map((g) => g.id), visible: (id) => this.labelManager.isVisible(id) };
+  }
+
+  /** Pixel direkt auf der Exportseite. */
+  planRaster(planId: string): import("./PlanProjections").ProjectionRaster | null {
+    const layers = this._rasterLayersByKey.get(`plan:${planId}`);
+    if (!layers || !layers.hasAnyContent()) return null;
+    return { layers, order: this.labelManager.list().map((g) => g.id), visible: (id) => this.labelManager.isVisible(id) };
+  }
+
+  /** Friert den Pixelstand eines Blatts für einen Ausschnitt ein (kodierte Kopie, keine Dekodierung). */
+  freezeProjectionRaster(projectionId: string, sheetId: string) {
+    const key = `frozen:${projectionId}`;
+    this._rasterLayersByKey.get(key)?.clear();
+    this._rasterLayersByKey.delete(key);
+    const src = this._rasterLayersByKey.get(`sheet:${sheetId}`);
+    if (!src || !src.hasAnyContent()) return;
+    const copy = new RasterLayers();
+    copy.onReady = () => { try { this.renderer?.render(); } catch { /* noop */ } };
+    copy.restore(src.serialize());
+    this._rasterLayersByKey.set(key, copy);
+  }
+
   /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
   pixelRenderDpi = 1200;
   pixelSupersampling = false;
@@ -1055,7 +1086,11 @@ export class CadApp {
       // Rasterebenen (Pixelmodus) je Zeichenblatt/Druckplan.
       rasterLayersByKey: (() => {
         const out: Record<string, any> = {};
+        // Eingefrorene Pixelkopien nur, solange ihr Ausschnitt eingefroren ist.
+        const frozen = new Set<string>();
+        for (const pl of this.planManager.list()) for (const pr of pl.projections) if (pr.mode === "frozen") frozen.add(`frozen:${pr.id}`);
         for (const [key, layers] of this._rasterLayersByKey.entries()) {
+          if (key.startsWith("frozen:") && !frozen.has(key)) continue;
           const json = layers.serialize(forHistory ? this._rasterTileStore : undefined);
           if (json.length > 0) out[key] = json;
         }
@@ -4421,8 +4456,9 @@ export class CadApp {
     const sc = this.planScenesById.get(plan.id);
     if (!sc) return null;
     const json = this._serializeOneScene(sc);
+    const raster = this.planRaster(plan.id);
     const hasContent = Object.values(json || {}).some(v => Array.isArray(v) && v.length > 0);
-    if (!hasContent) return null;
+    if (!hasContent && !raster) return null;
     const { renderSceneRegionToCanvas } = await import("./SceneRegionRenderer");
     const pxPerMm = 200 / 25.4;
     const canvas = document.createElement("canvas");
@@ -4438,6 +4474,21 @@ export class CadApp {
         background: "rgba(0,0,0,0)",
       });
     } finally { setExportMode(was); }
+    if (raster) {
+      // Pixel der Exportseite (Welt-Ursprung = Papiermitte) portionsweise darunter legen.
+      const out = document.createElement("canvas");
+      out.width = canvas.width; out.height = canvas.height;
+      const octx = out.getContext("2d")!;
+      const k = pxPerMm * 1000;
+      const rect = { x: -widthMm / 2000, y: -heightMm / 2000, w: widthMm / 1000, h: heightMm / 1000 };
+      const ok = await raster.layers.drawRegionAsync(octx, rect, k, (widthMm / 2) * pxPerMm, (heightMm / 2) * pxPerMm, raster.visible, raster.order);
+      if (!ok) { out.width = 0; canvas.width = 0; throw new Error("PIXUNA_RASTER_INCOMPLETE"); }
+      if (hasContent) octx.drawImage(canvas, 0, 0);
+      canvas.width = 0;
+      const b2: Blob | null = await new Promise(res => out.toBlob(b => res(b), "image/png"));
+      out.width = 0;
+      return b2 ? new Uint8Array(await b2.arrayBuffer()) : null;
+    }
     const blob: Blob | null = await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
     return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
   }
@@ -4459,6 +4510,7 @@ export class CadApp {
       const bytes = await exportPlansToPdf(
         sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h),
         (p) => p.spreadId ? { key: p.spreadId, rects: this.planManager.spreadRects(p.spreadId) } : null,
+        (_p, proj) => this.projectionRaster(proj),
       );
 
       const ts = new Date();
@@ -4469,6 +4521,10 @@ export class CadApp {
         : `Druckplaene_${stamp}.pdf`;
       downloadPdfBytes(bytes, fname);
     } catch (err) {
+      if (String((err as Error)?.message).includes("PIXUNA_RASTER_INCOMPLETE")) {
+        toast.error("PDF-Export abgebrochen", { description: "Pixelbereiche konnten nicht vollständig geladen werden – bitte erneut versuchen." });
+        return;
+      }
       console.error("[exportPlansPdf] PDF-Export fehlgeschlagen:", err);
       alert("PDF-Export fehlgeschlagen. Details in der Browser-Konsole.");
     }
