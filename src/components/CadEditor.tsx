@@ -994,8 +994,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       window.addEventListener("keydown", blockKeys, true);
       const unlock = () => { initialLoading = false; setProjectLoading(false); window.removeEventListener("keydown", blockKeys, true); };
       loadLocalScene(projectId ?? "default").then((res) => {
-        if ((app as any)._destroyed) return;
         unlock();
+        if ((app as any)._destroyed) return;
         if (!res) {
           // Migration: Altstand (Pixel als Text in localStorage) sofort in den
           // Gerätespeicher übernehmen. Der alte Stand wird erst nach
