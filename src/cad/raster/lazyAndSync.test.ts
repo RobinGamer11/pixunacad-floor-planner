@@ -1,9 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { RasterLayer } from "../RasterLayers";
 import { decideRasterKey, recordHashes } from "./localScenePersist";
 import { isLazySrc, registerLazySrc, resolveTileSrc } from "./lazyTileSrc";
 
 describe("Kacheln bedarfsgerecht laden", () => {
+  // jsdom hat kein Canvas: Kontext-Attrappe; jedes Zeichnen/Lesen würde hier auffallen.
+  beforeAll(() => { (HTMLCanvasElement.prototype as any).getContext = () => ({ getImageData: () => { throw new Error("dekodiert"); } }); });
   it("restore dekodiert nichts: Kacheln sind unbekannt (nie leer) und bleiben gespeichert", () => {
     const l = new RasterLayer("A", 500, 512);
     l.restore({ labelId: "A", pxPerM: 500, tilePx: 512, strokeCount: 1, tiles: [{ tx: 0, ty: 0, src: "data:image/png;base64,AAAA" }, { tx: 5, ty: 5, src: "data:image/png;base64,BBBB" }] } as any);
