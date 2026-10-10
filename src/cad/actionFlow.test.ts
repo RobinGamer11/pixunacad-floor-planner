@@ -58,3 +58,29 @@ describe("Gemeinsamer Aktionsablauf", () => {
     expect(app._history.length).toBe(2);
   });
 });
+
+describe("Rasterjob nach Aktion", () => {
+  function withDefer() {
+    const r = makeApp();
+    Object.assign(r.app, { _historyTokens: [null], _deferredTokens: new Set(), _deferredPending: null });
+    return r;
+  }
+  it("Zeichnen + späterer Rasterabschluss = genau ein Schritt, alter Schritt unverändert", () => {
+    const { app, state } = withDefer();
+    const before = [...app._history];
+    app.runAction(() => { state.items.push(1); app.deferActionCommit(app.currentActionToken()); app._t = app._actionToken; });
+    expect(app._history.length).toBe(1);
+    expect(app.commitRasterJob(app._t, () => { state.items[0] = 9; })).toBe(true);
+    expect(app._history.length).toBe(2);
+    expect(app._history[0]).toBe(before[0]);
+    app.undo();
+    expect(state.items).toEqual([]);
+  });
+  it("Fehlgeschlagener Job: Aktion bleibt als ein Schritt mit Vektorstand", () => {
+    const { app, state } = withDefer();
+    app.runAction(() => { state.items.push(1); app.deferActionCommit(app.currentActionToken()); app._t = app._actionToken; });
+    app.releaseDeferredAction(app._t);
+    expect(app._history.length).toBe(2);
+    expect(state.items).toEqual([1]);
+  });
+});

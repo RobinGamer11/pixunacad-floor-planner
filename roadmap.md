@@ -195,5 +195,5 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Kompakte Flächen/Muster (solidFill/patternFill mit Kontur)
 - [ ] Automatische Auflösung aktivieren + feiner Strich auf grober Kachel
 - [ ] startRasterJob ohne decoded-Sammlung; Budget bis zum Commit
-- [ ] Undo: Zeichnen + Rasterabschluss als eine Aktion, ohne Nachtrag in fertige Schritte
+- [x] Undo: Zeichnen + Rasterabschluss als eine Aktion, ohne Nachtrag in fertige Schritte (Schritt wartet auf Jobabschluss)
 - [ ] Speichermessung → Projekt-/Kontolimit in SQL eintragen (blockiert durch offene Punkte oben)
