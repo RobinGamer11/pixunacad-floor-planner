@@ -185,3 +185,15 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Atomarer Cloud-Manifest-Sync (Phase 7)
 - [ ] Serverquoten inkl. ausführbarem Uploadweg (Phase 8, braucht Betreiberwerte)
 - [ ] Bereinigung alter Schreibwege (Phase 9)
+
+## Pixelumbau fertigstellen (Auftrag 10.10.2026, mit Präzisierungen Phil)
+- [x] SQL-Endfassung V2 (FOUND-Fix, zentrale Sperre, echte Größe, Löschkandidaten bleiben gezählt, Prüfqueries)
+- [x] Uploadgrenze vor dem Upload (Client + Bucket + Reservierung der Obergrenze)
+- [x] Physische Bereinigung über Storage-API (claim → remove → finalize)
+- [x] Lokales Speichern je Projekt, echtes Erfolgsergebnis, kein Rückschreiben während Laden, Cloud auf frischem Gerät
+- [x] Cloud: getrennte Meldungen, alle Assets referenziert, Konflikt ohne Revisionsübernahme, portionsweiser Download
+- [ ] Kompakte Flächen/Muster (solidFill/patternFill mit Kontur)
+- [ ] Automatische Auflösung aktivieren + feiner Strich auf grober Kachel
+- [ ] startRasterJob ohne decoded-Sammlung; Budget bis zum Commit
+- [ ] Undo: Zeichnen + Rasterabschluss als eine Aktion, ohne Nachtrag in fertige Schritte
+- [ ] Speichermessung → Projekt-/Kontolimit in SQL eintragen (blockiert durch offene Punkte oben)
