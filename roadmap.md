@@ -202,3 +202,11 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Speicherprobe mit vielen Pixelobjekten (scripts/storage_probe.py, docs/storage-probe.md)
 - [x] Projekt 50 MB / Konto 150 MB in SQL und Client eingetragen
 - [ ] SQL-Datei manuell in Supabase anwenden (durch den Nutzer)
+
+## Pixel-Fehlerkorrektur (Auftrag auf Basis 293a7ffa)
+- [x] Schritt 1.1 Kacheln bedarfsgerecht laden (Referenzen beim Öffnen, nur Sichtbares, saubere Kacheln verdrängbar, portionsweise Ausgabe)
+- [x] Schritt 1.2 Cloud/Lokal je Blatt per Revision + Outbox, Konflikt erhält beide Stände, gemeinsame Veröffentlichung, Bearbeitungssperre beim Laden
+- [x] Schritt 1.3 Lokale Blob-Bereinigung, serverseitige Referenzen aus Manifest, Bereinigung bis leer
+- [ ] Schritt 2.4 Rasterinhalt in Export/PDF (CAD-Ausschnitte, Exportseiten)
+- [ ] Schritt 2.5 Bildmuster kompakt (patternFill), Haarlinien an Kachelgrenzen
+- [ ] SQL-Endfassung in Supabase einspielen (Nutzer)
