@@ -122,7 +122,7 @@ defineSchema({
   current: 2,
   steps: [
     {
-      // v1: Grundstruktur sicherstellen (Multi-Sheet, Druckpläne, Raster).
+      // v1: Grundstruktur sicherstellen (Multi-Sheet, Druckpläne).
       to: 1,
       up: (data: any) => {
         if (!isObj(data)) return data;
@@ -134,7 +134,6 @@ defineSchema({
         fill(data, "scenesById", {});
         fill(data, "plans", []);
         fill(data, "planScenesById", {});
-        fill(data, "rasterLayersByKey", {});
         return data;
       },
     },
