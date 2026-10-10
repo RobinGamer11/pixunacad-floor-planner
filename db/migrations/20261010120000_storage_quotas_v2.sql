@@ -442,6 +442,7 @@ create or replace function public.raster_publish_manifests(_project_id text, _it
 returns table (key text, accepted boolean, conflict boolean, revision bigint)
 language plpgsql security definer set search_path = public
 as $$
+#variable_conflict use_column
 declare
   it jsonb; k text; b bigint; cur bigint; nr bigint; pl jsonb;
   hs text[]; ids uuid[]; released uuid[]; v_conflict boolean := false; v_missing int;

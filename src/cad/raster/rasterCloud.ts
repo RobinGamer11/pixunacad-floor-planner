@@ -189,9 +189,9 @@ async function pushNow(projectId: string) {
       if (attempt === 0 && /PIXUNA_ASSET_MISSING/.test(error.message)) { uploaded.delete(projectId); await runStorageCleanup(projectId); continue; }
       throw error;
     }
-    const rows = (data ?? []) as { key: string; accepted: boolean; revision: number }[];
-    const rejected = rows.filter((r) => !r.accepted);
-    if (rejected.length) {
+    const rows = (data ?? []) as { key: string; accepted: boolean; conflict: boolean; revision: number }[];
+    const rejected = rows.filter((r) => r.conflict);
+    if (rows.some((r) => !r.accepted)) {
       // Nichts wurde geschrieben. Beide Stände erhalten: Cloudstand der
       // betroffenen Keys als Konfliktstand ablegen, lokal bleibt maßgeblich.
       const cloud = await fetchCloudKeys(projectId, rejected.map((r) => r.key));
