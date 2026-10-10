@@ -9,7 +9,7 @@
  */
 import { RASTER_FORMAT, fromManifest, manifestHashes, pinHashes, sessionHashes, toManifest, unpinHashes, type RasterManifest } from "./rasterManifest";
 import { downloadMissingTiles, pullRasterManifest, pushRasterSoon } from "./rasterCloud";
-import { gcBlobs, isQuotaError, loadProjectLocal, localStoreAvailable, patchProjectLocal, saveProjectLocal, type LocalProjectRecord } from "./LocalProjectStore";
+import { gcBlobs, isQuotaError, loadProjectLocal, localStoreAvailable, patchProjectLocal, saveProjectLocal, saveProjectLocalMerge, type LocalProjectRecord } from "./LocalProjectStore";
 
 export type LocalSaveStatus = "idle" | "saving" | "saved" | "quota" | "error" | "blocked";
 type Listener = (s: LocalSaveStatus, detail?: string) => void;
@@ -166,15 +166,19 @@ async function writeJob(projectId: string, job: Job): Promise<boolean> {
       data.rasterManifest = await toManifest(raster, job.revision, blobs, lastManifest.get(projectId));
       manifest = data.rasterManifest;
       pinHashes(blobs.keys());
-      const prev = await loadProjectLocal(projectId);
-      if (prev && prev.format > RASTER_FORMAT) { blocked.add(projectId); setStatus("blocked", "Neuerer Stand vorhanden – wird nicht überschrieben."); return false; }
-      // Outbox: jeder Key, dessen Manifest sich gegenüber dem gespeicherten Stand ändert.
-      const before: RasterManifest = prev ? (JSON.parse(prev.sceneJson).rasterManifest ?? {}) : {};
-      const dirty = new Set(prev?.dirtyKeys ?? []);
-      for (const k of new Set([...Object.keys(before), ...Object.keys(manifest)])) {
-        if (JSON.stringify(before[k] ?? null) !== JSON.stringify(manifest[k] ?? null)) dirty.add(k);
-      }
-      await saveProjectLocal({ projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson: JSON.stringify(data), cloudBase: prev?.cloudBase ?? {}, dirtyKeys: [...dirty], conflicts: prev?.conflicts ?? {} }, blobs);
+      const sceneJson = JSON.stringify(data);
+      const m = manifest;
+      const ok = await saveProjectLocalMerge(projectId, blobs, (prev) => {
+        if (prev && prev.format > RASTER_FORMAT) return null;
+        // Outbox: jeder Key, dessen Manifest sich gegenüber dem gespeicherten Stand ändert.
+        const before: RasterManifest = prev ? (JSON.parse(prev.sceneJson).rasterManifest ?? {}) : {};
+        const dirty = new Set(prev?.dirtyKeys ?? []);
+        for (const k of new Set([...Object.keys(before), ...Object.keys(m)])) {
+          if (JSON.stringify(before[k] ?? null) !== JSON.stringify(m[k] ?? null)) dirty.add(k);
+        }
+        return { projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson, cloudBase: prev?.cloudBase ?? {}, dirtyKeys: [...dirty], conflicts: prev?.conflicts ?? {} };
+      });
+      if (!ok) { blocked.add(projectId); setStatus("blocked", "Neuerer Stand vorhanden – wird nicht überschrieben."); return false; }
     } finally { activeWrites--; unpinHashes(blobs.keys()); }
     lastManifest.set(projectId, manifest);
     pushRasterSoon(projectId);

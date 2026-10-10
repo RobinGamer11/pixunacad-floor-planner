@@ -131,3 +131,20 @@ export async function gcBlobs(keep: Set<string>, hashesOfRecord: (rec: LocalProj
   await done(tx);
   return removed;
 }
+
+/** Wie `saveProjectLocal`, aber der neue Datensatz entsteht aus dem aktuellen in DERSELBEN Transaktion. */
+export async function saveProjectLocalMerge(projectId: string, blobs: Map<string, Blob>, fn: (prev: LocalProjectRecord | undefined) => LocalProjectRecord | null): Promise<boolean> {
+  const db = await open();
+  const tx = db.transaction([BLOBS, PROJECTS], "readwrite");
+  let ok = false;
+  const req = tx.objectStore(PROJECTS).get(projectId);
+  req.onsuccess = () => {
+    const rec = fn(req.result as LocalProjectRecord | undefined);
+    if (!rec) return;
+    for (const [hash, blob] of blobs) tx.objectStore(BLOBS).put(blob, hash);
+    tx.objectStore(PROJECTS).put(rec);
+    ok = true;
+  };
+  await done(tx);
+  return ok;
+}
