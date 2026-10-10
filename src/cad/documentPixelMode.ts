@@ -54,47 +54,6 @@ function bakeWidthPx(doc: DocumentObject): number {
 }
 
 /**
- * Vektor → Pixel: rendert die PDF-Seite scharf in ein PNG und schaltet das
- * Dokument auf Bildmodus um. Vorhandene Radierungen (Alpha-Maske) bleiben
- * erhalten und wirken unverändert weiter — im Pixelmodus zusätzlich mit
- * Smooth-Radierer.
- */
-export async function convertDocumentToPixel(doc: DocumentObject): Promise<boolean> {
-  if (!doc.pdfSourceB64 || doc.kind !== "pdf-page") return false;
-  const { renderPdfPageToCanvas } = await import("./documentImport");
-  const page = await renderPdfPageToCanvas(doc.pdfSourceB64, doc.pageIndex, bakeWidthPx(doc));
-
-  const c = document.createElement("canvas");
-  c.width = page.width;
-  c.height = page.height;
-  const ctx = c.getContext("2d")!;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  // Weißer Papiergrund, damit das Pixelbild wie ein gescanntes Blatt wirkt.
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, c.width, c.height);
-  ctx.drawImage(page, 0, 0, c.width, c.height);
-
-  // Maske vor dem Umschalten sicher materialisieren (bleibt 1:1 erhalten).
-  if (doc.eraseMaskDataUrl && !doc._eraseMask) {
-    try {
-      const mask = getOrCreateDocMask(doc);
-      const mi = await loadImage(doc.eraseMaskDataUrl);
-      const mctx = mask.getContext("2d")!;
-      mctx.clearRect(0, 0, mask.width, mask.height);
-      mctx.drawImage(mi, 0, 0, mask.width, mask.height);
-    } catch { /* ohne Maske weiter */ }
-  }
-
-  doc.src = c.toDataURL("image/png");
-  doc.pixelWidth = c.width;
-  doc.pixelHeight = c.height;
-  doc.kind = "image";
-  doc._eraseMaskDirty = true;
-  return true;
-}
-
-/**
  * Pixel → Vektor: rendert die PDF-Seite wieder als Vektorquelle. Alle im
  * Pixelmodus vorgenommenen Radierungen bleiben als Alpha-Maske erhalten und
  * werden zusätzlich aus dem Alpha-Kanal des Pixelbildes übernommen.

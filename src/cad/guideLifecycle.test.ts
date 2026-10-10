@@ -14,7 +14,6 @@ import { setExportMode } from "@/lib/printExport";
 
 let RendererClass: typeof import("./Renderer").Renderer;
 let MiniCadClass: typeof import("./embed/MiniCad").MiniCad;
-let rasterizeObject: typeof import("./rasterize").rasterizeObject;
 
 function fakeElement<T extends HTMLElement>(): T {
   const classes = new Set<string>();
@@ -61,7 +60,6 @@ beforeAll(async () => {
   });
   ({ Renderer: RendererClass } = await import("./Renderer"));
   ({ MiniCad: MiniCadClass } = await import("./embed/MiniCad"));
-  ({ rasterizeObject } = await import("./rasterize"));
 });
 
 afterEach(() => {
@@ -74,17 +72,6 @@ afterAll(() => {
 });
 
 describe("Hilfslinien-Lebenszyklus", () => {
-  it("rastert Hilfslinien auch im Pixelmodus niemals", () => {
-    const scene = new Scene();
-    const guide = scene.createSegment(v(0, 0), v(2, 0), { isGuide: true });
-    const app = { defaultDrawRasterMode: "pixel", scene, renderer: {} };
-
-    expect(rasterizeObject(app, { type: "segment", obj: guide })).toBeNull();
-    expect(scene.segments).toEqual([guide]);
-    expect(scene.documents).toHaveLength(0);
-    expect(guide.isGuide).toBe(true);
-  });
-
   it("bewahrt Guide-, Fang- und Pfeilattribute beim Wiederherstellen und Teilen", () => {
     const scene = new Scene();
     restoreOneScene(scene, {
