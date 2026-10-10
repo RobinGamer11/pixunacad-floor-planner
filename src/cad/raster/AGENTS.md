@@ -1,5 +1,5 @@
 # Raster/Pixel
-- Verlauf: Kacheln nur via `RasterTileStore`. Pixel: Grenzen nur `raster/RasterPolicy`, Jobs atomar via `CadApp.commitRasterJob`; Ablehnung = Vektor bleibt.
+- Verlauf: Kacheln nur via `RasterTileStore`. Pixel: Grenzen nur `raster/RasterPolicy`.
 - Lokaler CAD-Stand: IndexedDB (`raster/localScenePersist.ts`, Format `RASTER_FORMAT`) ist maßgeblich; Pixel nur als Hash-Blobs im Manifest (`raster/rasterManifest.ts`), localStorage nur Vektorstand – höheres Format wird nie geladen/überschrieben.
 - RAM: Kachelpuffer nur über `raster/RasterResourceManager` (LRU, nur saubere Kacheln verdrängbar); verdrängt = unbekannt, nie transparent; Änderungen an ladenden Kacheln laufen über die `pending`-Warteschlange.
 - Konsumenten: Masken melden `complete`; unvollständig = `RasterNotReadyError`, nie leer. Öffnen lädt nur Referenzen (`restore` dekodiert nie, Mehrfachketten über `lazyTileSrc`); `draw` lädt nur Sichtbares + 1 Kachel Rand; Ausgaben nur portionsweise über `drawRegionAsync` – nie alles vorab laden.

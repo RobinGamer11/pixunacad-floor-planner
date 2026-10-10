@@ -1,22 +1,7 @@
 /**
- * PDF ⇄ Pixel-Umschaltung für Dokumente.
- *
- * Ein importiertes PDF liegt normalerweise als `kind: "pdf-page"` mit den
- * Original-Bytes (`pdfSourceB64`) in der Scene — es wird beim Zoomen als Vektor
- * neu gerendert und kann per "Auflösen" in CAD-Objekte zerlegt werden.
- *
- * Mit dem Schalter "Pixel" wird der aktuelle Zustand (inkl. Radierungen) in ein
- * hochaufgelöstes PNG eingebrannt (`kind: "image"`). Danach verhält sich das
- * Dokument wie ein importiertes Bild: der Radiergummi arbeitet inkl.
- * Smooth-Modus direkt auf den Pixeln.
- *
- * Zurück auf "Vektor" bleibt die Bearbeitung erhalten: aus dem Alpha-Kanal des
- * eingebrannten Bildes wird wieder eine Radiermaske erzeugt und auf das frisch
- * aus dem PDF gerenderte Vektorbild gelegt.
- *
- * Da die Umschaltung nur `kind`/`src`/`eraseMaskDataUrl` verändert, ist sie
- * ohne Schema-Änderung persistent: `pdfSourceB64 && kind === "image"` bedeutet
- * "PDF im Pixelmodus".
+ * Rückführung älterer PDF-Dokumente im früheren Pixelmodus
+ * (`pdfSourceB64 && kind === "image"`) auf Vektor sowie Radierprüfung für
+ * „Auflösen“. Neue Pixel-PDFs entstehen nicht mehr.
  */
 import { Defaults } from "./constants";
 import type { DocumentObject } from "./Scene";
@@ -24,16 +9,6 @@ import { getOrCreateDocMask } from "./documentMask";
 
 /** Maximale Kantenlänge des eingebrannten Pixelbildes. */
 const MAX_BAKE_PX = 4096;
-
-/** true, wenn das Dokument aus einem PDF stammt (also umschaltbar ist). */
-export function isPdfBackedDocument(doc: DocumentObject | null | undefined): boolean {
-  return !!doc && !!doc.pdfSourceB64;
-}
-
-/** true, wenn ein PDF-Dokument aktuell im Pixelmodus liegt. */
-export function isDocumentPixelMode(doc: DocumentObject | null | undefined): boolean {
-  return !!doc && !!doc.pdfSourceB64 && doc.kind === "image";
-}
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -51,47 +26,6 @@ function bakeWidthPx(doc: DocumentObject): number {
   const longer = Math.max(w, h);
   if (longer <= MAX_BAKE_PX) return Math.max(64, Math.round(w));
   return Math.max(64, Math.round(w * (MAX_BAKE_PX / longer)));
-}
-
-/**
- * Vektor → Pixel: rendert die PDF-Seite scharf in ein PNG und schaltet das
- * Dokument auf Bildmodus um. Vorhandene Radierungen (Alpha-Maske) bleiben
- * erhalten und wirken unverändert weiter — im Pixelmodus zusätzlich mit
- * Smooth-Radierer.
- */
-export async function convertDocumentToPixel(doc: DocumentObject): Promise<boolean> {
-  if (!doc.pdfSourceB64 || doc.kind !== "pdf-page") return false;
-  const { renderPdfPageToCanvas } = await import("./documentImport");
-  const page = await renderPdfPageToCanvas(doc.pdfSourceB64, doc.pageIndex, bakeWidthPx(doc));
-
-  const c = document.createElement("canvas");
-  c.width = page.width;
-  c.height = page.height;
-  const ctx = c.getContext("2d")!;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  // Weißer Papiergrund, damit das Pixelbild wie ein gescanntes Blatt wirkt.
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, c.width, c.height);
-  ctx.drawImage(page, 0, 0, c.width, c.height);
-
-  // Maske vor dem Umschalten sicher materialisieren (bleibt 1:1 erhalten).
-  if (doc.eraseMaskDataUrl && !doc._eraseMask) {
-    try {
-      const mask = getOrCreateDocMask(doc);
-      const mi = await loadImage(doc.eraseMaskDataUrl);
-      const mctx = mask.getContext("2d")!;
-      mctx.clearRect(0, 0, mask.width, mask.height);
-      mctx.drawImage(mi, 0, 0, mask.width, mask.height);
-    } catch { /* ohne Maske weiter */ }
-  }
-
-  doc.src = c.toDataURL("image/png");
-  doc.pixelWidth = c.width;
-  doc.pixelHeight = c.height;
-  doc.kind = "image";
-  doc._eraseMaskDirty = true;
-  return true;
 }
 
 /**

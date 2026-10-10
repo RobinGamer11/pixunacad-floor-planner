@@ -231,7 +231,6 @@ export class MiniCad {
   defaultFreeImageRotate: boolean = Defaults.freeImageRotate;
   defaultFreeAutoShape: boolean = false;
   /** Zeichenmodus: "vector" oder "pixel" (Rasterung beim Fertigstellen). */
-  defaultDrawRasterMode: "vector" | "pixel" = "vector";
 
   /**
    * Raster-Zeichenebenen der Seite (Pixelmodus). Pro Ebene ein gekachelter
@@ -239,9 +238,6 @@ export class MiniCad {
    */
   readonly rasterLayers: RasterLayers;
   /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
-  pixelRenderDpi: number = 1200;
-  pixelSupersampling: boolean = false;
-  pixelSupersamplingFactor: 2 | 4 = 2;
   // Radiergummi-Defaults.
   defaultEraserRadiusM: number = Defaults.eraserRadiusM;
   defaultEraserStrength: number = Defaults.eraserStrength;

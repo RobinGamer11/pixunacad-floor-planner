@@ -275,7 +275,6 @@ export class CadApp {
 
   /** Zeichenmodus: "vector" (parametrisch) oder "pixel" (Objekt wird beim
    *  Fertigstellen zu einem Bild gerastert — wie in Malprogrammen). */
-  defaultDrawRasterMode: "vector" | "pixel" = "vector";
   /**
    * Raster-Zeichenebenen (Pixelmodus) — je Zeichenblatt bzw. Druckplan ein
    * eigener Satz gekachelter Rasterebenen im selben Papier-Koordinatensystem
@@ -344,9 +343,6 @@ export class CadApp {
   }
 
   /** Projektweite Rasterqualität für neu fertiggestellte Pixelobjekte. */
-  pixelRenderDpi = 1200;
-  pixelSupersampling = false;
-  pixelSupersamplingFactor: 2 | 4 = 2;
 
 
 
@@ -1218,8 +1214,6 @@ export class CadApp {
 
   private _maybeSnapshot() {
     if (this._isRestoring || this._destroyed || this.suspendHistory) return;
-    // Aktion wartet auf ihren Rasterabschluss: noch kein Schritt (sonst zwei).
-    if (this._deferredPending) return;
     // Don't snapshot mid-drag
     if (this.input.mouse.left || this.input.mouse.mid || this.input.mouse.right || this.input.isPanning) return;
     // Don't snapshot during an active point edit (Bewegen/Verschieben/Drehen/Offset),
@@ -1235,7 +1229,6 @@ export class CadApp {
   /** Erzwingt einen History-Push der aktuellen Scene (für Plan-Operationen). */
   commitHistorySnapshot() {
     if (this._isRestoring || this._destroyed) return;
-    if (this._actionDepth === 0) this._flushDeferred();
     // Innerhalb einer offenen Aktion entsteht der Schritt erst bei commitAction().
     if (this._actionDepth > 0) return;
     this._pushHistory(this._snapHistory());
@@ -1278,7 +1271,6 @@ export class CadApp {
   beginAction() {
     if (this._destroyed) return;
     if (this._actionDepth === 0) {
-      this._flushDeferred();
       // Noch nicht erfasste Vorher-Änderungen zuerst als eigenen Schritt sichern.
       if (!this._isRestoring) {
         const pre = this._snapHistory();
@@ -1302,73 +1294,7 @@ export class CadApp {
     this._actionToken = null;
     if (this._isRestoring || this._destroyed) return;
     (this as any)._changeDirty = true;
-    if (token && this._deferredTokens.has(token)) {
-      // Rasterjob dieser Aktion läuft noch: der Schritt entsteht erst mit
-      // seinem Abschluss (Zeichnen + Rastern = genau ein Undo-Schritt).
-      this._deferredPending = token;
-      return;
-    }
     this._pushHistory(this._snapHistory(), token);
-  }
-
-  /** Zugehörige Rasterjobs von Aktionen, deren Schritt bis zum Abschluss wartet. */
-  private _deferredTokens = new Set<string>();
-  private _deferredPending: string | null = null;
-
-  /** Rasterjob meldet: Schritt der Aktion `token` erst mit dem Jobabschluss bilden. */
-  deferActionCommit(token: string | null) { if (token) this._deferredTokens.add(token); }
-
-  /** Job beendet (Erfolg, Fehler, Abbruch): wartenden Schritt ggf. jetzt bilden. */
-  releaseDeferredAction(token: string | null) {
-    if (!token) return;
-    if (this._deferredPending === token) this._flushDeferred();
-    this._deferredTokens.delete(token);
-  }
-
-  /** Bildet den wartenden Schritt sofort (Vektorstand) – nie Nachtrag in alte Schritte. */
-  private _flushDeferred() {
-    const t = this._deferredPending;
-    if (!t) return;
-    this._deferredPending = null;
-    this._deferredTokens.delete(t);
-    if (this._isRestoring || this._destroyed) return;
-    this._pushHistory(this._snapHistory(), null);
-  }
-
-  /** Action-ID der offenen Aktion (für zugehörige Hintergrund-Rasterjobs). */
-  currentActionToken(): string | null {
-    if (this._actionDepth <= 0) return null;
-    if (!this._actionToken) this._actionToken = newRasterActionId();
-    return this._actionToken;
-  }
-
-  /**
-   * Atomarer Abschluss eines Hintergrund-Rasterjobs. Ist der oberste
-   * Verlaufseintrag noch die auslösende Aktion (und nichts dazwischen), wird
-   * das Ergebnis in genau diesen Schritt übernommen – eine Benutzeraktion
-   * bleibt EIN Undo-Schritt. Sonst entsteht ein eigener Schritt. Läuft gerade
-   * eine fremde Aktion, wird nichts eingeschachtelt (false).
-   */
-  commitRasterJob(token: string | null, apply: () => void): boolean {
-    if (this._destroyed || this._isRestoring || this._actionDepth > 0) return false;
-    if (!token || this._deferredPending !== token) {
-      // Auslösende Aktion ist bereits ein eigener Schritt: abgeschlossene
-      // Schritte werden nie verändert → Ergebnis als eigener Schritt.
-      let ok = false;
-      this.runAction(() => { apply(); ok = true; });
-      return ok;
-    }
-    try { apply(); }
-    catch (e) {
-      console.error("Rasterabschluss fehlgeschlagen:", e);
-      this._flushDeferred(); // Aktion bleibt mit Vektorstand erhalten
-      return false;
-    }
-    this._deferredPending = null;
-    this._deferredTokens.delete(token);
-    (this as any)._changeDirty = true;
-    this._pushHistory(this._snapHistory(), token);
-    return true;
   }
 
   cancelAction() {
@@ -1493,7 +1419,6 @@ export class CadApp {
 
   undo() {
     cancelRasterJobs(this, "undo");
-    this._flushDeferred();
     if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
     // Treppe: laufendes Zeichnen/Bewegen nimmt zuerst den lokalen Schritt zurück.
     if ((this.activeTool as any) === this.stairTool && this.stairTool.undoStep()) { this.renderer?.render?.(); return; }
@@ -1507,7 +1432,6 @@ export class CadApp {
 
   redo() {
     cancelRasterJobs(this, "redo");
-    this._flushDeferred();
     if (this._historyIndex >= this._history.length - 1) return;
     this._historyIndex++;
     this._restoreScene(this._history[this._historyIndex]);
