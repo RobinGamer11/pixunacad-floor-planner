@@ -48,4 +48,8 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Hilfslinien-Geometrie (Punkte, Kanten, anliegende Achsen) liefert nur `src/cad/guideGeometry.ts` aus echter Objektgeometrie (über `TopologyEngine.guideGeometry`) – nie Probeabfragen, nie Werkzeug-Sonderlogik.
 - Rechtsklick-Hilfslinien laufen nur über `GuideInteractionController` → `GlobalGuides` (Gruppen mit Referenzzählung, je Kontext `cad|export:sheet|plan`) – flüchtig, nie Cloud/Undo/Export, nie zwischen Blatt und Exportseite.
 - Benutzerhandlung = `CadApp.runAction` → 1 Undo, Fehler = volle Rücknahme.
-- Pixel/Raster-Regeln: siehe `src/cad/raster/AGENTS.md`.
+
+## Speicher
+- Gezeichnete Objekte sind ausschließlich Vektoren; Pixel gibt es nur in importierten Bildern/PDF-Dokumenten.
+- Lokaler CAD-Stand nur über `src/cad/persist/localScenePersist.ts` (IndexedDB maßgeblich, Formatversion; höheres Format wird nie überschrieben) – alte Pixelfelder werden beim Laden verworfen.
+- Cloud-Anhänge nur über `src/lib/storageQuota.ts` `uploadWithQuota` (Grenzen = `db/migrations/20261010120000_storage_quotas_v2.sql`).
