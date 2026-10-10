@@ -429,6 +429,111 @@ begin
   end if;
 end $$;
 
+-- ------------------------------------- 6. Pixel-Manifeste gemeinsam veröffentlichen
+-- Alle offenen Blatt-Keys einer Aktion in EINER Transaktion: zuerst Revisions-
+-- prüfung aller Keys (eine Abweichung → nichts wird geschrieben), dann Manifest,
+-- Verlauf und Assetreferenzen. Referenzen leitet der Server aus dem
+-- veröffentlichten Manifest ab (_hashes); nicht mehr referenzierte Raster-
+-- kacheln werden Löschkandidaten und erst nach physischer Entfernung
+-- (storage_finalize_delete) aus dem Verbrauch genommen.
+-- _items: [{ "key": text, "base": bigint, "payload": jsonb|null, "hashes": [text] }]
+drop function if exists public.raster_publish_manifests(text, jsonb);
+create or replace function public.raster_publish_manifests(_project_id text, _items jsonb)
+returns table (key text, accepted boolean, conflict boolean, revision bigint)
+language plpgsql security definer set search_path = public
+as $$
+declare
+  it jsonb; k text; b bigint; cur bigint; nr bigint; pl jsonb;
+  hs text[]; ids uuid[]; released uuid[]; v_conflict boolean := false; v_missing int;
+begin
+  if not public.project_can_edit(_project_id, auth.uid()) then raise exception 'PIXUNA_FORBIDDEN'; end if;
+  if jsonb_typeof(_items) <> 'array' then raise exception 'PIXUNA_BAD_ITEMS'; end if;
+  -- Gleiche zentrale Sperre wie alle Quoten-/Löschentscheidungen.
+  perform 1 from public.storage_quota_settings where id for update;
+
+  -- 1) Alle Zeilen sperren und Revisionen prüfen.
+  for it in select * from jsonb_array_elements(_items) loop
+    k := it->>'key'; b := coalesce((it->>'base')::bigint, 0);
+    select s.revision into cur from public.cad_object_state s
+     where s.project_id = _project_id and s.sheet_id = '__raster__' and s.object_id = k for update;
+    if coalesce(cur, 0) <> b then v_conflict := true; end if;
+  end loop;
+  if v_conflict then
+    return query
+      select i->>'key', false,
+             coalesce(s.revision, 0) <> coalesce((i->>'base')::bigint, 0),
+             coalesce(s.revision, 0)
+        from jsonb_array_elements(_items) i
+        left join public.cad_object_state s
+          on s.project_id = _project_id and s.sheet_id = '__raster__' and s.object_id = i->>'key';
+    return;
+  end if;
+
+  -- 2) Alle referenzierten Kacheln müssen als aktive Assets existieren.
+  select count(*) into v_missing
+    from (select distinct jsonb_array_elements_text(coalesce(i->'hashes', '[]'::jsonb)) h
+            from jsonb_array_elements(_items) i) x
+   where not exists (select 1 from public.storage_assets a
+                      where a.project_id = _project_id and a.kind = 'raster_tile'
+                        and a.content_hash = x.h and a.status = 'active');
+  if v_missing > 0 then raise exception 'PIXUNA_ASSET_MISSING'; end if;
+
+  -- 3) Schreiben + Referenzen umschalten.
+  for it in select * from jsonb_array_elements(_items) loop
+    k := it->>'key'; pl := it->'payload'; if jsonb_typeof(pl) = 'null' then pl := null; end if;
+    select s.revision into cur from public.cad_object_state s
+     where s.project_id = _project_id and s.sheet_id = '__raster__' and s.object_id = k;
+    nr := coalesce(cur, 0) + 1;
+    insert into public.cad_object_state as st
+      (project_id, sheet_id, object_id, object_kind, revision, payload, deleted, updated_by, updated_at)
+    values (_project_id, '__raster__', k, 'rasterManifest', nr, pl, pl is null, auth.uid(), now())
+    on conflict (project_id, sheet_id, object_id) do update
+      set revision = nr, object_kind = excluded.object_kind, payload = excluded.payload,
+          deleted = excluded.deleted, updated_by = excluded.updated_by, updated_at = excluded.updated_at;
+    insert into public.cad_object_ops
+      (project_id, sheet_id, object_id, object_kind, change_type, payload, object_version, actor_id)
+    values (_project_id, '__raster__', k, 'rasterManifest',
+            case when pl is null then 'delete' when cur is null then 'create' else 'update' end, pl, nr, auth.uid());
+
+    select coalesce(array_agg(x), '{}') into hs from jsonb_array_elements_text(coalesce(it->'hashes', '[]'::jsonb)) x;
+    select coalesce(array_agg(a.id), '{}') into ids from public.storage_assets a
+     where a.project_id = _project_id and a.kind = 'raster_tile' and a.status = 'active' and a.content_hash = any(hs);
+    with del as (
+      delete from public.storage_asset_refs r
+       where r.project_id = _project_id and r.ref_kind = 'raster_manifest' and r.ref_id = k
+         and not (r.asset_id = any(ids))
+      returning r.asset_id)
+    select coalesce(array_agg(asset_id), '{}') into released from del;
+    insert into public.storage_asset_refs (asset_id, project_id, ref_kind, ref_id)
+      select unnest(ids), _project_id, 'raster_manifest', k on conflict do nothing;
+    update public.storage_assets a set status = 'deleting'
+     where a.id = any(released) and a.kind = 'raster_tile' and a.status = 'active'
+       and not exists (select 1 from public.storage_asset_refs r where r.asset_id = a.id);
+    key := k; accepted := true; conflict := false; revision := nr;
+    return next;
+  end loop;
+end;
+$$;
+revoke all on function public.raster_publish_manifests(text, jsonb) from public, anon;
+grant execute on function public.raster_publish_manifests(text, jsonb) to authenticated;
+
+-- Bestand: Referenzen aus bereits veröffentlichten Manifesten wiederherstellen
+-- (frühere Clients führten sie nur sitzungsweise). Idempotent.
+insert into public.storage_asset_refs (asset_id, project_id, ref_kind, ref_id)
+select distinct a.id, s.project_id, 'raster_manifest', s.object_id
+  from public.cad_object_state s
+  cross join lateral jsonb_array_elements(coalesce(s.payload->'layers', '[]'::jsonb)) l
+  cross join lateral jsonb_array_elements(coalesce(l->'entries', '[]'::jsonb)) e
+  cross join lateral jsonb_array_elements(coalesce(e->'tiles', '[]'::jsonb)) t
+  join public.storage_assets a
+    on a.project_id = s.project_id and a.kind = 'raster_tile' and a.status = 'active' and a.content_hash = t->>'hash'
+ where s.sheet_id = '__raster__' and not s.deleted
+on conflict do nothing;
+-- Aktive Rasterkacheln ohne jede Referenz (verwaist durch frühere Abläufe) → Löschkandidat.
+update public.storage_assets a set status = 'deleting'
+ where a.kind = 'raster_tile' and a.status = 'active' and a.confirmed_at < now() - interval '1 day'
+   and not exists (select 1 from public.storage_asset_refs r where r.asset_id = a.id);
+
 -- ------------------------------------------- 9. Projekt- und Kontolimit
 -- WIRD NACH DER SPEICHERMESSUNG GESETZT (siehe Abschlussbericht). Bis dahin
 -- bleiben neue Cloud-Uploads mit „Cloud-Einrichtung fehlt“ gesperrt, alles
@@ -442,6 +547,7 @@ union all select 'Limits vollständig',
 union all select 'Effektive Dateigrenze (Bytes)', (global_bytes - global_reserve_bytes)::text from public.storage_quota_settings where id
 union all select 'Dateien gesamt in storage.objects (Bytes)', coalesce(sum((metadata->>'size')::bigint),0)::text from storage.objects
 union all select 'Offene Reservierungen (Bytes)', coalesce(sum(bytes),0)::text from public.storage_assets where status = 'reserved'
+union all select 'Funktion raster_publish_manifests vorhanden', (to_regprocedure('public.raster_publish_manifests(text,jsonb)') is not null)::text
 union all select 'Löschkandidaten (Bytes)', coalesce(sum(bytes),0)::text from public.storage_assets where status = 'deleting'
 union all select 'Datenbankgröße', pg_size_pretty(pg_database_size(current_database()))
 union all select 'Policies raster-tiles', count(*)::text from pg_policies where schemaname = 'storage' and policyname like 'raster tiles%';
