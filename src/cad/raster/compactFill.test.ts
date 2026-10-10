@@ -42,3 +42,22 @@ describe("automatische Auflösung neuer Aktionen", () => {
     expect(chooseActionScale({ bytesPerTileAtFull: budget / 100, occupiedTiles: 300, featurePx: 20, reducible: false })).toBeNull();
   });
 });
+
+describe("Musterfläche (patternFill)", () => {
+  const pat = { id: "f2", rings: [[{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 40 }, { x: 0, y: 40 }]], rule: "evenodd" as const, color: "#ffffff", alpha: 0,
+    pattern: { id: "mauerwerk", scale: 1, angleDeg: 45, skewDeg: 0, stretch: 1, color: "#000000", lineWidthM: 0.01, ax: 0, ay: 0 } };
+  it("große Musterfläche erzeugt keine Bildkacheln und behält die Mustertransformation", () => {
+    const l = new RasterLayer("A", 500, 512);
+    l.addFill(pat);
+    const json = l.serialize()!;
+    expect(json.tiles).toHaveLength(0);
+    expect(json.fills![0].pattern).toMatchObject({ id: "mauerwerk", angleDeg: 45, lineWidthM: 0.01 });
+  });
+  it("Manifest speichert patternFill ohne Pixeldaten und lädt es zurück", async () => {
+    const m = await toManifest({ s: [{ labelId: "A", pxPerM: 500, tilePx: 512, tiles: [], fills: [pat], strokeCount: 1 }] }, 1, new Map());
+    expect(m.s[0].entries[0].kind).toBe("patternFill");
+    expect(m.s[0].entries[0].tiles).toHaveLength(0);
+    const back = await fromManifest(m, []);
+    expect(back.s[0].fills[0].pattern.angleDeg).toBe(45);
+  });
+});

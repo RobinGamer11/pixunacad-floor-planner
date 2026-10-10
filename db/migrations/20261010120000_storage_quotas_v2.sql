@@ -525,9 +525,12 @@ select distinct a.id, s.project_id, 'raster_manifest', s.object_id
   from public.cad_object_state s
   cross join lateral jsonb_array_elements(coalesce(s.payload->'layers', '[]'::jsonb)) l
   cross join lateral jsonb_array_elements(coalesce(l->'entries', '[]'::jsonb)) e
-  cross join lateral jsonb_array_elements(coalesce(e->'tiles', '[]'::jsonb)) t
+  cross join lateral (
+    select x->>'hash' as h from jsonb_array_elements(coalesce(e->'tiles', '[]'::jsonb)) x
+    union all select e->>'patternHash' where e ? 'patternHash'   -- Musterbilder (patternFill)
+  ) t
   join public.storage_assets a
-    on a.project_id = s.project_id and a.kind = 'raster_tile' and a.status = 'active' and a.content_hash = t->>'hash'
+    on a.project_id = s.project_id and a.kind = 'raster_tile' and a.status = 'active' and a.content_hash = t.h
  where s.sheet_id = '__raster__' and not s.deleted
 on conflict do nothing;
 -- Aktive Rasterkacheln ohne jede Referenz (verwaist durch frühere Abläufe) → Löschkandidat.

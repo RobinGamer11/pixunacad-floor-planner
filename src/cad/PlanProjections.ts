@@ -159,6 +159,13 @@ export interface ProjectionLayout {
   itemOriginOffsetPlanM: { x: number; y: number };
 }
 
+/** Rasterinhalt eines Ausschnitts: Ebenen in Zeichenreihenfolge + Sichtbarkeit. */
+export interface ProjectionRaster {
+  layers: import("./RasterLayers").RasterLayers;
+  order: string[];
+  visible: (labelId: string) => boolean;
+}
+
 /** Padding um die Items-BBox in Plan-mm — damit der blaue Auswahlrahmen Luft hat
  *  und die Geometrie nicht bündig am Clip-Rand klebt. */
 export const PROJECTION_BBOX_PADDING_MM = 12;
@@ -217,6 +224,8 @@ export function drawProjection(
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: { left: number; right: number; top: number; bottom: number } },
   isSelected: boolean,
   isHover: boolean,
+  /** Getrennte Rasterebenen des Ausschnitts (verknüpft = aktuell, eingefroren = Kopie). */
+  raster?: ProjectionRaster | null,
 ) {
   const layout = computeProjectionLayout(items, proj);
 
@@ -248,6 +257,16 @@ export function drawProjection(
     x: offX + x * itemScalePxPerSheetM,
     y: offY + y * itemScalePxPerSheetM,
   });
+
+  if (raster) {
+    // Sichtbarer Blattbereich = Zuschnitt im Blattsystem → nur diese Kacheln laden.
+    const s = itemScalePxPerSheetM || 1;
+    const view = { x: (clipL - offX) / s, y: (clipT - offY) / s, w: (clipR - clipL) / s, h: (clipB - clipT) / s };
+    for (const id of raster.order) {
+      if (!raster.visible(id)) continue;
+      raster.layers.get(id)?.drawMapped(ctx, s, offX, offY, view);
+    }
+  }
 
   for (const it of items) {
     if (it.kind === "hatch" && it.points && it.points.length >= 3) {

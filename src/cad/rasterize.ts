@@ -16,6 +16,8 @@ import { coveredTiles, type CoverageGeom, type TileKey } from "./raster/rasterCo
 import { planRasterAction, chooseActionScale, RASTER_BUDGET } from "./raster/RasterPolicy";
 import { getEffectiveContourGeometry } from "./effectiveGeometry";
 import { isDisplayGradientActive } from "./displayGradient";
+import { patternBaseAngleDeg } from "./hatchPatterns";
+import { getCustomPattern, isCustomPatternId } from "./customHatchPatterns";
 import { rasterTempStoreAvailable, tempPut, tempGet, tempDeleteAction } from "./raster/RasterTempStore";
 import { registerRasterJob, unregisterRasterJob, serializeOnLayer } from "./raster/RasterJobs";
 
@@ -490,15 +492,38 @@ function isReducible(input: RasterInput): boolean {
  * (keine Muster, kein Verlauf, keine Flächenbeschriftung). Eine Kontur wird
  * als separates Pixelobjekt (Füllung transparent) gerendert.
  */
+/**
+ * Mustertransformation exakt wie `Renderer._paintHatchPattern`, aber in
+ * Weltkoordinaten. Eigene Musterbilder werden als Bildquelle mitgeführt
+ * (im Manifest einmal je Inhalt als Blob); eingebaute Muster nur als ID.
+ */
+function patternOf(app: any, h: any): any | null {
+  const id = h.patternId || "mauerwerk";
+  let src: string | undefined;
+  if (isCustomPatternId(id)) { src = getCustomPattern(id)?.src; if (!src) return null; }
+  const anchor = (h.patternRotateWithShape === false && h.patternOrigin && Number.isFinite(h.patternOrigin.x)) ? h.patternOrigin : h.points?.[0];
+  if (!anchor) return null;
+  const ref = app?.renderer?.referencePxPerM || Defaults.strokeWidthBaseScale;
+  return {
+    id, scale: h.patternScale ?? 1, angleDeg: (h.patternAngleDeg ?? 0) + patternBaseAngleDeg(id),
+    skewDeg: h.patternSkewDeg ?? 0, stretch: h.patternStretch ?? 1,
+    color: h.strokeColor || Defaults.hatchStrokeColor,
+    lineWidthM: (h.strokeWidthPx ?? Defaults.hatchStrokePx) / ref,
+    ax: anchor.x + (h.patternOffsetX ?? 0), ay: anchor.y + (h.patternOffsetY ?? 0),
+    ...(src ? { src } : {}),
+  };
+}
+
 function compactFillOf(app: any, input: RasterInput): { fill: any; strokeInput: RasterInput | null; strokeCoverage: CoverageGeom | null } | null {
   if (input.type !== "hatch") return null;
   const h = input.obj as any;
-  if (h.isPolygon === true || h.closed === false || h.patternEnabled || isDisplayGradientActive(h.displayGradient) || h.areaLabel?.show) return null;
+  if (h.isPolygon === true || h.closed === false || isDisplayGradientActive(h.displayGradient) || h.areaLabel?.show) return null;
   let rings: { x: number; y: number }[][];
   try { rings = (getEffectiveContourGeometry(h).rings || []).filter((r: any[]) => r.length >= 3); } catch { return null; }
   if (!rings.length) return null;
   const alpha = Math.max(0, Math.min(1, (h.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100));
-  const fill = { id: `f-${h.id ?? Date.now().toString(36)}`, rings: rings.map((r) => r.map((p) => ({ x: p.x, y: p.y }))), rule: "evenodd", color: h.fillColor || Defaults.hatchFillColor, alpha };
+  const fill = { id: `f-${h.id ?? Date.now().toString(36)}`, rings: rings.map((r) => r.map((p) => ({ x: p.x, y: p.y }))), rule: "evenodd", color: h.fillColor || Defaults.hatchFillColor, alpha, ...(h.patternEnabled ? { pattern: patternOf(app, h) } : {}) };
+  if (h.patternEnabled && !(fill as any).pattern) return null;
   if (!((h.strokeWidthPx || 0) > 0)) return { fill, strokeInput: null, strokeCoverage: null };
   const clone = Object.assign(Object.create(Object.getPrototypeOf(h)), h, { fillAlphaPct: 0, patternEnabled: false });
   const refRatio = Defaults.strokeWidthBaseScale / Math.max(1, (app?.renderer?.referencePxPerM || Defaults.strokeWidthBaseScale));

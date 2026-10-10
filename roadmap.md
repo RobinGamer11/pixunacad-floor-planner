@@ -207,6 +207,6 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Schritt 1.1 Kacheln bedarfsgerecht laden (Referenzen beim Öffnen, nur Sichtbares, saubere Kacheln verdrängbar, portionsweise Ausgabe)
 - [x] Schritt 1.2 Cloud/Lokal je Blatt per Revision + Outbox, Konflikt erhält beide Stände, gemeinsame Veröffentlichung, Bearbeitungssperre beim Laden
 - [x] Schritt 1.3 Lokale Blob-Bereinigung, serverseitige Referenzen aus Manifest, Bereinigung bis leer
-- [ ] Schritt 2.4 Rasterinhalt in Export/PDF (CAD-Ausschnitte, Exportseiten)
-- [ ] Schritt 2.5 Bildmuster kompakt (patternFill), Haarlinien an Kachelgrenzen
+- [x] Schritt 2.4 Rasterinhalt in Export/PDF (CAD-Ausschnitte, Exportseiten)
+- [x] Schritt 2.5 Bildmuster kompakt (patternFill), Haarlinien an Kachelgrenzen
 - [ ] SQL-Endfassung in Supabase einspielen (Nutzer)
