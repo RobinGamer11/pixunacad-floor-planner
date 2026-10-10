@@ -1,3 +1,4 @@
+-- ÜBERHOLT: Nicht mehr anwenden. Ersetzt durch 20261010120000_storage_quotas_v2.sql (korrigiert, idempotent).
 -- Paket 3: kontrollierter Projektspeicher.
 -- * Betreiberwerte (Konto-/Projekt-/Datei-Limit, globale Reserve) liegen in
 --   `storage_quota_settings`. Solange dort KEIN Wert eingetragen ist, werden

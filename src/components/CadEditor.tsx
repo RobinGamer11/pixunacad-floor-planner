@@ -893,14 +893,24 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     // CAD-State pro Projekt aus localStorage wiederherstellen
     const persistKey = `pixuna.cad.${projectId ?? "default"}`;
     let lastPersistRev = -1;
+    let inFlightRev = -1;
+    // Projektöffnung = Laden: bis IndexedDB/Cloud geantwortet haben, wird der
+    // vorläufige localStorage-Vektorstand nie zurückgeschrieben.
+    let initialLoading = true;
     const persist = () => {
       try {
+        if (initialLoading) return;
+        // Revisionsprüfung VOR der teuren Serialisierung.
+        const rev = (app as any).contentRevision ?? 0;
+        if (rev === lastPersistRev || rev === inFlightRev) return;
         const snap = (app as any)._serializeScene?.();
         if (typeof snap !== "string") return;
-        const rev = (app as any).contentRevision ?? 0;
-        const changed = rev !== lastPersistRev;
-        lastPersistRev = rev;
-        if (changed) saveLocalScene(projectId ?? "default", snap, rev, persistKey);
+        inFlightRev = rev;
+        // Erst nach bestätigtem Schreiben gilt die Revision als gespeichert.
+        saveLocalScene(projectId ?? "default", snap, rev, persistKey).then((ok) => {
+          if (inFlightRev === rev) inFlightRev = -1;
+          if (ok) lastPersistRev = Math.max(lastPersistRev, rev);
+        });
         if (projectId) {
           try {
             const data = JSON.parse(snap);
@@ -978,6 +988,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const revAtStart = (app as any).contentRevision;
       loadLocalScene(projectId ?? "default").then((res) => {
         if ((app as any)._destroyed) return;
+        initialLoading = false;
         if (!res) {
           // Migration: Altstand (Pixel als Text in localStorage) sofort in den
           // Gerätespeicher übernehmen. Der alte Stand wird erst nach
@@ -990,11 +1001,25 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         }
         // Hat der Nutzer inzwischen gezeichnet, nichts überschreiben.
         if ((app as any).contentRevision !== revAtStart) return;
-        (app as any)._restoreScene?.(res.snapshot);
-        lastPersistRev = (app as any).contentRevision;
+        if (res.cloudOnly) {
+          // Frisches Gerät: nur Cloud-Pixel einsetzen, Vektorstand bleibt.
+          try {
+            const cur = JSON.parse((app as any)._serializeScene?.() ?? "{}");
+            cur.rasterLayersByKey = JSON.parse(res.snapshot).rasterLayersByKey ?? {};
+            (app as any)._restoreScene?.(JSON.stringify(cur));
+          } catch (e) { console.error("Cloud-Pixel nicht übernommen:", e); }
+        } else {
+          (app as any)._restoreScene?.(res.snapshot);
+          lastPersistRev = (app as any).contentRevision;
+        }
         try { app.renderer?.render(); } catch {}
         if (res.missing.length) toast({ title: "Pixelinhalte unvollständig", description: `${res.missing.length} Kachel(n) fehlen im Gerätespeicher.` });
-      }).catch((e) => console.error("Lokaler Stand nicht lesbar:", e));
+      }).catch((e) => {
+        // Höhere Formatversion: Projekt bleibt gesperrt (initialLoading bleibt true → kein Überschreiben).
+        if (String(e?.message).includes("PIXUNA_FORMAT_NEWER")) return;
+        initialLoading = false;
+        console.error("Lokaler Stand nicht lesbar:", e);
+      });
     }
     const offSaveStatus = onLocalSaveStatus((s, d) => {
       if (s === "quota" || s === "blocked" || s === "error") toast({ title: s === "blocked" ? "Speichern gesperrt" : "Speichern fehlgeschlagen", description: d, variant: "destructive" });

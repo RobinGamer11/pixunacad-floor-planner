@@ -20,7 +20,11 @@ export const RASTER_SHEET_ID = "__raster__";
 export const RASTER_BUCKET = "raster-tiles";
 const KIND = "rasterManifest";
 
-export type RasterCloudStatus = "off" | "syncing" | "synced" | "quota" | "unconfigured" | "conflict" | "error";
+export type RasterCloudStatus = "off" | "syncing" | "synced" | "quota" | "unconfigured" | "setup-missing" | "forbidden" | "offline" | "conflict" | "error";
+
+/** Muss mit `storage_quota_settings.file_bytes` / Bucketlimits übereinstimmen. */
+export const MAX_UPLOAD_BYTES = 10_000_000;
+export const MAX_TILE_UPLOAD_BYTES = 2_000_000;
 type L = (s: RasterCloudStatus, detail?: string) => void;
 const listeners = new Set<L>();
 let status: RasterCloudStatus = "off";
@@ -30,7 +34,7 @@ export function onRasterCloudStatus(l: L) { listeners.add(l); l(status); return 
 /** Bekannte Serverrevision je Projekt/Key. */
 const revisions = new Map<string, number>();
 /** Bereits bestätigt hochgeladene Hashes je Projekt. */
-const uploaded = new Map<string, Set<string>>();
+const uploaded = new Map<string, Map<string, string>>(); // hash → asset_id
 const cloudProject = new Map<string, boolean>();
 
 export function quotaMessage(err: unknown): { status: RasterCloudStatus; text: string } | null {
@@ -40,6 +44,9 @@ export function quotaMessage(err: unknown): { status: RasterCloudStatus; text: s
   if (m.includes("PIXUNA_QUOTA_PROJECT")) return { status: "quota", text: "Projektspeicher in der Cloud ist voll." };
   if (m.includes("PIXUNA_QUOTA_ACCOUNT")) return { status: "quota", text: "Kontospeicher in der Cloud ist voll." };
   if (m.includes("PIXUNA_QUOTA_GLOBAL")) return { status: "quota", text: "Cloud-Speicher derzeit ausgelastet." };
+  if (m.includes("PIXUNA_FORBIDDEN")) return { status: "forbidden", text: "Keine Berechtigung, in diesem Projekt Dateien in der Cloud abzulegen." };
+  if (/function .*does not exist|PGRST202|schema cache/i.test(m)) return { status: "setup-missing", text: "Lokal gespeichert – Cloud-Einrichtung fehlt (SQL-Datei noch nicht angewendet)." };
+  if (/Failed to fetch|NetworkError|offline/i.test(m) || (typeof navigator !== "undefined" && navigator.onLine === false)) return { status: "offline", text: "Offline – Pixel bleiben lokal und werden später übertragen." };
   if (m.includes("PIXUNA_QUOTA_PAYLOAD")) return { status: "quota", text: "Objekt ist zu groß für die Cloud." };
   return null;
 }
@@ -52,9 +59,15 @@ async function isCloudProject(projectId: string): Promise<boolean> {
   const { data: sess } = await c.auth.getSession();
   if (!sess.session) return false;
   const { data, error } = await c.rpc("storage_usage", { _project_id: projectId });
-  // Fehlende Migration oder kein Mitglied → kein Cloud-Abgleich für Pixel.
-  const ok = !error && Array.isArray(data) && data.length > 0;
-  cloudProject.set(projectId, ok);
+  if (error) {
+    // Schema-/Netzfehler nie dauerhaft als „kein Cloudprojekt“ merken.
+    const q = quotaMessage(error);
+    if (q) set(q.status, q.text); else set("error", "Cloud-Status konnte nicht geprüft werden.");
+    return false;
+  }
+  const ok = Array.isArray(data) && data.length > 0;
+  cloudProject.set(projectId, ok); // nur bestätigte Mitgliedschaft cachen
+  if (!ok) set("forbidden", "Kein Cloud-Zugriff auf dieses Projekt – Pixel bleiben lokal.");
   return ok;
 }
 
@@ -66,6 +79,10 @@ export async function uploadWithQuota(
   projectId: string, bucket: string, path: string, blob: Blob, kind: "raster_tile" | "attachment", hash?: string,
   contentType?: string,
 ): Promise<string> {
+  // Vorab-Grenze: zu große Dateien werden gar nicht erst gesendet. Server
+  // (Reservierung der Bucketobergrenze) und Bucketlimit erzwingen dasselbe.
+  const limit = kind === "raster_tile" ? MAX_TILE_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
+  if (blob.size > limit) throw new Error("PIXUNA_QUOTA_FILE");
   const c = getNetworkClient();
   if (!c) throw new Error("Keine Cloud-Verbindung");
   const { data, error } = await c.rpc("storage_reserve_upload", {
@@ -113,40 +130,96 @@ export function pushRasterManifestSoon(projectId: string, manifest: RasterManife
   });
 }
 
+/** Zuletzt bestätigt veröffentlichte Hashes je Projekt/Key (Basis für Referenzfreigabe). */
+const published = new Map<string, Set<string>>();
+/** Projekte mit ungelöstem Konflikt: kein weiteres Überschreiben bis Neuöffnen. */
+const conflicted = new Set<string>();
+
 async function pushNow(projectId: string, manifest: RasterManifest, revision: number) {
-  if (!(await isCloudProject(projectId))) { set("off"); return; }
+  if (conflicted.has(projectId)) return;
+  if (!(await isCloudProject(projectId))) return;
   set("syncing");
-  const done = uploaded.get(projectId) ?? new Set<string>();
+  const c = getNetworkClient()!;
+  const done = uploaded.get(projectId) ?? new Map<string, string>();
   uploaded.set(projectId, done);
+  // 1) Alle Kacheln aller Keys zuerst vollständig sichern (nie halbe Stände).
+  const idsByKey = new Map<string, string[]>();
   for (const key of Object.keys(manifest)) {
-    const layers = manifest[key];
-    const assetIds: string[] = [];
-    // 1) Alle Kacheln sichern – erst danach das Manifest (nie halbe Stände).
-    for (const hash of hashesOf(layers)) {
-      if (done.has(hash)) continue;
-      const blob = await getBlob(hash);
-      if (!blob) throw new Error(`Pixelkachel ${hash} fehlt lokal`);
-      assetIds.push(await uploadWithQuota(projectId, RASTER_BUCKET, `${projectId}/${hash}.png`, blob, "raster_tile", hash, "image/png"));
-      done.add(hash);
+    const ids: string[] = [];
+    for (const hash of hashesOf(manifest[key])) {
+      let id = done.get(hash);
+      if (!id) {
+        const blob = await getBlob(hash);
+        if (!blob) throw new Error(`Pixelkachel ${hash} fehlt lokal`);
+        id = await uploadWithQuota(projectId, RASTER_BUCKET, `${projectId}/${hash}.png`, blob, "raster_tile", hash, "image/png");
+        done.set(hash, id);
+      }
+      ids.push(id); // auch wiederverwendete Assets referenzieren
     }
-    // 2) Manifest mit Revisionsprüfung schreiben.
+    idsByKey.set(key, ids);
+  }
+  // 2) Manifeste mit Revisionsprüfung; entfernte Keys als Tombstone.
+  const keys = new Set([...Object.keys(manifest), ...[...revisions.keys()].filter((k) => k.startsWith(projectId + "|")).map((k) => k.slice(projectId.length + 1))]);
+  for (const key of keys) {
     const rk = `${projectId}|${key}`;
     const base = revisions.get(rk) ?? 0;
+    const layers = manifest[key];
+    if (!layers && base === 0) continue;
+    const ids = idsByKey.get(key) ?? [];
+    // Referenzen VOR der Freigabe setzen: kein Löschen während Veröffentlichung.
+    for (const id of ids) {
+      const r = await c.rpc("storage_add_ref", { _asset_id: id, _ref_kind: "raster_manifest", _ref_id: key });
+      if (r.error) throw r.error;
+    }
     const res = await writeObject(projectId, {
       sheetId: RASTER_SHEET_ID, objectId: key, objectKind: KIND as never,
-      changeType: base > 0 ? "update" : "create",
-      payload: { format: 2, localRevision: revision, layers } as never,
+      changeType: !layers ? "delete" : base > 0 ? "update" : "create",
+      payload: layers ? ({ format: 2, localRevision: revision, layers } as never) : (null as never),
     } as never, base);
     if (!res.accepted) {
-      revisions.set(rk, res.revision);
-      set("conflict", "Pixelstand wurde auf einem anderen Gerät geändert – bitte Projekt neu öffnen.");
+      // Lokaler Inhalt bleibt; Serverrevision wird NICHT übernommen → kein
+      // späteres stilles Überschreiben. Auflösung über Neuöffnen/decideOpen.
+      conflicted.add(projectId);
+      set("conflict", "Pixelstand wurde auf einem anderen Gerät geändert – lokal behalten. Bitte Projekt neu öffnen.");
       return;
     }
-    revisions.set(rk, res.revision);
-    const c = getNetworkClient();
-    for (const id of assetIds) await c?.rpc("storage_add_ref", { _asset_id: id, _ref_kind: "raster_manifest", _ref_id: key });
+    if (layers) revisions.set(rk, res.revision); else revisions.delete(rk);
+    // 3) Nicht mehr benötigte Referenzen freigeben (Server markiert unreferenzierte Assets zum Löschen).
+    const now = new Set(ids);
+    for (const old of published.get(rk) ?? []) if (!now.has(old)) {
+      await c.rpc("storage_release_ref", { _asset_id: old, _ref_kind: "raster_manifest", _ref_id: key });
+    }
+    published.set(rk, now);
   }
   set("synced");
+  void runStorageCleanup(projectId);
+}
+
+/**
+ * Physische Bereinigung in begrenzten Batches über die Storage-API.
+ * Server liefert Löschkandidaten (Status `deleting`), Client entfernt die
+ * Dateien, Server gibt das Budget erst nach geprüfter Entfernung frei.
+ */
+export async function runStorageCleanup(projectId: string, batch = 50): Promise<number> {
+  const c = getNetworkClient();
+  if (!c) return 0;
+  try {
+    const { data, error } = await c.rpc("storage_claim_cleanup", { _project_id: projectId, _limit: batch });
+    if (error || !Array.isArray(data) || !data.length) return 0;
+    const byBucket = new Map<string, { id: string; path: string }[]>();
+    for (const r of data as { asset_id: string; bucket: string; path: string }[]) {
+      const l = byBucket.get(r.bucket) ?? []; l.push({ id: r.asset_id, path: r.path }); byBucket.set(r.bucket, l);
+    }
+    let n = 0;
+    for (const [bucket, items] of byBucket) {
+      const rm = await c.storage.from(bucket).remove(items.map((i) => i.path));
+      if (rm.error) continue; // bleibt gezählt, nächster Versuch später
+      const fin = await c.rpc("storage_finalize_delete", { _asset_ids: items.map((i) => i.id) });
+      if (!fin.error) n += Number(fin.data ?? 0);
+      for (const i of items) for (const m of uploaded.values()) for (const [h, id] of m) if (id === i.id) m.delete(h);
+    }
+    return n;
+  } catch (e) { console.warn("Speicherbereinigung übersprungen:", e); return 0; }
 }
 
 /**
@@ -162,6 +235,7 @@ export async function pullRasterManifest(projectId: string): Promise<RasterManif
     const { data, error } = await c.from("cad_object_state")
       .select("object_id,revision,payload,deleted")
       .eq("project_id", projectId).eq("sheet_id", RASTER_SHEET_ID).eq("object_kind", KIND)
+      .order("object_id", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw error;
     for (const r of data ?? []) {
@@ -173,16 +247,17 @@ export async function pullRasterManifest(projectId: string): Promise<RasterManif
     }
     if (!data || data.length < PAGE) break;
   }
-  const fetched = new Map<string, Blob>();
-  const done = uploaded.get(projectId) ?? new Set<string>();
-  uploaded.set(projectId, done);
+  // Nur fehlende Kacheln laden, portionsweise direkt in IndexedDB (kein Gesamt-RAM).
+  const seen = new Set<string>();
+  let portion = new Map<string, Blob>();
   for (const key of Object.keys(out)) for (const hash of hashesOf(out[key])) {
-    done.add(hash);
-    if (fetched.has(hash) || (await hasBlob(hash))) continue;
+    if (seen.has(hash)) continue; seen.add(hash);
+    if (await hasBlob(hash)) continue;
     const { data, error } = await c.storage.from(RASTER_BUCKET).download(`${projectId}/${hash}.png`);
     if (error || !data) continue; // fehlt → beim Zusammensetzen als "missing" gemeldet
-    fetched.set(hash, data);
+    portion.set(hash, data);
+    if (portion.size >= 16) { await putBlobs(portion); portion = new Map(); }
   }
-  await putBlobs(fetched);
+  if (portion.size) await putBlobs(portion);
   return out;
 }
