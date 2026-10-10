@@ -450,6 +450,7 @@ export function rasterizeIntoLayer(app: any, input: RasterInput): RasterOutcome 
 function startRasterJob(app: any, input: RasterInput, layers: any, layer: any, tiles: TileKey[]): RasterOutcome {
   if (typeof app?.commitRasterJob !== "function") return "rejected";
   const token: string | null = app.currentActionToken?.() ?? null;
+  app.deferActionCommit?.(token);
   const job = registerRasterJob(app);
   const useIdb = rasterTempStoreAvailable();
   const toastId = `raster-${job.id}`;
@@ -524,6 +525,7 @@ function startRasterJob(app: any, input: RasterInput, layers: any, layer: any, t
       for (const d of decoded) { if ("close" in d.image) (d.image as ImageBitmap).close(); else freeCanvas(d.image as HTMLCanvasElement); }
       if (useIdb) void tempDeleteAction(job.id);
       unregisterRasterJob(app, job);
+      app.releaseDeferredAction?.(token);
       dismiss();
       if (outcome === "failed") toast("error", "Pixel-Umwandlung fehlgeschlagen. Das Objekt bleibt als Vektorobjekt erhalten.");
       else if (outcome === "cancelled" && job.signal.reason === "user") toast("info", "Pixel-Umwandlung abgebrochen. Das Objekt bleibt als Vektorobjekt erhalten.");
