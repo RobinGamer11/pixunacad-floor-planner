@@ -7,9 +7,9 @@
  * - Warteschlange, legacyKey, Manifest und Status je Projekt: ein Wechsel A → B
  *   verdrängt nie den noch nicht gespeicherten Stand von A.
  */
-import { RASTER_FORMAT, fromManifest, toManifest } from "./rasterManifest";
-import { pullRasterManifest, pushRasterManifestSoon } from "./rasterCloud";
-import { isQuotaError, loadProjectLocal, localStoreAvailable, saveProjectLocal } from "./LocalProjectStore";
+import { RASTER_FORMAT, fromManifest, manifestHashes, pinHashes, sessionHashes, toManifest, unpinHashes, type RasterManifest } from "./rasterManifest";
+import { downloadMissingTiles, pullRasterManifest, pushRasterSoon } from "./rasterCloud";
+import { gcBlobs, isQuotaError, loadProjectLocal, localStoreAvailable, patchProjectLocal, saveProjectLocal, type LocalProjectRecord } from "./LocalProjectStore";
 
 export type LocalSaveStatus = "idle" | "saving" | "saved" | "quota" | "error" | "blocked";
 type Listener = (s: LocalSaveStatus, detail?: string) => void;
@@ -24,12 +24,27 @@ export function isLocalSaveBlocked(projectId: string) { return blocked.has(proje
 /** Zuletzt gespeichertes/geladenes Manifest je Projekt (Basis für Teil-Checkpoints). */
 const lastManifest = new Map<string, any>();
 
-export interface LoadResult { snapshot: string; missing: string[] }
+export interface LoadResult { snapshot: string; missing: string[]; conflicts: string[] }
+
+/** Entscheidung je Blatt-Key zwischen lokalem und Cloud-Pixelstand. */
+export type RasterKeyDecision = "local" | "cloud" | "delete" | "conflict";
+/**
+ * - keine Cloudänderung seit bestätigter Basis → lokal
+ * - Cloud neuer, lokal ohne ungesendete Änderung → Cloud übernehmen (bzw. löschen)
+ * - Cloud neuer UND lokal ungesendet geändert → Konflikt: beide erhalten, lokal bleibt
+ */
+export function decideRasterKey(o: { hasLocal: boolean; localDirty: boolean; base: number; cloudRev: number | undefined; cloudDeleted: boolean }): RasterKeyDecision {
+  if (o.cloudRev == null || o.cloudRev <= o.base) return "local";
+  if (o.localDirty && o.hasLocal) return "conflict";
+  if (o.localDirty && !o.hasLocal && o.cloudDeleted) return "local";
+  if (o.localDirty) return "conflict";
+  return o.cloudDeleted ? "delete" : "cloud";
+}
 
 /**
- * Lädt den IndexedDB-Stand. Ohne lokalen Datensatz wird trotzdem der
- * berechtigte Cloud-Pixelstand geholt (frisches Gerät): dann liefert die
- * Funktion nur `cloudRaster`, der Vektorstand kommt weiter über `decideOpen`.
+ * Lädt den IndexedDB-Stand und gleicht ihn mit dem Cloud-Pixelstand ab
+ * (Revisionen + lokale Outbox, siehe `decideRasterKey`). Ohne lokalen
+ * Datensatz liefert die Funktion nur den Cloudstand (`cloudOnly`).
  * Höheres Format → blockiert (nie leer gemeldet, nie überschrieben).
  */
 export async function loadLocalScene(projectId: string): Promise<(LoadResult & { cloudOnly?: boolean }) | null> {
@@ -41,22 +56,60 @@ export async function loadLocalScene(projectId: string): Promise<(LoadResult & {
     throw new Error("PIXUNA_FORMAT_NEWER");
   }
   const data = rec ? JSON.parse(rec.sceneJson) : {};
+  const local: RasterManifest = data.rasterManifest ?? {};
   const missing: string[] = [];
-  // Cloud ergänzt nur Blätter ohne lokalen Pixelstand – keine Vermischung je Blatt.
-  let cloudAdded = false;
-  try {
-    const cloud = await pullRasterManifest(projectId);
-    if (cloud) {
-      data.rasterManifest ||= {};
-      for (const k of Object.keys(cloud)) if (!data.rasterManifest[k]?.length) { data.rasterManifest[k] = cloud[k]; cloudAdded = true; }
+  const conflicts: string[] = Object.keys(rec?.conflicts ?? {});
+  let changed = false;
+  let cloud: Awaited<ReturnType<typeof pullRasterManifest>> = null;
+  try { cloud = await pullRasterManifest(projectId); } catch (e) { console.warn("Pixel aus der Cloud nicht geladen:", e); }
+  const base = { ...(rec?.cloudBase ?? {}) };
+  const dirty = new Set(rec?.dirtyKeys ?? []);
+  const newConflicts: Record<string, { revision: number; layers: unknown }> = { ...(rec?.conflicts ?? {}) };
+  if (cloud) {
+    const take: RasterManifest = {};
+    for (const key of new Set([...Object.keys(cloud.revisions), ...Object.keys(local)])) {
+      const d = decideRasterKey({ hasLocal: !!local[key]?.length, localDirty: dirty.has(key), base: base[key] ?? 0, cloudRev: cloud.revisions[key], cloudDeleted: cloud.deleted.has(key) });
+      if (d === "cloud") { take[key] = cloud.layers[key]; local[key] = cloud.layers[key]; base[key] = cloud.revisions[key]; changed = true; }
+      else if (d === "delete") { delete local[key]; base[key] = cloud.revisions[key]; changed = true; }
+      else if (d === "conflict" && !newConflicts[key]) { newConflicts[key] = { revision: cloud.revisions[key], layers: cloud.layers[key] ?? null }; conflicts.push(key); changed = true; }
     }
-  } catch (e) { console.warn("Pixel aus der Cloud nicht geladen:", e); }
-  if (!rec && !cloudAdded) return null;
-  lastManifest.set(projectId, data.rasterManifest);
-  data.rasterLayersByKey = await fromManifest(data.rasterManifest, missing);
+    try { await downloadMissingTiles(projectId, take); } catch (e) { console.warn("Cloudkacheln nicht geladen:", e); }
+  }
+  if (!rec && !changed) return null;
+  data.rasterManifest = local;
+  // Übernahme sofort lokal festhalten (gleiche Entscheidung beim nächsten Öffnen).
+  if (rec && changed) {
+    await patchProjectLocal(projectId, (cur) => cur && cur.format <= RASTER_FORMAT ? { ...cur, sceneJson: JSON.stringify(data), cloudBase: base, conflicts: newConflicts } : null);
+  } else if (!rec && changed) {
+    await saveProjectLocal({ projectId, format: RASTER_FORMAT, revision: 0, savedAt: Date.now(), sceneJson: JSON.stringify({ rasterManifest: local }), cloudBase: base, dirtyKeys: [], conflicts: newConflicts }, new Map());
+  }
+  lastManifest.set(projectId, local);
+  data.rasterLayersByKey = await fromManifest(local, missing);
   delete data.rasterManifest;
-  return { snapshot: JSON.stringify(data), missing, cloudOnly: !rec };
+  // Persistente Outbox aus früheren Sitzungen fortsetzen.
+  if (dirty.size) pushRasterSoon(projectId);
+  scheduleGc();
+  return { snapshot: JSON.stringify(data), missing, conflicts, cloudOnly: !rec };
 }
+
+/** Pixel-Hashes, auf die ein gespeicherter Datensatz verweist (aktuell + Konfliktstände). */
+export function recordHashes(rec: LocalProjectRecord): Set<string> {
+  const out = manifestHashes(JSON.parse(rec.sceneJson).rasterManifest);
+  for (const c of Object.values(rec.conflicts ?? {})) manifestHashes({ c: (c.layers ?? []) as any }, out);
+  return out;
+}
+
+let gcTimer: ReturnType<typeof setTimeout> | null = null;
+/** Lokale Bereinigung gebündelt, nur wenn kein Speichervorgang läuft. */
+function scheduleGc() {
+  if (gcTimer || typeof setTimeout === "undefined") return;
+  gcTimer = setTimeout(async () => {
+    gcTimer = null;
+    if (pendingByProject.size || activeWrites > 0) { scheduleGc(); return; }
+    try { await gcBlobs(sessionHashes(), recordHashes); } catch (e) { console.warn("Lokale Pixelbereinigung übersprungen:", e); }
+  }, 30_000);
+}
+let activeWrites = 0;
 
 interface Job { snap: string; revision: number; legacyKey: string; waiters: Array<(ok: boolean) => void> }
 const pendingByProject = new Map<string, Job>();
@@ -107,11 +160,25 @@ async function writeJob(projectId: string, job: Job): Promise<boolean> {
       return true;
     }
     const blobs = new Map<string, Blob>();
-    data.rasterManifest = await toManifest(raster, job.revision, blobs, lastManifest.get(projectId));
-    const manifest = data.rasterManifest;
-    await saveProjectLocal({ projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson: JSON.stringify(data) }, blobs);
+    activeWrites++;
+    let manifest: RasterManifest;
+    try {
+      data.rasterManifest = await toManifest(raster, job.revision, blobs, lastManifest.get(projectId));
+      manifest = data.rasterManifest;
+      pinHashes(blobs.keys());
+      const prev = await loadProjectLocal(projectId);
+      if (prev && prev.format > RASTER_FORMAT) { blocked.add(projectId); setStatus("blocked", "Neuerer Stand vorhanden – wird nicht überschrieben."); return false; }
+      // Outbox: jeder Key, dessen Manifest sich gegenüber dem gespeicherten Stand ändert.
+      const before: RasterManifest = prev ? (JSON.parse(prev.sceneJson).rasterManifest ?? {}) : {};
+      const dirty = new Set(prev?.dirtyKeys ?? []);
+      for (const k of new Set([...Object.keys(before), ...Object.keys(manifest)])) {
+        if (JSON.stringify(before[k] ?? null) !== JSON.stringify(manifest[k] ?? null)) dirty.add(k);
+      }
+      await saveProjectLocal({ projectId, format: RASTER_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson: JSON.stringify(data), cloudBase: prev?.cloudBase ?? {}, dirtyKeys: [...dirty], conflicts: prev?.conflicts ?? {} }, blobs);
+    } finally { activeWrites--; unpinHashes(blobs.keys()); }
     lastManifest.set(projectId, manifest);
-    pushRasterManifestSoon(projectId, manifest, job.revision);
+    pushRasterSoon(projectId);
+    scheduleGc();
     // Erst nach erfolgreichem IndexedDB-Commit: lesbarer Vektorstand ohne Pixel.
     delete data.rasterManifest;
     try { localStorage.setItem(job.legacyKey, JSON.stringify({ ...data, rasterLayersByKey: {}, rasterFormat: RASTER_FORMAT })); }
