@@ -3310,9 +3310,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               </label>
               <div className="space-y-3">
 
-                {!!docSelected.pdfSourceB64 && (
-                )}
-
                 <div className="space-y-2">
                   <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">SKALIERUNG</div>
 
