@@ -20,7 +20,11 @@ export const RASTER_SHEET_ID = "__raster__";
 export const RASTER_BUCKET = "raster-tiles";
 const KIND = "rasterManifest";
 
-export type RasterCloudStatus = "off" | "syncing" | "synced" | "quota" | "unconfigured" | "conflict" | "error";
+export type RasterCloudStatus = "off" | "syncing" | "synced" | "quota" | "unconfigured" | "setup-missing" | "forbidden" | "offline" | "conflict" | "error";
+
+/** Muss mit `storage_quota_settings.file_bytes` / Bucketlimits übereinstimmen. */
+export const MAX_UPLOAD_BYTES = 10_000_000;
+export const MAX_TILE_UPLOAD_BYTES = 2_000_000;
 type L = (s: RasterCloudStatus, detail?: string) => void;
 const listeners = new Set<L>();
 let status: RasterCloudStatus = "off";
@@ -40,6 +44,9 @@ export function quotaMessage(err: unknown): { status: RasterCloudStatus; text: s
   if (m.includes("PIXUNA_QUOTA_PROJECT")) return { status: "quota", text: "Projektspeicher in der Cloud ist voll." };
   if (m.includes("PIXUNA_QUOTA_ACCOUNT")) return { status: "quota", text: "Kontospeicher in der Cloud ist voll." };
   if (m.includes("PIXUNA_QUOTA_GLOBAL")) return { status: "quota", text: "Cloud-Speicher derzeit ausgelastet." };
+  if (m.includes("PIXUNA_FORBIDDEN")) return { status: "forbidden", text: "Keine Berechtigung, in diesem Projekt Dateien in der Cloud abzulegen." };
+  if (/function .*does not exist|PGRST202|schema cache/i.test(m)) return { status: "setup-missing", text: "Lokal gespeichert – Cloud-Einrichtung fehlt (SQL-Datei noch nicht angewendet)." };
+  if (/Failed to fetch|NetworkError|offline/i.test(m) || (typeof navigator !== "undefined" && navigator.onLine === false)) return { status: "offline", text: "Offline – Pixel bleiben lokal und werden später übertragen." };
   if (m.includes("PIXUNA_QUOTA_PAYLOAD")) return { status: "quota", text: "Objekt ist zu groß für die Cloud." };
   return null;
 }
@@ -52,9 +59,15 @@ async function isCloudProject(projectId: string): Promise<boolean> {
   const { data: sess } = await c.auth.getSession();
   if (!sess.session) return false;
   const { data, error } = await c.rpc("storage_usage", { _project_id: projectId });
-  // Fehlende Migration oder kein Mitglied → kein Cloud-Abgleich für Pixel.
-  const ok = !error && Array.isArray(data) && data.length > 0;
-  cloudProject.set(projectId, ok);
+  if (error) {
+    // Schema-/Netzfehler nie dauerhaft als „kein Cloudprojekt“ merken.
+    const q = quotaMessage(error);
+    if (q) set(q.status, q.text); else set("error", "Cloud-Status konnte nicht geprüft werden.");
+    return false;
+  }
+  const ok = Array.isArray(data) && data.length > 0;
+  cloudProject.set(projectId, ok); // nur bestätigte Mitgliedschaft cachen
+  if (!ok) set("forbidden", "Kein Cloud-Zugriff auf dieses Projekt – Pixel bleiben lokal.");
   return ok;
 }
 
@@ -66,6 +79,10 @@ export async function uploadWithQuota(
   projectId: string, bucket: string, path: string, blob: Blob, kind: "raster_tile" | "attachment", hash?: string,
   contentType?: string,
 ): Promise<string> {
+  // Vorab-Grenze: zu große Dateien werden gar nicht erst gesendet. Server
+  // (Reservierung der Bucketobergrenze) und Bucketlimit erzwingen dasselbe.
+  const limit = kind === "raster_tile" ? MAX_TILE_UPLOAD_BYTES : MAX_UPLOAD_BYTES;
+  if (blob.size > limit) throw new Error("PIXUNA_QUOTA_FILE");
   const c = getNetworkClient();
   if (!c) throw new Error("Keine Cloud-Verbindung");
   const { data, error } = await c.rpc("storage_reserve_upload", {
