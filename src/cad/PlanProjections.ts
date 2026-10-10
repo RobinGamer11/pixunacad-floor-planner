@@ -315,7 +315,6 @@ export function drawProjection(
       ctx.restore();
     }
   }
-  }
 
   ctx.restore();
 

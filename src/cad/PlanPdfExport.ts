@@ -8,7 +8,7 @@
  *  - Geometrisches Clipping (Liang-Barsky für Linien, Sutherland-Hodgman für Polygone)
  *    am Clip-Rechteck im lokalen, rotierten Plan-mm-System
  */
-import { PDFDocument, PDFPage, rgb, degrees } from "pdf-lib";
+import { PDFDocument, PDFPage, rgb } from "pdf-lib";
 import type { Plan } from "./PlanManager";
 import { getPlanPaperSize, type SpreadRect } from "./PlanManager";
 import {
@@ -127,8 +127,6 @@ function drawProjectionToPdf(
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: ClipRect },
   /** Lage der Seite auf der PDF-Seite (Verbund): Versatz oben links und Gesamthöhe in mm. */
   place: { offXMm: number; offYMm: number; pageHeightMm: number } = { offXMm: 0, offYMm: 0, pageHeightMm: paperHeightMm },
-  /** Nur diese Items zeichnen (Ebenenschritt); Lage aus allen `items`. */
-  drawOnly?: ProjectionItem[],
 ) {
   const layout = computeProjectionLayout(items, proj);
   const factor = layout.factor; // sheet-m → plan-m
@@ -157,7 +155,7 @@ function drawProjectionToPdf(
     return { x: mmX * MM_TO_PT, y: (place.pageHeightMm - mmY) * MM_TO_PT };
   };
 
-  for (const it of drawOnly ?? items) {
+  for (const it of items) {
     if (it.kind === "segment" && it.a && it.b) {
       const a = toLocalMm(it.a.x, it.a.y);
       const b = toLocalMm(it.b.x, it.b.y);
