@@ -12,7 +12,6 @@ import { Maximize2, Ruler as RulerIcon } from "lucide-react";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SelectionType } from "@/cad/constants";
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
-import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 
 interface Props {
@@ -125,7 +124,6 @@ export function CadDocumentInspector({ engine }: Props) {
       </div>
 
       {/* Objektart */}
-      <DocumentPixelModeToggle app={engine as any} docId={sel.id} />
 
       {/* Skalierung */}
       <div className="space-y-2 pt-1">

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
-import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
@@ -176,7 +175,6 @@ export const FreeDrawSettingsPanel: React.FC<Props> = ({ app, units = "cm", proj
       {!hideChrome && !framedCad && (
         <>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Freihand</div>
-          <RasterModeToggle app={app} projectId={projectId} />
         </>
       )}
       <FreeDrawPreview

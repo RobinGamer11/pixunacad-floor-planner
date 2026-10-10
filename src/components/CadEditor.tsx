@@ -53,10 +53,8 @@ import {
 } from "@/components/cad/CadFieldProxies";
 
 import { HelpOverlay } from "@/components/workspace/HelpOverlay";
-import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 
 import { DocumentFilterPanel } from "@/components/cad/DocumentFilterPanel";
-import { DocumentPixelModeToggle } from "@/components/cad/DocumentPixelModeToggle";
 import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector";
 import { CanvasFabBar, LayerFab, LayersHelpCard, LayersPanelTitle } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
@@ -2327,7 +2325,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <CadEbeneSelect target={idSelectRef} />
               </div>
               <div className="mt-3">
-                <RasterModeToggle app={appRef.current} projectId={projectId} />
               </div>
             </div>
           )}
@@ -2447,7 +2444,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
               </div>
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
               {activeTool === ToolIds.POLYGON && <PolygonModeSelect app={appRef.current} />}
               <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <PolygonSettingsPanel app={appRef.current} projectId={projectId} hideChrome variant="drawing" />
@@ -2461,7 +2457,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
               </div>
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
               {activeTool === ToolIds.HATCH && <HatchModeSelect app={appRef.current} />}
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -2480,7 +2475,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
            {/* Hatch Settings (Legacy-Bindings: Ebene + Flächenanzeige) */}
           <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
             <div className="hidden">
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
             </div>
 
             <div className="hidden gap-1 mb-3">
@@ -2778,7 +2772,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <CadEbeneSelect target={textIdSelectRef} />
-              <RasterModeToggle app={appRef.current} projectId={projectId} />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
                 <div className="hidden">
@@ -3024,7 +3017,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="space-y-3 mb-3">
                 <CadEbeneSelect target={idSelectRef} />
-                <RasterModeToggle app={appRef.current} projectId={projectId} />
               </div>
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -3319,7 +3311,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               <div className="space-y-3">
 
                 {!!docSelected.pdfSourceB64 && (
-                  <DocumentPixelModeToggle app={appRef.current} docId={docSelected.id} />
                 )}
 
                 <div className="space-y-2">

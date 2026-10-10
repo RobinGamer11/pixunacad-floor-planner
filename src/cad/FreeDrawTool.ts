@@ -5,7 +5,6 @@ import type { Input } from "./Input";
 import type { FreeLineStyle } from "./Scene";
 import { dedupePoints, projectPointToInfiniteLineFromTwoPoints, autoShapePoints } from "./freeGeom";
 import { RulerDragController } from "./rulerInteraction";
-import { maybeRasterize } from "./rasterize";
 import { endLiveBrush } from "./brushStrokes";
 
 /**
@@ -142,7 +141,6 @@ export class FreeDrawTool {
               autoShape: useAuto,
               autoShapeSource: useAuto ? raw : null,
             });
-            maybeRasterize(this.app, { type: "free", obj: stroke });
           });
           this.app.refreshLabelUI?.();
         }
