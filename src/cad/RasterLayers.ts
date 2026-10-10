@@ -31,6 +31,50 @@
 
 import type { Camera } from "./Camera";
 import { rasterResources, type ResidentTile } from "./raster/RasterResourceManager";
+import { segmentHitsRect } from "./raster/rasterCoverage";
+
+/**
+ * Kompakte Vollfläche (Manifest `solidFill`): Kontur + Löcher + Füllregel +
+ * Farbe/Alpha statt flächendeckender Bitmap. Kein Szenenobjekt, nicht
+ * auswählbar. Wird nur in Kacheln materialisiert, die später lokal bearbeitet
+ * werden (`mat` = Schlüssel bereits materialisierter Kacheln).
+ */
+export interface CompactFillJSON {
+  id: string;
+  rings: { x: number; y: number }[][];
+  rule: "evenodd" | "nonzero";
+  color: string;
+  alpha: number;
+  mat?: string[];
+}
+interface CompactFill extends Omit<CompactFillJSON, "mat"> {
+  mat: Set<string>;
+  bbox: { x0: number; y0: number; x1: number; y1: number };
+}
+function fillBBox(rings: { x: number; y: number }[][]) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const r of rings) for (const p of r) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+  return { x0, y0, x1, y1 };
+}
+function insideFill(f: CompactFill, x: number, y: number): boolean {
+  let wn = 0, odd = false;
+  for (const r of f.rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const a = r[i], b = r[j];
+    if ((a.y > y) !== (b.y > y)) {
+      const cx = ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x;
+      if (x < cx) { odd = !odd; wn += a.y > b.y ? 1 : -1; }
+    }
+  }
+  return f.rule === "evenodd" ? odd : wn !== 0;
+}
+/** Berührt die Fläche das Weltrechteck? (konservativ, reine Geometrie) */
+function fillHitsRect(f: CompactFill, x0: number, y0: number, x1: number, y1: number): boolean {
+  if (f.bbox.x1 < x0 || f.bbox.x0 > x1 || f.bbox.y1 < y0 || f.bbox.y0 > y1) return false;
+  for (const r of f.rings) for (let i = 0; i < r.length; i++) {
+    if (segmentHitsRect(r[i], r[(i + 1) % r.length], x0, y0, x1, y1)) return true;
+  }
+  return insideFill(f, (x0 + x1) / 2, (y0 + y1) / 2);
+}
 
 /** Kantenlänge einer Kachel in Pixeln. */
 export const RASTER_TILE_PX = 512;
@@ -124,6 +168,8 @@ export interface RasterLayerJSON {
   pxPerM: number;
   tilePx: number;
   tiles: RasterTileJSON[];
+  /** Kompakte Vollflächen (ohne Bitmap). */
+  fills?: CompactFillJSON[];
 }
 
 /** Ausdrückliche Ablehnung eines zu großen Einzeichnungsbereichs. */
@@ -178,6 +224,12 @@ export class RasterLayer {
   readonly pxPerM: number;
   readonly tilePx: number;
   private tiles = new Map<string, RasterTile>();
+  private fills: CompactFill[] = [];
+  /** Änderungszähler je Kachel (für Abschlussprüfung von Hintergrundjobs). */
+  private ver = new Map<string, number>();
+  /** Änderungszähler der kompakten Flächen. */
+  fillsVersion = 0;
+  private _materializing = false;
   /** Anzahl der in diese Ebene eingebrannten Rasterstriche. */
   strokeCount = 0;
 
@@ -223,7 +275,81 @@ export class RasterLayer {
     return t || null;
   }
 
+  private _bump(key: string) { this.ver.set(key, (this.ver.get(key) ?? 0) + 1); }
+  tileVersion(tx: number, ty: number): number { return this.ver.get(this._key(tx, ty)) ?? 0; }
+
+  /** Zeichnet die Fläche in Ebenen-Pixelkoordinaten der Kachel (Ursprung ox/oy). */
+  private _traceFill(ctx: CanvasRenderingContext2D, f: CompactFill, ox: number, oy: number, k: number) {
+    ctx.beginPath();
+    for (const r of f.rings) {
+      if (r.length < 3) continue;
+      ctx.moveTo((r[0].x - ox) * k, (r[0].y - oy) * k);
+      for (let i = 1; i < r.length; i++) ctx.lineTo((r[i].x - ox) * k, (r[i].y - oy) * k);
+      ctx.closePath();
+    }
+  }
+  private _paintFill(ctx: CanvasRenderingContext2D, f: CompactFill, ox: number, oy: number, k: number) {
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = Math.max(0, Math.min(1, f.alpha));
+    ctx.fillStyle = f.color;
+    this._traceFill(ctx, f, ox, oy, k);
+    ctx.fill(f.rule);
+    ctx.restore();
+  }
+
+  /**
+   * Materialisiert alle noch nicht eingebrachten Flächen in genau diese Kachel
+   * (in Flächenreihenfolge). Läuft vor jeder lokalen Kachelbearbeitung.
+   */
+  private _materialize(tile: RasterTile) {
+    if (!this.fills.length || this._materializing) return;
+    const key = this._key(tile.tx, tile.ty);
+    const tw = this.tileWorld, ox = tile.tx * tw, oy = tile.ty * tw;
+    const todo = this.fills.filter((f) => !f.mat.has(key) && fillHitsRect(f, ox, oy, ox + tw, oy + tw));
+    if (!todo.length) return;
+    for (const f of todo) f.mat.add(key);
+    this._materializing = true;
+    try {
+      this._mutate(tile, this._scaled(tile, (ctx) => { for (const f of todo) this._paintFill(ctx, f, ox, oy, this.pxPerM); }));
+    } finally { this._materializing = false; }
+  }
+
+  /** Legt Kacheln an, wo Flächen im Rechteck noch nicht materialisiert sind. */
+  private _ensureFillTiles(x: number, y: number, w: number, h: number) {
+    if (!this.fills.length) return;
+    const tw = this.tileWorld;
+    const tx0 = Math.floor(x / tw), tx1 = Math.floor((x + w) / tw);
+    const ty0 = Math.floor(y / tw), ty1 = Math.floor((y + h) / tw);
+    if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) > 4096) return;
+    for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) {
+      const key = this._key(tx, ty);
+      if (this.tiles.has(key)) continue;
+      const ox = tx * tw, oy = ty * tw;
+      if (this.fills.some((f) => !f.mat.has(key) && fillHitsRect(f, ox, oy, ox + tw, oy + tw))) {
+        this._materialize(this._tile(tx, ty, true)!);
+      }
+    }
+  }
+
+  /**
+   * Fügt eine kompakte Vollfläche hinzu. Bereits vorhandene Kacheln im
+   * Bereich werden sofort materialisiert, damit die Reihenfolge (Fläche über
+   * früheren Strichen) stimmt; alle übrigen Bereiche bleiben kompakt.
+   */
+  addFill(json: CompactFillJSON) {
+    const rings = (json.rings || []).filter((r) => Array.isArray(r) && r.length >= 3).map((r) => r.map((p) => ({ x: p.x, y: p.y })));
+    if (!rings.length) return;
+    const f: CompactFill = { id: json.id, rings, rule: json.rule === "nonzero" ? "nonzero" : "evenodd", color: json.color, alpha: json.alpha, mat: new Set(json.mat ?? []), bbox: fillBBox(rings) };
+    this.fills.push(f);
+    this.fillsVersion++;
+    for (const t of [...this.tiles.values()]) this._materialize(t);
+  }
+
+  get fillCount() { return this.fills.length; }
+
   private _drop(key: string) {
+    this._bump(key);
     const t = this.tiles.get(key);
     if (t) rasterResources.release(t.res);
     this.tiles.delete(key);
@@ -265,6 +391,8 @@ export class RasterLayer {
 
   /** Ändert eine Kachel; bei ladender/verdrängter Kachel wird nach dem Laden angewendet. */
   private _mutate(tile: RasterTile, fn: (ctx: CanvasRenderingContext2D) => void) {
+    this._materialize(tile);
+    this._bump(this._key(tile.tx, tile.ty));
     if (tile.loading || tile.evicted) {
       (tile.pending ||= []).push(fn);
       tile.sid = null;
@@ -349,6 +477,7 @@ export class RasterLayer {
     // unterscheidet sich 100 % Weichheit auch bei kleinen Radierern klar von
     // einer harten Kante.
     const outerR = mode === "smooth" ? r * (1 + 2 * soft) : r;
+    this._ensureFillTiles(cx - outerR, cy - outerR, outerR * 2, outerR * 2);
     this._forRect(cx - outerR, cy - outerR, outerR * 2, outerR * 2, false, (tile, ox, oy) => {
       this._mutate(tile, this._scaled(tile, (ctx) => {
       const px = (cx - ox) * this.pxPerM;
@@ -391,6 +520,7 @@ export class RasterLayer {
 
   /** Zeichnet den Rasterinhalt in den Viewport (Bildschirm-Canvas). */
   draw(ctx: CanvasRenderingContext2D, camera: Camera) {
+    this._drawFills(ctx, camera.scale, camera.offsetX, camera.offsetY, 0, 0);
     if (this.tiles.size === 0) return;
     const tw = this.tileWorld;
     const sizePx = tw * camera.scale;
@@ -414,11 +544,47 @@ export class RasterLayer {
     ctx.restore();
   }
 
+  /**
+   * Zeichnet kompakte Flächen direkt (nur sichtbarer Ausschnitt), ausgenommen
+   * bereits materialisierte Kacheln – deren Inhalt kommt aus der Kachel.
+   * Abbildung: Bildschirm = Welt * k + (offX, offY).
+   */
+  private _drawFills(ctx: CanvasRenderingContext2D, k: number, offX: number, offY: number, vw: number, vh: number) {
+    if (!this.fills.length) return;
+    const tw = this.tileWorld;
+    const vx0 = -offX / k, vy0 = -offY / k, vx1 = (vw - offX) / k, vy1 = (vh - offY) / k;
+    for (const f of this.fills) {
+      if (vw > 0 && (f.bbox.x1 < vx0 || f.bbox.x0 > vx1 || f.bbox.y1 < vy0 || f.bbox.y0 > vy1)) continue;
+      ctx.save();
+      if (f.mat.size) {
+        ctx.beginPath();
+        ctx.rect(-1e7, -1e7, 2e7, 2e7);
+        for (const key of f.mat) {
+          const [tx, ty] = key.split(",").map(Number);
+          const x0 = Math.round(tx * tw * k + offX), y0 = Math.round(ty * tw * k + offY);
+          const x1 = Math.round((tx + 1) * tw * k + offX), y1 = Math.round((ty + 1) * tw * k + offY);
+          ctx.rect(x0, y0, x1 - x0, y1 - y0);
+        }
+        ctx.clip("evenodd");
+      }
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.alpha));
+      ctx.fillStyle = f.color;
+      ctx.beginPath();
+      for (const r of f.rings) {
+        ctx.moveTo(r[0].x * k + offX, r[0].y * k + offY);
+        for (let i = 1; i < r.length; i++) ctx.lineTo(r[i].x * k + offX, r[i].y * k + offY);
+        ctx.closePath();
+      }
+      ctx.fill(f.rule);
+      ctx.restore();
+    }
+  }
+
   /** Gibt alle Kacheln beim RAM-Budget frei. */
   releaseAll() { for (const k of [...this.tiles.keys()]) this._drop(k); }
 
   hasContent(): boolean {
-    return this.tiles.size > 0;
+    return this.tiles.size > 0 || this.fills.length > 0;
   }
 
   /** Prüft, ob an einem Weltpunkt deckende Pixel liegen (Boundary-Analyse). */
@@ -426,7 +592,10 @@ export class RasterLayer {
   isOpaqueAt(x: number, y: number, threshold = 24): boolean | null {
     const tw = this.tileWorld;
     const tile = this._tile(Math.floor(x / tw), Math.floor(y / tw), false);
-    if (!tile) return false;
+    if (!tile) {
+      const key = this._key(Math.floor(x / tw), Math.floor(y / tw));
+      return this.fills.some((f) => !f.mat.has(key) && f.alpha * 255 >= threshold && insideFill(f, x, y));
+    }
     if (!this._ensure(tile)) return null;
     const n = this._px(tile);
     const px = Math.floor((x - Math.floor(x / tw) * tw) * this.pxPerM * tile.s);
@@ -444,6 +613,7 @@ export class RasterLayer {
   drawIntoMask(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, pxPerM: number): boolean {
     const k = pxPerM / this.pxPerM;
     let complete = true;
+    this._drawFills(ctx, pxPerM, -x * pxPerM, -y * pxPerM, Math.ceil(w * pxPerM), Math.ceil(h * pxPerM));
     this._forRect(x, y, w, h, false, (tile, ox, oy) => {
       if (!this._ensure(tile)) { complete = false; return; }
       ctx.drawImage(
@@ -488,8 +658,10 @@ export class RasterLayer {
       }
       push(tile, tile.dataUrl);
     }
-    if (tiles.length === 0) return null;
-    return { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles, strokeCount: this.strokeCount };
+    if (tiles.length === 0 && !this.fills.length) return null;
+    const out: RasterLayerJSON = { labelId: this.labelId, pxPerM: this.pxPerM, tilePx: this.tilePx, tiles, strokeCount: this.strokeCount };
+    if (this.fills.length) out.fills = this.fills.map((f) => ({ id: f.id, rings: f.rings, rule: f.rule, color: f.color, alpha: f.alpha, mat: [...f.mat] }));
+    return out;
   }
 
   private _isTileEmpty(tile: RasterTile): boolean {
@@ -528,7 +700,10 @@ export class RasterLayer {
     for (const e of entries) {
       // Neue Kachel übernimmt die Auflösung des Ergebnisses; bestehende Kacheln
       // behalten ihre eigene (Inhalt wird nie umgerechnet).
-      const tile = this._tile(e.tx, e.ty, true, e.s ?? 1)!;
+      let tile = this._tile(e.tx, e.ty, true, e.s ?? 1)!;
+      // Feinerer Inhalt auf grober Kachel: Kachel auf die feinere Stufe heben
+      // (vorhandener Inhalt wird nur vergrößert übernommen, nie vergröbert).
+      if ((e.s ?? 1) > tile.s) tile = this._upgrade(tile, normTileScale(e.s));
       const n = this._px(tile);
       this._mutate(tile, (ctx) => {
         ctx.globalCompositeOperation = "source-over";
@@ -538,12 +713,89 @@ export class RasterLayer {
     }
   }
 
+  /** Hebt eine residente Kachel auf eine feinere Auflösungsstufe. */
+  private _upgrade(tile: RasterTile, s: number): RasterTile {
+    if (tile.loading || tile.evicted || s <= tile.s) return tile;
+    const key = this._key(tile.tx, tile.ty);
+    const old = tile.canvas;
+    const oldMat = this.fills.filter((f) => f.mat.has(key));
+    this._drop(key);
+    for (const f of oldMat) f.mat.add(key);
+    const nt = this._tile(tile.tx, tile.ty, true, s)!;
+    const n = this._px(nt);
+    nt.ctx.imageSmoothingEnabled = true;
+    nt.ctx.drawImage(old, 0, 0, n, n);
+    old.width = 0; old.height = 0;
+    this._bump(key);
+    return nt;
+  }
+
+  /**
+   * Bereitet eine Kachel für den speicherschonenden Jobabschluss vor: setzt
+   * vorhandenen Inhalt + noch nicht materialisierte Flächen + neues Ergebnis
+   * zu EINEM kodierten Blob zusammen (nur diese eine Kachel im RAM). Ohne
+   * bestehenden Inhalt wird das Ergebnis unverändert übernommen.
+   */
+  async composeForCommit(tx: number, ty: number, blob: Blob, s: number): Promise<{ blob: Blob; s: number; version: number; fillsVersion: number }> {
+    const key = this._key(tx, ty);
+    const version = this.tileVersion(tx, ty), fillsVersion = this.fillsVersion;
+    const tile = this.tiles.get(key);
+    const tw = this.tileWorld, ox = tx * tw, oy = ty * tw;
+    const fills = this.fills.filter((f) => !f.mat.has(key) && fillHitsRect(f, ox, oy, ox + tw, oy + tw));
+    if (!tile && !fills.length) return { blob, s, version, fillsVersion };
+    const sc = Math.max(s, tile?.s ?? 0, fills.length ? 1 : 0);
+    const n = Math.max(1, Math.round(this.tilePx * sc));
+    const { canvas, ctx } = makeTileCanvas(n);
+    const loadImg = (src: string) => new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+    try {
+      if (tile) {
+        if (!tile.loading && !tile.evicted) ctx.drawImage(tile.canvas, 0, 0, n, n);
+        else if (tile.dataUrl) ctx.drawImage(await loadImg(tile.dataUrl), 0, 0, n, n);
+        else throw new Error("Kachel nicht verfügbar");
+      }
+      for (const f of fills) this._paintFill(ctx, f, ox, oy, this.pxPerM * sc);
+      const url = URL.createObjectURL(blob);
+      try { ctx.drawImage(await loadImg(url), 0, 0, n, n); } finally { URL.revokeObjectURL(url); }
+      const out: Blob = await new Promise((r, j) => canvas.toBlob((b) => (b ? r(b) : j(new Error("PNG-Kodierung fehlgeschlagen"))), "image/png"));
+      return { blob: out, s: sc, version, fillsVersion };
+    } finally { canvas.width = 0; canvas.height = 0; }
+  }
+
+  /** true, wenn eine vorbereitete Kachel noch zum aktuellen Stand passt. */
+  isCommitFresh(tx: number, ty: number, version: number, fillsVersion: number): boolean {
+    return this.tileVersion(tx, ty) === version && this.fillsVersion === fillsVersion;
+  }
+
+  /**
+   * Übernimmt vorbereitete Kacheln synchron und ohne Dekodierung: jede Kachel
+   * wird zur verdrängten Kachel mit kodierter Quelle (lädt erst bei Bedarf).
+   */
+  replaceTilesLazy(entries: { tx: number; ty: number; blob: Blob; s: number }[]) {
+    for (const e of entries) {
+      const key = this._key(e.tx, e.ty);
+      this._drop(key);
+      const t = this._tile(e.tx, e.ty, true, e.s)!;
+      t.canvas.width = 0; t.canvas.height = 0;
+      t.evicted = true;
+      t.dataUrl = URL.createObjectURL(e.blob);
+      t.sid = null;
+      rasterResources.release(t.res);
+      // Der Blob enthält bereits alle Flächen dieser Kachel.
+      const tw = this.tileWorld, ox = e.tx * tw, oy = e.ty * tw;
+      for (const f of this.fills) if (fillHitsRect(f, ox, oy, ox + tw, oy + tw)) f.mat.add(key);
+      this._bump(key);
+    }
+  }
+
   /** Eine abgeschlossene Zeichenaktion = genau ein gezählter Rasterstrich. */
   noteStroke() { this.strokeCount += 1; }
 
   /** Lädt Kacheln aus JSON (asynchron je Kachel; `onReady` triggert ein Re-Render). */
   restore(json: RasterLayerJSON, onReady?: () => void, store?: RasterTileStore) {
     this.strokeCount = Math.max(0, json.strokeCount ?? (json.tiles?.length ? 1 : 0));
+    // Flächen zuerst (ohne Materialisierung – `mat` stammt aus dem Stand).
+    this._materializing = true;
+    try { for (const f of json.fills ?? []) this.addFill(f); } finally { this._materializing = false; }
     const list = json.tiles || [];
     for (const t of list) {
       // `ref` verweist auf eine inhaltsgleiche Kachel (Dedupe beim Speichern).
@@ -564,7 +816,12 @@ export class RasterLayer {
    * Kachelgenau (nicht pixelgenau) — reicht für die Boundary-Analyse.
    */
   contentBoundsWorld(): { x: number; y: number; w: number; h: number } | null {
-    if (this.tiles.size === 0) return null;
+    let fb: { x: number; y: number; w: number; h: number } | null = null;
+    for (const f of this.fills) {
+      const b = { x: f.bbox.x0, y: f.bbox.y0, w: f.bbox.x1 - f.bbox.x0, h: f.bbox.y1 - f.bbox.y0 };
+      fb = !fb ? b : (() => { const x = Math.min(fb!.x, b.x), y = Math.min(fb!.y, b.y); return { x, y, w: Math.max(fb!.x + fb!.w, b.x + b.w) - x, h: Math.max(fb!.y + fb!.h, b.y + b.h) - y }; })();
+    }
+    if (this.tiles.size === 0) return fb;
     const tw = this.tileWorld;
     let minTx = Infinity, minTy = Infinity, maxTx = -Infinity, maxTy = -Infinity;
     for (const t of this.tiles.values()) {
@@ -573,8 +830,11 @@ export class RasterLayer {
       if (t.tx > maxTx) maxTx = t.tx;
       if (t.ty > maxTy) maxTy = t.ty;
     }
-    if (!Number.isFinite(minTx)) return null;
-    return { x: minTx * tw, y: minTy * tw, w: (maxTx - minTx + 1) * tw, h: (maxTy - minTy + 1) * tw };
+    if (!Number.isFinite(minTx)) return fb;
+    const tb = { x: minTx * tw, y: minTy * tw, w: (maxTx - minTx + 1) * tw, h: (maxTy - minTy + 1) * tw };
+    if (!fb) return tb;
+    const x = Math.min(fb.x, tb.x), y = Math.min(fb.y, tb.y);
+    return { x, y, w: Math.max(fb.x + fb.w, tb.x + tb.w) - x, h: Math.max(fb.y + fb.h, tb.y + tb.h) - y };
   }
 }
 

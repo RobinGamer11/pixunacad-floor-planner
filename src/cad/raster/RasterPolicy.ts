@@ -17,10 +17,42 @@ export const RASTER_BUDGET = {
   maxActionTiles: 6000,
   /** Bis zu dieser Kachelzahl läuft die Aktion sofort (ohne Fortschritt). */
   syncTileLimit: 12,
+  /** Obergrenze kodierter (PNG-)Assetbytes, die EINE neue Aktion erzeugen darf. */
+  maxActionAssetBytes: 5_000_000,
+  /** Kleinste zulässige Merkmalsbreite (Strich) in Pixeln nach einer Reduktion. */
+  minFeaturePx: 3,
 } as const;
 
 /** Vorbereitet, aber inaktiv (siehe Modulkommentar). */
-export const AUTO_RESOLUTION_REDUCTION_ENABLED = false;
+export const AUTO_RESOLUTION_REDUCTION_ENABLED = true;
+
+/** Halbierungsstufen je Kachel (identisch zu `TILE_SCALES` in RasterLayers). */
+export const RASTER_SCALE_STEPS = [1, 0.5, 0.25, 0.125] as const;
+
+/**
+ * Wählt für eine NEUE Aktion die Auflösungsstufe anhand einer Stichprobe
+ * (kodierte Bytes je belegter Kachel bei Stufe 1). Bestehende Inhalte werden
+ * nie umgerechnet. Feine Striche (`featurePx` bei Stufe 1) und Muster/Text
+ * (`reducible=false`) werden nie vergröbert – dann lieber ablehnen.
+ * Ergebnis null = auch reduziert zu groß → Vektor bleibt.
+ */
+export function chooseActionScale(input: {
+  bytesPerTileAtFull: number;
+  occupiedTiles: number;
+  featurePx: number;
+  reducible: boolean;
+}): number | null {
+  const budget = RASTER_BUDGET.maxActionAssetBytes;
+  const est = (s: number) => input.bytesPerTileAtFull * input.occupiedTiles * s * s;
+  if (est(1) <= budget) return 1;
+  if (!AUTO_RESOLUTION_REDUCTION_ENABLED || !input.reducible) return null;
+  for (const s of RASTER_SCALE_STEPS) {
+    if (s === 1) continue;
+    if (input.featurePx * s < RASTER_BUDGET.minFeaturePx) return null;
+    if (est(s) <= budget) return s;
+  }
+  return null;
+}
 
 export type RasterPlan =
   | { ok: true; pxPerM: number; tiles: number; mode: "sync" | "job" }
