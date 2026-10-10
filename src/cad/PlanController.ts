@@ -18,6 +18,7 @@ import {
   itemsBoundsM,
   projectionScaleDen,
   clipAfterEdgeDrag,
+  withRasterBounds,
   scaleProjectionClip,
 } from "./PlanProjections";
 import { formatScaleLabel } from "@/lib/scale";
@@ -87,6 +88,11 @@ export class PlanController {
 
   /** Liefert Items zur Projektion, mit Cache. */
   getItems(proj: Projection): ProjectionItem[] {
+    // Ausschnittsgröße aus dem ganzen sichtbaren Inhalt (Vektoren + Pixel).
+    return withRasterBounds(this._vectorItems(proj), (this.app as any).projectionRaster?.(proj) ?? null);
+  }
+
+  private _vectorItems(proj: Projection): ProjectionItem[] {
     if (proj.mode === "linked") return this._linkedItems(proj);
     let items = this._itemsCache.get(proj.id);
     if (!items) {

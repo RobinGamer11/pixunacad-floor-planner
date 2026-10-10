@@ -4521,6 +4521,10 @@ export class CadApp {
         : `Druckplaene_${stamp}.pdf`;
       downloadPdfBytes(bytes, fname);
     } catch (err) {
+      if (String((err as Error)?.message).includes("PIXUNA_PATTERN_MISSING")) {
+        toast.error("PDF-Export abgebrochen", { description: "Benötigte Flächenmuster fehlen oder konnten nicht geladen werden – es wurde kein unvollständiges PDF erzeugt." });
+        return;
+      }
       if (String((err as Error)?.message).includes("PIXUNA_RASTER_INCOMPLETE")) {
         toast.error("PDF-Export abgebrochen", { description: "Pixelbereiche konnten nicht vollständig geladen werden – bitte erneut versuchen." });
         return;
