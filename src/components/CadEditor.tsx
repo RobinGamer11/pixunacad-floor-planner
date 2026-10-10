@@ -988,6 +988,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const revAtStart = (app as any).contentRevision;
       loadLocalScene(projectId ?? "default").then((res) => {
         if ((app as any)._destroyed) return;
+        initialLoading = false;
         if (!res) {
           // Migration: Altstand (Pixel als Text in localStorage) sofort in den
           // Gerätespeicher übernehmen. Der alte Stand wird erst nach
@@ -1000,11 +1001,25 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         }
         // Hat der Nutzer inzwischen gezeichnet, nichts überschreiben.
         if ((app as any).contentRevision !== revAtStart) return;
-        (app as any)._restoreScene?.(res.snapshot);
-        lastPersistRev = (app as any).contentRevision;
+        if (res.cloudOnly) {
+          // Frisches Gerät: nur Cloud-Pixel einsetzen, Vektorstand bleibt.
+          try {
+            const cur = JSON.parse((app as any)._serializeScene?.() ?? "{}");
+            cur.rasterLayersByKey = JSON.parse(res.snapshot).rasterLayersByKey ?? {};
+            (app as any)._restoreScene?.(JSON.stringify(cur));
+          } catch (e) { console.error("Cloud-Pixel nicht übernommen:", e); }
+        } else {
+          (app as any)._restoreScene?.(res.snapshot);
+          lastPersistRev = (app as any).contentRevision;
+        }
         try { app.renderer?.render(); } catch {}
         if (res.missing.length) toast({ title: "Pixelinhalte unvollständig", description: `${res.missing.length} Kachel(n) fehlen im Gerätespeicher.` });
-      }).catch((e) => console.error("Lokaler Stand nicht lesbar:", e));
+      }).catch((e) => {
+        // Höhere Formatversion: Projekt bleibt gesperrt (initialLoading bleibt true → kein Überschreiben).
+        if (String(e?.message).includes("PIXUNA_FORMAT_NEWER")) return;
+        initialLoading = false;
+        console.error("Lokaler Stand nicht lesbar:", e);
+      });
     }
     const offSaveStatus = onLocalSaveStatus((s, d) => {
       if (s === "quota" || s === "blocked" || s === "error") toast({ title: s === "blocked" ? "Speichern gesperrt" : "Speichern fehlgeschlagen", description: d, variant: "destructive" });
