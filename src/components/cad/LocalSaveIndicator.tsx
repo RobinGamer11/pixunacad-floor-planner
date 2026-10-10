@@ -13,13 +13,13 @@ const CLOUD: Record<RasterCloudStatus, string> = {
 };
 
 /** Dauerhafte Anzeige: lokaler Gerätestand und getrennt der Cloud-Stand der Pixel. */
-export function LocalSaveIndicator() {
+export function LocalSaveIndicator({ projectId }: { projectId?: string }) {
   const [s, setS] = useState<LocalSaveStatus>("idle");
   const [d, setD] = useState<string | undefined>();
   const [c, setC] = useState<RasterCloudStatus>("off");
   const [cd, setCd] = useState<string | undefined>();
   useEffect(() => onLocalSaveStatus((st, det) => { setS(st); setD(det); }), []);
-  useEffect(() => onRasterCloudStatus((st, det) => { setC(st); setCd(det); }), []);
+  useEffect(() => onRasterCloudStatus((st, det) => { setC(st); setCd(det); }, projectId), [projectId]);
   if (s === "idle" && c === "off") return null;
   const pill = (bad: boolean) => `rounded-full px-2.5 py-1 text-[11px] border ${bad ? "bg-destructive text-destructive-foreground border-destructive" : "bg-background/85 text-muted-foreground border-border"}`;
   return (

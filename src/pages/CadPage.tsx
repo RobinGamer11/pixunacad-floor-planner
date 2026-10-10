@@ -152,7 +152,7 @@ const CadPage = () => {
           presenting={presenting}
           helpOn={helpOn}
         />
-        {!presenting && <LocalSaveIndicator />}
+        {!presenting && <LocalSaveIndicator projectId={projectId} />}
         {presenting && (
           <button
             onClick={() => { setPresenting(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }}
