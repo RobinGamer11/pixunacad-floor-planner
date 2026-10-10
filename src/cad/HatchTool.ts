@@ -785,7 +785,7 @@ export class HatchTool {
           loop = findHybridEnclosingFace(this.app.scene, raster, mouseW, { scope: "all", isVisible, extraScenes: libScenes });
         } catch (e) {
           if ((e as Error)?.name !== "RasterNotReadyError") throw e;
-          raster?.whenLoaded(isVisible).then(() => (this.app.renderer as any).requestDraw?.());
+          raster?.whenIdle().then(() => (this.app.renderer as any).requestDraw?.());
           toast("Pixel werden noch geladen", { description: "Bitte gleich noch einmal klicken." });
           return;
         }
