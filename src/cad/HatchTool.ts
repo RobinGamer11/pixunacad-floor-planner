@@ -13,7 +13,6 @@ import type { Input } from "./Input";
 import { findEnclosingFace } from "./hatchFill";
 import { findHybridEnclosingFace } from "./hybridFill";
 
-import { maybeRasterize } from "./rasterize";
 import { toast } from "sonner";
 
 
@@ -514,7 +513,6 @@ export class HatchTool {
     if (!carvedAsHole) {
       this.app.runAction(() => {
         const createdHatch = this.app.scene.createHatch(points, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
-        maybeRasterize(this.app, { type: "hatch", obj: createdHatch });
       });
     }
   }
@@ -800,7 +798,6 @@ export class HatchTool {
     const fillLoop = loop;
     this.app.runAction(() => {
       const filledHatch = this.app.scene.createHatch(fillLoop, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
-      maybeRasterize(this.app, { type: "hatch", obj: filledHatch });
     });
     this.app.clearSelection();
   }

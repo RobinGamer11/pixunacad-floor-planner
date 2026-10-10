@@ -4,7 +4,6 @@ import { Spline, RectangleHorizontal, Circle, PaintBucket } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { HatchDrawMode } from "@/cad/HatchTool";
-import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
@@ -169,7 +168,6 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
       {!hideChrome && (
         <>
           {/* OBJEKTART (Vektor / Pixel) */}
-          <RasterModeToggle app={app} projectId={projectId} />
           <HatchModeSelect app={app} />
         </>
       )}

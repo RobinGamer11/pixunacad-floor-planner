@@ -3,7 +3,6 @@ import { Spline, RectangleHorizontal, Circle } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
-import { RasterModeToggle } from "@/components/cad/RasterModeToggle";
 import { Defaults } from "@/cad/constants";
 import { StrokeSettingsPanel } from "@/components/cad/StrokeSettingsPanel";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
@@ -156,7 +155,6 @@ export const PolygonSettingsPanel: React.FC<{
   return (
     <div className="space-y-3">
       {!hideChrome && <PolygonModeSelect app={app} />}
-      {!hideChrome && <RasterModeToggle app={app} projectId={projectId} />}
 
       <StrokeSettingsPanel
         title="POLYGON"

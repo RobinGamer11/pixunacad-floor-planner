@@ -1,5 +1,4 @@
 import { HatchTool, type HatchDrawMode } from "./HatchTool";
-import { maybeRasterize } from "./rasterize";
 import type { Vec2 } from "./geometry";
 import type { Input } from "./Input";
 
@@ -62,7 +61,6 @@ export class PolygonTool extends HatchTool {
         shapeMode,
         closed: shapeMode === "polygon" ? closed : true,
       });
-      maybeRasterize(this.app, { type: "hatch", obj: poly });
     });
     if (!poly) return;
     (this.app as any).notifyPolygonCreated?.(poly);

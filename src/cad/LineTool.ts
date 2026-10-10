@@ -8,7 +8,6 @@ import {
 import type { CadApp } from "./CadApp";
 import type { Snap } from "./TopologyEngine";
 import type { Input } from "./Input";
-import { maybeRasterize } from "./rasterize";
 
 /** Zeichenmodus des Linienwerkzeugs — 1:1 analog zum Schraffurwerkzeug. */
 export type LineDrawMode = "polyline" | "rectangle" | "circle";
@@ -151,7 +150,6 @@ export class LineTool {
         const b = points[(i + 1) % points.length];
         if (dist(a, b) < 1e-9) continue;
         const seg = this.app.scene.createSegment(v(a.x, a.y), v(b.x, b.y), { ...style, ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
-        maybeRasterize(this.app, { type: "segment", obj: seg });
       }
     });
     this.app.clearSelection();
@@ -601,7 +599,6 @@ export class LineTool {
     const from = this.currentPoint!;
     this.app.runAction(() => {
       const createdSeg = this.app.scene.createSegment(from, point, { ...this.app.getCurrentLineStyle(), ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
-      maybeRasterize(this.app, { type: "segment", obj: createdSeg });
     });
     this.app.clearSelection();
     this.currentPoint = v(point.x, point.y);
