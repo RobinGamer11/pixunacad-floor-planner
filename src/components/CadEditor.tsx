@@ -1,5 +1,5 @@
 import { toast } from "@/hooks/use-toast";
-import { saveLocalScene, loadLocalScene, onLocalSaveStatus } from "@/cad/raster/localScenePersist";
+import { saveLocalScene, loadLocalScene, onLocalSaveStatus } from "@/cad/persist/localScenePersist";
 import { TrashIcon } from "@/lib/trashIcon";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
@@ -894,7 +894,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     const persistKey = `pixuna.cad.${projectId ?? "default"}`;
     let lastPersistRev = -1;
     let inFlightRev = -1;
-    // Projektöffnung = Laden: bis IndexedDB/Cloud geantwortet haben, wird der
+    // Projektöffnung = Laden: bis IndexedDB geantwortet hat, wird der
     // vorläufige localStorage-Vektorstand nie zurückgeschrieben.
     let initialLoading = true;
     const persist = () => {
@@ -994,32 +994,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       loadLocalScene(projectId ?? "default").then((res) => {
         unlock();
         if ((app as any)._destroyed) return;
-        if (!res) {
-          // Migration: Altstand (Pixel als Text in localStorage) sofort in den
-          // Gerätespeicher übernehmen. Der alte Stand wird erst nach
-          // erfolgreichem Schreiben ersetzt; bei Abbruch beim nächsten Öffnen erneut.
-          try {
-            const legacy = localStorage.getItem(persistKey);
-            if (legacy && legacy.includes("data:image")) { lastPersistRev = -1; persist(); }
-          } catch {}
-          return;
-        }
+        if (!res) return;
         // Hat der Nutzer inzwischen gezeichnet, nichts überschreiben.
         if ((app as any).contentRevision !== revAtStart) return;
-        if (res.cloudOnly) {
-          // Frisches Gerät: nur Cloud-Pixel einsetzen, Vektorstand bleibt.
-          try {
-            const cur = JSON.parse((app as any)._serializeScene?.() ?? "{}");
-            cur.rasterLayersByKey = JSON.parse(res.snapshot).rasterLayersByKey ?? {};
-            (app as any)._restoreScene?.(JSON.stringify(cur));
-          } catch (e) { console.error("Cloud-Pixel nicht übernommen:", e); }
-        } else {
-          (app as any)._restoreScene?.(res.snapshot);
-          lastPersistRev = (app as any).contentRevision;
-        }
+        (app as any)._restoreScene?.(res.snapshot);
+        lastPersistRev = (app as any).contentRevision;
         try { app.renderer?.render(); } catch {}
-        if (res.missing.length) toast({ title: "Pixelinhalte unvollständig", description: `${res.missing.length} Kachel(n) fehlen im Gerätespeicher.` });
-        if (res.conflicts.length) toast({ title: "Pixel-Konflikt", description: "Pixel wurden auch auf einem anderen Gerät geändert. Beide Stände sind erhalten; hier wird dein lokaler Stand gezeigt.", variant: "destructive" });
       }).catch((e) => {
         // Höhere Formatversion: Projekt bleibt gesperrt (initialLoading bleibt true → kein Überschreiben).
         if (String(e?.message).includes("PIXUNA_FORMAT_NEWER")) { setProjectLoading(false); window.removeEventListener("keydown", blockKeys, true); return; }

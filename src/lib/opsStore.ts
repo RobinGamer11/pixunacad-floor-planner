@@ -1,4 +1,4 @@
-import { quotaMessage, uploadWithQuota } from "@/cad/raster/rasterCloud";
+import { quotaMessage, uploadWithQuota } from "@/lib/storageQuota";
 /**
  * Paket 04–06 – gemeinsame Datenschicht für
  *   * Arbeitszeiten (`time_entries`)
@@ -700,7 +700,7 @@ export function useAttachments(projectId: string | undefined, itemId: string | u
     const path = `${projectId}/${itemId}/${Date.now()}-${safeName}`;
     // Kontrollierter Speicher: Reservierung → Upload → Bestätigung.
     try {
-      await uploadWithQuota(projectId, ATTACHMENT_BUCKET, path, file, "attachment", undefined, file.type || undefined);
+      await uploadWithQuota(projectId, ATTACHMENT_BUCKET, path, file, file.type || undefined);
     } catch (e) {
       const q = quotaMessage(e);
       throw q ? new Error(q.text) : e;
