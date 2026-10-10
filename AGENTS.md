@@ -50,6 +50,4 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 - Benutzerhandlung = `CadApp.runAction` → 1 Undo, Fehler = volle Rücknahme.
 
 ## Speicher
-- Gezeichnete Objekte sind ausschließlich Vektoren; Pixel gibt es nur in importierten Bildern/PDF-Dokumenten.
-- Lokaler CAD-Stand nur über `src/cad/persist/localScenePersist.ts` (IndexedDB maßgeblich, Formatversion; höheres Format wird nie überschrieben) – alte Pixelfelder werden beim Laden verworfen.
-- Cloud-Anhänge nur über `src/lib/storageQuota.ts` `uploadWithQuota` (Grenzen = `db/migrations/20261010120000_storage_quotas_v2.sql`).
+- Gezeichnetes ist nur Vektor; Pixel nur in importierten Dokumenten. Lokaler Stand nur via `cad/persist/localScenePersist.ts`, Anhänge nur via `lib/storageQuota.ts` (Grenzen = SQL v2).
