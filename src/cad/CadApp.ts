@@ -4465,30 +4465,43 @@ export class CadApp {
     canvas.width = Math.max(1, Math.round(widthMm * pxPerMm));
     canvas.height = Math.max(1, Math.round(heightMm * pxPerMm));
     const { setExportMode, isExportMode } = await import("@/lib/printExport");
-    const was = isExportMode();
-    setExportMode(true);
-    try {
-      renderSceneRegionToCanvas({
-        canvas, sceneJson: json, labelsJson: this.labelManager.list() as any,
-        paperWmm: widthMm, paperHmm: heightMm, scaleDen: 1, centerM: { x: 0, y: 0 },
-        background: "rgba(0,0,0,0)",
-      });
-    } finally { setExportMode(was); }
+    const labels = this.labelManager.list() as any[];
+    const renderVectors = (target: HTMLCanvasElement, onlyLabel: string | null) => {
+      const was = isExportMode();
+      setExportMode(true);
+      try {
+        renderSceneRegionToCanvas({
+          canvas: target, sceneJson: json,
+          labelsJson: (onlyLabel ? labels.map((g) => ({ ...g, visible: g.id === onlyLabel && g.visible !== false })) : labels) as any,
+          paperWmm: widthMm, paperHmm: heightMm, scaleDen: 1, centerM: { x: 0, y: 0 },
+          background: "rgba(0,0,0,0)",
+        });
+      } finally { setExportMode(was); }
+    };
     if (raster) {
-      // Pixel der Exportseite (Welt-Ursprung = Papiermitte) portionsweise darunter legen.
-      const out = document.createElement("canvas");
-      out.width = canvas.width; out.height = canvas.height;
-      const octx = out.getContext("2d")!;
+      // Vorhandene Ebenenreihenfolge (hinten → vorne): je Ebene erst Pixel, dann Vektoren.
+      const octx = canvas.getContext("2d")!;
       const k = pxPerMm * 1000;
       const rect = { x: -widthMm / 2000, y: -heightMm / 2000, w: widthMm / 1000, h: heightMm / 1000 };
-      const ok = await raster.layers.drawRegionAsync(octx, rect, k, (widthMm / 2) * pxPerMm, (heightMm / 2) * pxPerMm, raster.visible, raster.order);
-      if (!ok) { out.width = 0; canvas.width = 0; throw new Error("PIXUNA_RASTER_INCOMPLETE"); }
-      if (hasContent) octx.drawImage(canvas, 0, 0);
+      const tmp = document.createElement("canvas");
+      try {
+        for (let i = labels.length - 1; i >= 0; i--) {
+          const id = labels[i].id;
+          if (!raster.visible(id)) continue;
+          const ok = await raster.layers.drawRegionAsync(octx, rect, k, (widthMm / 2) * pxPerMm, (heightMm / 2) * pxPerMm, (l) => l === id);
+          if (!ok) throw new Error("PIXUNA_RASTER_INCOMPLETE");
+          if (hasContent) {
+            tmp.width = canvas.width; tmp.height = canvas.height;
+            renderVectors(tmp, id);
+            octx.drawImage(tmp, 0, 0);
+          }
+        }
+      } catch (err) { canvas.width = 0; throw err; } finally { tmp.width = 0; tmp.height = 0; }
+      const b2: Blob | null = await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
       canvas.width = 0;
-      const b2: Blob | null = await new Promise(res => out.toBlob(b => res(b), "image/png"));
-      out.width = 0;
       return b2 ? new Uint8Array(await b2.arrayBuffer()) : null;
     }
+    renderVectors(canvas, null);
     const blob: Blob | null = await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
     return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
   }
@@ -4521,6 +4534,10 @@ export class CadApp {
         : `Druckplaene_${stamp}.pdf`;
       downloadPdfBytes(bytes, fname);
     } catch (err) {
+      if (String((err as Error)?.message).includes("PIXUNA_PATTERN_MISSING")) {
+        toast.error("PDF-Export abgebrochen", { description: "Benötigte Flächenmuster fehlen oder konnten nicht geladen werden – es wurde kein unvollständiges PDF erzeugt." });
+        return;
+      }
       if (String((err as Error)?.message).includes("PIXUNA_RASTER_INCOMPLETE")) {
         toast.error("PDF-Export abgebrochen", { description: "Pixelbereiche konnten nicht vollständig geladen werden – bitte erneut versuchen." });
         return;

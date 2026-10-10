@@ -15,6 +15,8 @@ import { getPlanPaperSize, type SpreadRect } from "./PlanManager";
 import {
   flattenSheetSnapshot,
   computeProjectionLayout,
+  withRasterBounds,
+  projectionDrawSteps,
   type ProjectionItem,
 } from "./PlanProjections";
 import { Defaults } from "./constants";
@@ -128,6 +130,8 @@ function drawProjectionToPdf(
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: ClipRect },
   /** Lage der Seite auf der PDF-Seite (Verbund): Versatz oben links und Gesamthöhe in mm. */
   place: { offXMm: number; offYMm: number; pageHeightMm: number } = { offXMm: 0, offYMm: 0, pageHeightMm: paperHeightMm },
+  /** Nur diese Items zeichnen (Ebenenschritt); Lage aus allen `items`. */
+  drawOnly?: ProjectionItem[],
 ) {
   const layout = computeProjectionLayout(items, proj);
   const factor = layout.factor; // sheet-m → plan-m
@@ -156,7 +160,7 @@ function drawProjectionToPdf(
     return { x: mmX * MM_TO_PT, y: (place.pageHeightMm - mmY) * MM_TO_PT };
   };
 
-  for (const it of items) {
+  for (const it of drawOnly ?? items) {
     if (it.kind === "segment" && it.a && it.b) {
       const a = toLocalMm(it.a.x, it.a.y);
       const b = toLocalMm(it.b.x, it.b.y);
@@ -242,7 +246,10 @@ async function drawProjectionRasterToPdf(
   pdf: PDFDocument, page: PDFPage, paperWidthMm: number, paperHeightMm: number,
   items: ProjectionItem[], proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: ClipRect },
   place: { offXMm: number; offYMm: number; pageHeightMm: number }, raster: ProjectionRaster,
+  /** Genau diese Ebene (Ebenenschritt der CAD-Reihenfolge). */
+  labelId: string,
 ) {
+  const only = (id: string) => id === labelId && raster.visible(id);
   const layout = computeProjectionLayout(items, proj);
   const c = layout.clipLocalMm;
   const wMm = c.right - c.left, hMm = c.bottom - c.top;
@@ -250,7 +257,7 @@ async function drawProjectionRasterToPdf(
   const sheetPerMm = 1 / (layout.factor * 1000);
   const offMmX = layout.itemOriginOffsetPlanM.x * 1000, offMmY = layout.itemOriginOffsetPlanM.y * 1000;
   const rect = { x: (c.left - offMmX) * sheetPerMm, y: (c.top - offMmY) * sheetPerMm, w: wMm * sheetPerMm, h: hMm * sheetPerMm };
-  const b = raster.layers.contentBoundsWorld((id) => raster.visible(id));
+  const b = raster.layers.contentBoundsWorld(only);
   if (!b || b.x > rect.x + rect.w || b.x + b.w < rect.x || b.y > rect.y + rect.h || b.y + b.h < rect.y) return;
   // 300 dpi auf dem Papier, begrenzt auf 4096 px je Kante.
   const pxPerMm = Math.min(300 / 25.4, 4096 / wMm, 4096 / hMm);
@@ -259,7 +266,7 @@ async function drawProjectionRasterToPdf(
   try {
     const ctx = cv.getContext("2d")!;
     const k = layout.factor * 1000 * pxPerMm;
-    const ok = await raster.layers.drawRegionAsync(ctx, rect, k, (offMmX - c.left) * pxPerMm, (offMmY - c.top) * pxPerMm, raster.visible, raster.order);
+    const ok = await raster.layers.drawRegionAsync(ctx, rect, k, (offMmX - c.left) * pxPerMm, (offMmY - c.top) * pxPerMm, only);
     if (!ok) throw new Error("PIXUNA_RASTER_INCOMPLETE");
     const blob: Blob | null = await new Promise((r) => cv.toBlob(r, "image/png"));
     if (!blob) return;
@@ -332,18 +339,21 @@ export async function exportPlansToPdf(
       for (const proj of plan.projections) {
         const snap = proj.sceneSnapshot ?? resolveSheetSnapshot(proj.sourceSheetId);
         if (!snap) continue;
-        const items = flattenSheetSnapshot(snap);
-        if (items.length === 0) continue;
         const raster = rasterOf?.(plan, proj) ?? null;
-        if (raster) await drawProjectionRasterToPdf(pdf, page, size.width, size.height, items, {
-          x: proj.x, y: proj.y, rotation: proj.rotation, scale: proj.scale, clip: proj.clip,
-        }, place, raster);
-        try {
-          drawProjectionToPdf(page, size.width, size.height, items, {
-            x: proj.x, y: proj.y, rotation: proj.rotation, scale: proj.scale, clip: proj.clip,
-          }, place);
-        } catch (err) {
-          console.warn("[PlanPdfExport] Projektion fehlgeschlagen:", proj.id, err);
+        // Reine Pixelblätter zählen mit: Größe aus Vektoren + sichtbarem Rasterinhalt.
+        const items = withRasterBounds(flattenSheetSnapshot(snap), raster);
+        if (items.length === 0) continue;
+        const pj = { x: proj.x, y: proj.y, rotation: proj.rotation, scale: proj.scale, clip: proj.clip };
+        // Vorhandene CAD-Ebenenreihenfolge: je Ebene erst Pixel, dann Vektoren.
+        const steps = raster ? projectionDrawSteps(items, raster) : [{ rasterLabel: null, items }];
+        for (const step of steps) {
+          if (raster && step.rasterLabel) await drawProjectionRasterToPdf(pdf, page, size.width, size.height, items, pj, place, raster, step.rasterLabel);
+          if (!step.items.length) continue;
+          try {
+            drawProjectionToPdf(page, size.width, size.height, items, pj, place, step.items);
+          } catch (err) {
+            console.warn("[PlanPdfExport] Projektion fehlgeschlagen:", proj.id, err);
+          }
         }
       }
 
@@ -356,6 +366,8 @@ export async function exportPlansToPdf(
             page.drawImage(img, { x: r.x * MM_TO_PT, y: (pageH - r.y - r.height) * MM_TO_PT, width: size.width * MM_TO_PT, height: size.height * MM_TO_PT });
           }
         } catch (err) {
+          // Unvollständige Pixel/fehlende Muster brechen den Export ab.
+          if (/PIXUNA_(RASTER_INCOMPLETE|PATTERN_MISSING)/.test(String((err as Error)?.message))) throw err;
           console.warn("[PlanPdfExport] Anmerkungen fehlgeschlagen:", plan.id, err);
         }
       }

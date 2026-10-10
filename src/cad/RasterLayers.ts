@@ -82,23 +82,76 @@ interface CompactFill extends Omit<CompactFillJSON, "mat"> {
 
 /** Bild eines eigenen Musters (einmal je Quelle geladen). */
 const patternImages = new Map<string, HTMLImageElement>();
+const patternFailed = new Set<string>();
 function patternImage(src: string): HTMLImageElement | null {
   let img = patternImages.get(src);
   if (!img) {
-    img = new Image();
-    patternImages.set(src, img);
-    resolveTileSrc(src).then((u) => { if (u) img!.src = u; });
+    const im = new Image();
+    img = im;
+    patternImages.set(src, im);
+    im.onerror = () => patternFailed.add(src);
+    resolveTileSrc(src).then((u) => { if (u) im.src = u; else patternFailed.add(src); }, () => patternFailed.add(src));
   }
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
-/** true, wenn das Muster der Fläche ohne Nachladen zeichnbar ist. */
-function fillReady(f: CompactFill): boolean {
+/** Wartezeit, nach der ein nicht verfügbares Muster als fehlend gilt. */
+export const PATTERN_MISSING_AFTER_MS = 60_000;
+const patternFirstAsk = new Map<string, number>();
+/** Zustand des Musters einer Fläche: bereit, lädt noch oder fehlt. */
+export type PatternState = "ready" | "loading" | "failed";
+function fillState(f: CompactFill): PatternState {
   const p = f.pattern;
-  if (!p) return true;
-  if (p.src) return !!patternImage(p.src);
-  if (isCustomPatternId(p.id)) return !!getCustomPatternImage(p.id);
-  if (isImagePatternId(p.id)) return !!getImagePattern(p.id);
-  return true;
+  if (!p) return "ready";
+  let ok = true;
+  if (p.src) ok = !!patternImage(p.src);
+  else if (isCustomPatternId(p.id)) ok = !!getCustomPatternImage(p.id);
+  else if (isImagePatternId(p.id)) ok = !!getImagePattern(p.id);
+  if (ok) return "ready";
+  const key = p.src ?? p.id;
+  if (p.src && patternFailed.has(p.src)) return "failed";
+  const t0 = patternFirstAsk.get(key) ?? (patternFirstAsk.set(key, Date.now()), Date.now());
+  return Date.now() - t0 > PATTERN_MISSING_AFTER_MS ? "failed" : "loading";
+}
+/** true, wenn das Muster der Fläche ohne Nachladen zeichnbar ist. */
+function fillReady(f: CompactFill): boolean { return fillState(f) === "ready"; }
+/**
+ * Eindeutiger Lade-/Fehlerzustand statt unvollständiger Fläche: gestrichelte
+ * Kontur + Schraffur + Hinweis (grau = lädt, rot = Muster fehlt).
+ */
+function paintPatternPlaceholder(ctx: CanvasRenderingContext2D, f: CompactFill, state: PatternState, k: number, offX: number, offY: number) {
+  const col = state === "failed" ? "rgba(200,30,30," : "rgba(90,90,90,";
+  ctx.save();
+  ctx.beginPath();
+  for (const r of f.rings) {
+    if (r.length < 3) continue;
+    ctx.moveTo(r[0].x * k + offX, r[0].y * k + offY);
+    for (let i = 1; i < r.length; i++) ctx.lineTo(r[i].x * k + offX, r[i].y * k + offY);
+    ctx.closePath();
+  }
+  ctx.fillStyle = col + "0.08)";
+  ctx.fill(f.rule);
+  ctx.save();
+  ctx.clip(f.rule);
+  const x0 = f.bbox.x0 * k + offX, y0 = f.bbox.y0 * k + offY, x1 = f.bbox.x1 * k + offX, y1 = f.bbox.y1 * k + offY;
+  ctx.strokeStyle = col + "0.45)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let d = x0 - (y1 - y0); d < x1; d += 10) { ctx.moveTo(d, y1); ctx.lineTo(d + (y1 - y0), y0); }
+  ctx.stroke();
+  ctx.restore();
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = col + "0.9)";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (x1 - x0 > 70 && y1 - y0 > 16) {
+    ctx.fillStyle = col + "0.95)";
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(state === "failed" ? "Muster fehlt" : "Muster lädt …", (x0 + x1) / 2, (y0 + y1) / 2);
+  }
+  ctx.restore();
 }
 /**
  * Zeichnet eine kompakte Fläche (Grundfarbe + optional Muster) mit der
@@ -393,7 +446,9 @@ export class RasterLayer {
     tile.patternWait = (tile.patternWait ?? 0) + 1;
     const started = Date.now();
     const poll = () => {
-      if (!todo.every(fillReady) && Date.now() - started < 60_000) { setTimeout(poll, 100); return; }
+      // Nie ohne Muster materialisieren: die Kachel bleibt unbekannt (Platzhalter
+      // auf dem Bildschirm), bis das Muster verfügbar ist.
+      if (!todo.every(fillReady)) { setTimeout(poll, Date.now() - started < 60_000 ? 100 : 1000); return; }
       tile.patternWait = Math.max(0, (tile.patternWait ?? 1) - 1);
       this._flushPending(tile);
       this.onTileReady?.();
@@ -682,7 +737,13 @@ export class RasterLayer {
     let ok = true;
     for (const f of this.fills) {
       if (vw > 0 && (f.bbox.x1 < vx0 || f.bbox.x0 > vx1 || f.bbox.y1 < vy0 || f.bbox.y0 > vy1)) continue;
-      if (!fillReady(f)) { ok = false; this._retryFills(); continue; }
+      const st = fillState(f);
+      if (st !== "ready") {
+        ok = false; this._retryFills();
+        // Platzhalter über die ganze Fläche (auch materialisierte Kacheln warten).
+        paintPatternPlaceholder(ctx, f, st, k, offX, offY);
+        continue;
+      }
       ctx.save();
       if (f.mat.size) {
         // Deckende Flächen laufen 1 px unter materialisierte Kacheln (keine
@@ -966,8 +1027,10 @@ export class RasterLayer {
    */
   async drawRegionAsync(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, k: number, offX: number, offY: number): Promise<boolean> {
     const vw = Math.ceil(ctx.canvas.width), vh = Math.ceil(ctx.canvas.height);
-    for (const until = Date.now() + 15000; !this.fills.every(fillReady);) {
-      if (Date.now() > until) return false;
+    // Benötigte Muster fehlen → Abbruch statt unvollständiger Ausgabe.
+    const needed = this.fills.filter((f) => f.pattern && f.bbox.x1 >= rect.x && f.bbox.x0 <= rect.x + rect.w && f.bbox.y1 >= rect.y && f.bbox.y0 <= rect.y + rect.h);
+    for (const until = Date.now() + 15000; !needed.every(fillReady);) {
+      if (Date.now() > until || needed.some((f) => fillState(f) === "failed")) throw new Error("PIXUNA_PATTERN_MISSING");
       await new Promise((r) => setTimeout(r, 50));
     }
     this._drawFills(ctx, k, offX, offY, vw, vh);
@@ -983,7 +1046,10 @@ export class RasterLayer {
       for (const t of batch) this._ensure(t);
       const until = Date.now() + 15000;
       while (batch.some((t) => t.loading || t.patternWait)) {
-        if (Date.now() > until) return false;
+        if (Date.now() > until) {
+          if (batch.some((t) => t.patternWait)) throw new Error("PIXUNA_PATTERN_MISSING");
+          return false;
+        }
         await new Promise((r) => setTimeout(r, 20));
       }
       for (const t of batch) {
@@ -1149,7 +1215,8 @@ export class RasterLayers {
    */
   async drawRegionAsync(ctx: CanvasRenderingContext2D, rect: { x: number; y: number; w: number; h: number }, k: number, offX: number, offY: number, filter?: (labelId: string) => boolean, order?: string[]): Promise<boolean> {
     let ok = true;
-    const ids = order ? order.filter((id) => this.layers.has(id)) : [...this.layers.keys()];
+    // `order` wie LabelManager.list(): Index 0 = vorne → von hinten nach vorne zeichnen.
+    const ids = order ? order.filter((id) => this.layers.has(id)).reverse() : [...this.layers.keys()];
     for (const id of ids) {
       if (filter && !filter(id)) continue;
       if (!(await this.layers.get(id)!.drawRegionAsync(ctx, rect, k, offX, offY))) ok = false;
