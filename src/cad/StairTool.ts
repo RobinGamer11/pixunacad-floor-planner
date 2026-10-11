@@ -1058,7 +1058,7 @@ export class StairTool {
         const params = this.paramsFromSettings(path);
         const g = computeStairGeometry(params);
         this.lastWarnings = g.warnings;
-        drawStair(ctx, cam, { ...params, ...s, path }, { geometry: g, alpha: 0.75, invalid: !g.valid });
+        drawStair(ctx, cam, { ...params, ...s, path }, { zoomFactor: cam.scale / ((this.app as any).renderer?.referencePxPerM || 80), textPtScale: (this.app as any).renderer?.textPtScale ?? 1, geometry: g, alpha: 0.75, invalid: !g.valid });
         ctx.save(); ctx.strokeStyle = BLUE; ctx.setLineDash([6, 4]); ctx.lineWidth = 1.5;
         ctx.beginPath(); path.map(S).forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke();
         ctx.restore();
@@ -1071,7 +1071,7 @@ export class StairTool {
 
     if (this.phase === "edit" && this._draft) {
       const g = computeStairGeometry(this._draft);
-      drawStair(ctx, cam, this._draft, { geometry: g, selected: true, invalid: !g.valid });
+      drawStair(ctx, cam, this._draft, { zoomFactor: cam.scale / ((this.app as any).renderer?.referencePxPerM || 80), textPtScale: (this.app as any).renderer?.textPtScale ?? 1, geometry: g, selected: true, invalid: !g.valid });
       // Fangpunkte der Treppe sichtbar.
       for (const q of g.snapPoints) {
         const sq = S(q);

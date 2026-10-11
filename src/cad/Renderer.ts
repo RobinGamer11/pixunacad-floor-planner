@@ -1713,7 +1713,7 @@ export class Renderer {
     if (!list || !list.length) return;
     for (const st of list) {
       if (st.labelId !== labelId || this.stairHiddenIds.has(st.id)) continue;
-      drawStair(this.ctx, this.camera as any, st, { selected: !isExportMode() && this.stairHighlightIds.has(st.id) });
+      drawStair(this.ctx, this.camera as any, st, { selected: !isExportMode() && this.stairHighlightIds.has(st.id), zoomFactor: this.camera.scale / this.referencePxPerM, textPtScale: this.textPtScale });
     }
   }
 

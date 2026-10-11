@@ -2,6 +2,8 @@
  * Zeichnet eine Treppe ausschließlich aus ihren abgeleiteten Daten.
  * Derselbe Pfad dient CAD, Exportausschnitten, PDF und Rastern.
  */
+import { Defaults } from "./constants";
+import { ptToCssPx } from "./textTypography";
 import { computeStairGeometry, stairLabelLines, type P, type StairGeometry } from "./stairGeometry";
 
 type Cam = { worldToScreen(x: number, y: number): { x: number; y: number }; scale: number };
@@ -12,10 +14,16 @@ export interface StairDrawOpts {
   selected?: boolean;
   /** Vorschau-Geometrie statt Neuberechnung. */
   geometry?: StairGeometry;
+  /** Plan-Zoomfaktor wie beim Textwerkzeug (cam.scale / referencePxPerM). */
+  zoomFactor?: number;
+  /** Zusätzlicher pt→px-Faktor für Text (Renderer.textPtScale). */
+  textPtScale?: number;
 }
 
 export function drawStair(ctx: CanvasRenderingContext2D, cam: Cam, st: any, opts: StairDrawOpts = {}) {
   const g = opts.geometry ?? computeStairGeometry(st);
+  // Wie das Textwerkzeug: feste Plangröße, proportional zum Plan (keine Klemmung).
+  const zf = opts.zoomFactor ?? cam.scale / Defaults.strokeWidthBaseScale;
   const S = (q: P) => cam.worldToScreen(q.x, q.y);
   const color = opts.invalid ? "#d33" : (st.color || "#111111");
   ctx.save();
@@ -51,7 +59,7 @@ export function drawStair(ctx: CanvasRenderingContext2D, cam: Cam, st: any, opts
     ctx.stroke();
     const a = sp[sp.length - 2], b = sp[sp.length - 1];
     const ang = Math.atan2(b.y - a.y, b.x - a.x);
-    const hl = Math.max(6, Math.min(16, 0.12 * cam.scale));
+    const hl = 10 * zf;
     ctx.beginPath();
     ctx.moveTo(b.x, b.y);
     ctx.lineTo(b.x - hl * Math.cos(ang - 0.4), b.y - hl * Math.sin(ang - 0.4));
@@ -62,7 +70,7 @@ export function drawStair(ctx: CanvasRenderingContext2D, cam: Cam, st: any, opts
   }
   if (wl.length >= 1 && st.showCircle !== false) {
     const c = S(wl[0]);
-    const r = Math.max(3, Math.min(10, 0.05 * cam.scale));
+    const r = 5 * zf;
     ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.stroke();
   }
   if (wl.length >= 2 && st.showLabel !== false && g.treadCount > 0) {
@@ -78,7 +86,7 @@ export function drawStair(ctx: CanvasRenderingContext2D, cam: Cam, st: any, opts
     let ang = Math.atan2(sb.y - sa.y, sb.x - sa.x);
     if (ang > Math.PI / 2 || ang < -Math.PI / 2) ang += Math.PI;
     const ms = S(m);
-    const fs = Math.max(7, Math.min(28, 0.11 * cam.scale));
+    const fs = ptToCssPx(st.labelPt ?? 8) * zf * (opts.textPtScale ?? 1);
     const lines = stairLabelLines(st, g, !!st.showWidth);
     ctx.save();
     ctx.translate(ms.x, ms.y);
