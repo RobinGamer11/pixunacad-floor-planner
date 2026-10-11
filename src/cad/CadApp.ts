@@ -3297,6 +3297,7 @@ export class CadApp {
   }
 
   setTool(id: string) {
+    if (id !== ToolIds.SELECT && this.selectionFilterOpen) this.closeSelectionFilter();
     try { this.propertyEdit?.flush(); } catch {}
     try { this.settleHistoryState(); } catch {}
     // Zuletzt gewähltes objektbezogenes Werkzeug merken. Der Wechsel zum
