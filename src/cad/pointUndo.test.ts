@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { HatchTool } from "./HatchTool";
 
 function makeTool() {
-  const app: any = { hub: { bindCommit() {}, hide() {} } };
+  const app: any = { hub: { bindCommit() {}, hide() {} }, renderer: { setHoverHatchId() {} } };
   const t = new HatchTool(app) as any;
   t.drawMode = "polygon";
   return t as HatchTool & { points: { x: number; y: number }[]; state: string };
