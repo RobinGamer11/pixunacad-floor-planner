@@ -715,6 +715,15 @@ export class StairTool {
     if (this.phase === "start") {
       if (pressed) {
         input.clicked = false;
+        // Klick auf eine bestehende Treppe öffnet deren Bearbeitung statt
+        // eine neue Treppe zu beginnen.
+        const q = { x: input.mouse.wx, y: input.mouse.wy };
+        const list = (this.app.scene as any).stairs || [];
+        for (let i = list.length - 1; i >= 0; i--) {
+          const st = list[i];
+          if (!this.app.labelManager.isEditable(st.labelId)) continue;
+          if (hitStair(st, q)) { this.beginEdit(st.id); return; }
+        }
         this._start = w;
         this._dir = this._dir ?? { x: 0, y: -1 };
         this.phase = "dir";

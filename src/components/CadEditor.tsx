@@ -881,6 +881,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // Der Ebenen-Reiter bleibt dabei offen, wenn dort gerade gearbeitet wird.
       setRightTab((prev) => (prev === "layers" ? prev : (id === ToolIds.SELECT ? "sheets" : "settings")));
     };
+    // Gesetzte Tabelle per Auswahl erneut angetippt → Tabellenkontext samt
+    // Zellmodus automatisch aktiv (Engine startet beginTableEdit).
+    app.onTableEditChange((id) => {
+      if (!id) return;
+      setTableTool(true);
+      setTableSelectedId(id);
+      setTableEditId(id);
+      setRightTab("settings");
+    });
     app.onTablePlaced = (id: string) => {
       // Nach genau einer Platzierung: neue Tabelle unmittelbar auswählen und
       // den Tabellenkontext samt Einstellungen geöffnet lassen (kein Seitenreiter).
@@ -1029,7 +1038,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // verlassen (Ordneransicht, Suche und Filter bleiben erhalten).
       if (app.activeTool === app.selectTool && activeToolRef.current !== ToolIds.LIBRARY) {
         // Der Ebenen-Reiter bleibt offen, wenn dort gerade gearbeitet wird.
-        setRightTab((prev) => (prev === "layers" ? prev : (app.selection || app.doorTool.selectedDoorId ? "settings" : "sheets")));
+        const stairSel = (app.selectTool as any).marqueeSelectedIds?.some?.((m: any) => m.kind === "stair");
+        setRightTab((prev) => (prev === "layers" ? prev : (app.selection || app.doorTool.selectedDoorId || stairSel ? "settings" : "sheets")));
       }
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
       setSelectedSegmentId(((app.selection as any)?.segmentId as string) || null);
