@@ -117,6 +117,8 @@ export class WallTool {
   }
 
   cancel() {
+    this._chain = [];
+    this._chainRedo = [];
     this.state = "idle";
     this.corners = [];
     this.cornerSnaps = [];
@@ -137,7 +139,38 @@ export class WallTool {
   getGuideAnchor() { return this.corners.length ? this.corners[this.corners.length - 1] : null; }
   isDrawing() { return this.state === "drawing"; }
   /** Enter beendet einen Wandzug mit mindestens einem gesetzten Abschnitt. */
-  canFinish(): boolean { return this.state === "drawing" && this.corners.length >= 2; }
+  canFinish(): boolean { return this.state === "drawing" && this._chain.length >= 2; }
+
+  /* ---- Punktweises Rückgängig im Wandzug ----
+   * Jede gesetzte Wand ist ein eigener Verlaufsschritt; die lokale Kette merkt
+   * sich die Punkte, damit Rückgängig/Wiederholen den Zeichenpunkt mitführt. */
+  private _chain: { p: Vec2; snap: Snap | null }[] = [];
+  private _chainRedo: { p: Vec2; snap: Snap | null }[] = [];
+  hasPointUndo(): boolean { return this.state === "drawing" && this._chain.length > 0; }
+  hasPointRedo(): boolean { return this._chainRedo.length > 0; }
+  pointUndo(): boolean {
+    if (!this.hasPointUndo()) return false;
+    if (this._chain.length >= 2 && !this.app.historyUndoStep()) return false;
+    this._chainRedo.push(this._chain.pop()!);
+    const last = this._chain[this._chain.length - 1];
+    if (last) { this.corners = [v(last.p.x, last.p.y)]; this.cornerSnaps = [last.snap]; }
+    else { this.state = "idle"; this.corners = []; this.cornerSnaps = []; this.app.hub.hide(); }
+    this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
+    return true;
+  }
+  pointRedo(): boolean {
+    if (!this.hasPointRedo()) return false;
+    const e = this._chainRedo[this._chainRedo.length - 1];
+    if (this._chain.length > 0 && !this.app.historyRedoStep()) return false;
+    this._chainRedo.pop();
+    this._chain.push(e);
+    this.corners = [v(e.p.x, e.p.y)];
+    this.cornerSnaps = [e.snap];
+    this.state = "drawing";
+    this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
+    return true;
+  }
+  endPointSession() { this._chain = []; this._chainRedo = []; if (this.state === "idle") this.corners = []; }
 
   ownLineKind(): "main" | "sub" | "help" {
     if (this.settings.referenceSide === "outer") return "main";
@@ -418,6 +451,8 @@ export class WallTool {
     if (this.state === "idle") {
       this.corners = [v(p.x, p.y)];
       this.cornerSnaps = [snapAtClick];
+      this._chain = [{ p: v(p.x, p.y), snap: snapAtClick }];
+      this._chainRedo = [];
       this.state = "drawing";
       this.hubLocked = false;
       this.hubLengthM = null;
@@ -429,10 +464,13 @@ export class WallTool {
     const anchorA = this._anchorFromSnap(this.cornerSnaps[this.cornerSnaps.length - 1] || null);
     const anchorB = this._anchorFromSnap(snapAtClick);
     this._createSingleWall(last, p, anchorA, anchorB);
+    this._chainRedo = [];
     if (this.settings.inputMode === "chain") {
       this.corners = [v(p.x, p.y)];
       this.cornerSnaps = [snapAtClick];
+      this._chain.push({ p: v(p.x, p.y), snap: snapAtClick });
     } else {
+      this._chain = [];
       this.state = "idle";
       this.corners = [];
       this.cornerSnaps = [];

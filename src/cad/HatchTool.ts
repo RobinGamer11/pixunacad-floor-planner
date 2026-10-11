@@ -90,6 +90,7 @@ export class HatchTool {
   }
 
   cancel() {
+    this._pointRedo = [];
     this.state = "idle";
     this.points = [];
     this.rectState = "idle";
@@ -149,6 +150,33 @@ export class HatchTool {
   }
 
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
+
+  /* ---- Punktweises Rückgängig während der Eingabe (lokale Sitzung) ---- */
+  /** Zurückgenommene Punkte; bleibt auch bei leerer Punktkette erhalten. */
+  private _pointRedo: Vec2[] = [];
+  hasPointUndo(): boolean { return this.drawMode === "polygon" && this.state === "drawing" && this.points.length > 0; }
+  hasPointRedo(): boolean { return this.drawMode === "polygon" && this._pointRedo.length > 0; }
+  pointUndo(): boolean {
+    if (!this.hasPointUndo()) return false;
+    this._pointRedo.push(this.points.pop()!);
+    if (!this.points.length) {
+      this.state = "idle";
+      this.startReferenceEdge = null;
+      this.startPointReference = null;
+      this.app.hub.hide();
+    }
+    this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
+    return true;
+  }
+  pointRedo(): boolean {
+    if (!this.hasPointRedo()) return false;
+    this.points.push(this._pointRedo.pop()!);
+    this.state = "drawing";
+    this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
+    return true;
+  }
+  /** Globale Historie übernimmt: lokale Sitzung verwerfen. */
+  endPointSession() { this._pointRedo = []; }
   /** Enter würde jetzt eine Fläche erzeugen (gleiche Bedingungen wie finishFromKey). */
   canFinish(): boolean {
     if (this.drawMode === "polygon") return this.state === "drawing" && this.points.length >= this._polygonMinPoints();
@@ -482,6 +510,7 @@ export class HatchTool {
     this._createShapeFromPoints(points, closed);
     this.app.clearSelection();
     this.points = [];
+    this._pointRedo = [];
     this.state = "idle";
     this.rectState = "idle";
     this.rectPointA = null;
@@ -734,6 +763,7 @@ export class HatchTool {
 
     if (this.state === "idle") {
       this.points = [v(point.x, point.y)];
+      this._pointRedo = [];
       this.state = "drawing";
       this.hubLocked = false;
       this.hubLengthM = null;
@@ -766,6 +796,7 @@ export class HatchTool {
     }
 
     this.points.push(v(point.x, point.y));
+    this._pointRedo = [];
     this.hubLocked = false;
     this.hubLengthM = null;
     this.hubAngleDeg = null;
