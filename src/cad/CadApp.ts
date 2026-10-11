@@ -1238,7 +1238,7 @@ export class CadApp {
   }
 
   private _emitHistoryChange() {
-    this.onHistoryChange?.(this._historyIndex > 0, this._historyIndex < this._history.length - 1);
+    this._emitHistoryButtons();
     this._emitPlanUiChange?.();
     this.onSceneCommitted?.();
   }
@@ -1318,20 +1318,39 @@ export class CadApp {
     if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
     // Treppe: laufendes Zeichnen/Bewegen nimmt zuerst den lokalen Schritt zurück.
     if ((this.activeTool as any) === this.stairTool && this.stairTool.undoStep()) { this.renderer?.render?.(); return; }
+    // Wand/Linie/Polygon/Schraffur: laufende Punktkette punktweise zurück.
+    const t = this.activeTool as any;
+    if (t?.pointUndo?.()) { this._emitHistoryChange(); this.renderer?.render?.(); return; }
+    t?.endPointSession?.();
+    this.historyUndoStep();
+  }
+
+  redo() {
+    const t = this.activeTool as any;
+    if (t?.pointRedo?.()) { this._emitHistoryChange(); this.renderer?.render?.(); return; }
+    t?.endPointSession?.();
+    this.historyRedoStep();
+  }
+
+  /** Ein Schritt der globalen Szenenhistorie zurück (ohne Werkzeug-Umleitung). */
+  historyUndoStep(): boolean {
     this._maybeSnapshot();
-    if (this._historyIndex <= 0) return;
+    if (this._historyIndex <= 0) return false;
     this._historyIndex--;
     this._restoreScene(this._history[this._historyIndex]);
     this.stairTool?.afterHistoryRestore?.();
     this._emitHistoryChange();
+    return true;
   }
 
-  redo() {
-    if (this._historyIndex >= this._history.length - 1) return;
+  /** Ein Schritt der globalen Szenenhistorie vor (ohne Werkzeug-Umleitung). */
+  historyRedoStep(): boolean {
+    if (this._historyIndex >= this._history.length - 1) return false;
     this._historyIndex++;
     this._restoreScene(this._history[this._historyIndex]);
     this.stairTool?.afterHistoryRestore?.();
     this._emitHistoryChange();
+    return true;
   }
 
   /* ---- Selection ---- */
@@ -3610,8 +3629,24 @@ export class CadApp {
     try { return !!t.canFinish(); } catch { return false; }
   }
 
+  private _historyButtonsKey = "";
+  /** Rückgängig/Wiederholen-Knöpfe inkl. laufender Punktkette des Werkzeugs. */
+  private _emitHistoryButtons() {
+    const t = this.activeTool as any;
+    const u = this._historyIndex > 0 || !!t?.hasPointUndo?.();
+    const r = this._historyIndex < this._history.length - 1 || !!t?.hasPointRedo?.();
+    this._historyButtonsKey = `${u}|${r}`;
+    this.onHistoryChange?.(u, r);
+  }
+
   private _finishHint = false;
   private _updateFinishHint() {
+    {
+      const t = this.activeTool as any;
+      const u = this._historyIndex > 0 || !!t?.hasPointUndo?.();
+      const r = this._historyIndex < this._history.length - 1 || !!t?.hasPointRedo?.();
+      if (`${u}|${r}` !== this._historyButtonsKey) this._emitHistoryButtons();
+    }
     const on = this.canFinishActiveTool();
     if (on === this._finishHint) return;
     this._finishHint = on;

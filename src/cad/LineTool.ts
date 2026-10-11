@@ -83,6 +83,8 @@ export class LineTool {
   }
 
   cancel() {
+    this._chain = [];
+    this._chainRedo = [];
     this.state = "idle";
     this.currentPoint = null;
     this.snap = null;
@@ -119,8 +121,37 @@ export class LineTool {
   isDrawing() {
     return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle";
   }
-  /** Segmente im laufenden Linienzug (für die Enter-Hervorhebung). */
-  private _chainSegs = 0;
+  /* ---- Punktweises Rückgängig im Linienzug ----
+   * Jedes Segment ist ein eigener Verlaufsschritt; die lokale Kette führt den
+   * Zeichenpunkt bei Rückgängig/Wiederholen mit. */
+  private _chain: { p: Vec2; ref: string | null }[] = [];
+  private _chainRedo: { p: Vec2; ref: string | null }[] = [];
+  private get _chainSegs() { return Math.max(0, this._chain.length - 1); }
+  hasPointUndo(): boolean { return this.drawMode === "polyline" && this.state === "drawing" && this._chain.length > 0; }
+  hasPointRedo(): boolean { return this.drawMode === "polyline" && this._chainRedo.length > 0; }
+  pointUndo(): boolean {
+    if (!this.hasPointUndo()) return false;
+    if (this._chain.length >= 2 && !this.app.historyUndoStep()) return false;
+    this._chainRedo.push(this._chain.pop()!);
+    const last = this._chain[this._chain.length - 1];
+    if (last) this.currentPoint = v(last.p.x, last.p.y);
+    else { this.state = "idle"; this.currentPoint = null; this.startReferenceSegmentId = null; this.app.hub.hide(); }
+    this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
+    return true;
+  }
+  pointRedo(): boolean {
+    if (!this.hasPointRedo()) return false;
+    const e = this._chainRedo[this._chainRedo.length - 1];
+    if (this._chain.length > 0 && !this.app.historyRedoStep()) return false;
+    this._chainRedo.pop();
+    if (!this._chain.length) this.startReferenceSegmentId = e.ref;
+    this._chain.push(e);
+    this.currentPoint = v(e.p.x, e.p.y);
+    this.state = "drawing";
+    this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
+    return true;
+  }
+  endPointSession() { this._chain = []; this._chainRedo = []; }
   /** Enter schließt jetzt tatsächlich etwas ab. */
   canFinish(): boolean {
     if (this.drawMode === "rectangle") return this.rectState === "secondSide";
@@ -597,11 +628,12 @@ export class LineTool {
     if (this.state === "idle") {
       this.currentPoint = v(point.x, point.y);
       this.state = "drawing";
-      this._chainSegs = 0;
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
       this.startReferenceSegmentId = this.snap?.segment?.id || null;
+      this._chain = [{ p: v(point.x, point.y), ref: this.startReferenceSegmentId }];
+      this._chainRedo = [];
       return;
     }
     if (dist(this.currentPoint!, point) < Defaults.minSegLenM) return;
@@ -609,7 +641,8 @@ export class LineTool {
     this.app.runAction(() => {
       const createdSeg = this.app.scene.createSegment(from, point, { ...this.app.getCurrentLineStyle(), ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
     });
-    this._chainSegs += 1;
+    this._chain.push({ p: v(point.x, point.y), ref: null });
+    this._chainRedo = [];
     this.app.clearSelection();
     this.currentPoint = v(point.x, point.y);
     this.hubLocked = false;
