@@ -1,3 +1,4 @@
+import { emptyFilterState, objectMatchesFilter, type SelectionFilterState } from "./selectionFilter";
 import { toast } from "sonner";
 import { pageGuideSnapGeometry, paperMmToWorld } from "./pageGuides";
 import { copyDisplayGradient } from "./displayGradient";
@@ -1412,13 +1413,43 @@ export class CadApp {
     // Werkzeugkontext nicht verlieren.
     const filter = this.selectionFilterTool;
     if (this.activeTool !== this.selectTool) this.setTool(ToolIds.SELECT);
-    const n = this.selectTool.selectAll(filter);
-    if (!n) return false;
-    // Führendes Objekt = zuletzt erfasstes Objekt der Auswahl.
+    // Gespeicherte Filterwerte wieder anwenden; ein leerer Filter übernimmt
+    // den bisherigen Werkzeugkontext als sichtbaren Objekttyp.
+    const fs = this.selectionFilterState;
+    if (!fs.types.length && !fs.criteria.length && filter) fs.types = [filter];
+    this.selectionFilterOpen = true;
+    this.applySelectionFilter();
+    try { this.onSelectionFilterChange?.(); } catch {}
+    return true;
+  }
+
+  /* ── Auswahlfilter (lokaler Bedienzustand, nie Cloud/Undo) ─────────────── */
+  selectionFilterOpen = false;
+  selectionFilterState: SelectionFilterState = emptyFilterState();
+  onSelectionFilterChange: (() => void) | null = null;
+
+  /** Wendet den Filter auf die bestehende Mehrfachauswahl an; liefert die Trefferzahl. */
+  applySelectionFilter(): number {
+    const st = this.selectionFilterState;
+    const n = this.selectTool.selectAll(null, (kind, obj) => objectMatchesFilter(st, kind, obj));
     try { this.selectTool.syncPrimarySelection(); } catch {}
+    if (!n) { try { this.setSelection(null as any); } catch {} }
     try { this.onSelectionChange?.(); } catch {}
     try { this.renderer.render(); } catch {}
-    return true;
+    return n;
+  }
+
+  /** Schließt die Filteransicht; Auswahl und Filterwerte bleiben erhalten. */
+  closeSelectionFilter(clearSelection = false) {
+    if (!this.selectionFilterOpen) return;
+    this.selectionFilterOpen = false;
+    if (clearSelection) {
+      this.selectTool.marqueeSelectedIds = [];
+      try { this.setSelection(null as any); } catch {}
+      try { this.onSelectionChange?.(); } catch {}
+      try { this.renderer.render(); } catch {}
+    }
+    try { this.onSelectionFilterChange?.(); } catch {}
   }
 
 
@@ -2710,6 +2741,10 @@ export class CadApp {
         e.preventDefault(); this.commitDimensionMove(); return;
       }
 
+      if (e.key === "Escape" && this.selectionFilterOpen) {
+        // Esc: Filteransicht schließen und Auswahl aufheben; Werte bleiben gespeichert.
+        e.preventDefault(); this.closeSelectionFilter(true); return;
+      }
       if (e.key === "Escape") {
         // ESC bricht ALLES ab — unabhängig von Werkzeug und Objekt:
         // laufende Hub-Interaktionen, Sonder-Modi und Rahmen-Auswahl.

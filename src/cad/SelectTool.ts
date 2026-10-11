@@ -429,12 +429,13 @@ export class SelectTool {
    * (z. B. nur Linien, nur Polygone). `null` wählt alles Auswählbare.
    * Gibt die Anzahl der ausgewählten Objekte zurück.
    */
-  selectAll(toolFilter: ObjectToolId | null = null): number {
+  selectAll(toolFilter: ObjectToolId | null = null, where?: (kind: string, obj: any) => boolean): number {
     const hits: { kind: string; id: string }[] = [];
     const seen = new Set<string>();
     for (const { kind, id, obj } of this._iterElements()) {
       if (!id) continue;
       if (!engineObjectMatchesTool(toolFilter, kind, obj)) continue;
+      if (where && !where(kind, obj)) continue;
       const pts = this._elementPoints(kind, obj);
       if (!pts || !pts.length) continue;      // temporäre/geometrielose Objekte überspringen
       const key = kind + ":" + id;
@@ -2902,6 +2903,10 @@ export class SelectTool {
 
   update(input: Input) {
     if (input.clicked) this._preClickSel = this.marqueeSelectedIds.slice();
+    // Normaler Objektklick schließt die Filteransicht (Shift-Klick ergänzt wie bisher).
+    if (input.clicked && !input.keys?.shift && (this.app as any).selectionFilterOpen) {
+      try { (this.app as any).closeSelectionFilter?.(); } catch { /* ignore */ }
+    }
     this._guideOrigin = null;
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
