@@ -4060,11 +4060,21 @@ export class SelectTool {
           const stairHit = this._hitStair(input);
           if (stairHit) {
             this._clearTransformGuides();
+            // Erster Klick: Treppe bleibt im Auswahlwerkzeug ausgewählt
+            // (Verschieben/Drehen/Kopieren/Löschen wie bei anderen Objekten).
+            // Erneuter Klick auf dieselbe Treppe öffnet die Griffbearbeitung.
+            const already = this.marqueeSelectedIds.length === 1
+              && this.marqueeSelectedIds[0].kind === "stair"
+              && this.marqueeSelectedIds[0].id === stairHit.id;
             this.app.setSelection(null as any);
             this.marqueeSelectedIds = [{ kind: "stair", id: stairHit.id }];
             (this.app as any).onStairSelect?.(stairHit.id);
             this.app.pointEditMenu.hide();
-            (this.app as any).openStairEdit?.(stairHit.id);
+            if (already) (this.app as any).openStairEdit?.(stairHit.id);
+            else {
+              try { (this.app as any).onSelectionChange?.(); } catch {}
+              try { this.app.renderer.render(); } catch {}
+            }
             return;
           }
           const libHit = this._hitLibraryInstance(input);
