@@ -51,3 +51,4 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 
 ## Speicher
 - Gezeichnetes nur Vektor (Pixel nur in Importen). Lokaler Stand nur via `cad/persist/localScenePersist.ts`, Anhänge nur via `lib/storageQuota.ts` (Grenzen = SQL v2).
+- Auswahlfilter: Eigenschaften nur über das Verzeichnis in `src/cad/selectionFilter.ts` (`registerFilterProperty`); Treffer gehen in `selectTool.marqueeSelectedIds`, Filterwerte bleiben lokal (nie Cloud/Undo).
