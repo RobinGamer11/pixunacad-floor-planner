@@ -85,6 +85,7 @@ export class LineTool {
   cancel() {
     this._chain = [];
     this._chainRedo = [];
+    this._stepRedo = [];
     this.state = "idle";
     this.currentPoint = null;
     this.snap = null;
@@ -319,6 +320,7 @@ export class LineTool {
       const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
       this.rectPointA = v(p.x, p.y);
       this.rectState = "firstSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -330,6 +332,7 @@ export class LineTool {
       if (dist(this.rectPointA!, p) < Defaults.minSegLenM) return;
       this.rectPointB = v(p.x, p.y);
       this.rectState = "secondSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -391,6 +394,7 @@ export class LineTool {
       const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
       this.circleCenter = v(p.x, p.y);
       this.circleState = "radius";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -403,6 +407,7 @@ export class LineTool {
       this.circleEndAngleDeg = metrics.angleDeg;
       if (this.circleRadiusM <= Defaults.minSegLenM) return;
       this.circleState = "arc";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = this.circleRadiusM;
       this.hubAngleDeg = this.circleStartAngleDeg;
