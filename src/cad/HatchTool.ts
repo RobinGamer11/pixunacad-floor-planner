@@ -653,6 +653,7 @@ export class HatchTool {
       const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
       this.circleCenter = v(p.x, p.y);
       this.circleState = "radius";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -665,6 +666,7 @@ export class HatchTool {
       this.circleEndAngleDeg = metrics.angleDeg;
       if (this.circleRadiusM <= Defaults.minSegLenM) return;
       this.circleState = "arc";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = this.circleRadiusM;
       this.hubAngleDeg = this.circleStartAngleDeg;
