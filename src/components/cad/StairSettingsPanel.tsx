@@ -160,8 +160,8 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
   const phaseIdx = ["start", "dir", "side", "path"].indexOf(tool.phase);
   const labels: any[] = (app as any).labelManager?.list?.() ?? [];
   const labelValue = st ? st.labelId : (app as any).activeDrawLabelId ?? "";
-  const info = st ? tool.handleInfo() : null;
-  const knick = st ? tool.selectedKnick() : null;
+  const info = st && !selectedStair ? tool.handleInfo() : null;
+  const knick = st && !selectedStair ? tool.selectedKnick() : null;
   const floorAuto = g ? g.totalHeightM : null;
   const manualFloor = src.floorHeightM != null;
   const tablet = isTabletMode();
