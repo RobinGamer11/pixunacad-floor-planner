@@ -85,6 +85,7 @@ export class LineTool {
   cancel() {
     this._chain = [];
     this._chainRedo = [];
+    this._stepRedo = [];
     this.state = "idle";
     this.currentPoint = null;
     this.snap = null;
@@ -126,32 +127,84 @@ export class LineTool {
    * Zeichenpunkt bei Rückgängig/Wiederholen mit. */
   private _chain: { p: Vec2; ref: string | null }[] = [];
   private _chainRedo: { p: Vec2; ref: string | null }[] = [];
+  /** Zurückgenommene Schritte bei Rechteck/Kreis (Zustand vor dem Rücknehmen). */
+  private _stepRedo: Array<
+    | { kind: "rect"; state: "firstSide" | "secondSide"; a: Vec2 | null; b: Vec2 | null }
+    | { kind: "circle"; state: "radius" | "arc"; center: Vec2 | null; r: number; sa: number; ea: number }
+  > = [];
   private get _chainSegs() { return Math.max(0, this._chain.length - 1); }
-  hasPointUndo(): boolean { return this.drawMode === "polyline" && this.state === "drawing" && this._chain.length > 0; }
-  hasPointRedo(): boolean { return this.drawMode === "polyline" && this._chainRedo.length > 0; }
+  hasPointUndo(): boolean {
+    if (this.drawMode === "polyline") return this.state === "drawing" && this._chain.length > 0;
+    if (this.drawMode === "rectangle") return this.rectState !== "idle";
+    if (this.drawMode === "circle") return this.circleState !== "idle";
+    return false;
+  }
+  hasPointRedo(): boolean {
+    if (this.drawMode === "polyline") return this._chainRedo.length > 0;
+    return this._stepRedo.length > 0;
+  }
   pointUndo(): boolean {
     if (!this.hasPointUndo()) return false;
-    if (this._chain.length >= 2 && !this.app.historyUndoStep()) return false;
-    this._chainRedo.push(this._chain.pop()!);
-    const last = this._chain[this._chain.length - 1];
-    if (last) this.currentPoint = v(last.p.x, last.p.y);
-    else { this.state = "idle"; this.currentPoint = null; this.startReferenceSegmentId = null; this.app.hub.hide(); }
+    if (this.drawMode === "rectangle") {
+      if (this.rectState === "secondSide") {
+        this._stepRedo.push({ kind: "rect", state: "secondSide", a: this.rectPointA, b: this.rectPointB });
+        this.rectPointB = null;
+        this.rectState = "firstSide";
+      } else {
+        this._stepRedo.push({ kind: "rect", state: "firstSide", a: this.rectPointA, b: null });
+        this.rectPointA = null;
+        this.rectState = "idle";
+        this.app.hub.hide();
+      }
+    } else if (this.drawMode === "circle") {
+      if (this.circleState === "arc") {
+        this._stepRedo.push({ kind: "circle", state: "arc", center: this.circleCenter, r: this.circleRadiusM, sa: this.circleStartAngleDeg, ea: this.circleEndAngleDeg });
+        this.circleState = "radius";
+      } else {
+        this._stepRedo.push({ kind: "circle", state: "radius", center: this.circleCenter, r: this.circleRadiusM, sa: this.circleStartAngleDeg, ea: this.circleEndAngleDeg });
+        this.circleCenter = null;
+        this.circleRadiusM = 0;
+        this.circleState = "idle";
+        this.app.hub.hide();
+      }
+    } else {
+      if (this._chain.length >= 2 && !this.app.historyUndoStep()) return false;
+      this._chainRedo.push(this._chain.pop()!);
+      const last = this._chain[this._chain.length - 1];
+      if (last) this.currentPoint = v(last.p.x, last.p.y);
+      else { this.state = "idle"; this.currentPoint = null; this.startReferenceSegmentId = null; this.app.hub.hide(); }
+    }
     this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
     return true;
   }
   pointRedo(): boolean {
     if (!this.hasPointRedo()) return false;
-    const e = this._chainRedo[this._chainRedo.length - 1];
-    if (this._chain.length > 0 && !this.app.historyRedoStep()) return false;
-    this._chainRedo.pop();
-    if (!this._chain.length) this.startReferenceSegmentId = e.ref;
-    this._chain.push(e);
-    this.currentPoint = v(e.p.x, e.p.y);
-    this.state = "drawing";
+    if (this.drawMode === "rectangle" || this.drawMode === "circle") {
+      const e = this._stepRedo.pop()!;
+      if (e.kind === "rect") {
+        this.rectPointA = e.a;
+        this.rectPointB = e.b;
+        this.rectState = e.state;
+      } else {
+        this.circleCenter = e.center;
+        this.circleRadiusM = e.r;
+        this.circleStartAngleDeg = e.sa;
+        this.circleEndAngleDeg = e.ea;
+        this.circleState = e.state;
+      }
+    } else {
+      const e = this._chainRedo[this._chainRedo.length - 1];
+      if (this._chain.length > 0 && !this.app.historyRedoStep()) return false;
+      this._chainRedo.pop();
+      if (!this._chain.length) this.startReferenceSegmentId = e.ref;
+      this._chain.push(e);
+      this.currentPoint = v(e.p.x, e.p.y);
+      this.state = "drawing";
+    }
     this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
     return true;
   }
-  endPointSession() { this._chain = []; this._chainRedo = []; }
+  endPointSession() { this._chain = []; this._chainRedo = []; this._stepRedo = []; }
   /** Enter schließt jetzt tatsächlich etwas ab. */
   canFinish(): boolean {
     if (this.drawMode === "rectangle") return this.rectState === "secondSide";
@@ -267,6 +320,7 @@ export class LineTool {
       const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
       this.rectPointA = v(p.x, p.y);
       this.rectState = "firstSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -278,6 +332,7 @@ export class LineTool {
       if (dist(this.rectPointA!, p) < Defaults.minSegLenM) return;
       this.rectPointB = v(p.x, p.y);
       this.rectState = "secondSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -339,6 +394,7 @@ export class LineTool {
       const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
       this.circleCenter = v(p.x, p.y);
       this.circleState = "radius";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -351,6 +407,7 @@ export class LineTool {
       this.circleEndAngleDeg = metrics.angleDeg;
       if (this.circleRadiusM <= Defaults.minSegLenM) return;
       this.circleState = "arc";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = this.circleRadiusM;
       this.hubAngleDeg = this.circleStartAngleDeg;

@@ -91,6 +91,7 @@ export class HatchTool {
 
   cancel() {
     this._pointRedo = [];
+    this._stepRedo = [];
     this.state = "idle";
     this.points = [];
     this.rectState = "idle";
@@ -154,29 +155,81 @@ export class HatchTool {
   /* ---- Punktweises Rückgängig während der Eingabe (lokale Sitzung) ---- */
   /** Zurückgenommene Punkte; bleibt auch bei leerer Punktkette erhalten. */
   private _pointRedo: Vec2[] = [];
-  hasPointUndo(): boolean { return this.drawMode === "polygon" && this.state === "drawing" && this.points.length > 0; }
-  hasPointRedo(): boolean { return this.drawMode === "polygon" && this._pointRedo.length > 0; }
+  /** Zurückgenommene Schritte bei Rechteck/Kreis (Zustand vor dem Rücknehmen). */
+  private _stepRedo: Array<
+    | { kind: "rect"; state: "firstSide" | "secondSide"; a: Vec2 | null; b: Vec2 | null }
+    | { kind: "circle"; state: "radius" | "arc"; center: Vec2 | null; r: number; sa: number; ea: number }
+  > = [];
+  hasPointUndo(): boolean {
+    if (this.drawMode === "polygon") return this.state === "drawing" && this.points.length > 0;
+    if (this.drawMode === "rectangle") return this.rectState !== "idle";
+    if (this.drawMode === "circle") return this.circleState !== "idle";
+    return false;
+  }
+  hasPointRedo(): boolean {
+    if (this.drawMode === "polygon") return this._pointRedo.length > 0;
+    return this._stepRedo.length > 0;
+  }
   pointUndo(): boolean {
     if (!this.hasPointUndo()) return false;
-    this._pointRedo.push(this.points.pop()!);
-    if (!this.points.length) {
-      this.state = "idle";
-      this.startReferenceEdge = null;
-      this.startPointReference = null;
-      this.app.hub.hide();
+    if (this.drawMode === "rectangle") {
+      if (this.rectState === "secondSide") {
+        this._stepRedo.push({ kind: "rect", state: "secondSide", a: this.rectPointA, b: this.rectPointB });
+        this.rectPointB = null;
+        this.rectState = "firstSide";
+      } else {
+        this._stepRedo.push({ kind: "rect", state: "firstSide", a: this.rectPointA, b: null });
+        this.rectPointA = null;
+        this.rectState = "idle";
+        this.app.hub.hide();
+      }
+    } else if (this.drawMode === "circle") {
+      if (this.circleState === "arc") {
+        this._stepRedo.push({ kind: "circle", state: "arc", center: this.circleCenter, r: this.circleRadiusM, sa: this.circleStartAngleDeg, ea: this.circleEndAngleDeg });
+        this.circleState = "radius";
+      } else {
+        this._stepRedo.push({ kind: "circle", state: "radius", center: this.circleCenter, r: this.circleRadiusM, sa: this.circleStartAngleDeg, ea: this.circleEndAngleDeg });
+        this.circleCenter = null;
+        this.circleRadiusM = 0;
+        this.circleState = "idle";
+        this.app.hub.hide();
+      }
+    } else {
+      this._pointRedo.push(this.points.pop()!);
+      if (!this.points.length) {
+        this.state = "idle";
+        this.startReferenceEdge = null;
+        this.startPointReference = null;
+        this.app.hub.hide();
+      }
     }
     this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
     return true;
   }
   pointRedo(): boolean {
     if (!this.hasPointRedo()) return false;
-    this.points.push(this._pointRedo.pop()!);
-    this.state = "drawing";
+    if (this.drawMode === "rectangle" || this.drawMode === "circle") {
+      const e = this._stepRedo.pop()!;
+      if (e.kind === "rect") {
+        this.rectPointA = e.a;
+        this.rectPointB = e.b;
+        this.rectState = e.state;
+      } else {
+        this.circleCenter = e.center;
+        this.circleRadiusM = e.r;
+        this.circleStartAngleDeg = e.sa;
+        this.circleEndAngleDeg = e.ea;
+        this.circleState = e.state;
+      }
+    } else {
+      this.points.push(this._pointRedo.pop()!);
+      this.state = "drawing";
+    }
     this.hubLocked = false; this.hubLengthM = null; this.hubAngleDeg = null;
     return true;
   }
   /** Globale Historie übernimmt: lokale Sitzung verwerfen. */
-  endPointSession() { this._pointRedo = []; }
+  endPointSession() { this._pointRedo = []; this._stepRedo = []; }
   /** Enter würde jetzt eine Fläche erzeugen (gleiche Bedingungen wie finishFromKey). */
   canFinish(): boolean {
     if (this.drawMode === "polygon") return this.state === "drawing" && this.points.length >= this._polygonMinPoints();
@@ -600,6 +653,7 @@ export class HatchTool {
       const p = this.app.topology.resolveSnapPoint(this.snap, this._rawPreviewWorld(input));
       this.circleCenter = v(p.x, p.y);
       this.circleState = "radius";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -612,6 +666,7 @@ export class HatchTool {
       this.circleEndAngleDeg = metrics.angleDeg;
       if (this.circleRadiusM <= Defaults.minSegLenM) return;
       this.circleState = "arc";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = this.circleRadiusM;
       this.hubAngleDeg = this.circleStartAngleDeg;
@@ -829,6 +884,7 @@ export class HatchTool {
       const p = this._commitPoint(input);
       this.rectPointA = v(p.x, p.y);
       this.rectState = "firstSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -850,6 +906,7 @@ export class HatchTool {
       if (dist(this.rectPointA!, p) < Defaults.minSegLenM) return;
       this.rectPointB = v(p.x, p.y);
       this.rectState = "secondSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
