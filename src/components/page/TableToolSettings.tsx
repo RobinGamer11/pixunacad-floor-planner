@@ -54,6 +54,7 @@ export function TableToolSettings({
   const ctx = React.useContext(TableEditContext);
   const [infoOpen, setInfoOpen] = React.useState(false);
   const editMode = !!tableElement && ctx?.editId === tableElement.id;
+  const [resizeMode, setResizeMode] = React.useState<"row" | "col" | null>(null);
   const setEditMode = (v: boolean) => ctx?.setEditId(v && tableElement ? tableElement.id : null);
   const newCols = ctx?.newCols ?? 3;
   const newRows = ctx?.newRows ?? 4;
@@ -236,6 +237,12 @@ export function TableToolSettings({
       </div>
 
 
+      {editMode && !sel && (
+        <div className="text-[11px] text-muted-foreground leading-snug">
+          Zuerst eine Zelle in der Tabelle auswählen – danach sind die Zelleinstellungen verfügbar.
+        </div>
+      )}
+      <fieldset disabled={!sel} className="space-y-3 disabled:opacity-40 min-w-0 border-0 p-0 m-0">
       {editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           <div className="flex items-center justify-between gap-2">
@@ -268,6 +275,37 @@ export function TableToolSettings({
             />
             <MiniBtn icon={<Split size={11} />} label="Trennen" disabled={!merged} onClick={() => commit(unmergeAt(model, selR, selC))} />
           </div>
+          <div className="text-[10px] text-muted-foreground leading-snug">
+            Verbinden/Trennen: Zellen mit aktiviertem Shift wählen.
+          </div>
+          <div className="grid grid-cols-2 gap-1">
+            <MiniBtn icon={<Rows3 size={11} />} label={resizeMode === "row" ? "Zeilen bewegen ✓" : "Zeilen bewegen"} onClick={() => setResizeMode(resizeMode === "row" ? null : "row")} />
+            <MiniBtn icon={<Columns3 size={11} />} label={resizeMode === "col" ? "Spalten bewegen ✓" : "Spalten bewegen"} onClick={() => setResizeMode(resizeMode === "col" ? null : "col")} />
+          </div>
+          {resizeMode && sel && (() => {
+            const isCol = resizeMode === "col";
+            const idx = isCol ? selC : selR;
+            const arr = isCol ? model.colWidthsMm : model.rowHeightsMm;
+            const v = arr[idx] ?? (isCol ? 25 : 8);
+            const min = isCol ? 5 : 3, max = isCol ? 200 : 100;
+            const setV = (n: number) => {
+              if (!Number.isFinite(n)) return;
+              const next = arr.slice(); next[idx] = Math.max(min, Math.min(max, n));
+              commit(isCol ? { ...model, colWidthsMm: next } : { ...model, rowHeightsMm: next });
+            };
+            return (
+              <div className="space-y-1">
+                <div className="text-[11px] text-muted-foreground">
+                  {isCol ? `Spalte ${colName(idx)} – Breite` : `Zeile ${idx + 1} – Höhe`}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="range" min={min} max={max} step={0.5} value={v} onChange={(e) => setV(parseFloat(e.target.value))} className="flex-1" />
+                  <input type="number" min={min} max={max} step={0.5} value={Number(v.toFixed(1))} onChange={(e) => setV(parseFloat(e.target.value))} className="w-16 h-8 rounded-md border px-1 text-[11px] tabular-nums bg-transparent" style={{ borderColor: "hsl(var(--hairline))" }} />
+                  <span className="text-[11px] text-muted-foreground">mm</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -364,6 +402,8 @@ export function TableToolSettings({
         </div>
       )}
 
+
+      </fieldset>
 
       {setFormulaFn && editMode && (
         <div className="rounded-md border p-2 space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
