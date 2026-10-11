@@ -638,6 +638,15 @@ export class CadApp {
     // Default-Sheet teilt sich die initiale Scene.
     this.scenesById.set(SheetDefaults.defaultSheetId, this.scene);
     this.input = new Input(canvas);
+    // Zwei-Finger-Geste (Pinch) verwirft einen laufenden Zeichenvorgang,
+    // statt ihn beim Loslassen der Finger als Strich zu committen.
+    this.input.onPinchStart = () => {
+      const t = this.activeTool as any;
+      if (t && typeof t.isDrawing === "function" && t.isDrawing() && typeof t.cancel === "function") {
+        t.cancel();
+        this.hub.hide();
+      }
+    };
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
     this.globalGuides = new GlobalGuides();

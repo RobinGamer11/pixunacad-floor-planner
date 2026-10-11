@@ -131,6 +131,9 @@ export class Input {
   private _touchPanId: number | null = null;
   /** Pointer, der aktuell die "linke Maustaste" hält (Stift/Finger/Maus). */
   private _drawPointerId: number | null = null;
+  /** Wird beim Start einer Zwei-Finger-Geste (Pinch) aufgerufen, damit die App
+   *  einen laufenden Zeichenvorgang verwerfen kann statt ihn zu committen. */
+  onPinchStart: (() => void) | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -287,9 +290,12 @@ export class Input {
 
         // Zweiter Finger → Pinch/Pan-Modus starten, ggf. laufenden Draw abbrechen.
         if (this._touches.size >= 2) {
-          this.mouse.left = false;
+           this.mouse.left = false;
           this._clickQueued = false;
           this._dblQueued = false;
+          // Laufenden Draw verwerfen (z. B. Freihand): ein Pinch darf nie
+          // einen Strich erzeugen.
+          this.onPinchStart?.();
           if (this._touchPanId !== null) {
             this._panning = false;
             this.isPanning = false;
