@@ -28,7 +28,7 @@ Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; kein
 - Impressum/Datenschutz: keine erfundenen Angaben; Platzhalter klar kennzeichnen.
 
 ## 6. Abschlussmeldung
-Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlender Push deutlich). Immer mit vollständigem PowerShell-Befehl für den nächsten Schritt enden.
+Änderungen, Dateien, Tests, Build, Push-Status, Commit-Hash; Ende mit PowerShell-Befehl für den nächsten Schritt.
 
 ## Architekturregeln
 - Öffnen/Laden folgt nur `decideOpen` in `src/lib/cloudProjectState.ts` – Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
