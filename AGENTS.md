@@ -10,7 +10,7 @@ Aktuellen Stand von `main` nennen. Ist er nicht aktuell oder GitHub nicht erreic
 - Ohne Push: Arbeit behalten, Grund nennen und deutlich schreiben: `WICHTIG: Die Änderungen wurden noch nicht nach GitHub main übertragen. Vor der Weiterarbeit in Lovable muss der Commit/Push bzw. die GitHub-Verbindung noch abgeschlossen werden.`
 
 ## 2. Lovable
-Lovable-Strukturen und -Funktionen nicht ohne Grund entfernen; Code muss in Lovable ladbar bleiben; keine separate Codex-Version; Architekturänderungen auf Vorschau/Sync prüfen.
+Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; keine separate Codex-Version.
 
 ## 3. Supabase, Secrets
 - Frontend nur `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Nie service_role, Secret Keys, DB-Passwörter, Tokens im Repo/Frontend.
@@ -28,7 +28,7 @@ Lovable-Strukturen und -Funktionen nicht ohne Grund entfernen; Code muss in Lova
 - Impressum/Datenschutz: keine erfundenen Angaben; Platzhalter klar kennzeichnen.
 
 ## 6. Abschlussmeldung
-Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlender Push deutlich). Immer mit vollständigem PowerShell-Befehl für den nächsten Schritt enden.
+Änderungen, Dateien, Tests, Build, Push-Status, Commit-Hash; Ende mit PowerShell-Befehl für den nächsten Schritt.
 
 ## Architekturregeln
 - Öffnen/Laden folgt nur `decideOpen` in `src/lib/cloudProjectState.ts` – Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
@@ -51,3 +51,4 @@ Was geändert, wichtige Dateien, Tests, Build, Push-Status, Commit-Hash (fehlend
 
 ## Speicher
 - Gezeichnetes nur Vektor (Pixel nur in Importen). Lokaler Stand nur via `cad/persist/localScenePersist.ts`, Anhänge nur via `lib/storageQuota.ts` (Grenzen = SQL v2).
+- Auswahlfilter-Eigenschaften nur via `registerFilterProperty` (`cad/selectionFilter.ts`); Treffer in `marqueeSelectedIds`, Werte lokal.

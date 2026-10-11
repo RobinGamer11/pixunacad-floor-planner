@@ -11,6 +11,7 @@ import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
 import { StairSettingsPanel, StairIcon } from "@/components/cad/StairSettingsPanel";
+import { SelectionFilterPanel } from "@/components/cad/SelectionFilterPanel";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import LibraryPanel from "@/components/cad/LibraryPanel";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
@@ -551,6 +552,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   // Raster (Hintergrund-Grid) Einstellungen
   const [gridEnabled, setGridEnabled] = useState(true);
   const [gridPanelOpen, setGridPanelOpen] = useState(false);
+  const [selectionFilterOpen, setSelectionFilterOpen] = useState(false);
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
   // Standard: 85 % Transparenz → 15 % Deckkraft.
@@ -1028,6 +1030,10 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.documentTool.onPhaseChange = () => {
       setDocToolPhase(app.documentTool.phase);
       setDocPlacePointSet(app.documentTool.hasPlacedPosition());
+    };
+    app.onSelectionFilterChange = () => {
+      setSelectionFilterOpen(!!app.selectionFilterOpen);
+      if (app.selectionFilterOpen) setRightTab("settings");
     };
     app.onSelectionChange = () => {
       setSelectedWallId(app.getSelectedWall()?.id || null);
@@ -2208,7 +2214,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
         {/* Settings area (scrollable) — kompakter, keine horizontale Overflow-Falle. */}
-        <div className={`flex-1 min-h-0 p-2 w-full ${gridPanelOpen ? "cad-grid-only" : ""}`}>
+        <div className={`flex-1 min-h-0 p-2 w-full ${gridPanelOpen || selectionFilterOpen ? "cad-grid-only" : ""}`}>
+          {/* Auswahlfilter („Alles auswählen“) – solange offen, einzige Ansicht */}
+          {selectionFilterOpen && appRef.current && !gridPanelOpen && (
+            <SelectionFilterPanel app={appRef.current} />
+          )}
           {/* Raster-Einstellungen */}
           {gridPanelOpen && (
             <div className="cad-settings-panel mb-2">
