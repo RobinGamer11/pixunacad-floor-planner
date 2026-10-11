@@ -91,6 +91,7 @@ export class HatchTool {
 
   cancel() {
     this._pointRedo = [];
+    this._stepRedo = [];
     this.state = "idle";
     this.points = [];
     this.rectState = "idle";
@@ -881,6 +882,7 @@ export class HatchTool {
       const p = this._commitPoint(input);
       this.rectPointA = v(p.x, p.y);
       this.rectState = "firstSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -902,6 +904,7 @@ export class HatchTool {
       if (dist(this.rectPointA!, p) < Defaults.minSegLenM) return;
       this.rectPointB = v(p.x, p.y);
       this.rectState = "secondSide";
+      this._stepRedo = [];
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
