@@ -120,9 +120,19 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
     const t = window.setInterval(() => force((n) => n + 1), 200);
     return () => window.clearInterval(t);
   }, [app]);
-  if (!app || activeTool !== ToolIds.STAIR) return null;
+  if (!app) return null;
+  // Auswahlwerkzeug: genau eine ausgewählte Treppe zeigt deren Eigenschaften.
+  let selectedStair: any = null;
+  if (activeTool === ToolIds.SELECT) {
+    const sel: any[] = (app as any).selectTool?.marqueeSelectedIds ?? [];
+    if (sel.length === 1 && sel[0].kind === "stair") {
+      const s = (app.scene as any).getStairById?.(sel[0].id);
+      if (s && (!app.labelManager || app.labelManager.isEditable(s.labelId))) selectedStair = s;
+    }
+    if (!selectedStair) return null;
+  } else if (activeTool !== ToolIds.STAIR) return null;
   const tool = app.stairTool;
-  const st: any = tool.phase === "edit" ? tool.editStair() : null;
+  const st: any = selectedStair ?? (tool.phase === "edit" ? tool.editStair() : null);
 
   const src: any = st ?? tool.settings;
   const set = (patch: Record<string, any>) => {
