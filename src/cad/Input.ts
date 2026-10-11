@@ -134,6 +134,16 @@ export class Input {
   /** Wird beim Start einer Zwei-Finger-Geste (Pinch) aufgerufen, damit die App
    *  einen laufenden Zeichenvorgang verwerfen kann statt ihn zu committen. */
   onPinchStart: (() => void) | null = null;
+  /**
+   * Laufende Kamerageste (zwei Finger): ab dem zweiten Finger bis alle Finger
+   * gelöst sind. Währenddessen werden weder Punkte gesetzt noch Aktionen
+   * bestätigt; der Zeichen-Cursor bleibt an seiner Position (kein Springen).
+   */
+  cameraGesture = false;
+  /** Drehpunkt des Pinch-Zooms (Bildschirm); null = Mausposition. */
+  zoomPivot: { sx: number; sy: number } | null = null;
+  /** Cursorposition vor dem ersten Fingerkontakt der Geste. */
+  private _preTouchPos: { sx: number; sy: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -176,6 +186,12 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("pointerleave", onPointerLeave));
 
     const onPointerMove = (e: PointerEvent) => {
+      // Finger einer Kamerageste bewegen nie den Zeichen-Cursor.
+      if (e.pointerType === "touch" && this._touches.has(e.pointerId) && (this.cameraGesture || this._touches.size >= 2)) {
+        this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        this._handlePinchMove(c);
+        return;
+      }
       const r = c.getBoundingClientRect();
       this.mouse.sx = e.clientX - r.left;
       this.mouse.sy = e.clientY - r.top;
@@ -186,31 +202,6 @@ export class Input {
       // Multi-Touch: Pinch/Two-Finger-Pan
       if (e.pointerType === "touch" && this._touches.has(e.pointerId)) {
         this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        if (this._touches.size >= 2) {
-          const pts = Array.from(this._touches.values()).slice(0, 2);
-          const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-          const center = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
-          if (this._pinchLastDist > 0 && !isZoomLocked()) {
-            // Zwei-Finger-Pan (Center-Bewegung)
-            const dx = center.x - this._pinchLastCenter.x;
-            const dy = center.y - this._pinchLastCenter.y;
-            this.panDX += dx;
-            this.panDY += dy;
-            this.isPanning = true;
-            // Pinch-Zoom als Wheel-Delta emulieren (Vorzeichen wie MouseWheel)
-            const ratio = dist / this._pinchLastDist;
-            // wheelDelta positiv = herauszoomen; Camera.zoomAt nutzt Math.pow(1.0015,-delta)
-            const delta = -Math.log(ratio) / Math.log(1.0015);
-            this.wheelDelta += delta;
-            // Pivot auf Pinch-Center (relativ zu Canvas) setzen — hierfür sx/sy überschreiben.
-            const rect = c.getBoundingClientRect();
-            this.mouse.sx = center.x - rect.left;
-            this.mouse.sy = center.y - rect.top;
-          }
-          this._pinchLastDist = dist;
-          this._pinchLastCenter = center;
-          return;
-        }
         // Ein-Finger-Pan (Pen-Only-Modus)
         if (this._touchPanId === e.pointerId && this._panning) {
           this.panDX = this.mouse.sx - this._panLast.x;
@@ -231,6 +222,7 @@ export class Input {
       }
     };
     c.addEventListener("pointermove", onPointerMove);
+    // (Pinch-Bewegung siehe _handlePinchMove)
     this._cleanups.push(() => c.removeEventListener("pointermove", onPointerMove));
 
     const onWheel = (e: WheelEvent) => {
@@ -264,6 +256,15 @@ export class Input {
       // Move — der Startpunkt landete an der letzten Maus-Position. Damit
       // starten Werkzeuge jetzt exakt dort, wo Stift/Finger den Bildschirm
       // berühren.
+      if (e.pointerType === "touch" && this.cameraGesture) {
+        // Weitere Finger während einer laufenden Geste: nur mitzählen.
+        this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        try { c.setPointerCapture(e.pointerId); } catch {}
+        return;
+      }
+      if (e.pointerType === "touch" && this._touches.size === 0) {
+        this._preTouchPos = { sx: this.mouse.sx, sy: this.mouse.sy };
+      }
       {
         const r = c.getBoundingClientRect();
         this.mouse.sx = e.clientX - r.left;
@@ -290,9 +291,15 @@ export class Input {
 
         // Zweiter Finger → Pinch/Pan-Modus starten, ggf. laufenden Draw abbrechen.
         if (this._touches.size >= 2) {
-           this.mouse.left = false;
+          this.mouse.left = false;
+          this._drawPointerId = null;
           this._clickQueued = false;
           this._dblQueued = false;
+          this._tabletTapQueued = false;
+          this.cameraGesture = true;
+          setLmbHint(false);
+          // Cursor auf die Position vor der Geste zurück – nichts springt.
+          if (this._preTouchPos) { this.mouse.sx = this._preTouchPos.sx; this.mouse.sy = this._preTouchPos.sy; }
           // Laufenden Draw verwerfen (z. B. Freihand): ein Pinch darf nie
           // einen Strich erzeugen.
           this.onPinchStart?.();
@@ -372,6 +379,11 @@ export class Input {
         this._touches.delete(e.pointerId);
         if (this._touches.size < 2) {
           this._pinchLastDist = 0;
+          this.zoomPivot = null;
+        }
+        if (this._touches.size === 0) {
+          this.cameraGesture = false;
+          this._preTouchPos = null;
         }
         if (this._touchPanId === e.pointerId) {
           this._touchPanId = null;
@@ -403,6 +415,7 @@ export class Input {
       this.mouse.left = false; this.mouse.mid = false; this.mouse.right = false;
       this._drawPointerId = null; this._touches.clear(); this._touchPanId = null;
       this._pinchLastDist = 0; this._panning = false; this.isPanning = false;
+      this.cameraGesture = false; this.zoomPivot = null; this._preTouchPos = null;
     };
     const onLostCapture = (e: PointerEvent) => { if (e.pointerId === this._drawPointerId) { this.mouse.left = false; this._drawPointerId = null; } };
     const onVis = () => { if (document.hidden) releaseAll(); };
@@ -418,6 +431,25 @@ export class Input {
     c.addEventListener("auxclick", onAux);
     this._cleanups.push(() => c.removeEventListener("auxclick", onAux));
 
+  }
+
+  /** Zwei-Finger-Pan + Pinch-Zoom; verändert nur die Kamera, nie den Cursor. */
+  private _handlePinchMove(c: HTMLCanvasElement) {
+    if (this._touches.size < 2) return;
+    const pts = Array.from(this._touches.values()).slice(0, 2);
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    const center = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+    if (this._pinchLastDist > 0 && !isZoomLocked()) {
+      this.panDX += center.x - this._pinchLastCenter.x;
+      this.panDY += center.y - this._pinchLastCenter.y;
+      this.isPanning = true;
+      // wheelDelta positiv = herauszoomen; Camera.zoomAt nutzt Math.pow(1.0015,-delta)
+      this.wheelDelta += -Math.log(dist / this._pinchLastDist) / Math.log(1.0015);
+      const rect = c.getBoundingClientRect();
+      this.zoomPivot = { sx: center.x - rect.left, sy: center.y - rect.top };
+    }
+    this._pinchLastDist = dist;
+    this._pinchLastCenter = center;
   }
 
   update(camera: Camera) {
@@ -445,12 +477,19 @@ export class Input {
       this.rightClicked = true;
       this._rightQueued = false;
     }
+    // Während einer Kamerageste: keine Punkte, keine Bestätigungen.
+    if (this.cameraGesture) {
+      this.clicked = false; this.doubleClicked = false; this.tabletTapped = false;
+      this.mouse.left = false;
+      return;
+    }
     if (this.clicked || this.doubleClicked) setLmbHint(false);
   }
 
 
   endFrame() {
     this.wheelDelta = 0;
+    if (!this.cameraGesture) this.isPanning = this._panning;
     this.panDX = 0;
     this.panDY = 0;
   }
