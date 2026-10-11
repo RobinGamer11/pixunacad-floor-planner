@@ -640,12 +640,12 @@ export class CadApp {
     this.input = new Input(canvas);
     // Zwei-Finger-Geste (Pinch) verwirft einen laufenden Zeichenvorgang,
     // statt ihn beim Loslassen der Finger als Strich zu committen.
+    // Nur Freihand verwirft den Strich (ein Pinch darf keinen Strich erzeugen);
+    // punktweise Werkzeuge (Wand, Linie, Polygon, Schraffur …) behalten ihre
+    // laufende Eingabe – die Geste ändert nur die Kamera.
     this.input.onPinchStart = () => {
       const t = this.activeTool as any;
-      if (t && typeof t.isDrawing === "function" && t.isDrawing() && typeof t.cancel === "function") {
-        t.cancel();
-        this.hub.hide();
-      }
+      if (t === this.freeDrawTool && t.isDrawing?.()) t.cancel();
     };
     this.labelManager = new LabelManager();
     this.topology = new TopologyEngine(this.scene, this.camera, this.labelManager);
@@ -2491,6 +2491,8 @@ export class CadApp {
   /* ---- Shortcuts ---- */
   private _setupShortcuts() {
     this._keydownHandler = (e: KeyboardEvent) => {
+      // Während einer Zwei-Finger-Geste wird nichts bestätigt.
+      if (e.key === "Enter" && this.input.cameraGesture) { e.preventDefault(); return; }
       const tag = (document.activeElement?.tagName || "").toLowerCase();
       const isHubInput = document.activeElement === this.hub.lenInputEl || document.activeElement === this.hub.angInputEl;
 
@@ -3601,6 +3603,22 @@ export class CadApp {
     r.idSelect.value = labelForDisplay;
   }
 
+  /** Kann das aktive Werkzeug jetzt per Enter tatsächlich abschließen? */
+  canFinishActiveTool(): boolean {
+    const t = this.activeTool as any;
+    if (!t || typeof t.canFinish !== "function") return false;
+    try { return !!t.canFinish(); } catch { return false; }
+  }
+
+  private _finishHint = false;
+  private _updateFinishHint() {
+    const on = this.canFinishActiveTool();
+    if (on === this._finishHint) return;
+    this._finishHint = on;
+    (window as any).__pixunaFinishHint = on;
+    try { window.dispatchEvent(new CustomEvent("pixuna-finish-hint", { detail: on })); } catch {}
+  }
+
   resize() { this._resize(); }
 
   private _resize() {
@@ -3616,8 +3634,13 @@ export class CadApp {
     if (this._destroyed) return;
     try {
       if (this.input.isPanning) this.camera.panBy(this.input.panDX, this.input.panDY);
-      if (this.input.wheelDelta !== 0) this.camera.zoomAt(this.input.wheelDelta, this.input.mouse.sx, this.input.mouse.sy);
+      if (this.input.wheelDelta !== 0) {
+        const pv = this.input.zoomPivot ?? this.input.mouse;
+        this.camera.zoomAt(this.input.wheelDelta, pv.sx, pv.sy);
+      }
       this.input.update(this.camera);
+      (window as any).__pixunaCameraGesture = this.input.cameraGesture;
+      this._updateFinishHint();
       {
         const sel = (this.selectTool as any)?.marqueeSelectedIds as { kind: string; id: string }[] | undefined;
         const ids = (sel || []).filter((o) => o.kind === "stair").map((o) => o.id);

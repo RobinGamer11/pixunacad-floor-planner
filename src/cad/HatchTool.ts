@@ -149,6 +149,13 @@ export class HatchTool {
   }
 
   isDrawing() { return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle"; }
+  /** Enter würde jetzt eine Fläche erzeugen (gleiche Bedingungen wie finishFromKey). */
+  canFinish(): boolean {
+    if (this.drawMode === "polygon") return this.state === "drawing" && this.points.length >= this._polygonMinPoints();
+    if (this.drawMode === "rectangle") return this.rectState === "secondSide";
+    if (this.drawMode === "circle") return this.circleState === "arc";
+    return false;
+  }
   /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
   getGuideAnchor() { return this.points.length ? this.points[this.points.length - 1] : null; }
   /** Laufende Zeichnung (gesetzte Punkte + bestätigte Kanten) als temporäre Guide-Geometrie – nur lesend. */

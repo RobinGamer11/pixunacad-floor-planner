@@ -134,6 +134,13 @@ export function TabletAidWheel() {
     window.addEventListener("pixuna-lmb-hint", on as EventListener);
     return () => window.removeEventListener("pixuna-lmb-hint", on as EventListener);
   }, []);
+  // Enter leuchtet zusätzlich, sobald das Werkzeug tatsächlich abschließen kann.
+  const [finishHint, setFinishHint] = useState<boolean>(() => !!(window as any).__pixunaFinishHint);
+  useEffect(() => {
+    const on = (e: Event) => setFinishHint(!!(e as CustomEvent).detail);
+    window.addEventListener("pixuna-finish-hint", on as EventListener);
+    return () => window.removeEventListener("pixuna-finish-hint", on as EventListener);
+  }, []);
 
 
   // Zentrale Verteilung aller realen Kontakte an die Rad-Knöpfe (iPadOS-fest).
@@ -201,6 +208,7 @@ export function TabletAidWheel() {
       {/* Enter oben, rechts RMB + ESC, links LMB + SHIFT */}
       <WheelButton angle={-90} size={size} label="Enter" description="Objekt setzen" tooltip="Bestätigen: setzt Punkt am Cursor (bzw. Enter-Taste in Eingabefeldern)"
         onTap={() => {
+          if ((window as any).__pixunaCameraGesture) return;
           const el = document.activeElement as HTMLElement | null;
           const isPrimer = !!el?.hasAttribute?.("data-virtual-primer");
           const inField = !isPrimer && !!el &&
@@ -223,7 +231,7 @@ export function TabletAidWheel() {
           }
           virtualKeyPress("Enter");
         }}
-        highlight={lmbHint}
+        highlight={lmbHint || finishHint}
         icon={<Keyboard size={24} strokeWidth={1.45} />} />
 
       <WheelButton angle={-25} size={size} label="R-Klick" description="Hilfslinie" tooltip="Rechte Maustaste"
@@ -235,7 +243,7 @@ export function TabletAidWheel() {
         icon={<Keyboard size={24} strokeWidth={1.45} />} />
       <WheelButton angle={-155} size={size} label="L-Klick" description="Auswählen" tooltip="Linke Maustaste (Tap = Klick, Halten = gedrückt halten)"
         highlight={lmbHint}
-        onTap={() => virtualMouseClick(0)}
+        onTap={() => { if (!(window as any).__pixunaCameraGesture) virtualMouseClick(0); }}
         onHold={(on) => virtualMouseHold(0, on)}
         icon={<MouseIcon side="left" />} />
       <WheelButton angle={140} size={size} label="Shift" description="Mehrfach" tooltip="Shift halten (2-Hand-Bedienung)"
