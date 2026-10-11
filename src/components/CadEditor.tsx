@@ -467,7 +467,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
-  const [selectionFilterOpen, setSelectionFilterOpen] = useState(false);
   // Anzahl der Ebenen für den Ebenen-Button oben links (leichtgewichtiges Polling).
   const [layerCount, setLayerCount] = useState(1);
   useEffect(() => {
