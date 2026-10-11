@@ -552,6 +552,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   // Raster (Hintergrund-Grid) Einstellungen
   const [gridEnabled, setGridEnabled] = useState(true);
   const [gridPanelOpen, setGridPanelOpen] = useState(false);
+  const [selectionFilterOpen, setSelectionFilterOpen] = useState(false);
   const [gridSizeM, setGridSizeM] = useState<number>(1);
   const [gridColor, setGridColor] = useState<string>("#000000");
   // Standard: 85 % Transparenz → 15 % Deckkraft.
