@@ -119,6 +119,14 @@ export class LineTool {
   isDrawing() {
     return this.state === "drawing" || this.rectState !== "idle" || this.circleState !== "idle";
   }
+  /** Segmente im laufenden Linienzug (für die Enter-Hervorhebung). */
+  private _chainSegs = 0;
+  /** Enter schließt jetzt tatsächlich etwas ab. */
+  canFinish(): boolean {
+    if (this.drawMode === "rectangle") return this.rectState === "secondSide";
+    if (this.drawMode === "circle") return this.circleState === "arc";
+    return this.state === "drawing" && this._chainSegs > 0;
+  }
 
   /** ENTER: laufende Rechteck-/Kreiskontur sofort abschließen. */
   finishFromKey(): boolean {
@@ -589,6 +597,7 @@ export class LineTool {
     if (this.state === "idle") {
       this.currentPoint = v(point.x, point.y);
       this.state = "drawing";
+      this._chainSegs = 0;
       this.hubLocked = false;
       this.hubLengthM = null;
       this.hubAngleDeg = null;
@@ -600,6 +609,7 @@ export class LineTool {
     this.app.runAction(() => {
       const createdSeg = this.app.scene.createSegment(from, point, { ...this.app.getCurrentLineStyle(), ...((this.app as any).getStrokeEffectDefaults?.("line") ?? {}) });
     });
+    this._chainSegs += 1;
     this.app.clearSelection();
     this.currentPoint = v(point.x, point.y);
     this.hubLocked = false;

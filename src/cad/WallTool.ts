@@ -136,6 +136,8 @@ export class WallTool {
   /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
   getGuideAnchor() { return this.corners.length ? this.corners[this.corners.length - 1] : null; }
   isDrawing() { return this.state === "drawing"; }
+  /** Enter beendet einen Wandzug mit mindestens einem gesetzten Abschnitt. */
+  canFinish(): boolean { return this.state === "drawing" && this.corners.length >= 2; }
 
   ownLineKind(): "main" | "sub" | "help" {
     if (this.settings.referenceSide === "outer") return "main";
