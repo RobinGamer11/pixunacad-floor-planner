@@ -319,7 +319,8 @@ export function TableElementView({
     if (!pickFn || !pickTarget) return null;
     const anchor = pickStep === "end" ? pickStart : pickHover;
     const cursor = pickStep === "end" ? pickHover : null;
-    if (!anchor) return null;
+    // Zielzelle gewählt: dort sofort „=SUM(“ zeigen, damit klar ist, wo das Ergebnis erscheint.
+    if (!anchor) return { expr: `=${pickFn}(`, value: `=${pickFn}(`, r1: -1, r2: -1, c1: -1, c2: -1 };
     const end = cursor ?? anchor;
     const range = rangeExpr(anchor.r, anchor.c, end.r, end.c);
     const expr = `=${pickFn}(${range})`;
@@ -722,41 +723,6 @@ export function TableElementView({
         }),
       )}
 
-      {/* Ziehgriffe für Spaltenbreiten / Zeilenhöhen (nur im Tabellenmodus) */}
-      {active && !pickFn && lay.colEdgesMm.slice(1).map((edge, i) => (
-        <div
-          key={`cw${i}`}
-          className="absolute z-10 group"
-          style={{
-            left: `calc(${pct(edge, lay.widthMm)} - 3px)`,
-            top: 0, width: 6, height: "100%", cursor: "col-resize",
-          }}
-          onPointerDown={(e) => startResize(e, "col", i)}
-          title={`Spalte ${colLabel(i)}: ${model.colWidthsMm[i].toFixed(1)} mm`}
-        >
-          <div
-            className="absolute inset-y-0 left-1/2 w-px opacity-0 group-hover:opacity-100"
-            style={{ background: "hsl(var(--cad-snap-line))" }}
-          />
-        </div>
-      ))}
-      {active && !pickFn && lay.rowEdgesMm.slice(1).map((edge, i) => (
-        <div
-          key={`rh${i}`}
-          className="absolute z-10 group"
-          style={{
-            top: `calc(${pct(edge, lay.heightMm)} - 3px)`,
-            left: 0, height: 6, width: "100%", cursor: "row-resize",
-          }}
-          onPointerDown={(e) => startResize(e, "row", i)}
-          title={`Zeile ${i + 1}: ${model.rowHeightsMm[i].toFixed(1)} mm`}
-        >
-          <div
-            className="absolute inset-x-0 top-1/2 h-px opacity-0 group-hover:opacity-100"
-            style={{ background: "hsl(var(--cad-snap-line))" }}
-          />
-        </div>
-      ))}
     </div>
   );
 }
