@@ -2897,7 +2897,11 @@ export class SelectTool {
 
 
 
+  /** Auswahl vor dem aktuellen Klick (wird später im Frame ggf. geleert). */
+  private _preClickSel: { kind: string; id: string }[] = [];
+
   update(input: Input) {
+    if (input.clicked) this._preClickSel = this.marqueeSelectedIds.slice();
     this._guideOrigin = null;
     this.app.topology.priorityWallId = this.getPriorityWallId();
 
@@ -4063,9 +4067,10 @@ export class SelectTool {
             // Erster Klick: Treppe bleibt im Auswahlwerkzeug ausgewählt
             // (Verschieben/Drehen/Kopieren/Löschen wie bei anderen Objekten).
             // Erneuter Klick auf dieselbe Treppe öffnet die Griffbearbeitung.
-            const already = this.marqueeSelectedIds.length === 1
-              && this.marqueeSelectedIds[0].kind === "stair"
-              && this.marqueeSelectedIds[0].id === stairHit.id;
+            const prev = this._preClickSel;
+            const already = prev.length === 1
+              && prev[0].kind === "stair"
+              && prev[0].id === stairHit.id;
             this.app.setSelection(null as any);
             this.marqueeSelectedIds = [{ kind: "stair", id: stairHit.id }];
             (this.app as any).onStairSelect?.(stairHit.id);

@@ -883,7 +883,9 @@ export class StairTool {
     if (!this._draft) return;
 
     if (this.moving && this._moveBase) {
-      const left = !!input.mouse.left;
+      // Tablet-Schutz: abgefangene Kontakte liefern tabletDown statt der linken
+      // Taste – nur Vorschau-Kontakt, nie Bestätigung (die bleibt ✓/Enter).
+      const left = !!input.mouse.left || (isTabletMode() && !!input.tabletDown && !input.cameraGesture);
       const pressed = left && !this._prevLeft;
       this._prevLeft = left;
       this._setCursor(this.action === "rotate" ? "crosshair" : this.action === "extend" ? "crosshair" : "move");
@@ -960,8 +962,10 @@ export class StairTool {
 
     const hover = this._hitHandle(input);
     this._setCursor(hover ? "pointer" : "default");
-    if (input.clicked) {
-      input.clicked = false;
+    // Griff antippen: Klick oder abgefangener Tablet-Kontakt – wählt nur aus
+    // und öffnet das Punktmenü, startet nie eine Transformation.
+    if (input.clicked || input.tabletTapped) {
+      input.clicked = false; input.tabletTapped = false;
       if (hover) {
         // Fangpunkt antippen = auswählen + kleines Punktmenü direkt am Punkt.
         this.selectedHandleKey = hover.key;

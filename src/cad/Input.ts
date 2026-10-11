@@ -106,6 +106,9 @@ export class Input {
   clicked = false;
   /** Echter Stift-/Finger-Kontakt, der vom Tablet-Gate abgefangen wurde. */
   tabletTapped = false;
+  /** Abgefangener Stift-/Finger-Kontakt liegt gerade auf (nur Vorschau, nie Klick). */
+  tabletDown = false;
+  private _tabletPointerId: number | null = null;
   private _tabletTapQueued = false;
   rightClicked = false;
   doubleClicked = false;
@@ -281,6 +284,7 @@ export class Input {
       if (e.pointerType === "pen" && isTabletDrawGate(e)) {
         try { c.setPointerCapture(e.pointerId); } catch {}
         this._tabletTapQueued = true;
+        this.tabletDown = true; this._tabletPointerId = e.pointerId;
         return;
       }
 
@@ -296,6 +300,7 @@ export class Input {
           this._clickQueued = false;
           this._dblQueued = false;
           this._tabletTapQueued = false;
+          this.tabletDown = false; this._tabletPointerId = null;
           this.cameraGesture = true;
           setLmbHint(false);
           // Cursor auf die Position vor der Geste zurück – nichts springt.
@@ -332,6 +337,7 @@ export class Input {
       if (isTabletDrawGate(e)) {
         try { c.setPointerCapture(e.pointerId); } catch {}
         this._tabletTapQueued = true;
+        this.tabletDown = true; this._tabletPointerId = e.pointerId;
         return;
       }
 
@@ -375,6 +381,7 @@ export class Input {
       if (tgt && typeof tgt.closest === "function" && tgt.closest('[data-tablet-aid="true"]')
         && e.pointerId !== this._drawPointerId) return;
 
+      if (e.pointerId === this._tabletPointerId) { this.tabletDown = false; this._tabletPointerId = null; }
       if (e.pointerType === "touch") {
         this._touches.delete(e.pointerId);
         if (this._touches.size < 2) {
@@ -416,6 +423,7 @@ export class Input {
       this._drawPointerId = null; this._touches.clear(); this._touchPanId = null;
       this._pinchLastDist = 0; this._panning = false; this.isPanning = false;
       this.cameraGesture = false; this.zoomPivot = null; this._preTouchPos = null;
+      this.tabletDown = false; this._tabletPointerId = null;
     };
     const onLostCapture = (e: PointerEvent) => { if (e.pointerId === this._drawPointerId) { this.mouse.left = false; this._drawPointerId = null; } };
     const onVis = () => { if (document.hidden) releaseAll(); };

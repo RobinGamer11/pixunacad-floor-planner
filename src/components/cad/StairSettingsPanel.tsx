@@ -120,9 +120,19 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
     const t = window.setInterval(() => force((n) => n + 1), 200);
     return () => window.clearInterval(t);
   }, [app]);
-  if (!app || activeTool !== ToolIds.STAIR) return null;
+  if (!app) return null;
+  // Auswahlwerkzeug: genau eine ausgewählte Treppe zeigt deren Eigenschaften.
+  let selectedStair: any = null;
+  if (activeTool === ToolIds.SELECT) {
+    const sel: any[] = (app as any).selectTool?.marqueeSelectedIds ?? [];
+    if (sel.length === 1 && sel[0].kind === "stair") {
+      const s = (app.scene as any).getStairById?.(sel[0].id);
+      if (s && (!app.labelManager || app.labelManager.isEditable(s.labelId))) selectedStair = s;
+    }
+    if (!selectedStair) return null;
+  } else if (activeTool !== ToolIds.STAIR) return null;
   const tool = app.stairTool;
-  const st: any = tool.phase === "edit" ? tool.editStair() : null;
+  const st: any = selectedStair ?? (tool.phase === "edit" ? tool.editStair() : null);
 
   const src: any = st ?? tool.settings;
   const set = (patch: Record<string, any>) => {
@@ -150,8 +160,8 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
   const phaseIdx = ["start", "dir", "side", "path"].indexOf(tool.phase);
   const labels: any[] = (app as any).labelManager?.list?.() ?? [];
   const labelValue = st ? st.labelId : (app as any).activeDrawLabelId ?? "";
-  const info = st ? tool.handleInfo() : null;
-  const knick = st ? tool.selectedKnick() : null;
+  const info = st && !selectedStair ? tool.handleInfo() : null;
+  const knick = st && !selectedStair ? tool.selectedKnick() : null;
   const floorAuto = g ? g.totalHeightM : null;
   const manualFloor = src.floorHeightM != null;
   const tablet = isTabletMode();
@@ -202,7 +212,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
 
       {st && (
         <div className="space-y-2 rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
-          {!info && <p style={{ color: MUTED }}>Blauen Fangpunkt antippen – das Punktmenü erscheint direkt am Punkt.</p>}
+          {!info && <p style={{ color: MUTED }}>{selectedStair ? "Treppe erneut antippen – die Fangpunkte erscheinen." : "Blauen Fangpunkt antippen – das Punktmenü erscheint direkt am Punkt."}</p>}
           {info && (
             <>
               {info.fields.map((f) => (
