@@ -212,7 +212,7 @@ export const StairSettingsPanel: React.FC<{ app: CadApp | null; activeTool: stri
 
       {st && (
         <div className="space-y-2 rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
-          {!info && <p style={{ color: MUTED }}>Blauen Fangpunkt antippen – das Punktmenü erscheint direkt am Punkt.</p>}
+          {!info && <p style={{ color: MUTED }}>{selectedStair ? "Treppe erneut antippen – die Fangpunkte erscheinen." : "Blauen Fangpunkt antippen – das Punktmenü erscheint direkt am Punkt."}</p>}
           {info && (
             <>
               {info.fields.map((f) => (
