@@ -72,6 +72,10 @@ export function CadTableLayer({
       // noch die Zellauswahl beenden — dort wird die aktive Tabelle bearbeitet.
       const el = t instanceof Element ? t : (t?.parentElement ?? null);
       if (el?.closest?.("[data-table-settings]")) return;
+      // Auf der Zeichenfläche (Verschieben/Zoomen/Pinch) nicht beenden – dort
+      // entscheidet die Auswahl: Wechselt sie zu etwas anderem, endet der
+      // Zellmodus über CadApp.setSelection.
+      if (el?.tagName === "CANVAS") return;
       exitEdit();
     };
     const onKey = (ev: KeyboardEvent) => {

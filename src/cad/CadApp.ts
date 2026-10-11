@@ -1345,6 +1345,11 @@ export class CadApp {
       if (!stillSameTable) this.endTableEdit();
     }
     this.selection = selection;
+    // Gesetzte Tabellen sind bei Auswahl automatisch im Zellmodus.
+    if (!this.tableEditId && selection && (selection as any).type === SelectionType.TEXTBOX) {
+      const tid = (selection as any).textBoxId;
+      if (tid && (this.scene as any).getTableById?.(tid)) this.beginTableEdit(tid);
+    }
 
     this.renderer.setSelection(selection);
     this._syncLineSettingsFromContext();
