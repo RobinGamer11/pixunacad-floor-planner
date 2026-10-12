@@ -119,8 +119,8 @@ export class GuideInteractionController {
     this._mids.set(key, [a, b]);
     if (this.guides.hasGroup(key)) return;
     const d = v(b.x - a.x, b.y - a.y);
-    // Fangbarer Mittelpunkt mit kurzer Achse quer zur Verbindung
-    this.guides.toggleGroup(key, [{ point: m, dir: v(-d.y, d.x) }], [m]);
+    // Nur fangbarer Markierungsstrich – die Hilfslinie entsteht erst per R-Klick
+    this.guides.toggleMarker(key, m, d);
   }
 
   private _onPoint(p: Vec2) {
