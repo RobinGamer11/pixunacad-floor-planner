@@ -4,6 +4,7 @@ import {
   setObjectCode, setObjectNameMany, addAttachments, attachmentBytes,
   MAX_ATTACHMENT_BYTES_PER_OBJECT, type ObjectAttachment,
 } from "@/cad/objectMeta";
+import { iterSceneObjects } from "@/cad/objectMeta";
 import { OBJECT_TYPE_LABELS, objectTypeKey } from "@/cad/selectionFilter";
 
 const HAIRLINE = "hsl(var(--hairline))";
@@ -66,6 +67,21 @@ export function resolveSelectedObjects(app: any): { kind: string; obj: any }[] {
   return out;
 }
 
+/** Objektart, die das aktive Zeichenwerkzeug erzeugt (für Daten vor dem Erstellen). */
+const TOOL_KIND: Record<string, string> = {
+  line: "segment", polygon: "segment", hatch: "hatch", free: "freeStroke", wall: "wall",
+  door: "door", text: "textbox", table: "table", stair: "stair", measure: "dimension",
+};
+export function toolDraftKind(app: any): string | null {
+  const t = app?.activeTool;
+  if (!t || t === app.selectTool) return null;
+  for (const [id, kind] of Object.entries(TOOL_KIND)) {
+    const tool = app[id === "free" ? "freeDrawTool" : `${id}Tool`];
+    if (tool && tool === t) return kind;
+  }
+  return null;
+}
+
 export function allAppScenes(app: any): any[] {
   const list: any[] = [];
   try { for (const sc of app?.scenesById?.values?.() ?? []) list.push(sc); } catch { /* noop */ }
@@ -73,7 +89,7 @@ export function allAppScenes(app: any): any[] {
   return list;
 }
 
-const commit = (app: any) => { try { app?.commitHistorySnapshot?.(); } catch { /* noop */ } };
+const commit = (app: any, obj?: any) => { if (obj?.__draft) return; try { app?.commitHistorySnapshot?.(); } catch { /* noop */ } };
 
 /** Objektname/ID + Untertabs „Darstellung | Infos“ (nur bei ausgewähltem Objekt). */
 export const ObjectInfoTabs: React.FC<{
@@ -89,14 +105,56 @@ export const ObjectInfoTabs: React.FC<{
     if (!app) return;
     let lastKey = "";
     let lastObjs: any[] = [];
+    // Bekannte Objekte; neu auftauchende erhalten beim Erstellen die Entwurfsdaten.
+    const known = new WeakSet<object>();
+    const scanNew = (): { kind: string; obj: any }[] => {
+      const fresh: { kind: string; obj: any }[] = [];
+      for (const x of iterSceneObjects(allAppScenes(app))) {
+        if (!known.has(x.obj)) { known.add(x.obj); fresh.push(x); }
+      }
+      return fresh;
+    };
+    scanNew();
+    const applyDraft = () => {
+      const fresh = scanNew();
+      const draft = app.__objMetaDraft;
+      if (!fresh.length || !draft || !toolDraftKind(app)) return;
+      const scenes = allAppScenes(app);
+      for (const x of fresh) {
+        if (draft.objName) x.obj.objName = draft.objName;
+        if (draft.objDesc) x.obj.objDesc = draft.objDesc;
+        if (draft.objAttachments?.length) x.obj.objAttachments = draft.objAttachments.map((a: any) => ({ ...a }));
+        x.obj.objCode = undefined;
+        ensureObjectCode(scenes, x.kind, x.obj);
+      }
+      app.__objMetaDraft = null;
+    };
+    // Erstellen + Objektdaten = derselbe Rückgängig-Schritt.
+    const origCommit = app.commitHistorySnapshot;
+    if (typeof origCommit === "function") {
+      app.commitHistorySnapshot = function (...args: any[]) {
+        try { applyDraft(); } catch { /* noop */ }
+        return origCommit.apply(this, args);
+      };
+    }
     const t = window.setInterval(() => {
-      const r = resolveSelectedObjects(app);
+      applyDraft();
+      let r = resolveSelectedObjects(app);
+      const dk = r.length ? null : toolDraftKind(app);
+      if (dk) {
+        let d = app.__objMetaDraft;
+        if (!d || d.__kind !== dk) d = app.__objMetaDraft = { __kind: dk, __draft: true };
+        if (dk === "door") d.kind = app.doorTool?.settings?.mode ?? app.doorTool?.mode;
+        d.objCode = undefined;
+        ensureObjectCode(allAppScenes(app), dk, d);
+        r = [{ kind: dk, obj: d }];
+      }
       const same = r.length === lastObjs.length && r.every((x, i) => x.obj === lastObjs[i]);
       if (!same) {
         const wasEmpty = !lastObjs.length;
         lastObjs = r.map((x) => x.obj);
         const scenes = allAppScenes(app);
-        for (const x of r) ensureObjectCode(scenes, x.kind, x.obj);
+        for (const x of r) if (!x.obj.__draft) ensureObjectCode(scenes, x.kind, x.obj);
         setItems(r);
         onHasObject(r.length > 0);
         const key = r.length === 1 ? "one" : "many";
@@ -105,7 +163,10 @@ export const ObjectInfoTabs: React.FC<{
       }
       force((x) => x + 1);
     }, 300);
-    return () => window.clearInterval(t);
+    return () => {
+      window.clearInterval(t);
+      if (typeof origCommit === "function") app.commitHistorySnapshot = origCommit;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app]);
 
@@ -183,7 +244,7 @@ const ObjectInfoPanel: React.FC<{ app: any; items: { kind: string; obj: any }[] 
             value={nameVal ?? ""}
             placeholder={placeholder}
             onChange={(e) => { setObjectNameMany(scenes, items, e.target.value); force((x) => x + 1); }}
-            onBlur={() => commit(app)}
+            onBlur={() => commit(app, obj)}
             className="h-8 w-full rounded-md border px-2 text-[11px] outline-none"
             style={fieldStyle}
           />
@@ -204,7 +265,7 @@ const ObjectInfoPanel: React.FC<{ app: any; items: { kind: string; obj: any }[] 
                 type="text"
                 value={codeDraft ?? obj.objCode ?? ""}
                 onChange={(e) => { setCodeDraft(e.target.value); setCodeError(setObjectCode(scenes, kind, obj, e.target.value)); }}
-                onBlur={() => { setCodeDraft(null); setCodeError(null); commit(app); }}
+                onBlur={() => { setCodeDraft(null); setCodeError(null); commit(app, obj); }}
                 className="h-full min-w-0 flex-1 bg-transparent pr-2 text-[11px] uppercase tabular-nums outline-none"
               />
             </span>
@@ -218,7 +279,7 @@ const ObjectInfoPanel: React.FC<{ app: any; items: { kind: string; obj: any }[] 
             value={descVal ?? ""}
             placeholder={descVal === null ? "Verschiedene Beschreibungen" : ""}
             onChange={(e) => { for (const x of items) x.obj.objDesc = e.target.value; force((n) => n + 1); }}
-            onBlur={() => commit(app)}
+            onBlur={() => commit(app, obj)}
             className="w-full resize-y rounded-md border px-2 py-1.5 text-[11px] outline-none"
             style={fieldStyle}
           />
@@ -269,19 +330,19 @@ const AttachmentsSection: React.FC<{ app: any; obj: any }> = ({ app, obj }) => {
     }
     const rejected = addAttachments(obj, items);
     setMsg(rejected.length ? `Nicht hinzugefügt (Format oder 5-MB-Grenze): ${rejected.join(", ")}` : null);
-    commit(app); force((x) => x + 1);
+    commit(app, obj); force((x) => x + 1);
   };
   const rename = (a: ObjectAttachment) => {
     setMenu(null);
     const n = window.prompt("Anlage umbenennen", a.name);
     if (!n?.trim()) return;
     obj.objAttachments = list.map((x) => (x.id === a.id ? { ...x, name: n.trim() } : x));
-    commit(app); force((x) => x + 1);
+    commit(app, obj); force((x) => x + 1);
   };
   const remove = (a: ObjectAttachment) => {
     setMenu(null);
     obj.objAttachments = list.filter((x) => x.id !== a.id);
-    commit(app); force((x) => x + 1);
+    commit(app, obj); force((x) => x + 1);
   };
 
   return (
