@@ -47,3 +47,24 @@ describe("Objekt-ID", () => {
     expect((s2.hatches[0] as any).objDesc).toBe("Zeile 1\nZeile 2");
   });
 });
+
+import { setObjectNameMany, addAttachments, copyObjectMeta, MAX_ATTACHMENT_BYTES_PER_OBJECT } from "./objectMeta";
+describe("Mehrfachauswahl & Anlagen", () => {
+  it("vergibt bei gemeinsamem Namen fortlaufende IDs", () => {
+    const a: any = { id: "a" }, b: any = { id: "b" }, c: any = { id: "c" };
+    const scenes = [{ walls: [a, b, c] }];
+    setObjectNameMany(scenes, [{ kind: "wall", obj: a }, { kind: "wall", obj: b }, { kind: "wall", obj: c }], "Bestand");
+    expect([a.objCode, b.objCode, c.objCode]).toEqual(["A0001", "A0002", "A0003"]);
+    expect(b.objName).toBe("Bestand");
+  });
+  it("begrenzt Anlagen auf 5 MB je Objekt und kopiert sie beim Duplizieren", () => {
+    const o: any = {};
+    const r = addAttachments(o, [
+      { id: "1", name: "a.png", type: "image/png", size: 3 * 1024 * 1024, dataUrl: "x" },
+      { id: "2", name: "b.pdf", type: "application/pdf", size: 3 * 1024 * 1024, dataUrl: "y" },
+    ]);
+    expect(MAX_ATTACHMENT_BYTES_PER_OBJECT).toBe(5 * 1024 * 1024);
+    expect(r).toEqual(["b.pdf"]);
+    expect(copyObjectMeta(o, { withCode: false }).objAttachments?.length).toBe(1);
+  });
+});
