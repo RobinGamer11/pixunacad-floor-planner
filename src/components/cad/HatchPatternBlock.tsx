@@ -178,7 +178,7 @@ export const HatchPatternBlock: React.FC<Props> = ({ app, scaleMax = 5000, scale
   const hairline = "hsl(var(--hairline, var(--border)))";
 
   return (
-    <div className="space-y-2 rounded border p-2" style={{ borderColor: hairline }}>
+    <div className="space-y-2">
       <SettingsToggleButton
         label="Muster"
         active={enabled}

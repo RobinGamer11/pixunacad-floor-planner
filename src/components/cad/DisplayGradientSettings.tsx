@@ -93,17 +93,25 @@ export const DisplayGradientSettings: React.FC<Props> = ({
       />
       {current.enabled && (
         <div className="space-y-2 rounded-md border p-2" style={{ borderColor: HAIRLINE }}>
-          <div className="grid grid-cols-2 gap-2">
-            <SettingsToggleButton
-              label="Art"
-              active={current.type === "linear"}
-              onLabel="Linear"
-              offLabel="Vignette"
-              onClick={() => patch({ type: current.type === "linear" ? "vignette" : "linear" })}
-            />
+          <div className="grid grid-cols-2 gap-1">
+            {(["linear", "vignette"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                aria-pressed={current.type === t}
+                onClick={() => patch({ type: t })}
+                className={`flex h-8 items-center justify-center rounded border text-[11px] transition-colors ${
+                  current.type === t ? "bg-accent" : "hover:bg-muted"
+                }`}
+                style={{ borderColor: HAIRLINE }}
+              >
+                {t === "linear" ? "Linear" : "Vignette"}
+              </button>
+            ))}
+          </div>
+          <div>
             {current.type === "linear" && (
               <label className="block min-w-0">
-                <span className="mb-1 block text-[9px] text-muted-foreground">Richtung</span>
                 <select
                   value={current.direction}
                   onChange={(e) => patch({ direction: e.target.value as DisplayGradientDirection })}
