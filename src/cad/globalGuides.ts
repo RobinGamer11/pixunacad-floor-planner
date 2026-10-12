@@ -111,6 +111,19 @@ export class GlobalGuides {
     this.toggleGroup(`line:${axisKey(p, dir)}`, [{ point: p, dir }]);
   }
 
+  /** Setzt/entfernt einen kurzen Markierungsstrich (fangbar, aber keine Hilfslinie). */
+  toggleMarker(key: string, point: Vec2, dir: Vec2): boolean {
+    const s = this._s;
+    if (s.markers.has(key)) { s.markers.delete(key); return false; }
+    if (Math.hypot(dir.x, dir.y) < 1e-12) return false;
+    s.markers.set(key, { key, point: v(point.x, point.y), dir: canonicalDir(dir) });
+    return true;
+  }
+
+  removeMarker(key: string): void { this._s.markers.delete(key); }
+
+  get markers(): GuideMarker[] { return [...this._s.markers.values()]; }
+
   /** Setzt/entfernt H+V-Achsen an einem Weltpunkt. */
   toggleAt(p: Vec2): void {
     this.toggleGroup(`pt:${p.x.toFixed(6)}_${p.y.toFixed(6)}`, [{ point: p, dir: v(1, 0) }, { point: p, dir: v(0, 1) }], [p]);
