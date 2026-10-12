@@ -173,7 +173,7 @@ export class GlobalGuides {
   /** Zeichnet Hilfslinien + Anker (Screen-Space). */
   draw(ctx: CanvasRenderingContext2D, cam: Camera, _vw: number, _vh: number): void {
     const s = this._s;
-    if (!s.axes.size) return;
+    if (!s.axes.size && !s.markers.size) return;
     ctx.save();
     // Sichtbar auf hellem und dunklem Grund (vorher 0.38 → teils unsichtbar)
     ctx.globalAlpha = 1;
