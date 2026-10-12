@@ -365,3 +365,45 @@ export function CadSegmentedProxy({
     </div>
   );
 }
+
+/**
+ * Flächenanzeige (Schraffur): Schalter + kompakte Einstellungen direkt darunter.
+ * Gebunden an die versteckten Engine-Felder, Logik bleibt in der Engine.
+ */
+export function CadAreaLabelBlock(props: {
+  showRef: React.RefObject<HTMLInputElement>;
+  textColorRef: React.RefObject<HTMLInputElement>;
+  fontSizeRef: React.RefObject<HTMLInputElement>;
+  bgColorRef: React.RefObject<HTMLInputElement>;
+  bgAlphaRef: React.RefObject<HTMLInputElement>;
+  borderToggleRef: React.RefObject<HTMLInputElement>;
+  borderColorRef: React.RefObject<HTMLInputElement>;
+  borderWidthRef: React.RefObject<HTMLInputElement>;
+}) {
+  const shown = usePolled(() => props.showRef.current?.checked ?? false, [props.showRef]) ?? false;
+  const border = usePolled(() => props.borderToggleRef.current?.checked ?? false, [props.borderToggleRef]) ?? false;
+  return (
+    <div className="space-y-2">
+      <SettingsToggleButton label="Flächenanzeige" active={shown} onClick={() => props.showRef.current?.click()} />
+      {shown && (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <CadColorProxy label="Textfarbe" target={props.textColorRef} />
+            <CadColorProxy label="Hintergrundfarbe" target={props.bgColorRef} />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CadMeasureProxy label="Textgröße" unit="px" target={props.fontSizeRef} digits={1} />
+            <CadMeasureProxy label="HG-Transparenz" unit="%" target={props.bgAlphaRef} digits={0} />
+          </div>
+          <SettingsToggleButton label="Rahmen der Flächenanzeige" active={border} onClick={() => props.borderToggleRef.current?.click()} />
+          {border && (
+            <div className="grid grid-cols-2 gap-2">
+              <CadColorProxy label="Rahmenfarbe" target={props.borderColorRef} />
+              <CadMeasureProxy label="Rahmenstärke" unit="px" target={props.borderWidthRef} digits={1} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
