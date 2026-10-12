@@ -388,7 +388,7 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
         { label: "SVG exportieren", run: () => exportSvg(d) },
         { label: "DXF exportieren", run: () => exportDxf(d) },
         {
-          label: "Löschen", danger: true, run: () => {
+          label: "Löschen", run: () => {
             if (window.confirm(`„${d.name}“ löschen? Platzierte Exemplare werden ebenfalls entfernt.`)) {
               app.removeLibraryDefinition(d.id);
               setSelectedId((s) => (s === d.id ? null : s));
@@ -804,7 +804,7 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             { label: "SVG exportieren", run: () => exportSvg(selectedDef) },
             { label: "DXF exportieren", run: () => exportDxf(selectedDef) },
             {
-              label: "Löschen", danger: true, run: () => {
+              label: "Löschen", run: () => {
                 if (window.confirm(`„${selectedDef.name}“ löschen? Platzierte Exemplare werden ebenfalls entfernt.`)) {
                   app.removeLibraryDefinition(selectedDef.id);
                   setSelectedId(null);
