@@ -9,7 +9,7 @@ describe("Objekt-ID", () => {
   it("nummeriert je Name fortlaufend: A0001, A0002", () => {
     const s = new Scene();
     const a = wall(s), b = wall(s, 1);
-    a.objName = "Wand Bestand"; (b as any).objName = "Wand Bestand";
+    (a as any).objName = "Wand Bestand"; (b as any).objName = "Wand Bestand";
     ensureObjectCode([s], "wall", a); ensureObjectCode([s], "wall", b);
     expect(formatObjectId("wall", a)).toBe("Wand Bestand - #A0001");
     expect(formatObjectId("wall", b)).toBe("Wand Bestand - #A0002");
