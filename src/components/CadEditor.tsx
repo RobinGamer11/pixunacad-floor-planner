@@ -43,6 +43,7 @@ import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
 import { StepHints } from "@/components/cad/StepHints";
 import {
   CadEbeneSelect,
+  CadAreaLabelBlock,
   CadThicknessMmInput,
   CadColorProxy,
   CadMeasureProxy,
@@ -235,6 +236,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const hatchAlphaRef = useRef<HTMLInputElement>(null);
   const areaShowRef = useRef<HTMLInputElement>(null);
   const areaSettingsGroupRef = useRef<HTMLDivElement>(null);
+  const areaBorderToggleRef = useRef<HTMLInputElement>(null);
+  const areaBorderColorRef = useRef<HTMLInputElement>(null);
+  const areaBorderWidthRef = useRef<HTMLInputElement>(null);
   const areaTextColorRef = useRef<HTMLInputElement>(null);
   const areaTextPreviewRef = useRef<HTMLDivElement>(null);
   const areaFontSizeRef = useRef<HTMLInputElement>(null);
@@ -2465,7 +2469,18 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                   projectId={projectId}
                   patternScaleMax={5000}
                   hideChrome
-                  afterStroke={<CadBigToggleProxy target={areaShowRef} label="Flächenanzeige" />}
+                  afterStroke={
+                    <CadAreaLabelBlock
+                      showRef={areaShowRef}
+                      textColorRef={areaTextColorRef}
+                      fontSizeRef={areaFontSizeRef}
+                      bgColorRef={areaBgColorRef}
+                      bgAlphaRef={areaBgAlphaRef}
+                      borderToggleRef={areaBorderToggleRef}
+                      borderColorRef={areaBorderColorRef}
+                      borderWidthRef={areaBorderWidthRef}
+                    />
+                  }
                 />
               </div>
             </div>
@@ -2473,7 +2488,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           )}
 
            {/* Hatch Settings (Legacy-Bindings: Ebene + Flächenanzeige) */}
-          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`}>
+          <div ref={hatchSettingsRef} className={`cad-settings-panel hidden mb-2`} style={{ display: "none" }}>
             <div className="hidden">
             </div>
 
@@ -2580,6 +2595,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <div className="flex items-center gap-2 pt-1">
                   <input
                     id="cad-area-border"
+                    ref={areaBorderToggleRef}
                     data-area-border
                     type="checkbox"
                     className="w-[14px] h-[14px] cursor-pointer rounded-[3px] border accent-primary"
@@ -2592,12 +2608,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                     <label>Rahmenfarbe</label>
                     <div className="flex items-center gap-2">
                       <div data-area-border-preview className="w-6 h-6 rounded border" style={{ borderColor: "hsl(var(--border))" }} />
-                      <input data-area-border-color type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
+                      <input ref={areaBorderColorRef} data-area-border-color type="color" defaultValue="#111111" className="w-8 h-8 cursor-pointer border-0 p-0 bg-transparent" />
                     </div>
                   </div>
                   <div>
                     <label>Rahmenstärke (px)</label>
-                    <input data-area-border-width type="text" defaultValue="1" />
+                    <input ref={areaBorderWidthRef} data-area-border-width type="text" defaultValue="1" />
                   </div>
                 </div>
                </div>
