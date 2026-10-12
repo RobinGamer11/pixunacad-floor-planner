@@ -107,9 +107,35 @@ export function guideAxesFor(target: GuideTarget, anchor: Vec2 | null): { key: s
 export class GuideInteractionController {
   constructor(private guides: GlobalGuides, private topo: GuideTopology, private cam: GuideCamera) {}
 
+  /** Letzter per Rechtsklick gewählter Punkt (je Kontext) für Mittelpunkte. */
+  private _last: { ctx: string; p: Vec2 } | null = null;
+  /** Mittelpunkt → Elternpunkte (fortlaufende Halbierung). */
+  private _mids = new Map<string, [Vec2, Vec2]>();
+
+  private _addMid(a: Vec2, b: Vec2) {
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 1e-9) return;
+    const m = v((a.x + b.x) / 2, (a.y + b.y) / 2);
+    const key = `mid:${this.guides.contextKey}:${m.x.toFixed(6)}_${m.y.toFixed(6)}`;
+    this._mids.set(key, [a, b]);
+    if (this.guides.hasGroup(key)) return;
+    const d = v(b.x - a.x, b.y - a.y);
+    // Fangbarer Mittelpunkt mit kurzer Achse quer zur Verbindung
+    this.guides.toggleGroup(key, [{ point: m, dir: v(-d.y, d.x) }], [m]);
+  }
+
+  private _onPoint(p: Vec2) {
+    const ctx = this.guides.contextKey;
+    const midKey = `mid:${ctx}:${p.x.toFixed(6)}_${p.y.toFixed(6)}`;
+    const parents = this._mids.get(midKey);
+    if (parents) { this._addMid(parents[0], p); this._addMid(p, parents[1]); }
+    else if (this._last && this._last.ctx === ctx) this._addMid(this._last.p, p);
+    this._last = { ctx, p: v(p.x, p.y) };
+  }
+
   handleRightClick(mouseS: Vec2, mouseW: Vec2, ctx: GuideToolContext = { anchor: null }): boolean {
     const target = findGuideTarget(this.topo, this.cam, mouseS, mouseW, ctx);
-    if (!target) return false;
+    if (!target) { this._last = null; return false; }
+    if (target.kind === "point") this._onPoint(target.world); else this._last = null;
     const { key, axes, anchors } = guideAxesFor(target, ctx.anchor);
     if (this.guides.hasGroup(key)) { this.guides.toggleGroup(key, []); return true; }
     this.guides.toggleGroup(key, axes, anchors);

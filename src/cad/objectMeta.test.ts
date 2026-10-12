@@ -68,3 +68,14 @@ describe("Mehrfachauswahl & Anlagen", () => {
     expect(copyObjectMeta(o, { withCode: false }).objAttachments?.length).toBe(1);
   });
 });
+
+describe("Umbenennen auf unbenutzten Namen", () => {
+  it("setzt die ID auf A0001 zurück", () => {
+    const s = new Scene(); const a = wall(s), b = wall(s, 1);
+    setObjectName([s], "wall", a, "Wand 02"); ensureObjectCode([s], "wall", a);
+    setObjectName([s], "wall", b, "Wand 02"); ensureObjectCode([s], "wall", b);
+    expect((b as any).objCode).toBe("A0002");
+    setObjectName([s], "wall", b, "Wand 03");
+    expect((b as any).objCode).toBe("A0001");
+  });
+});

@@ -56,3 +56,16 @@ describe("Zentrale Hilfslinien", () => {
     expect(g.lines.length).toBe(2);
   });
 });
+
+describe("Mittelpunkte per Rechtsklick", () => {
+  it("zwei Punkte erzeugen einen fangbaren Mittelpunkt", () => {
+    const g = new GlobalGuides();
+    const c = new GuideInteractionController(g, { findBestSnap: (_s: any, w: any) => ({ type: "POINT", world: w }) }, cam);
+    c.handleRightClick({ x: 0, y: 0 }, { x: 0, y: 0 });
+    c.handleRightClick({ x: 400, y: 0 }, { x: 4, y: 0 });
+    expect(g.groups.some((x) => x.key.includes("mid:") && x.anchors[0].x === 2)).toBe(true);
+    c.handleRightClick({ x: 200, y: 0 }, { x: 2, y: 0 });
+    const mids = g.groups.filter((x) => x.key.includes("mid:")).map((x) => x.anchors[0].x).sort();
+    expect(mids).toEqual([1, 2, 3]);
+  });
+});
