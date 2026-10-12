@@ -23,7 +23,36 @@ const KIND_OF_KEY: Record<string, string> = {
   freeStrokes: "freeStroke", doors: "door", stairs: "stair",
 };
 
-export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string }
+export interface ObjectAttachment { id: string; name: string; type: string; size: number; dataUrl: string }
+export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[] }
+
+/** Maximaler Anlagenspeicher je Objekt (Bytes). */
+export const MAX_ATTACHMENT_BYTES_PER_OBJECT = 5 * 1024 * 1024;
+export const ATTACHMENT_TYPES = ["image/jpeg", "image/png", "application/pdf"];
+
+export function attachmentBytes(obj: any): number {
+  return ((obj?.objAttachments || []) as ObjectAttachment[]).reduce((n, a) => n + (a?.size || 0), 0);
+}
+
+/** Fügt Anlagen hinzu, solange das 5-MB-Limit nicht überschritten wird. Liefert abgewiesene Namen. */
+export function addAttachments(obj: any, items: ObjectAttachment[]): string[] {
+  const list: ObjectAttachment[] = Array.isArray(obj.objAttachments) ? obj.objAttachments.slice() : [];
+  let used = attachmentBytes(obj);
+  const rejected: string[] = [];
+  for (const a of items) {
+    if (!ATTACHMENT_TYPES.includes(a.type) || used + a.size > MAX_ATTACHMENT_BYTES_PER_OBJECT) { rejected.push(a.name); continue; }
+    list.push(a); used += a.size;
+  }
+  obj.objAttachments = list;
+  return rejected;
+}
+
+/** Mehrfachauswahl: gleicher Name für alle; IDs werden fortlaufend und eindeutig neu vergeben. */
+export function setObjectNameMany(scenes: any[], items: { kind: string; obj: any }[], name: string) {
+  if (items.length === 1) { setObjectName(scenes, items[0].kind, items[0].obj, name); return; }
+  for (const { obj } of items) { obj.objName = name; obj.objCode = undefined; }
+  for (const { kind, obj } of items) ensureObjectCode(scenes, kind, obj);
+}
 
 const CODE_RE = /^[A-Z]\d{4}$/;
 
@@ -119,6 +148,7 @@ export function copyObjectMeta(obj: any, opts: { withCode?: boolean } = {}): Obj
   const out: ObjectMeta = {};
   if (typeof obj?.objName === "string" && obj.objName) out.objName = obj.objName;
   if (typeof obj?.objDesc === "string" && obj.objDesc) out.objDesc = obj.objDesc;
+  if (Array.isArray(obj?.objAttachments) && obj.objAttachments.length) out.objAttachments = obj.objAttachments.map((a: ObjectAttachment) => ({ ...a }));
   if (opts.withCode !== false && typeof obj?.objCode === "string" && obj.objCode) out.objCode = obj.objCode;
   return out;
 }
@@ -129,6 +159,7 @@ export function applyObjectMeta(obj: any, src: any, opts: { withCode?: boolean }
   if (m.objName) obj.objName = m.objName;
   if (m.objDesc) obj.objDesc = m.objDesc;
   if (m.objCode) obj.objCode = m.objCode;
+  if (m.objAttachments) obj.objAttachments = m.objAttachments;
 }
 
 /** Hängt die Objektdaten an eine serialisierte Szene (Zuordnung über id). */
@@ -158,7 +189,7 @@ export function restoreObjectMeta(scene: any, data: any, before: Record<string, 
   if (!data) return;
   for (const key of SCENE_OBJECT_KEYS) {
     const raw = data[key];
-    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc))) continue;
+    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments))) continue;
     const created = ((scene?.[key] || []) as any[]).slice(before[key] ?? 0);
     if (created.length !== raw.length) continue;
     raw.forEach((r: any, i: number) => applyObjectMeta(created[i], r));
