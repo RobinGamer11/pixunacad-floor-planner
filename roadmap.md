@@ -1,5 +1,10 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Objekteinstellungen – Korrektur 12.10.2026
+- [x] Objektname/ID mittig und mit tiefer liegenden Untertabs anzeigen
+- [x] „Sonstiges“ beim Öffnen von Infos und bei Objektwechsel automatisch aufklappen
+- [x] Schraffur-Höhenkörper weiß mit schwarzem Umriss darstellen
+
 ## Aktuelle Korrekturen
 - [x] Projekt-bearbeiten-Inhalt ausschließlich zwischen fester Kopf- und Fußzeile scrollen
 - [x] Sichtbare CAD-Transparentpausen vollständig als schreibgeschützte Fang- und Hilfslinienquelle nutzen
