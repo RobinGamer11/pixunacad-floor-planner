@@ -1,3 +1,4 @@
+import { applyObjectMeta, copyObjectMeta } from "./objectMeta";
 import { copyDisplayGradient } from "./displayGradient";
 import { serializeStair } from "./Scene";
 import { Defaults, SelectionType } from "./constants";
@@ -93,12 +94,12 @@ export interface Clipboard {
 }
 
 /* ---- Snapshot helpers ---- */
-function snapSegment(s: Segment): SegmentSnap {
+function snapSegment_(s: Segment): SegmentSnap {
   return { kind: "segment", a: v(s.a.x, s.a.y), b: v(s.b.x, s.b.y),
     color: s.color, thicknessM: s.thicknessM, labelId: s.labelId, bulge: (s as any).bulge || 0,
     ...copyStrokeEffects(s) } as any;
 }
-function snapHatch(h: Hatch): HatchSnap {
+function snapHatch_(h: Hatch): HatchSnap {
   return { kind: "hatch", points: h.points.map(p => v(p.x, p.y)),
     fillColor: h.fillColor, strokeColor: h.strokeColor,
     fillAlphaPct: h.fillAlphaPct, strokeWidthPx: h.strokeWidthPx,
@@ -114,7 +115,7 @@ function snapHatch(h: Hatch): HatchSnap {
     heightM: (h as any).heightM,
     ...copyStrokeEffects(h) } as any;
 }
-function snapDimension(d: Dimension): DimensionSnap {
+function snapDimension_(d: Dimension): DimensionSnap {
   return { kind: "dimension",
     p1: v(d.p1.x, d.p1.y), p2: v(d.p2.x, d.p2.y),
     placementPoint: v(d.placementPoint.x, d.placementPoint.y),
@@ -126,7 +127,7 @@ function snapDimension(d: Dimension): DimensionSnap {
     textBgEnabled: d.textBgEnabled, textBgColor: d.textBgColor, textBgAlpha: d.textBgAlpha,
     labelId: d.labelId };
 }
-function snapFree(f: FreeStroke): FreeSnap {
+function snapFree_(f: FreeStroke): FreeSnap {
   return { kind: "free", points: f.points.map(p => v(p.x, p.y)),
     color: (f as any).color, thicknessM: (f as any).thicknessM, opacity: (f as any).opacity,
     lineStyle: (f as any).lineStyle, gapM: (f as any).gapM,
@@ -136,7 +137,7 @@ function snapFree(f: FreeStroke): FreeSnap {
     imageSpacingM: (f as any).imageSpacingM, imageRotateAlongPath: (f as any).imageRotateAlongPath,
     labelId: f.labelId, ...copyStrokeEffects(f) } as any;
 }
-function snapTextBox(t: TextBox): TextBoxSnap {
+function snapTextBox_(t: TextBox): TextBoxSnap {
   return { kind: "textbox",
     center: v(t.center.x, t.center.y),
     widthM: t.widthM, heightM: t.heightM, rotationRad: t.rotationRad,
@@ -144,7 +145,7 @@ function snapTextBox(t: TextBox): TextBoxSnap {
 }
 
 /* ---- Bounding center for an item, used as anchor candidate ---- */
-function snapLibrary(i: any): LibrarySnap {
+function snapLibrary_(i: any): LibrarySnap {
   return { kind: "library", definitionId: i.definitionId, definitionVersion: i.definitionVersion,
     position: v(i.position.x, i.position.y), rotationRad: i.rotationRad,
     scaleX: i.scaleX, scaleY: i.scaleY, labelId: i.labelId };
@@ -173,21 +174,21 @@ const pickFields = (obj: any, keys: string[]): Record<string, any> => {
   return out;
 };
 
-function snapTable(t: any): TableSnap {
+function snapTable_(t: any): TableSnap {
   return { kind: "table", center: v(t.center.x, t.center.y), rotationRad: t.rotationRad || 0,
     data: JSON.parse(JSON.stringify(t.data ?? {})), mPerMm: t.mPerMm, scale: t.scale || 1,
     labelId: t.labelId };
 }
 
-function snapDocument(d: any): DocumentSnap {
+function snapDocument_(d: any): DocumentSnap {
   return { kind: "document", position: v(d.position.x, d.position.y), data: pickFields(d, DOC_FIELDS) };
 }
 
-function snapDoor(d: any, wallRef: number | null): DoorSnap {
+function snapDoor_(d: any, wallRef: number | null): DoorSnap {
   return { kind: "door", wallId: d.wallId, wallRef, props: pickFields(d, DOOR_FIELDS) };
 }
 
-function snapWallObj(o: any): WallSnap {
+function snapWallObj_(o: any): WallSnap {
   return { kind: "wall", corners: o.corners.map((p: Vec2) => v(p.x, p.y)),
     wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
     color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
@@ -195,6 +196,20 @@ function snapWallObj(o: any): WallSnap {
     patternAngleDeg: o.patternAngleDeg ?? 0, heightM: o.heightM,
     bulges: Array.isArray(o.bulges) ? [...o.bulges] : undefined } as any;
 }
+
+/** Kopien übernehmen Name/Beschreibung, aber nie die Objekt-ID. */
+const withMeta = <A extends any[], R>(f: (o: any, ...a: A) => R) =>
+  (o: any, ...a: A): R => ({ ...(f(o, ...a) as any), ...copyObjectMeta(o, { withCode: false }) });
+const snapSegment = withMeta(snapSegment_);
+const snapHatch = withMeta(snapHatch_);
+const snapDimension = withMeta(snapDimension_);
+const snapFree = withMeta(snapFree_);
+const snapTextBox = withMeta(snapTextBox_);
+const snapLibrary = withMeta(snapLibrary_);
+const snapTable = withMeta(snapTable_);
+const snapDocument = withMeta(snapDocument_);
+const snapDoor = withMeta(snapDoor_);
+const snapWallObj = withMeta(snapWallObj_);
 
 function itemCenter(it: ClipboardItem): Vec2 {
   if (it.kind === "segment") return { x: (it.a.x + it.b.x) / 2, y: (it.a.y + it.b.y) / 2 };
@@ -275,7 +290,7 @@ export function buildClipboardFromSelection(app: CadApp, anchorOverride?: Vec2 |
       else if (kind === "freeStroke" || kind === "free") { const o = s.getFreeStrokeById?.(id); if (o) items.push(snapFree(o)); }
       else if (kind === "library") { const o = s.getLibraryInstanceById?.(id); if (o) items.push(snapLibrary(o)); }
       else if (kind === "table") { const o = s.getTableById?.(id); if (o) items.push(snapTable(o)); }
-      else if (kind === "stair") { const o = s.getStairById?.(id); if (o) { const data = serializeStair(o); items.push({ kind: "stair", data, path: data.path.map((p: any) => v(p.x, p.y)) }); } }
+      else if (kind === "stair") { const o = s.getStairById?.(id); if (o) { const data = serializeStair(o); items.push({ kind: "stair", ...copyObjectMeta(o, { withCode: false }), data, path: data.path.map((p: any) => v(p.x, p.y)) }); } }
       else if (kind === "document") { const o = s.getDocumentById?.(id); if (o && !o._snapOnly) items.push(snapDocument(o)); }
       else if (kind === "wall") {
         const o = s.getWallById?.(id);
@@ -377,7 +392,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
       const o = app.scene.createSegment({ x: it.a.x + dx, y: it.a.y + dy }, { x: it.b.x + dx, y: it.b.y + dy },
         { color: it.color, thicknessM: it.thicknessM, labelId: it.labelId, bulge: (it as any).bulge,
           ...copyStrokeEffects(it) });
-      if (o) created.push({ kind: "segment", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "segment", id: o.id });
     } else if (it.kind === "hatch" && (it as any).isPolygon) {
       const o = app.scene.createPolygon(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
         { color: it.strokeColor, thicknessM: (it as any).thicknessM, alpha: (it as any).alpha,
@@ -385,7 +400,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
           midpointSnap: !!(it as any).midpointSnap, divisionSnap: (it as any).divisionSnap,
           closed: (it as any).closed !== false, shapeMode: (it as any).shapeMode,
           ...copyStrokeEffects(it) });
-      if (o) created.push({ kind: "hatch", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "hatch") {
       const o = app.scene.createHatch(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })),
         { fillColor: it.fillColor, strokeColor: it.strokeColor,
@@ -396,7 +411,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
           displayGradient: (it as any).displayGradient,
           heightM: (it as any).heightM,
           ...copyStrokeEffects(it) });
-      if (o) created.push({ kind: "hatch", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "dimension") {
       const o = app.scene.createDimension(
         { x: it.p1.x + dx, y: it.p1.y + dy },
@@ -410,7 +425,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
           bulge: (it as any).bulge || 0,
           p3: it.p3 ? { x: it.p3.x + dx, y: it.p3.y + dy } : null,
           labelId: it.labelId });
-      if (o) created.push({ kind: "dimension", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "dimension", id: o.id });
     } else if (it.kind === "wall") {
       const o = app.scene.createWall({
         kind: it.wallKind as any,
@@ -423,7 +438,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         patternAngleDeg: it.patternAngleDeg ?? 0,
         heightM: (it as any).heightM,
       });
-      if (o) { newWallIds.set(idx, o.id); created.push({ kind: "wall", id: o.id }); }
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) { newWallIds.set(idx, o.id); created.push({ kind: "wall", id: o.id }); }
     } else if (it.kind === "free") {
       const o = app.scene.createFreeStroke(it.points.map(p => ({ x: p.x + dx, y: p.y + dy })), {
         color: it.color, thicknessM: it.thicknessM, opacity: it.opacity, lineStyle: it.lineStyle,
@@ -432,7 +447,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         imageRotateAlongPath: it.imageRotateAlongPath, labelId: it.labelId,
         ...copyStrokeEffects(it),
       });
-      if (o) created.push({ kind: "freeStroke", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "freeStroke", id: o.id });
     } else if (it.kind === "library") {
       // Neue Instanz mit neuer ID, aber identischer definitionId — die
       // Bibliotheksdefinition selbst bleibt unverändert.
@@ -442,28 +457,28 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         rotationRad: it.rotationRad, scaleX: it.scaleX, scaleY: it.scaleY,
         labelId: it.labelId,
       });
-      if (o) created.push({ kind: "library", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "library", id: o.id });
     } else if (it.kind === "table") {
       const o = (app.scene as any).createTable(
         { x: it.center.x + dx, y: it.center.y + dy },
         JSON.parse(JSON.stringify(it.data ?? {})), it.mPerMm,
         { rotationRad: it.rotationRad, labelId: it.labelId, scale: it.scale });
-      if (o) created.push({ kind: "table", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "table", id: o.id });
     } else if (it.kind === "stair") {
       const { id: _old, ...rest } = it.data || {};
       const o = (app.scene as any).createStair?.({ ...rest, path: it.path.map(p => ({ x: p.x + dx, y: p.y + dy })) });
-      if (o) created.push({ kind: "stair", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "stair", id: o.id });
     } else if (it.kind === "document") {
       const o = app.scene.createDocument({
         ...(JSON.parse(JSON.stringify(it.data)) as any),
         position: { x: it.position.x + dx, y: it.position.y + dy },
       });
-      if (o) created.push({ kind: "document", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "document", id: o.id });
     } else if (it.kind === "door") {
       const wallId = (it.wallRef !== null ? newWallIds.get(it.wallRef) : null) || it.wallId;
       if ((app.scene as any).getWallById?.(wallId)) {
         const o = (app.scene as any).createDoor({ ...(it.props as any), wallId });
-        if (o) created.push({ kind: "door", id: o.id });
+        if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "door", id: o.id });
       }
     } else {
       const o = app.scene.createTextBox(
@@ -471,7 +486,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         it.widthM, it.heightM,
         { ...it.style, labelId: it.labelId },
         it.html, it.rotationRad);
-      if (o) created.push({ kind: "textbox", id: o.id });
+      if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "textbox", id: o.id });
     }
 
   }
