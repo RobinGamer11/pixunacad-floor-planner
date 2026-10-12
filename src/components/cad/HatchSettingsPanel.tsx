@@ -61,9 +61,9 @@ const HeightIllustration: React.FC<{ heightM: number }> = ({ heightM }) => {
   const top = 46 - h;
   return (
     <svg viewBox="0 0 64 56" className="h-14 w-16 shrink-0" aria-hidden>
-      <polygon points={`8,${top + 6} 30,${top} 50,${top + 6} 28,${top + 12}`} fill="hsl(var(--cad-accent) / 0.25)" stroke="hsl(var(--foreground) / 0.7)" strokeWidth="0.8" />
-      <polygon points={`8,${top + 6} 28,${top + 12} 28,52 8,46`} fill="hsl(var(--cad-accent) / 0.12)" stroke="hsl(var(--foreground) / 0.7)" strokeWidth="0.8" />
-      <polygon points={`28,${top + 12} 50,${top + 6} 50,46 28,52`} fill="hsl(var(--cad-accent) / 0.05)" stroke="hsl(var(--foreground) / 0.7)" strokeWidth="0.8" />
+      <polygon points={`8,${top + 6} 30,${top} 50,${top + 6} 28,${top + 12}`} fill="hsl(var(--cad-height-body))" stroke="hsl(var(--cad-height-outline))" strokeWidth="0.8" />
+      <polygon points={`8,${top + 6} 28,${top + 12} 28,52 8,46`} fill="hsl(var(--cad-height-body))" stroke="hsl(var(--cad-height-outline))" strokeWidth="0.8" />
+      <polygon points={`28,${top + 12} 50,${top + 6} 50,46 28,52`} fill="hsl(var(--cad-height-body))" stroke="hsl(var(--cad-height-outline))" strokeWidth="0.8" />
       <line x1="57" y1={top + 6} x2="57" y2="46" stroke="hsl(var(--cad-accent))" strokeWidth="0.8" />
       <line x1="54" y1={top + 6} x2="60" y2={top + 6} stroke="hsl(var(--cad-accent))" strokeWidth="0.8" />
       <line x1="54" y1="46" x2="60" y2="46" stroke="hsl(var(--cad-accent))" strokeWidth="0.8" />

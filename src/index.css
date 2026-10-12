@@ -55,6 +55,9 @@
     --cad-selection-fill: 215 90% 55%;
     --cad-settings-bg: 0 0% 100%;
     --cad-tools-bg: 0 0% 100%;
+    /* Höhenillustration: feste Papierfarben, unabhängig vom Editor-Theme. */
+    --cad-height-body: 0 0% 100%;
+    --cad-height-outline: 0 0% 0%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;

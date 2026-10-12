@@ -6,6 +6,7 @@ import {
 } from "@/cad/objectMeta";
 import { iterSceneObjects } from "@/cad/objectMeta";
 import { OBJECT_TYPE_LABELS, objectTypeKey } from "@/cad/selectionFilter";
+import { Button } from "@/components/ui/button";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -179,24 +180,25 @@ export const ObjectInfoTabs: React.FC<{
         return names.size === 1 ? `${[...names][0]} (${items.length} Objekte)` : `Mehrfachauswahl (${items.length} Objekte)`;
       })();
   return (
-    <div className="mb-2">
-      <div className="mb-1 truncate px-1 text-[12px] font-semibold" title={header}>
+    <div className="mb-2 pt-3">
+      <div className="mb-3 truncate px-1 text-center text-[12px] font-semibold" title={header}>
         {header}
       </div>
       <div className="grid grid-cols-2 border-b" style={{ borderColor: HAIRLINE }}>
         {(["darstellung", "infos"] as const).map((t) => (
-          <button
+          <Button
             key={t}
             type="button"
+            variant="ghost"
             onClick={() => onTab(t)}
-            className="py-1.5 text-[11px] font-medium transition-colors"
+            className="h-auto rounded-none py-1.5 text-[11px] font-medium transition-colors"
             style={{
               color: tab === t ? "hsl(var(--ink))" : "hsl(var(--ink-soft))",
               borderBottom: tab === t ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
             }}
           >
             {t === "darstellung" ? "Darstellung" : "Infos"}
-          </button>
+          </Button>
         ))}
       </div>
       {tab === "infos" && <ObjectInfoPanel app={app} items={items} />}
@@ -216,8 +218,8 @@ const ObjectInfoPanel: React.FC<{ app: any; items: { kind: string; obj: any }[] 
   const [, force] = useState(0);
   const [codeDraft, setCodeDraft] = useState<string | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
-  const [miscOpen, setMiscOpen] = useState(false);
-  useEffect(() => { setCodeDraft(null); setCodeError(null); }, [items]);
+  const [miscOpen, setMiscOpen] = useState(true);
+  useEffect(() => { setCodeDraft(null); setCodeError(null); setMiscOpen(true); }, [items]);
 
   const multi = items.length > 1;
   const { kind, obj } = items[0];
@@ -289,10 +291,10 @@ const ObjectInfoPanel: React.FC<{ app: any; items: { kind: string; obj: any }[] 
       {!multi && <AttachmentsSection app={app} obj={obj} />}
 
       <div>
-        <button type="button" onClick={() => setMiscOpen((o) => !o)} aria-expanded={miscOpen} className="flex w-full items-center justify-between">
+        <Button type="button" variant="ghost" onClick={() => setMiscOpen((o) => !o)} aria-expanded={miscOpen} className="h-auto w-full justify-between rounded-none p-0 hover:bg-transparent">
           <Heading>SONSTIGES</Heading>
           <span className="mb-1.5 text-[10px] text-muted-foreground">{miscOpen ? "▾" : "▸"}</span>
-        </button>
+        </Button>
         {miscOpen && (
           <div className="space-y-1 rounded-md border p-2 text-[11px]" style={{ borderColor: HAIRLINE }}>
             <div className="flex justify-between gap-2"><span className="text-muted-foreground">Objekttyp</span><span className="truncate">{typeLabel}</span></div>
