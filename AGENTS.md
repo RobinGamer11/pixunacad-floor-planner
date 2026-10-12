@@ -52,3 +52,5 @@ Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; kein
 ## Speicher
 - Gezeichnetes nur Vektor (Pixel nur in Importen). Lokaler Stand nur via `cad/persist/localScenePersist.ts`, Anhänge nur via `lib/storageQuota.ts` (Grenzen = SQL v2).
 - Auswahlfilter-Eigenschaften nur via `registerFilterProperty` (`cad/selectionFilter.ts`); Treffer in `marqueeSelectedIds`, Werte lokal.
+
+- Objekt-ID/Name/Beschreibung laufen nur über `src/cad/objectMeta.ts` (an `_serializeOneScene`/`appendSceneObjects` gekoppelt, Kopien ohne ID) – sonst gehen sie beim Laden/Undo verloren.
