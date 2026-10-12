@@ -89,14 +89,56 @@ export const ObjectInfoTabs: React.FC<{
     if (!app) return;
     let lastKey = "";
     let lastObjs: any[] = [];
+    // Bekannte Objekte; neu auftauchende erhalten beim Erstellen die Entwurfsdaten.
+    const known = new WeakSet<object>();
+    const scanNew = (): { kind: string; obj: any }[] => {
+      const fresh: { kind: string; obj: any }[] = [];
+      for (const x of iterSceneObjects(allAppScenes(app))) {
+        if (!known.has(x.obj)) { known.add(x.obj); fresh.push(x); }
+      }
+      return fresh;
+    };
+    scanNew();
+    const applyDraft = () => {
+      const fresh = scanNew();
+      const draft = app.__objMetaDraft;
+      if (!fresh.length || !draft || !toolDraftKind(app)) return;
+      const scenes = allAppScenes(app);
+      for (const x of fresh) {
+        if (draft.objName) x.obj.objName = draft.objName;
+        if (draft.objDesc) x.obj.objDesc = draft.objDesc;
+        if (draft.objAttachments?.length) x.obj.objAttachments = draft.objAttachments.map((a: any) => ({ ...a }));
+        x.obj.objCode = undefined;
+        ensureObjectCode(scenes, x.kind, x.obj);
+      }
+      app.__objMetaDraft = null;
+    };
+    // Erstellen + Objektdaten = derselbe Rückgängig-Schritt.
+    const origCommit = app.commitHistorySnapshot;
+    if (typeof origCommit === "function") {
+      app.commitHistorySnapshot = function (...args: any[]) {
+        try { applyDraft(); } catch { /* noop */ }
+        return origCommit.apply(this, args);
+      };
+    }
     const t = window.setInterval(() => {
-      const r = resolveSelectedObjects(app);
+      applyDraft();
+      let r = resolveSelectedObjects(app);
+      const dk = r.length ? null : toolDraftKind(app);
+      if (dk) {
+        let d = app.__objMetaDraft;
+        if (!d || d.__kind !== dk) d = app.__objMetaDraft = { __kind: dk, __draft: true };
+        if (dk === "door") d.kind = app.doorTool?.settings?.mode ?? app.doorTool?.mode;
+        d.objCode = undefined;
+        ensureObjectCode(allAppScenes(app), dk, d);
+        r = [{ kind: dk, obj: d }];
+      }
       const same = r.length === lastObjs.length && r.every((x, i) => x.obj === lastObjs[i]);
       if (!same) {
         const wasEmpty = !lastObjs.length;
         lastObjs = r.map((x) => x.obj);
         const scenes = allAppScenes(app);
-        for (const x of r) ensureObjectCode(scenes, x.kind, x.obj);
+        for (const x of r) if (!x.obj.__draft) ensureObjectCode(scenes, x.kind, x.obj);
         setItems(r);
         onHasObject(r.length > 0);
         const key = r.length === 1 ? "one" : "many";
@@ -105,7 +147,10 @@ export const ObjectInfoTabs: React.FC<{
       }
       force((x) => x + 1);
     }, 300);
-    return () => window.clearInterval(t);
+    return () => {
+      window.clearInterval(t);
+      if (typeof origCommit === "function") app.commitHistorySnapshot = origCommit;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app]);
 
