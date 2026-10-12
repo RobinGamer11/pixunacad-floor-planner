@@ -1,3 +1,4 @@
+import { restoreObjectMeta, sceneObjectCounts } from "./objectMeta";
 import { ANNOTATION_M_PER_MM } from "./textTypography";
 import { rulerSideOf, rulerUnitOf } from "./rulerModel";
 /**
@@ -63,6 +64,12 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
 export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | undefined): void {
   const data = raw ? (migrateSceneData(raw) as SerializedScene) : raw;
   if (!data) return;
+  const metaBefore = sceneObjectCounts(scene);
+  try { appendSceneObjectsInner(scene, data); }
+  finally { restoreObjectMeta(scene, data, metaBefore); }
+}
+
+function appendSceneObjectsInner(scene: Scene, data: SerializedScene): void {
 
   for (const s of data.freeStrokes || []) {
     const stroke = scene.createFreeStroke(s.points || [], {
