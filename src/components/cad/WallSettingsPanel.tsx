@@ -244,6 +244,20 @@ export const WallSettingsPanel: React.FC<Props> = ({ app, projectId }) => {
           />
         </div>
 
+        <div>
+          <label>Wandhöhe (m)</label>
+          <input
+            type="number" step="0.01" min="0"
+            value={selectedWall ? (selectedWall.heightM ?? 2.5) : (s.heightM ?? 2.5)}
+            onChange={e => {
+              const n = parseFloat(e.target.value);
+              const h = Number.isFinite(n) ? Math.max(0, n) : 0;
+              if (selectedWall) updateAllSelected(w => { w.heightM = h; });
+              else update({ heightM: h });
+            }}
+          />
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <label className="flex min-w-0 flex-col gap-1">
             <span className="text-[10px] text-muted-foreground">Linienfarbe</span>
