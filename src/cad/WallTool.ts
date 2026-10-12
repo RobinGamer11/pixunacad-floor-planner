@@ -32,6 +32,8 @@ export interface WallToolSettings {
   patternAlignToWall: boolean;
   /** Freie Muster-Drehung in Grad (-180..180). */
   patternAngleDeg: number;
+  /** Wandhöhe in Metern (reine Information). */
+  heightM?: number;
 }
 
 
@@ -220,6 +222,7 @@ export class WallTool {
       patternScale: this.settings.patternScale,
       patternAlignToWall: this.settings.patternAlignToWall,
       patternAngleDeg: this.settings.patternAngleDeg,
+      heightM: this.settings.heightM ?? 2.5,
     });
     this._runConnectionPipeline(newWall);
     this.app.refreshLabelUI?.();

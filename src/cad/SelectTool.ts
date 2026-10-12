@@ -1564,6 +1564,7 @@ export class SelectTool {
         patternAlignToWall: wall.patternAlignToWall,
         patternAngleDeg: (wall as any).patternAngleDeg ?? 0,
         bulges: bulB,
+        heightM: wall.heightM,
       });
 
       wall.corners = cornersA;

@@ -231,7 +231,6 @@ export const StrokeEffectsSettings: React.FC<{
 
   const roughenBlock = (
     <div>
-      <div className="mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">AUFRAUEN</div>
       <SettingsToggleButton
         label="Aufrauen"
         active={!!roughen.enabled}

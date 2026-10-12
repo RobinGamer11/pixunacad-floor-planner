@@ -111,6 +111,7 @@ function snapHatch(h: Hatch): HatchSnap {
     closed: (h as any).closed !== false, shapeMode: (h as any).shapeMode,
     midpointSnap: !!(h as any).midpointSnap, divisionSnap: (h as any).divisionSnap,
     displayGradient: copyDisplayGradient((h as any).displayGradient),
+    heightM: (h as any).heightM,
     ...copyStrokeEffects(h) } as any;
 }
 function snapDimension(d: Dimension): DimensionSnap {
@@ -191,7 +192,7 @@ function snapWallObj(o: any): WallSnap {
     wallKind: o.kind, thicknessM: o.thicknessM, referenceSide: o.referenceSide,
     color: o.color, fillColor: o.fillColor, priority: o.priority, labelId: o.labelId,
     patternId: o.patternId, patternScale: o.patternScale, patternAlignToWall: o.patternAlignToWall,
-    patternAngleDeg: o.patternAngleDeg ?? 0,
+    patternAngleDeg: o.patternAngleDeg ?? 0, heightM: o.heightM,
     bulges: Array.isArray(o.bulges) ? [...o.bulges] : undefined } as any;
 }
 
@@ -393,6 +394,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
           patternEnabled: it.patternEnabled, patternId: it.patternId, patternScale: it.patternScale, patternAngleDeg: it.patternAngleDeg, patternSkewDeg: it.patternSkewDeg, patternStretch: it.patternStretch, patternOffsetX: it.patternOffsetX, patternOffsetY: it.patternOffsetY,
           bulges: (it as any).bulges, holeBulges: (it as any).holeBulges,
           displayGradient: (it as any).displayGradient,
+          heightM: (it as any).heightM,
           ...copyStrokeEffects(it) });
       if (o) created.push({ kind: "hatch", id: o.id });
     } else if (it.kind === "dimension") {
@@ -419,6 +421,7 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
         priority: it.priority, labelId: it.labelId,
         patternId: it.patternId, patternScale: it.patternScale, patternAlignToWall: it.patternAlignToWall,
         patternAngleDeg: it.patternAngleDeg ?? 0,
+        heightM: (it as any).heightM,
       });
       if (o) { newWallIds.set(idx, o.id); created.push({ kind: "wall", id: o.id }); }
     } else if (it.kind === "free") {

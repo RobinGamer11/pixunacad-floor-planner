@@ -832,6 +832,7 @@ export class CadApp {
         patternOrigin: (h as any).patternOrigin ? { ...(h as any).patternOrigin } : null,
         patternRotateWithShape: (h as any).patternRotateWithShape !== false,
         displayGradient: copyDisplayGradient((h as any).displayGradient),
+        heightM: (h as any).heightM,
         bulges: [...((h as any).bulges || [])],
         holeBulges: ((h as any).holeBulges || []).map((l: number[]) => [...l]),
         isPolygon: (h as any).isPolygon === true,
@@ -854,6 +855,7 @@ export class CadApp {
         cornerAnchors: (w.cornerAnchors || []).map(a => a ? { ...a } : null),
 
         customName: w.customName,
+        heightM: (w as any).heightM,
         color: w.color,
         fillColor: w.fillColor,
         labelId: w.labelId,
@@ -1952,6 +1954,7 @@ export class CadApp {
       patternAngleDeg: this.defaultHatchPatternAngleDeg,
       patternSkewDeg: this.defaultHatchPatternSkewDeg, patternStretch: this.defaultHatchPatternStretch, patternOffsetX: 0, patternOffsetY: 0, patternRotateWithShape: this.defaultHatchPatternRotateWithShape,
       displayGradient: copyDisplayGradient((this as any).defaultHatchDisplayGradient),
+      heightM: (this as any).defaultHatchHeightM ?? 0,
       labelId: this.activeDrawLabelId || Defaults.defaultLabelId,
       areaLabel: {
         show: this.defaultAreaShow, textColor: Defaults.areaTextColor, fontSizePx: Defaults.areaFontSizePx,
