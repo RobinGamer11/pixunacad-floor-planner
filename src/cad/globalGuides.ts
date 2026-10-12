@@ -132,13 +132,14 @@ export class GlobalGuides {
   /** Bester Snap auf Hilfslinien-Schnittpunkte / Achsen (oder null). */
   findSnap(mouseS: Vec2, mouseW: Vec2, cam: Camera): any | null {
     const s = this._s;
-    if (!s.axes.size) return null;
+    if (!s.axes.size && !s.markers.size) return null;
     const defs = [...s.axes.values()];
     let best: any = null;
     let bestPx = Infinity;
 
     const pts: Vec2[] = [];
     for (const g of s.groups) pts.push(...g.anchors);
+    for (const m of s.markers.values()) pts.push(m.point);
     for (let i = 0; i < defs.length; i++) {
       for (let j = i + 1; j < defs.length; j++) {
         const ip = lineLineIntersectionInfinite(defs[i].point, defs[i].dir, defs[j].point, defs[j].dir);
