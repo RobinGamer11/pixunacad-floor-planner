@@ -35,7 +35,7 @@ export function colorLuminance(color: string): number | null {
   let hex = m[1];
   if (hex.length === 4) hex = hex.slice(0, 3);
   else if (hex.length === 8) hex = hex.slice(0, 6);
-  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join(""));
+  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
   if (hex.length !== 6) return null;
   const n = Number.parseInt(hex, 16);
   if (!Number.isFinite(n)) return null;
