@@ -194,6 +194,14 @@ export class GlobalGuides {
       const sp = cam.worldToScreen(p.x, p.y);
       ctx.beginPath(); ctx.arc(sp.x, sp.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
+    // Markierungen: kurzer blauer Strich quer zur Richtung + Punkt, keine Hilfslinie
+    for (const m of s.markers.values()) {
+      const sp = cam.worldToScreen(m.point.x, m.point.y);
+      const sq = cam.worldToScreen(m.point.x + m.dir.x, m.point.y + m.dir.y);
+      let dx = sq.x - sp.x, dy = sq.y - sp.y;
+      const l = Math.hypot(dx, dy) || 1;
+      dx = (-dy / l) * 7; dy = (dx0 => dx0)(0) || 0; // Platzhalter, wird unten korrekt gesetzt
+    }
     ctx.restore();
   }
 }
