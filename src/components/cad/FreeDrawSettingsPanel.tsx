@@ -4,6 +4,7 @@ import type { MiniCad } from "@/cad/embed/MiniCad";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
+import { previewSurface } from "@/components/cad/previewSurface";
 
 type FreeStyle = "solid" | "image";
 
@@ -423,14 +424,17 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
     const ctx = c.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Hintergrund — folgt dem Design (auch im Nachtmodus lesbar)
     const cssVar = (name: string, fallback: string) => {
       const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
       return v ? `hsl(${v})` : fallback;
     };
-    ctx.fillStyle = cssVar("--card", "#ffffff");
+    // Hintergrund — folgt dem Design; die Linienvorschau bekommt den
+    // kontrastreicheren Untergrund, damit auch dunkle Linien sichtbar bleiben.
+    const design: PreviewSurface = { bg: cssVar("--card", "#ffffff"), border: cssVar("--hairline", "#d1d5db") };
+    const surface = props.style === "image" ? design : previewSurface(props.color, design);
+    ctx.fillStyle = surface.bg;
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = cssVar("--hairline", "#d1d5db");
+    ctx.strokeStyle = surface.border;
     ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
 
 
@@ -483,7 +487,7 @@ const FreeDrawPreview: React.FC<PreviewProps> = (props) => {
         }
       }
     } else if (style === "image") {
-      ctx.fillStyle = "hsl(var(--cad-toolbar-muted))";
+      ctx.fillStyle = cssVar("--cad-toolbar-muted", "#8a8f98");
       ctx.font = "11px system-ui";
       ctx.textAlign = "center";
       ctx.fillText("Bild laden für Vorschau", w / 2, h / 2 + 4);
