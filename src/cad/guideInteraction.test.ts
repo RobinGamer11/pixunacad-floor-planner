@@ -58,14 +58,19 @@ describe("Zentrale Hilfslinien", () => {
 });
 
 describe("Mittelpunkte per Rechtsklick", () => {
-  it("zwei Punkte erzeugen einen fangbaren Mittelpunkt", () => {
+  it("zwei Punkte erzeugen nur einen Markierungsstrich, R-Klick darauf die Hilfslinie", () => {
     const g = new GlobalGuides();
     const c = new GuideInteractionController(g, { findBestSnap: (_s: any, w: any) => ({ type: "POINT", world: w }) }, cam);
     c.handleRightClick({ x: 0, y: 0 }, { x: 0, y: 0 });
     c.handleRightClick({ x: 400, y: 0 }, { x: 4, y: 0 });
-    expect(g.groups.some((x) => x.key.includes("mid:") && x.anchors[0].x === 2)).toBe(true);
+    // Mittelpunkt bei x=2: nur Markierung, keine Gruppe/Achse
+    expect(g.markers.some((m) => m.key.includes("mid:") && m.point.x === 2)).toBe(true);
+    expect(g.groups.some((x) => x.key.includes("mid:"))).toBe(false);
+    // R-Klick auf den Mittelpunkt: Markierung weg, Hilfslinie da, neue Teilstriche
     c.handleRightClick({ x: 200, y: 0 }, { x: 2, y: 0 });
-    const mids = g.groups.filter((x) => x.key.includes("mid:")).map((x) => x.anchors[0].x).sort();
-    expect(mids).toEqual([1, 2, 3]);
+    expect(g.markers.some((m) => m.point.x === 2)).toBe(false);
+    expect(g.groups.some((x) => x.key.startsWith("pt:2.000000"))).toBe(true);
+    const xs = g.markers.filter((m) => m.key.includes("mid:")).map((m) => m.point.x).sort();
+    expect(xs).toEqual([1, 3]);
   });
 });

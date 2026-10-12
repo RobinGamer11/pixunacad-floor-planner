@@ -8,9 +8,12 @@ export type GuideAxis = { key: string; point: Vec2; dir: Vec2 };
 /** Ein Rechtsklick erzeugt genau eine Gruppe; Gruppen referenzieren Achsen. */
 export type GuideGroup = { key: string; axisKeys: string[]; anchors: Vec2[] };
 
-type ContextState = { groups: GuideGroup[]; axes: Map<string, GuideAxis>; refs: Map<string, number> };
+/** Kurzer, fangbarer Markierungsstrich (z. B. Mittelpunkt) – keine unendliche Achse. */
+export type GuideMarker = { key: string; point: Vec2; dir: Vec2 };
 
-const emptyState = (): ContextState => ({ groups: [], axes: new Map(), refs: new Map() });
+type ContextState = { groups: GuideGroup[]; axes: Map<string, GuideAxis>; refs: Map<string, number>; markers: Map<string, GuideMarker> };
+
+const emptyState = (): ContextState => ({ groups: [], axes: new Map(), refs: new Map(), markers: new Map() });
 
 /** Normierte, vorzeichen-eindeutige Richtung. */
 export function canonicalDir(dir: Vec2): Vec2 {
@@ -108,6 +111,19 @@ export class GlobalGuides {
     this.toggleGroup(`line:${axisKey(p, dir)}`, [{ point: p, dir }]);
   }
 
+  /** Setzt/entfernt einen kurzen Markierungsstrich (fangbar, aber keine Hilfslinie). */
+  toggleMarker(key: string, point: Vec2, dir: Vec2): boolean {
+    const s = this._s;
+    if (s.markers.has(key)) { s.markers.delete(key); return false; }
+    if (Math.hypot(dir.x, dir.y) < 1e-12) return false;
+    s.markers.set(key, { key, point: v(point.x, point.y), dir: canonicalDir(dir) });
+    return true;
+  }
+
+  removeMarker(key: string): void { this._s.markers.delete(key); }
+
+  get markers(): GuideMarker[] { return [...this._s.markers.values()]; }
+
   /** Setzt/entfernt H+V-Achsen an einem Weltpunkt. */
   toggleAt(p: Vec2): void {
     this.toggleGroup(`pt:${p.x.toFixed(6)}_${p.y.toFixed(6)}`, [{ point: p, dir: v(1, 0) }, { point: p, dir: v(0, 1) }], [p]);
@@ -116,13 +132,14 @@ export class GlobalGuides {
   /** Bester Snap auf Hilfslinien-Schnittpunkte / Achsen (oder null). */
   findSnap(mouseS: Vec2, mouseW: Vec2, cam: Camera): any | null {
     const s = this._s;
-    if (!s.axes.size) return null;
+    if (!s.axes.size && !s.markers.size) return null;
     const defs = [...s.axes.values()];
     let best: any = null;
     let bestPx = Infinity;
 
     const pts: Vec2[] = [];
     for (const g of s.groups) pts.push(...g.anchors);
+    for (const m of s.markers.values()) pts.push(m.point);
     for (let i = 0; i < defs.length; i++) {
       for (let j = i + 1; j < defs.length; j++) {
         const ip = lineLineIntersectionInfinite(defs[i].point, defs[i].dir, defs[j].point, defs[j].dir);
@@ -156,7 +173,7 @@ export class GlobalGuides {
   /** Zeichnet Hilfslinien + Anker (Screen-Space). */
   draw(ctx: CanvasRenderingContext2D, cam: Camera, _vw: number, _vh: number): void {
     const s = this._s;
-    if (!s.axes.size) return;
+    if (!s.axes.size && !s.markers.size) return;
     ctx.save();
     // Sichtbar auf hellem und dunklem Grund (vorher 0.38 → teils unsichtbar)
     ctx.globalAlpha = 1;
@@ -176,6 +193,21 @@ export class GlobalGuides {
     for (const g of s.groups) for (const p of g.anchors) {
       const sp = cam.worldToScreen(p.x, p.y);
       ctx.beginPath(); ctx.arc(sp.x, sp.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    // Markierungen: kurzer blauer Strich quer zur Richtung + Punkt, keine Hilfslinie
+    ctx.strokeStyle = "rgba(30,136,255,0.85)";
+    ctx.lineWidth = 1.25;
+    for (const m of s.markers.values()) {
+      const sp = cam.worldToScreen(m.point.x, m.point.y);
+      const sq = cam.worldToScreen(m.point.x + m.dir.x, m.point.y + m.dir.y);
+      let ux = sq.x - sp.x, uy = sq.y - sp.y;
+      const l = Math.hypot(ux, uy) || 1;
+      ux /= l; uy /= l;
+      const nx = -uy * 7, ny = ux * 7;
+      ctx.beginPath();
+      ctx.moveTo(sp.x - nx, sp.y - ny); ctx.lineTo(sp.x + nx, sp.y + ny);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, 3, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }

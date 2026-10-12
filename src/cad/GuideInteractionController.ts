@@ -119,8 +119,8 @@ export class GuideInteractionController {
     this._mids.set(key, [a, b]);
     if (this.guides.hasGroup(key)) return;
     const d = v(b.x - a.x, b.y - a.y);
-    // Fangbarer Mittelpunkt mit kurzer Achse quer zur Verbindung
-    this.guides.toggleGroup(key, [{ point: m, dir: v(-d.y, d.x) }], [m]);
+    // Nur fangbarer Markierungsstrich – die Hilfslinie entsteht erst per R-Klick
+    this.guides.toggleMarker(key, m, d);
   }
 
   private _onPoint(p: Vec2) {
@@ -135,7 +135,12 @@ export class GuideInteractionController {
   handleRightClick(mouseS: Vec2, mouseW: Vec2, ctx: GuideToolContext = { anchor: null }): boolean {
     const target = findGuideTarget(this.topo, this.cam, mouseS, mouseW, ctx);
     if (!target) { this._last = null; return false; }
-    if (target.kind === "point") this._onPoint(target.world); else this._last = null;
+    if (target.kind === "point") {
+      // Markierungsstrich (Mittelpunkt) angeklickt: Strich weg, Hilfslinie her
+      const midKey = `mid:${this.guides.contextKey}:${target.world.x.toFixed(6)}_${target.world.y.toFixed(6)}`;
+      if (this._mids.has(midKey)) this.guides.removeMarker(midKey);
+      this._onPoint(target.world);
+    } else this._last = null;
     const { key, axes, anchors } = guideAxesFor(target, ctx.anchor);
     if (this.guides.hasGroup(key)) { this.guides.toggleGroup(key, []); return true; }
     this.guides.toggleGroup(key, axes, anchors);
