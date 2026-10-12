@@ -8,9 +8,12 @@ export type GuideAxis = { key: string; point: Vec2; dir: Vec2 };
 /** Ein Rechtsklick erzeugt genau eine Gruppe; Gruppen referenzieren Achsen. */
 export type GuideGroup = { key: string; axisKeys: string[]; anchors: Vec2[] };
 
-type ContextState = { groups: GuideGroup[]; axes: Map<string, GuideAxis>; refs: Map<string, number> };
+/** Kurzer, fangbarer Markierungsstrich (z. B. Mittelpunkt) – keine unendliche Achse. */
+export type GuideMarker = { key: string; point: Vec2; dir: Vec2 };
 
-const emptyState = (): ContextState => ({ groups: [], axes: new Map(), refs: new Map() });
+type ContextState = { groups: GuideGroup[]; axes: Map<string, GuideAxis>; refs: Map<string, number>; markers: Map<string, GuideMarker> };
+
+const emptyState = (): ContextState => ({ groups: [], axes: new Map(), refs: new Map(), markers: new Map() });
 
 /** Normierte, vorzeichen-eindeutige Richtung. */
 export function canonicalDir(dir: Vec2): Vec2 {
