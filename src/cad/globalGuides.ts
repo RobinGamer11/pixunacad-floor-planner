@@ -195,12 +195,19 @@ export class GlobalGuides {
       ctx.beginPath(); ctx.arc(sp.x, sp.y, 4.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     }
     // Markierungen: kurzer blauer Strich quer zur Richtung + Punkt, keine Hilfslinie
+    ctx.strokeStyle = "rgba(30,136,255,0.85)";
+    ctx.lineWidth = 1.25;
     for (const m of s.markers.values()) {
       const sp = cam.worldToScreen(m.point.x, m.point.y);
       const sq = cam.worldToScreen(m.point.x + m.dir.x, m.point.y + m.dir.y);
-      let dx = sq.x - sp.x, dy = sq.y - sp.y;
-      const l = Math.hypot(dx, dy) || 1;
-      dx = (-dy / l) * 7; dy = (dx0 => dx0)(0) || 0; // Platzhalter, wird unten korrekt gesetzt
+      let ux = sq.x - sp.x, uy = sq.y - sp.y;
+      const l = Math.hypot(ux, uy) || 1;
+      ux /= l; uy /= l;
+      const nx = -uy * 7, ny = ux * 7;
+      ctx.beginPath();
+      ctx.moveTo(sp.x - nx, sp.y - ny); ctx.lineTo(sp.x + nx, sp.y + ny);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, 3, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
