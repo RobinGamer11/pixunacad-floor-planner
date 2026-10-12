@@ -1,3 +1,4 @@
+import { attachObjectMeta } from "./objectMeta";
 import { emptyFilterState, objectMatchesFilter, type SelectionFilterState } from "./selectionFilter";
 import { toast } from "sonner";
 import { pageGuideSnapGeometry, paperMmToWorld } from "./pageGuides";
@@ -809,6 +810,12 @@ export class CadApp {
 
   /* ---- History (Undo / Redo) ---- */
   private _serializeOneScene(scene: Scene) {
+    const out = this._serializeOneSceneRaw(scene);
+    attachObjectMeta(out, scene);
+    return out;
+  }
+
+  private _serializeOneSceneRaw(scene: Scene) {
     return {
       segments: scene.segments.map(s => ({
         id: s.id, a: { x: s.a.x, y: s.a.y }, b: { x: s.b.x, y: s.b.y },

@@ -39,10 +39,10 @@ Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; kein
 - Export-Bedienzustände sind lokal/flüchtig, nie Cloud/Undo/Snapshot/localStorage; Fangpunkte von Hintergrundseiten nur über `TopologyEngine.tracingSnapScenes`.
 - Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt nur den Projekt-Payload (nie CAD/Export).
 - Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
-- Treppen-Knöpfe sind DOM über der Zeichenfläche, nie Geometrie; Cursor-Reset zentral in `CadApp.setTool`.
-- Export-Ausschnitte transformieren als Sitzung in `PlanController` (`_drag.preview`); Projection erst bei ✓/Enter geändert.
+- Treppen-Knöpfe sind DOM, nie Geometrie; Cursor-Reset in `CadApp.setTool`.
+- Export-Ausschnitte: Sitzung in `PlanController` (`_drag.preview`), Projection erst bei ✓/Enter.
 - Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges`.
-- Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M` je Auftritt) – Podeste wachsen nie automatisch, nur durch bewusste Eingabe.
+- Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M`); Podeste wachsen nie automatisch.
 
 ## Hilfslinien
 - Hilfslinien-Geometrie (Punkte, Kanten, anliegende Achsen) liefert nur `src/cad/guideGeometry.ts` aus echter Objektgeometrie (über `TopologyEngine.guideGeometry`) – nie Probeabfragen, nie Werkzeug-Sonderlogik.
@@ -52,3 +52,5 @@ Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; kein
 ## Speicher
 - Gezeichnetes nur Vektor (Pixel nur in Importen). Lokaler Stand nur via `cad/persist/localScenePersist.ts`, Anhänge nur via `lib/storageQuota.ts` (Grenzen = SQL v2).
 - Auswahlfilter-Eigenschaften nur via `registerFilterProperty` (`cad/selectionFilter.ts`); Treffer in `marqueeSelectedIds`, Werte lokal.
+
+- Objektname/-ID/-Beschreibung nur über `cad/objectMeta.ts` (Serialisierung/Laden gekoppelt, Kopien ohne ID).

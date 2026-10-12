@@ -35,6 +35,7 @@ import { ProjectFilePickerDialog } from "@/components/cad/ProjectFilePickerDialo
 import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
+import { ObjectInfoTabs, type ObjectInfoTab } from "@/components/cad/ObjectInfoTabs";
 import { LineModeSelect } from "@/components/cad/LineModeSelect";
 
 
@@ -236,6 +237,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const hatchAlphaRef = useRef<HTMLInputElement>(null);
   const areaShowRef = useRef<HTMLInputElement>(null);
   const areaSettingsGroupRef = useRef<HTMLDivElement>(null);
+  const [objInfoTab, setObjInfoTab] = useState<ObjectInfoTab>("darstellung");
+  const [objInfoHas, setObjInfoHas] = useState(false);
   const areaBorderToggleRef = useRef<HTMLInputElement>(null);
   const areaBorderColorRef = useRef<HTMLInputElement>(null);
   const areaBorderWidthRef = useRef<HTMLInputElement>(null);
@@ -2217,8 +2220,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         </div>
 
         <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
+        {!gridPanelOpen && !selectionFilterOpen && appRef.current && (
+          <ObjectInfoTabs app={appRef.current} tab={objInfoTab} onTab={setObjInfoTab} onHasObject={setObjInfoHas} />
+        )}
         {/* Settings area (scrollable) — kompakter, keine horizontale Overflow-Falle. */}
-        <div className={`flex-1 min-h-0 p-2 w-full ${gridPanelOpen || selectionFilterOpen ? "cad-grid-only" : ""}`}>
+        <div
+          className={`flex-1 min-h-0 p-2 w-full ${gridPanelOpen || selectionFilterOpen ? "cad-grid-only" : ""}`}
+          style={{ display: objInfoHas && objInfoTab === "infos" && !gridPanelOpen && !selectionFilterOpen ? "none" : undefined }}
+        >
           {/* Auswahlfilter („Alles auswählen“) – solange offen, einzige Ansicht */}
           {selectionFilterOpen && appRef.current && !gridPanelOpen && (
             <SelectionFilterPanel app={appRef.current} />
