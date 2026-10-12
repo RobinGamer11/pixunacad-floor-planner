@@ -138,8 +138,11 @@ export function setObjectCode(scenes: any[], kind: string, obj: any, raw: string
 
 /** Name ändern; die ID bleibt erhalten, außer sie wäre mit dem neuen Namen doppelt. */
 export function setObjectName(scenes: any[], kind: string, obj: any, name: string) {
+  const before = objectDisplayName(kind, obj);
   obj.objName = name;
-  if (obj.objCode && idTaken(scenes, obj, objectDisplayName(kind, obj), obj.objCode)) {
+  const after = objectDisplayName(kind, obj);
+  // Neuer Name → Nummerierung dieses Namens neu bestimmen (unbenutzt = A0001)
+  if (obj.objCode && (before !== after || idTaken(scenes, obj, after, obj.objCode))) {
     obj.objCode = nextFreeCode(scenes, obj, objectDisplayName(kind, obj));
   }
 }
