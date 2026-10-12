@@ -123,6 +123,7 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
       patternSkewDeg: h.patternSkewDeg, patternStretch: h.patternStretch, patternOffsetX: h.patternOffsetX, patternOffsetY: h.patternOffsetY,
       patternOrigin: h.patternOrigin, patternRotateWithShape: h.patternRotateWithShape,
       displayGradient: h.displayGradient,
+      heightM: h.heightM,
       bulges: Array.isArray(h.bulges) ? h.bulges : undefined,
       holeBulges: Array.isArray(h.holeBulges) ? h.holeBulges : undefined,
       strokePattern: h.strokePattern, roughen: h.roughen, appearanceSeed: h.appearanceSeed,
@@ -148,6 +149,7 @@ export function appendSceneObjects(scene: Scene, raw: SerializedScene | null | u
       patternAlignToWall: !!w.patternAlignToWall,
       patternAngleDeg: Number.isFinite(w.patternAngleDeg) ? w.patternAngleDeg : 0,
       bulges: Array.isArray(w.bulges) ? w.bulges : undefined,
+      heightM: w.heightM,
     });
     if (w.id) (wall as any).id = w.id;
     if (w._stickerEditOwnerId) (wall as any)._stickerEditOwnerId = w._stickerEditOwnerId;

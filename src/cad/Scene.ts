@@ -143,6 +143,8 @@ export class Hatch {
   appearanceSeed!: number;
   /** Optionaler Transparenzverlauf für Füllung + Muster (reine Anzeige). */
   displayGradient?: DisplayGradient;
+  /** Reine Information: Objekthöhe in Metern (3D-Eigenschaft, 0 = flach). */
+  heightM = 0;
   _stickerEditOwnerId?: string | null;
 
   constructor({ id, points, holes, fillColor, strokeColor, fillAlphaPct, strokeWidthPx, labelId, areaLabel,
@@ -763,6 +765,8 @@ export class Wall {
 
   /** Kantenwölbung je Bezugs-Segment (index-parallel zu corners[i] → corners[i+1]). */
   bulges: number[];
+  /** Reine Information: Wandhöhe in Metern. */
+  heightM = 2.5;
   _stickerEditOwnerId?: string | null;
 
   constructor(opts: {
@@ -1569,6 +1573,7 @@ export class Scene {
     patternOrigin?: { x: number; y: number } | null; patternRotateWithShape?: boolean;
     bulges?: number[]; holeBulges?: number[][];
     displayGradient?: Partial<DisplayGradient>;
+    heightM?: number;
   } & StrokeEffectsInit = {}) {
     const hatch = new Hatch({
       id: this._makeId(), points, holes: style.holes,
@@ -1584,6 +1589,7 @@ export class Scene {
       displayGradient: style.displayGradient,
     });
 
+    if (Number.isFinite(style.heightM)) hatch.heightM = Math.max(0, style.heightM as number);
     hatch._stickerEditOwnerId = this._currentEditOwnerId;
     this.hatches.push(hatch);
     this._hatchIdMap.set(hatch.id, hatch);
@@ -1745,8 +1751,11 @@ export class Scene {
     patternId?: string; patternScale?: number; patternAlignToWall?: boolean;
     patternAngleDeg?: number;
     bulges?: number[];
+    heightM?: number;
   }) {
-    const w = new Wall({ id: this._makeId(), ...opts });
+    const { heightM, ...wallOpts } = opts;
+    const w = new Wall({ id: this._makeId(), ...wallOpts });
+    if (Number.isFinite(heightM)) w.heightM = Math.max(0, heightM as number);
     w._stickerEditOwnerId = this._currentEditOwnerId;
     this.walls.push(w);
     this.markWallsDirty();
@@ -1834,6 +1843,7 @@ export class Scene {
       corners: cornersB, customName: "", color: wall.color, fillColor: wall.fillColor, labelId: newLabelIdForB || wall.labelId,
       bulges: bulgesB,
     });
+    wA.heightM = wall.heightM; wB.heightM = wall.heightM;
     wA._stickerEditOwnerId = wall._stickerEditOwnerId;
     wB._stickerEditOwnerId = wall._stickerEditOwnerId;
     const idx = this.walls.indexOf(wall);
