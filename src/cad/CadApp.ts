@@ -1261,8 +1261,8 @@ export class CadApp {
     const ok = this.runAction(() => {
       first.points = geo.outer;
       first.holes = geo.holes;
-      first.bulges = [];
-      first.holeBulges = geo.holes.map(() => []);
+      first.bulges = geo.outerBulges;
+      first.holeBulges = geo.holeBulges;
       this.scene.removeHatchesByIds(rest.map((h: any) => h.id));
       this.selectTool.marqueeSelectedIds = [];
       this.setSelection({ type: SelectionType.HATCH, hatchId: first.id, pointIndex: null } as any);
