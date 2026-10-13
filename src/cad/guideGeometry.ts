@@ -23,7 +23,7 @@ export interface GuideGeometrySources {
   scene: any;
   isVisible: (labelId: string | undefined) => boolean;
   /** Bereits aufgelöste Weltszenen (Bibliothek, Transparenzpause, Export-Ausschnitte). */
-  extraScenes?: { id: string; type: GuideSourceType; scene: any }[];
+  extraScenes?: { id: string; type: GuideSourceType; scene: any; frame?: Vec2[]; extremes?: Vec2[] }[];
   /** Temporäre Kanten (Vorschau / Exportrand). */
   extraEdges?: [Vec2, Vec2][];
   /** Temporäre Punkte (laufende Zeichnung). */
@@ -94,7 +94,13 @@ function addScene(b: Builder, scn: any, vis: (l: any) => boolean, forced?: Guide
 export function buildGuideGeometry(src: GuideGeometrySources): GuideGeometry {
   const b = new Builder();
   addScene(b, src.scene, src.isVisible);
-  for (const x of src.extraScenes || []) addScene(b, x.scene, src.isVisible, x.type, x.id);
+  for (const x of src.extraScenes || []) {
+    addScene(b, x.scene, src.isVisible, x.type, x.id);
+    if (x.type === "library" && x.frame) {
+      b.ring(x.frame, x.id, "library");
+      for (const p of x.extremes || []) b.point(p, x.id, "library");
+    }
+  }
   for (const [a, c] of src.extraEdges || []) b.edge(a, c, "extra", "extra");
   for (const p of src.extraPoints || []) b.point(p, "extra", "extra");
   return b.result();
@@ -103,8 +109,12 @@ export function buildGuideGeometry(src: GuideGeometrySources): GuideGeometry {
 /** Anliegende Achsen an einem Weltpunkt – aus echter Geometrie (Endpunkte + Punkte auf Kanten). */
 export function incidentDirectionsAt(g: GuideGeometry, p: Vec2, tolW: number): Vec2[] {
   const out = new Map<string, Vec2>();
-  for (const q of g.points) if (Math.hypot(q.world.x - p.x, q.world.y - p.y) <= tolW) for (const d of q.incidentDirections) out.set(dirKey(d), d);
+  // Bibliotheksdetails (z. B. Baumkrone) liefern weiterhin Fangpunkte/Kanten,
+  // aber keine Fächer aus sämtlichen anliegenden Segmentrichtungen.
+  // Rechtsklick-Punkte behalten die gemeinsamen horizontalen/vertikalen Achsen.
+  for (const q of g.points) if (q.sourceType !== "library" && Math.hypot(q.world.x - p.x, q.world.y - p.y) <= tolW) for (const d of q.incidentDirections) out.set(dirKey(d), d);
   for (const e of g.edges) {
+    if (e.sourceType === "library") continue;
     const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, L = dx * dx + dy * dy;
     const t = ((p.x - e.a.x) * dx + (p.y - e.a.y) * dy) / L;
     if (t < -1e-6 || t > 1 + 1e-6) continue;
