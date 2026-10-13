@@ -51,6 +51,11 @@ function snapshotToSvg(snap: LibraryGeometrySnapshot): string {
     }
     case "hatch": {
       const outer: any[] = d.points || [];
+      if (d.isPolygon === true && d.closed === false) {
+        if (outer.length < 2) return "";
+        const sw0 = Math.max(0.2, (d.strokeWidthPx ?? 1) * 0.35);
+        return `<polyline points="${pts(outer)}" fill="none" stroke="${esc(d.strokeColor || "#000000")}" stroke-width="${n(sw0)}"/>`;
+      }
       if (outer.length < 3) return "";
       const holes: any[][] = d.holes || [];
       const fill = d.fillColor && d.fillAlphaPct > 0 ? esc(d.fillColor) : "none";
