@@ -28,7 +28,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Impressum/Datenschutz: keine erfundenen Angaben; Platzhalter klar kennzeichnen.
 
 ## 6. Abschlussmeldung
-Änderungen, Dateien, Tests, Build, Push-Status, Commit-Hash; Ende mit PowerShell-Befehl für den nächsten Schritt.
+Änderungen, Dateien, Tests, Build, Push-Status, Commit; Ende mit PowerShell-Befehl.
 
 ## Architekturregeln
 - Öffnen/Laden folgt nur `decideOpen` in `src/lib/cloudProjectState.ts` – Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
@@ -40,7 +40,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt nur den Projekt-Payload (nie CAD/Export).
 - Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
 - Treppen-Knöpfe = DOM, nie Geometrie; Cursor-Reset in `CadApp.setTool`.
-- Export-Ausschnitte: Sitzung in `PlanController` (`_drag.preview`), Projection erst bei ✓/Enter.
+- Export-Ausschnitt: Sitzung in `PlanController` (`_drag.preview`), Projection erst bei ✓/Enter.
 - Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges`.
 - Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M`); Podeste wachsen nie automatisch.
 
