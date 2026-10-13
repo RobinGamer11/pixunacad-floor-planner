@@ -73,6 +73,7 @@
     --surface-muted: 36 25% 93%;
     --surface-card: 0 0% 100%;
     --beige-soft: 34 45% 86%;
+    --notice-beige: 34 38% 42%;
     --ink: 222 20% 12%;
     --ink-soft: 222 12% 38%;
     --accent-gold: 32 55% 52%;
@@ -142,6 +143,7 @@
     --surface-card: 222 16% 17%;
     --surface-strong: 222 14% 23%;
     --beige-soft: 222 12% 26%;
+    --notice-beige: 36 45% 78%;
     --ink: 210 20% 93%;
     --ink-soft: 215 12% 68%;
     --accent-gold: 38 62% 62%;

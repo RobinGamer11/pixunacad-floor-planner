@@ -97,7 +97,7 @@ export const EraserModeSelect: React.FC<Props> = ({ app, rasterSelection = null 
         })}
       </div>
       {(mode === "smooth" || !smoothAllowed) && (
-        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-snug" style={{ color: "hsl(var(--beige-soft))" }}>
+        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-snug" style={{ color: "hsl(var(--notice-beige))" }}>
           <TriangleAlert size={12} className="shrink-0" />
           <span>Weich nur bei Bilddateien (PNG/JPG).</span>
         </div>
