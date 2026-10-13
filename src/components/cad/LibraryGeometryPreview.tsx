@@ -36,10 +36,11 @@ export default function LibraryGeometryPreview({ geometry, size = 40, className,
     const scale = Math.min((size - pad * 2) / w, (size - pad * 2) / h);
     const cx = (b.minX + b.maxX) / 2;
     const cy = (b.minY + b.maxY) / 2;
-    // Y-Achse spiegeln: Weltkoordinaten zeigen nach oben, Canvas nach unten.
+    // Weltkoordinaten haben dieselbe Y-Richtung wie die Zeichenfläche (nach unten),
+    // daher keine Spiegelung – Vorschau entspricht 1:1 dem gesetzten Objekt.
     const tx = (p: { x: number; y: number }) => ({
       x: size / 2 + (p.x - cx) * scale,
-      y: size / 2 - (p.y - cy) * scale,
+      y: size / 2 + (p.y - cy) * scale,
     });
 
     const stroke = "hsl(var(--cad-toolbar-fg, 0 0% 90%))";
