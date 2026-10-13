@@ -140,6 +140,7 @@ export class Input {
   /** Optional DOM annotation mode: navigation stays in Input, taps never draw. */
   canvasTapHandler: ((sx: number, sy: number) => void) | null = null;
   private _annotationTap: { id: number; x: number; y: number } | null = null;
+  cancelCanvasTap() { this._annotationTap = null; }
   /**
    * Laufende Kamerageste (zwei Finger): ab dem zweiten Finger bis alle Finger
    * gelöst sind. Währenddessen werden weder Punkte gesetzt noch Aktionen
@@ -192,6 +193,8 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("pointerleave", onPointerLeave));
 
     const onPointerMove = (e: PointerEvent) => {
+      const tap = this._annotationTap;
+      if (tap?.id === e.pointerId && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 6) this._annotationTap = null;
       // Finger einer Kamerageste bewegen nie den Zeichen-Cursor.
       if (e.pointerType === "touch" && this._touches.has(e.pointerId) && (this.cameraGesture || this._touches.size >= 2)) {
         this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -284,7 +287,7 @@ export class Input {
       // Position als "vorgemerkten Punkt" speichern (gelbes Visier + gelbe
       // Hervorhebung von L-Klick/Enter). Muss VOR der Touch-/Pen-Only-Logik
       // stehen, damit der Kontakt nicht vorher im Pan-Zweig verschluckt wird.
-      if (e.pointerType === "pen" && isTabletDrawGate(e)) {
+      if (!this.canvasTapHandler && e.pointerType === "pen" && isTabletDrawGate(e)) {
         try { c.setPointerCapture(e.pointerId); } catch {}
         this._tabletTapQueued = true;
         this.tabletDown = true; this._tabletPointerId = e.pointerId;

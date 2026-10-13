@@ -1,5 +1,10 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Aktueller Auftrag – Bibliothek und Infoboxen
+- [x] Bibliotheks-Rechtsklick auf überschaubare Hauptachsen begrenzen und Rahmenfangpunkte wieder anbinden
+- [ ] Frühere Infobox-Markierungen und Knopf prüfen; Platzieren, Zoom und Verschieben ohne blockierende Oberfläche testen
+- [ ] GitHub-main-Übertragung verifizieren (Lovable verwaltet Git; kein manueller Push verfügbar)
+
 ## Cutter & Bogenerhalt – 13.10.2026
 - [x] Cutter-Werkzeug (Axt-Symbol unter Lineal, 3-Schritt-Anleitung, Enter/Doppelklick teilt Objekte)
 - [x] Gewölbte Schraffurkanten beim Verbinden/Schneiden als echte Bögen erhalten

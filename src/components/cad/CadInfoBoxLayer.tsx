@@ -94,7 +94,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
         const active = sel.selectedId === b.id
           || ((app.selectTool?.marqueeSelectedIds || []) as any[]).some((m) => m.kind === "infobox" && m.id === b.id);
         const task = b.kind === "task";
-        const cat = (app.scene?.infoBoxCategories || []).find((c: any) => c.id === b.categoryId);
         const statusVar = b.status === "done" ? "--infobox-done" : "--infobox-open";
         return (
           <div
@@ -107,7 +106,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
                 app.canvas?.dispatchEvent(new PointerEvent("pointerdown", { pointerId: e.pointerId, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY, button: e.button, buttons: e.buttons, bubbles: true }));
                 if (e.button !== 0 || app.input?.cameraGesture) return;
                 // Touch on a pin selects it; never creates another box on release.
-                if (app.input) app.input.canvasTapHandler = null;
+                app.input?.cancelCanvasTap();
               }
               const st = app.selectTool;
               const selectToolOn = !ui.mode && st && app.activeTool === st;
