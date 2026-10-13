@@ -106,8 +106,7 @@ export class LibraryPlacementTool {
     if (!this.activeDef || !this.anchor) return;
     const def = this.activeDef;
     const anchor = this.anchor;
-    const inst = (this.app as any).runAction
-      ? (this.app as any).runAction(() => this.app.scene.createLibraryInstance({
+    const create = () => this.app.scene.createLibraryInstance({
           definitionId: def.id,
           definitionVersion: def.version,
           position: { x: anchor.x, y: anchor.y },
@@ -115,8 +114,9 @@ export class LibraryPlacementTool {
           scaleX: this.scale,
           scaleY: this.scale,
           labelId: this.app.activeDrawLabelId,
-        }))
-      : null;
+        });
+    const run = (this.app as any).runAction;
+    const inst = run ? run.call(this.app, create) : (() => { const i = create(); this.app.commitHistorySnapshot?.(); return i; })();
     if (!inst) return;
     this.phase = "idle";
     this.activeDef = null;
