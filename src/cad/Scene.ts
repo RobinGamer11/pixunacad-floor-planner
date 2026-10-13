@@ -1054,6 +1054,8 @@ export class InfoBox {
   }
 }
 
+export interface InfoBoxCategory { id: string; name: string; color: string }
+
 export function serializeInfoBox(b: InfoBox): any {
   return {
     id: b.id, labelId: b.labelId, x: b.x, y: b.y, kind: b.kind, status: b.status,
@@ -1079,6 +1081,8 @@ export class Scene {
   stairs: Stair[] = [];
   /** Infoboxen (Information / Aufgabe). */
   infoBoxes: InfoBox[] = [];
+  /** Infobox-Kategorien dieses Blatts (frei benannt, mit Farbe). */
+  infoBoxCategories: InfoBoxCategory[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Edit-Owner-ID markiert (Alt-Mechanismus, aktuell ungenutzt und immer null).

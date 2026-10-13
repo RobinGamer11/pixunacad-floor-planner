@@ -983,6 +983,7 @@ export class CadApp {
       })),
       stairs: ((scene as any).stairs || []).map(serializeStair),
       infoBoxes: ((scene as any).infoBoxes || []).map(serializeInfoBox),
+      infoBoxCategories: ((scene as any).infoBoxCategories || []).map((c: any) => ({ id: c.id, name: c.name, color: c.color })),
 
     };
   }
