@@ -54,3 +54,4 @@ Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; kein
 - Auswahlfilter-Eigenschaften nur via `registerFilterProperty` (`cad/selectionFilter.ts`); Treffer in `marqueeSelectedIds`, Werte lokal.
 
 - Objektname/-ID/-Beschreibung nur über `cad/objectMeta.ts` (Serialisierung/Laden gekoppelt, Kopien ohne ID).
+- Flächen-Schnitt/-Vereinigung (Cutter, Schraffur verbinden) nur über `cad/cutGeometry.ts` – `restoreArcs` hält gewölbte Kanten als echte Bögen.
