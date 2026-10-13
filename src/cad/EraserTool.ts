@@ -177,10 +177,6 @@ export class EraserTool {
     }
   }
 
-  private _key(x: number, y: number) {
-    return `${x.toFixed(5)}|${y.toFixed(5)}`;
-  }
-
   private _ringArea(ring: Vec2[]): number {
     let a = 0;
     for (let i = 0; i < ring.length; i++) {
