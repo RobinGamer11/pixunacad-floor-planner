@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Eraser, Feather } from "lucide-react";
+import { Eraser, Feather, TriangleAlert } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 
@@ -73,13 +73,6 @@ export const EraserModeSelect: React.FC<Props> = ({ app, rasterSelection = null 
 
   return (
     <div className="mb-2">
-      <div
-        className="mb-2 rounded-md border px-2 py-1.5 text-[10px] leading-snug"
-        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--muted-foreground))" }}
-      >
-        Hinweis: „Smooth“ funktioniert nur bei Pixel-Objekten (PNG/JPG bzw. Blätter im Pixel-Modus).
-        Zeichnungen und andere Vektor-Objekte werden immer hart radiert.
-      </div>
       <div className="text-[10px] font-semibold tracking-wider text-muted-foreground mb-1.5">MODUS</div>
       <div className="grid grid-cols-2 gap-1">
 
@@ -103,9 +96,10 @@ export const EraserModeSelect: React.FC<Props> = ({ app, rasterSelection = null 
           );
         })}
       </div>
-      {!smoothAllowed && (
-        <div className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
-          Weicher Modus ist nur für Bilder (PNG/JPG) verfügbar.
+      {(mode === "smooth" || !smoothAllowed) && (
+        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-snug" style={{ color: "hsl(var(--beige-soft))" }}>
+          <TriangleAlert size={12} className="shrink-0" />
+          <span>Weich nur bei Bilddateien (PNG/JPG).</span>
         </div>
       )}
     </div>
@@ -187,11 +181,6 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
         </span>
       </button>
 
-      <div className="text-[10px] leading-snug text-muted-foreground">
-        Maus gedrückt halten → radieren. Ist im Werkzeug „Lineal“ ein Lineal
-        gesetzt, radiert der Radiergummi exakt an dessen Zeichenkante entlang.
-        Geändert wird das Lineal nur im Linealwerkzeug selbst.
-      </div>
     </div>
   );
 };
