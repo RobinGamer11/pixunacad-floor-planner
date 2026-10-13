@@ -43,8 +43,10 @@ const MeasureInput: React.FC<{
           onBlur={() => setFocused(false)}
           onChange={(e) => {
             setDraft(e.target.value);
-            const n = Number(e.target.value.trim().replace(",", "."));
-            if (Number.isFinite(n) && n >= 0) onChange(n);
+            const raw = e.target.value.trim().replace(",", ".");
+            const n = Number(raw);
+            // Leere/Null-Eingabe während des Tippens schaltet den Rahmen nie ab.
+            if (raw !== "" && Number.isFinite(n) && n > 0) onChange(n);
           }}
           className="h-full min-w-0 flex-1 bg-transparent px-2 text-right text-[11px] tabular-nums outline-none"
         />
