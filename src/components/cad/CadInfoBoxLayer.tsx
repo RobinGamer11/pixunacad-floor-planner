@@ -4,6 +4,7 @@
  * bearbeitet wird ausschließlich in den Werkzeugeinstellungen.
  */
 import React from "react";
+import { Info } from "lucide-react";
 import { commentUi, useCommentUi } from "@/lib/commentsStore";
 import { infoBoxUi, useInfoBoxUi } from "@/lib/infoBoxUi";
 
@@ -47,6 +48,29 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
 
   React.useEffect(() => () => { commentUi.exitMode(); infoBoxUi.clear(); }, []);
 
+  React.useEffect(() => {
+    if (!app?.input || !ui.mode) return;
+    const onTap = (sx: number, sy: number) => {
+      const w = app.camera.screenToWorld(sx, sy);
+      infoBoxUi.set({ selectedId: null, draft: { x: w.x, y: w.y, sheetId: app.activeSheetId || "default" } });
+    };
+    app.input.canvasTapHandler = onTap;
+    return () => { if (app.input.canvasTapHandler === onTap) app.input.canvasTapHandler = null; };
+  }, [app, ui.mode]);
+
+  // Wheel over a pin also uses the canvas' existing, non-passive zoom listener.
+  React.useEffect(() => {
+    const host = hostRef.current;
+    if (!host || !app?.canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      app.canvas.dispatchEvent(new PointerEvent("pointermove", { clientX: e.clientX, clientY: e.clientY }));
+      app.canvas.dispatchEvent(new WheelEvent("wheel", { deltaX: e.deltaX, deltaY: e.deltaY, deltaMode: e.deltaMode, clientX: e.clientX, clientY: e.clientY, ctrlKey: e.ctrlKey, cancelable: true }));
+    };
+    host.addEventListener("wheel", onWheel, { passive: false });
+    return () => host.removeEventListener("wheel", onWheel);
+  }, [app]);
+
   // Offene Aufgaben für den Zähler am Knopf.
   const boxes: any[] = app?.scene?.infoBoxes || [];
   const openCount = boxes.filter((b) => b.kind === "task" && b.status !== "done").length;
@@ -56,13 +80,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
   if (!cam) return null;
   const visible = (b: any) => app.labelManager?.isVisible?.(b.labelId) !== false;
 
-  const onCanvasDown = (e: React.PointerEvent) => {
-    if (!ui.mode || !hostRef.current || e.button !== 0) return;
-    const rect = hostRef.current.getBoundingClientRect();
-    const w = cam.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-    infoBoxUi.set({ selectedId: null, draft: { x: w.x, y: w.y, sheetId: app.activeSheetId || "default" } });
-  };
-
   const draft = sel.draft && sel.draft.sheetId === (app.activeSheetId || "default") ? sel.draft : null;
 
   return (
@@ -70,8 +87,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       ref={hostRef}
       data-infobox-layer
       className="pixuna-comments absolute inset-0"
-      style={{ pointerEvents: ui.mode ? "auto" : "none", zIndex: 25 }}
-      onPointerDown={onCanvasDown}
+      style={{ pointerEvents: "none", zIndex: 25 }}
     >
       {boxes.filter(visible).map((b) => {
         const p = cam.worldToScreen(b.x, b.y);
@@ -87,6 +103,12 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
             title={b.title || "Infobox"}
             onPointerDown={(e) => {
               e.stopPropagation();
+              if (e.button !== 0 || e.pointerType === "touch") {
+                app.canvas?.dispatchEvent(new PointerEvent("pointerdown", { pointerId: e.pointerId, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY, button: e.button, buttons: e.buttons, bubbles: true }));
+                if (e.button !== 0 || app.input?.cameraGesture) return;
+                // Touch on a pin selects it; never creates another box on release.
+                if (app.input) app.input.canvasTapHandler = null;
+              }
               const st = app.selectTool;
               const selectToolOn = !ui.mode && st && app.activeTool === st;
               if (selectToolOn && e.shiftKey) {
@@ -103,39 +125,28 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
               }
               app.renderer?.render?.();
             }}
-            className="absolute rounded-md px-2 py-1.5 text-[11.5px] leading-tight shadow-md cursor-pointer select-none"
+            className="absolute flex items-center justify-center shadow-md cursor-pointer select-none"
             style={{
-              left: p.x, top: p.y, width: b.sizePx || 180, pointerEvents: "auto",
-              background: "hsl(var(--cad-settings-bg))",
+              left: p.x, top: p.y, width: 32, height: 32, marginLeft: -16, marginTop: -32,
+              borderRadius: "50% 50% 50% 6px", pointerEvents: "auto", touchAction: "none",
+              background: "hsl(var(--card))",
               color: "hsl(var(--foreground))",
-              border: `2px solid hsl(var(--notice-beige))`,
+              border: `2px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
               outline: active ? "2px solid hsl(var(--primary))" : undefined,
               outlineOffset: 2,
             }}
           >
             {task ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center">
                 <span
                   className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold"
                   style={{ background: `hsl(var(${statusVar}))`, color: "hsl(0 0% 100%)", boxShadow: "0 0 0 2px hsl(0 0% 100%)" }}
                 >
                   {b.authorInitials || "?"}
                 </span>
-                <span className="truncate font-semibold">{b.title || "Aufgabe"}</span>
               </div>
             ) : (
-              <>
-                <div className="truncate font-semibold">{b.title || "Information"}</div>
-                <div className="truncate text-[10.5px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                  Information
-                </div>
-              </>
-            )}
-            {cat && (
-              <div className="mt-1 flex items-center gap-1.5 text-[10px]">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cat.color }} />
-                <span className="truncate">{cat.name}</span>
-              </div>
+              <Info size={20} />
             )}
           </div>
         );

@@ -137,6 +137,9 @@ export class Input {
   /** Wird beim Start einer Zwei-Finger-Geste (Pinch) aufgerufen, damit die App
    *  einen laufenden Zeichenvorgang verwerfen kann statt ihn zu committen. */
   onPinchStart: (() => void) | null = null;
+  /** Optional DOM annotation mode: navigation stays in Input, taps never draw. */
+  canvasTapHandler: ((sx: number, sy: number) => void) | null = null;
+  private _annotationTap: { id: number; x: number; y: number } | null = null;
   /**
    * Laufende Kamerageste (zwei Finger): ab dem zweiten Finger bis alle Finger
    * gelöst sind. Währenddessen werden weder Punkte gesetzt noch Aktionen
@@ -289,12 +292,17 @@ export class Input {
       }
 
       // ---- Touch (Finger) ----
+      if (this.canvasTapHandler && e.button === 0) {
+        this._annotationTap = this._touches.size === 0
+          ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
+      }
       if (e.pointerType === "touch") {
         this._touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         try { c.setPointerCapture(e.pointerId); } catch {}
 
         // Zweiter Finger → Pinch/Pan-Modus starten, ggf. laufenden Draw abbrechen.
         if (this._touches.size >= 2) {
+          this._annotationTap = null;
           this.mouse.left = false;
           this._drawPointerId = null;
           this._clickQueued = false;
@@ -320,7 +328,7 @@ export class Input {
         }
 
         // Ein Finger im Pen-Only-Modus → pannen statt zeichnen.
-        if (isPenOnly()) {
+        if (isPenOnly() || this.canvasTapHandler) {
           this._touchPanId = e.pointerId;
           this._panning = true;
           this.isPanning = true;
@@ -334,6 +342,10 @@ export class Input {
       }
 
       // ── Tablet-Commit-Gate: keine automatische Klick-Emission.
+      if (this.canvasTapHandler && (e.button === 0 || e.pointerType === "pen")) {
+        try { c.setPointerCapture(e.pointerId); } catch {}
+        return;
+      }
       if (isTabletDrawGate(e)) {
         try { c.setPointerCapture(e.pointerId); } catch {}
         this._tabletTapQueued = true;
@@ -373,6 +385,14 @@ export class Input {
     this._cleanups.push(() => c.removeEventListener("pointerdown", onPointerDown));
 
     const onPointerUp = (e: PointerEvent) => {
+      const tap = this._annotationTap;
+      if (tap?.id === e.pointerId) {
+        this._annotationTap = null;
+        if (e.type !== "pointercancel" && !this.cameraGesture && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) <= 6) {
+          const rect = c.getBoundingClientRect();
+          this.canvasTapHandler?.(e.clientX - rect.left, e.clientY - rect.top);
+        }
+      }
       // Kontakte, die auf dem Tablet-Hilfsrad (oder anderer Overlay-UI) enden,
       // dürfen einen laufenden Stift-Strich nicht abbrechen.
       const tgt = e.target as Element | null;
@@ -419,6 +439,7 @@ export class Input {
     this._cleanups.push(() => window.removeEventListener("pointerup", onPointerUp));
     // Fokusverlust / verlorener Pointer-Capture: keinen gedrückten Zustand zurücklassen.
     const releaseAll = () => {
+      this._annotationTap = null;
       this.mouse.left = false; this.mouse.mid = false; this.mouse.right = false;
       this._drawPointerId = null; this._touches.clear(); this._touchPanId = null;
       this._pinchLastDist = 0; this._panning = false; this.isPanning = false;
