@@ -11,7 +11,7 @@
  * Alle Farben kommen aus den Design-Tokens → helles und dunkles Design.
  */
 import React from "react";
-import { ArrowUp, AtSign, Check, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { ArrowUp, AtSign, Check, Info, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import {
   commentUi,
   initialsOf,
@@ -20,6 +20,7 @@ import {
   type ProjectComment,
 } from "@/lib/commentsStore";
 import type { TeamMemberOption } from "@/lib/projectTeam";
+import { infoBoxUi } from "@/lib/infoBoxUi";
 
 const OPEN_COLOR = "hsl(38 92% 50%)";
 const DONE_COLOR = "hsl(150 45% 42%)";
