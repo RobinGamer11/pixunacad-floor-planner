@@ -108,7 +108,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
               <>
                 <div className="truncate font-semibold">{b.title || "Information"}</div>
                 <div className="truncate text-[10.5px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
-                  {b.categoryName || "Information"}
+                  Information
                 </div>
               </>
             )}
