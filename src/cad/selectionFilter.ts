@@ -54,7 +54,7 @@ export const emptyFilterState = (): SelectionFilterState => ({ types: [], criter
 export const OBJECT_TYPE_LABELS: Record<string, string> = {
   line: "Linie", guide: "Hilfslinie", free: "Freihand", polygon: "Polygon",
   hatch: "Schraffur", text: "Text", table: "Tabelle", document: "Bild/PDF",
-  measure: "Bemaßung", wall: "Wand", door: "Tür", stair: "Treppe", library: "Bibliothek",
+  measure: "Bemaßung", wall: "Wand", door: "Tür", stair: "Treppe", library: "Bibliothek", infobox: "Infobox",
 };
 
 /** Objekttyp eines Engine-Objekts (Werkzeugtyp oder eigener Objekttyp). */
