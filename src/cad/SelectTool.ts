@@ -4129,7 +4129,7 @@ export class SelectTool {
               PointEditAction.ROTATE,
               PointEditAction.SCALE,
               PointEditAction.SCALE_2PT,
-            ]);
+            ], { moveAsTranslate: true });
             return;
           }
           // 2) Objekt-Treffer: Linksklick wählt ausschließlich aus.

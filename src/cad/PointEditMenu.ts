@@ -36,7 +36,7 @@ export class PointEditMenu {
   }
 
   /** Optional: nur diese Actions als Buttons sichtbar (alle anderen werden ausgeblendet). */
-  showAt(sx: number, sy: number, allowedActions?: string[], opts?: { align?: "default" | "centerAbove" }) {
+  showAt(sx: number, sy: number, allowedActions?: string[], opts?: { align?: "default" | "centerAbove"; moveAsTranslate?: boolean }) {
     const wasVisible = this.visible;
     this.visible = true;
     this.root.classList.remove("hidden");
@@ -58,6 +58,16 @@ export class PointEditMenu {
       if (!btn) continue;
       const visible = !allow || allow.has(action);
       btn.style.display = visible ? "" : "none";
+    }
+    // Bewegen-Knopf optional als „Verschieben“ beschriften (Funktion unverändert).
+    const moveBtn = this.buttonsByAction[PointEditAction.MOVE];
+    if (moveBtn) {
+      if (moveBtn.dataset.origTitle === undefined) {
+        moveBtn.dataset.origTitle = moveBtn.title;
+        moveBtn.dataset.origText = moveBtn.textContent || "";
+      }
+      moveBtn.title = opts?.moveAsTranslate ? "Verschieben" : moveBtn.dataset.origTitle!;
+      moveBtn.textContent = opts?.moveAsTranslate ? "✥" : moveBtn.dataset.origText!;
     }
     this._sync();
 
