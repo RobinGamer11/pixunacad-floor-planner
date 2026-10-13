@@ -3323,6 +3323,9 @@ export class CadApp {
     if (this.multiPasteActive && id !== ToolIds.SELECT) this.stopMultiPaste();
 
 
+    // Werkzeugwechsel erhält die Mehrfachauswahl — nur laufende Interaktionen
+    // werden abgebrochen. Aufheben nur bewusst (Esc, Klick ins Leere, Löschen).
+    const keptMulti = this.selectTool.pasteFloatActive ? [] : this.selectTool.marqueeSelectedIds.slice();
     if (this.activeTool && this.activeTool.cancel) this.activeTool.cancel();
     // Cursor zentral zurücksetzen: kein Werkzeugcursor bleibt im nächsten Werkzeug.
     try { this.canvas.style.cursor = "default"; } catch { /* optional */ }
@@ -3349,6 +3352,9 @@ export class CadApp {
     else if (id === ToolIds.TABLE) { this.activeTool = this.tableTool; this.tableTool.activate(); }
     else if (id === ToolIds.RULER) { this.activeTool = this.rulerTool as any; this.rulerTool.activate(); }
     else if (id === ToolIds.STAIR) { this.activeTool = this.stairTool as any; this.stairTool.activate(); }
+    if (keptMulti.length && this.selectTool.marqueeSelectedIds.length === 0) {
+      this.selectTool.marqueeSelectedIds = keptMulti;
+    }
     this._syncLineSettingsFromContext();
     this._syncHatchSettingsFromContext();
     this._syncMeasureSettingsFromContext();
