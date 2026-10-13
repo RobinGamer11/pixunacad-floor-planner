@@ -148,6 +148,7 @@ export const ToolIds = {
   TABLE: "table",
   RULER: "ruler",
   STAIR: "stair",
+  CUTTER: "cutter",
   /** Bibliothekssystem (nur eigenständige CAD-Oberfläche). */
   LIBRARY: "library",
 } as const;

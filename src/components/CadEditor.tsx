@@ -6,7 +6,7 @@ import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon, Boxes } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon, Boxes, Axe } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { FreeDrawSettingsPanel } from "@/components/cad/FreeDrawSettingsPanel";
 import { PipetteSettingsPanel } from "@/components/cad/PipetteSettingsPanel";
+import { CutterSettingsPanel } from "@/components/cad/CutterSettingsPanel";
 import { MeasureWorkflowPanel } from "@/components/cad/MeasureWorkflowPanel";
 import { RulerSettingsPanel } from "@/components/cad/RulerSettingsPanel";
 import { EraserSettingsPanel, EraserModeSelect } from "@/components/cad/EraserSettingsPanel";
@@ -1421,6 +1422,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           >
             <RulerIcon size={18} />
             <span>Lineal</span>
+          </button>
+          <button
+            onClick={() => handleToolClick(ToolIds.CUTTER)}
+            title="Cutter"
+            aria-label="Cutter"
+            className={`cad-rail-btn ${activeTool === ToolIds.CUTTER ? "active" : ""}`}
+          >
+            <Axe size={18} />
+            <span>Cutter</span>
           </button>
         </div>
 
@@ -3070,6 +3080,14 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Lineal</div>
               <RulerSettingsPanel app={appRef.current} />
+            </div>
+          )}
+
+          {/* Cutter-Panel — Schrittanleitung */}
+          {activeTool === ToolIds.CUTTER && (
+            <div className="cad-settings-panel mb-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] mb-3" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Cutter</div>
+              <CutterSettingsPanel app={appRef.current} />
             </div>
           )}
 

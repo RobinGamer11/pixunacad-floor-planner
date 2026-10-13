@@ -1,5 +1,9 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Cutter & Bogenerhalt – 13.10.2026
+- [x] Cutter-Werkzeug (Axt-Symbol unter Lineal, 3-Schritt-Anleitung, Enter/Doppelklick teilt Objekte)
+- [x] Gewölbte Schraffurkanten beim Verbinden/Schneiden als echte Bögen erhalten
+
 ## Objekteinstellungen – Korrektur 12.10.2026
 - [x] Objektname/ID mittig und mit tiefer liegenden Untertabs anzeigen
 - [x] „Sonstiges“ beim Öffnen von Infos und bei Objektwechsel automatisch aufklappen

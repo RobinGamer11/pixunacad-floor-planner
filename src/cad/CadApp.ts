@@ -41,6 +41,7 @@ import { MeasureTool } from "./MeasureTool";
 import { TextTool } from "./TextTool";
 import { TextEditorOverlay } from "./TextEditorOverlay";
 import { PipetteTool } from "./PipetteTool";
+import { CutterTool } from "./CutterTool";
 import { Clipboard, buildClipboardFromSelection, commitClipboardAt, translatedItems, ClipboardItem } from "./ClipboardManager";
 import type { LibraryDefinition, LibraryFolder } from "./library/types";
 import { LibraryPlacementTool } from "./library/LibraryPlacementTool";
@@ -322,6 +323,7 @@ export class CadApp {
   measureTool!: MeasureTool;
   textTool!: TextTool;
   pipetteTool!: PipetteTool;
+  cutterTool!: CutterTool;
   /** Bibliotheks-Platzierungswerkzeug (nur eigenständige CAD-Oberfläche). */
   libraryTool!: LibraryPlacementTool;
   tableTool!: TableTool;
@@ -687,6 +689,7 @@ export class CadApp {
     this.measureTool = new MeasureTool(this);
     this.textTool = new TextTool(this);
     this.pipetteTool = new PipetteTool(this);
+    this.cutterTool = new CutterTool(this);
     this.libraryTool = new LibraryPlacementTool(this);
     this.renderer.libraryDefinitionSource = () => this.libraryDefinitions;
     // Bibliotheksinstanzen als schreibgeschützte Fangquelle für alle Werkzeuge.
@@ -1261,8 +1264,8 @@ export class CadApp {
     const ok = this.runAction(() => {
       first.points = geo.outer;
       first.holes = geo.holes;
-      first.bulges = [];
-      first.holeBulges = geo.holes.map(() => []);
+      first.bulges = geo.outerBulges;
+      first.holeBulges = geo.holeBulges;
       this.scene.removeHatchesByIds(rest.map((h: any) => h.id));
       this.selectTool.marqueeSelectedIds = [];
       this.setSelection({ type: SelectionType.HATCH, hatchId: first.id, pointIndex: null } as any);
@@ -2718,6 +2721,10 @@ export class CadApp {
       }
 
 
+      if (e.key === "Enter" && (this.activeTool as any) === this.cutterTool && !isHubInput) {
+        if (this.cutterTool.canFinish()) { e.preventDefault(); this.cutterTool.execute(); return; }
+      }
+
       if (e.key === "Enter" && this.activeTool === this.wallTool && !isHubInput) {
         if (this.wallTool.isDrawing?.()) { e.preventDefault(); this.wallTool.finish(); return; }
       }
@@ -2848,6 +2855,10 @@ export class CadApp {
         if (this.activeTool === this.hatchTool) { this.hatchTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.textTool) { this.textTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.measureTool) { this.measureTool.cancel(); this.clearSelection(); this.setTool(ToolIds.SELECT); return; }
+        if ((this.activeTool as any) === this.cutterTool) {
+          if (this.cutterTool.isDrawing()) { this.cutterTool.reset(); return; }
+          this.setTool(ToolIds.SELECT); return;
+        }
         if (this.activeTool === this.pipetteTool) {
           // 1. ESC: nur die gemerkte Quelle verwerfen — Werkzeug bleibt aktiv.
           if (this.pipetteTool.hasSource) { this.pipetteTool.clearSource(); return; }
@@ -3385,6 +3396,7 @@ export class CadApp {
     else if (id === ToolIds.MEASURE) { this.activeTool = this.measureTool; this.measureTool.activate(); }
     else if (id === ToolIds.TEXT) { this.activeTool = this.textTool; this.textTool.activate(); }
     else if (id === ToolIds.PIPETTE) { this.activeTool = this.pipetteTool; this.pipetteTool.activate(); }
+    else if (id === ToolIds.CUTTER) { this.activeTool = this.cutterTool as any; this.cutterTool.activate(); }
     // Bibliothek: solange nichts platziert wird, arbeitet die normale Auswahl
     // weiter (Klick, Shift-Klick, Rahmenauswahl). Erst `beginPlacement()`
     // übernimmt das Bibliothekswerkzeug die Eingabe.
