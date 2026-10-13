@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SquareDashed, BoxSelect, SquareDashedMousePointer } from "lucide-react";
+import { formatObjectId, objectDisplayName } from "@/cad/objectMeta";
+import { OBJECT_TYPE_LABELS, objectTypeKey } from "@/cad/selectionFilter";
+import { infoBoxUi } from "@/lib/infoBoxUi";
 
 interface Props { app: CadApp | MiniCad | null; }
 
@@ -111,6 +114,7 @@ export const SelectSettingsPanel: React.FC<Props> = ({ app }) => {
             <div className="text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>
               {count} Element{count === 1 ? "" : "e"} ausgewählt
             </div>
+            <SelectedList app={app} />
             <div className="flex gap-1">
               <button type="button" onClick={deleteSel}
                 className="cad-toolbar-btn flex-1 justify-center h-9">
@@ -132,6 +136,68 @@ export const SelectSettingsPanel: React.FC<Props> = ({ app }) => {
           Mit <b>Entf</b> gemeinsam löschen.
         </div>
       </div>
+    </div>
+  );
+};
+
+/** Liste aller ausgewählten Objekte: Klick = nur dieses, Shift-Klick = hinzufügen/entfernen. */
+const SelectedList: React.FC<{ app: any }> = ({ app }) => {
+  const [, force] = useState(0);
+  useEffect(() => {
+    let raf = 0; let last = "";
+    const tick = () => {
+      const k = (app.selectTool.marqueeSelectedIds || []).map((m: any) => m.kind + m.id).join();
+      if (k !== last) { last = k; force((x) => x + 1); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [app]);
+  const st = app.selectTool;
+  const list: { kind: string; id: string }[] = st.marqueeSelectedIds || [];
+  const objOf = (m: { kind: string; id: string }) => (st as any)._getElementById?.(m.kind, m.id);
+  const [anchor, setAnchor] = useState<string | null>(null);
+
+  const click = (e: React.MouseEvent, m: { kind: string; id: string }) => {
+    const key = m.kind + ":" + m.id;
+    if (e.shiftKey) {
+      // Shift: Bereich ab dem letzten angeklickten Eintrag zusätzlich markieren.
+      const keys = list.map((x) => x.kind + ":" + x.id);
+      const a = anchor ? keys.indexOf(anchor) : -1;
+      if (a >= 0) {
+        const b = keys.indexOf(key);
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        st.marqueeSelectedIds = list.slice(lo, hi + 1);
+      }
+      setAnchor(key);
+      app.renderer?.render?.();
+      return;
+    }
+    setAnchor(key);
+    st.marqueeSelectedIds = [m];
+    st.syncPrimarySelection?.();
+    if (m.kind === "infobox") infoBoxUi.select(m.id); else infoBoxUi.clear();
+    app.renderer?.render?.();
+  };
+
+  return (
+    <div className="max-h-56 overflow-y-auto rounded-md border" style={{ borderColor: "hsl(var(--border))" }}>
+      {list.map((m) => {
+        const o = objOf(m);
+        if (!o) return null;
+        const type = OBJECT_TYPE_LABELS[objectTypeKey(m.kind, o)] || m.kind;
+        let id = ""; try { id = formatObjectId(m.kind, o); } catch { /* */ }
+        const name = (() => { try { return objectDisplayName(m.kind, o); } catch { return type; } })();
+        return (
+          <button key={m.kind + m.id} type="button" onClick={(e) => click(e, m)}
+            className="flex w-full items-center gap-2 border-b px-2 py-1.5 text-left text-[11px] last:border-b-0 hover:bg-muted"
+            style={{ borderColor: "hsl(var(--border))", background: anchor === m.kind + ":" + m.id ? "hsl(var(--muted))" : undefined }}
+            title="Klick: nur dieses Objekt auswählen · Shift-Klick: Bereich auswählen">
+            <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
+            <span className="shrink-0 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{type}{id ? ` · ${id}` : ""}</span>
+          </button>
+        );
+      })}
     </div>
   );
 };

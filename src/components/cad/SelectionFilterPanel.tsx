@@ -31,7 +31,7 @@ export const SelectionFilterPanel: React.FC<{ app: CadApp }> = ({ app }) => {
     const sc: any = app.scene;
     const lists: [string, any[]][] = [["segment", sc.segments], ["wall", sc.walls], ["hatch", sc.hatches],
       ["freeStroke", sc.freeStrokes], ["dimension", sc.dimensions], ["textbox", sc.textBoxes], ["table", sc.tables],
-      ["document", sc.documents], ["library", sc.libraryInstances], ["stair", sc.stairs]];
+      ["document", sc.documents], ["library", sc.libraryInstances], ["stair", sc.stairs], ["infobox", sc.infoBoxes]];
     for (const [kind, arr] of lists) for (const o of arr || []) {
       types.add(objectTypeKey(kind, o));
       for (const c of [o?.color, o?.strokeColor, o?.fillColor, o?.style?.color]) if (typeof c === "string" && c) colors.add(c.toLowerCase());
