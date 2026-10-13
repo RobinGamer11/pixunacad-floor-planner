@@ -19,7 +19,7 @@ import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
 import { CadInfoBoxLayer } from "@/components/cad/CadInfoBoxLayer";
 import InfoBoxSettingsPanel from "@/components/cad/InfoBoxSettingsPanel";
-import { infoBoxUi, useInfoBoxUi } from "@/lib/infoBoxUi";
+import { useInfoBoxUi } from "@/lib/infoBoxUi";
 import LibraryPlacementPreview from "@/components/cad/LibraryPlacementPreview";
 import { CadPresenceBar } from "@/components/cad/CadPresenceBar";
 import { CadCollabOverlay } from "@/components/cad/CadCollabOverlay";
