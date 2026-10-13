@@ -74,6 +74,8 @@
     --surface-card: 0 0% 100%;
     --beige-soft: 34 45% 86%;
     --notice-beige: 34 38% 42%;
+    --infobox-open: 0 78% 52%;
+    --infobox-done: 140 62% 36%;
     --ink: 222 20% 12%;
     --ink-soft: 222 12% 38%;
     --accent-gold: 32 55% 52%;
@@ -144,6 +146,8 @@
     --surface-strong: 222 14% 23%;
     --beige-soft: 222 12% 26%;
     --notice-beige: 36 45% 78%;
+    --infobox-open: 0 82% 58%;
+    --infobox-done: 140 60% 42%;
     --ink: 210 20% 93%;
     --ink-soft: 215 12% 68%;
     --accent-gold: 38 62% 62%;

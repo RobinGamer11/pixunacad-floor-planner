@@ -88,9 +88,9 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
             style={{
               left: p.x, top: p.y, width: b.sizePx || 180, pointerEvents: "auto",
               background: "hsl(var(--cad-settings-bg))",
-              color: "hsl(var(--cad-toolbar-fg))",
+              color: "hsl(var(--foreground))",
               border: `2px solid hsl(var(--notice-beige))`,
-              outline: active ? "2px solid hsl(var(--cad-accent-blue, 214 90% 60%))" : undefined,
+              outline: active ? "2px solid hsl(var(--primary))" : undefined,
               outlineOffset: 2,
             }}
           >
