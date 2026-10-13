@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from "react-dom";
 import {
   Boxes, ChevronDown, ChevronRight, Folder, FolderPlus,
-  MoreHorizontal, Plus, Save, Ungroup, Upload, X,
+  ArrowRight, MoreHorizontal, Plus, Save, Ungroup, Upload, Wrench, X,
 } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import type { LibraryDefinition, LibraryFolder, LibraryUnits } from "@/cad/library/types";
@@ -43,18 +43,20 @@ const selectCls = "cad-settings-select w-full h-9 text-[12px] px-2";
 const muted = { color: "hsl(var(--cad-toolbar-muted))" };
 const border = { borderColor: "hsl(var(--cad-hub-border))" };
 
-type MenuItem = { label: string; run: () => void; danger?: boolean };
+type MenuItem = { label: string; run: () => void; danger?: boolean; emphasis?: boolean };
 
 function LibraryActionMenu({
   open,
   onToggle,
   onClose,
   items,
+  tool,
 }: {
   open: boolean;
   onToggle: () => void;
   onClose: () => void;
   items: MenuItem[];
+  tool?: boolean;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number; width: number } | null>(null);
@@ -66,7 +68,7 @@ function LibraryActionMenu({
       if (!trigger) return;
       const rect = trigger.getBoundingClientRect();
       const width = 208;
-      const height = items.length * 37 + 8;
+      const height = items.length * 37 + 16;
       const gap = 4;
       const top = window.innerHeight - rect.bottom >= height + gap
         ? rect.bottom + gap
@@ -100,13 +102,14 @@ function LibraryActionMenu({
       <button
         ref={triggerRef}
         type="button"
-        title="Weitere Aktionen"
+        title={tool ? "Einstellungen" : "Weitere Aktionen"}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="cad-toolbar-btn h-8 w-8 justify-center p-0"
+        className={`cad-toolbar-btn h-8 w-8 justify-center p-0 ${tool ? "border" : ""}`}
+        style={tool ? { borderColor: "hsl(var(--cad-accent))", color: "hsl(var(--cad-accent))", background: "hsl(var(--cad-accent) / 0.12)" } : undefined}
         onClick={(event) => { event.stopPropagation(); onToggle(); }}
       >
-        <MoreHorizontal className="h-4 w-4" />
+        {tool ? <Wrench className="h-4 w-4" /> : <MoreHorizontal className="h-4 w-4" />}
       </button>
       {open && position && createPortal(
         <div
@@ -115,7 +118,20 @@ function LibraryActionMenu({
           style={{ ...border, background: "hsl(var(--cad-settings-bg))", left: position.left, top: position.top, width: position.width }}
           onClick={(event) => event.stopPropagation()}
         >
-          {items.map((item) => (
+          {items.map((item) => item.emphasis ? (
+            <div key={item.label} className="px-2 py-1">
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center justify-between rounded-md border-2 px-3 py-2 text-left text-[12.5px] font-bold hover:bg-[hsl(var(--cad-toolbar-hover))]"
+                style={{ borderColor: "hsl(var(--notice-beige))", color: "hsl(var(--notice-beige))" }}
+                onClick={() => { onClose(); item.run(); }}
+              >
+                <span>{item.label}</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
             <button
               key={item.label}
               type="button"
@@ -343,8 +359,9 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
 
   /* ------------------------------------------------------------ Bausteine */
 
-  const menu = (id: string, items: MenuItem[]) => (
+  const menu = (id: string, items: MenuItem[], tool = false) => (
     <LibraryActionMenu
+      tool={tool}
       open={openMenu === id}
       onToggle={() => setOpenMenu(openMenu === id ? null : id)}
       onClose={() => setOpenMenu(null)}
@@ -357,31 +374,25 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
       key={d.id}
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/pixuna-lib-def", d.id)}
-      onClick={() => setSelectedId(d.id === selectedId ? null : d.id)}
+      onClick={() => {
+        if (placingId === d.id) { app.cancelLibraryPlacement(); return; }
+        setSelectedId(d.id);
+        app.beginLibraryPlacement(d.id);
+      }}
       className="flex items-center gap-2 rounded-md px-2 cursor-pointer"
       style={{
-        height: 56,
+        height: 46,
         paddingLeft: 8 + depth * 14,
         borderLeft: selectedId === d.id ? "3px solid hsl(var(--primary))" : "3px solid transparent",
         background: selectedId === d.id ? "hsl(var(--primary) / 0.12)" : undefined,
       }}
     >
-      <div className="shrink-0 rounded border flex items-center justify-center" style={{ ...border, width: 38, height: 38 }}>
-        <LibraryGeometryPreview geometry={d.geometry} size={34} title={d.name} />
-      </div>
       <div className="min-w-0 flex-1">
         <div className="text-[12.5px] font-medium truncate">{d.name}</div>
-        <div className="text-[11px] truncate" style={muted}>
-          {[d.category || "Ohne Kategorie", ...(d.tags || []).slice(0, 2)].join(" · ")}
-        </div>
+        <div className="text-[11px] truncate" style={muted}>{d.category || "Ohne Kategorie"}</div>
       </div>
-      <button type="button" title="Platzieren"
-        className={`cad-toolbar-btn h-8 w-8 justify-center p-0 ${placingId === d.id ? "active" : ""}`}
-        onClick={(e) => { e.stopPropagation(); app.beginLibraryPlacement(d.id); }}>
-        <Boxes className="h-4 w-4" />
-      </button>
       {menu(`def:${d.id}`, [
-        { label: "Bearbeiten", run: () => { setMeta(metaFromDefinition(d)); setMode({ kind: "edit", id: d.id }); } },
+        { label: "Bearbeiten", emphasis: true, run: () => { setMeta(metaFromDefinition(d)); setMode({ kind: "edit", id: d.id }); } },
         { label: "Duplizieren", run: () => app.duplicateLibraryDefinition(d.id) },
         { label: "Verschieben nach …", run: () => moveToFolderPrompt(d) },
         { label: "Pixuna exportieren", run: () => exportPxobj(d) },
@@ -395,7 +406,7 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             }
           },
         },
-      ])}
+      ], true)}
     </div>
   );
 
@@ -650,7 +661,6 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
     );
   }
 
-  const selectedDef = selectedId ? defs.find((d) => d.id === selectedId) || null : null;
   const total = visible.length;
 
   return (
@@ -779,41 +789,6 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
           </div>
         )}
       </div>
-
-      {/* ------------------------------------------------- Aktionsleiste */}
-      {selectedDef && (
-        <div className="mt-3 flex items-center gap-2 rounded-md border p-2"
-          style={{ ...border, background: "hsl(var(--primary) / 0.08)" }}>
-          <div className="shrink-0 rounded border flex items-center justify-center" style={{ ...border, width: 38, height: 38 }}>
-            <LibraryGeometryPreview geometry={selectedDef.geometry} size={34} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[12.5px] font-medium truncate">{selectedDef.name}</div>
-            <div className="text-[11px] truncate" style={muted}>{selectedDef.category || "Ohne Kategorie"}</div>
-          </div>
-          <button type="button" className="cad-toolbar-btn h-9 px-3 text-[12px] font-semibold"
-            style={{ background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }}
-            onClick={() => app.beginLibraryPlacement(selectedDef.id)}>
-            Platzieren
-          </button>
-          {menu(`bar:${selectedDef.id}`, [
-            { label: "Bearbeiten", run: () => { setMeta(metaFromDefinition(selectedDef)); setMode({ kind: "edit", id: selectedDef.id }); } },
-            { label: "Duplizieren", run: () => app.duplicateLibraryDefinition(selectedDef.id) },
-            { label: "Verschieben nach …", run: () => moveToFolderPrompt(selectedDef) },
-            { label: "Pixuna exportieren", run: () => exportPxobj(selectedDef) },
-            { label: "SVG exportieren", run: () => exportSvg(selectedDef) },
-            { label: "DXF exportieren", run: () => exportDxf(selectedDef) },
-            {
-              label: "Löschen", run: () => {
-                if (window.confirm(`„${selectedDef.name}“ löschen? Platzierte Exemplare werden ebenfalls entfernt.`)) {
-                  app.removeLibraryDefinition(selectedDef.id);
-                  setSelectedId(null);
-                }
-              },
-            },
-          ])}
-        </div>
-      )}
 
       {/* Auflösen bleibt an die ausgewählte Instanz auf der Zeichenfläche gebunden. */}
       {instanceDefId && (
