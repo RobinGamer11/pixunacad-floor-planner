@@ -96,6 +96,27 @@ const Hatch3DSection: React.FC<{ value: number; onChange: (v: number) => void }>
   );
 };
 
+/** Großer Knopf: mehrere ausgewählte Schraffuren zu einer verbinden. */
+const HatchMergeButton: React.FC<{ app: CadApp | MiniCad | null }> = ({ app }) => {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!app || !(app as any).getSelectedMergeHatches) return;
+    const t = window.setInterval(() => setCount((app as any).getSelectedMergeHatches().length), 300);
+    return () => window.clearInterval(t);
+  }, [app]);
+  if (count < 2) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => { (app as any)?.mergeSelectedHatches?.(); setCount(0); }}
+      className="w-full rounded-md border bg-accent px-3 py-2.5 text-[12px] font-semibold transition-colors hover:bg-muted"
+      style={{ borderColor: "hsl(var(--cad-accent))" }}
+    >
+      Schraffuren verbinden ({count})
+    </button>
+  );
+};
+
 interface Props {
   app: CadApp | MiniCad | null;
   projectId?: string;
@@ -327,6 +348,8 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
 
       {/* Muster ganz unten */}
       <HatchPatternBlock app={app} scaleMax={patternScaleMax} scaleUnit={patternScaleUnit} />
+
+      <HatchMergeButton app={app} />
     </div>
   );
 };

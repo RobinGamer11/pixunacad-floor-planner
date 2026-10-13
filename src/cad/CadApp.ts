@@ -1,4 +1,5 @@
 import { attachObjectMeta } from "./objectMeta";
+import { mergeHatchGeometry } from "./hatchMerge";
 import { emptyFilterState, objectMatchesFilter, type SelectionFilterState } from "./selectionFilter";
 import { toast } from "sonner";
 import { pageGuideSnapGeometry, paperMmToWorld } from "./pageGuides";
@@ -758,6 +759,10 @@ export class CadApp {
           this.selectTool.beginWallSplit((sel as any).wallId, (sel as any).edgeIndex);
           return;
         }
+        if (sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null && (sel as any).holeIndex == null) {
+          this.selectTool.beginPolygonSplit((sel as any).hatchId, (sel as any).edgeIndex);
+          return;
+        }
         if ((sel as any).segmentId) {
           this.selectTool.beginSegmentSplit((sel as any).segmentId);
           return;
@@ -1230,6 +1235,43 @@ export class CadApp {
    * äußeren Aktion auf. Wirft fn, wird alles
    * zurückgenommen – keine Teiländerungen im Projekt.
    */
+  /** Ausgewählte Schraffuren (ohne Polygone); die zuerst ausgewählte steht vorn. */
+  getSelectedMergeHatches(): any[] {
+    const ids: string[] = [];
+    const prim: any = this.selection;
+    if (prim?.hatchId) ids.push(prim.hatchId);
+    for (const e of this.selectTool.marqueeSelectedIds) {
+      if (e.kind === "hatch" && !ids.includes(e.id)) ids.push(e.id);
+    }
+    return ids
+      .map((id) => this.scene.getHatchById(id) as any)
+      .filter((h) => h && !h.isPolygon && this.labelManager.isEditable(h.labelId));
+  }
+
+  /** Verbindet alle ausgewählten Schraffuren zu einer (Stil der ersten). Ein Undo-Schritt. */
+  mergeSelectedHatches(): boolean {
+    const list = this.getSelectedMergeHatches();
+    if (list.length < 2) return false;
+    const geo = mergeHatchGeometry(list);
+    if (!geo) {
+      toast.error("Schraffuren müssen sich berühren oder überlappen, um verbunden zu werden.");
+      return false;
+    }
+    const [first, ...rest] = list;
+    const ok = this.runAction(() => {
+      first.points = geo.outer;
+      first.holes = geo.holes;
+      first.bulges = [];
+      first.holeBulges = geo.holes.map(() => []);
+      this.scene.removeHatchesByIds(rest.map((h: any) => h.id));
+      this.selectTool.marqueeSelectedIds = [];
+      this.setSelection({ type: SelectionType.HATCH, hatchId: first.id, pointIndex: null } as any);
+      return true;
+    });
+    this.renderer?.render?.();
+    return !!ok;
+  }
+
   runAction<T>(fn: () => T): T | undefined {
     this.beginAction();
     let ok = false;
