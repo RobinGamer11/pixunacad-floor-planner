@@ -4880,6 +4880,12 @@ export class SelectTool {
         case "table":    return boxCornersWorld(obj);
         case "document": return documentCornersWorld(obj);
         case "stair": return stairBoundsPoints(obj) as any;
+        case "infobox": {
+          // Feste Bildschirmgröße → Ausdehnung in Welt je nach Zoom.
+          const k = 1 / ((this.app as any).camera?.scale || 80);
+          const w = (obj.sizePx || 180) * k, h = 44 * k;
+          return [{ x: obj.x, y: obj.y }, { x: obj.x + w, y: obj.y }, { x: obj.x + w, y: obj.y + h }, { x: obj.x, y: obj.y + h }] as any;
+        }
         case "library": {
           const geom = this._libraryGeometryOf(obj);
           return geom ? instanceCornersWorld(geom, this._libraryTransformOf(obj)) as any : [];
@@ -4924,6 +4930,7 @@ export class SelectTool {
     for (const o of s.documents || [])        if (selectable(o)) yield { kind: "document",   id: o.id, obj: o };
     for (const o of s.libraryInstances || []) if (selectable(o)) yield { kind: "library",    id: o.id, obj: o };
     for (const o of s.stairs || [])           if (selectable(o)) yield { kind: "stair",      id: o.id, obj: o };
+    for (const o of s.infoBoxes || [])        if (selectable(o)) yield { kind: "infobox",    id: o.id, obj: o };
   }
 
   /** Abstand des Element-Mittelpunkts zum Startpunkt des Auswahlrahmens. */
@@ -5019,6 +5026,11 @@ export class SelectTool {
       ["libraryInstanceId", "library"],
       ["stairId", "stair"],
     ];
+    const ib = (globalThis as any).__pixunaInfoBoxSelectedId;
+    if (typeof ib === "string" && ib && (this.app.scene as any).getInfoBoxById?.(ib)) {
+      this.marqueeSelectedIds = [{ kind: "infobox", id: ib }];
+      return;
+    }
     for (const [prop, kind] of map) {
       const id = sel[prop];
       if (typeof id === "string" && id) {
@@ -5059,6 +5071,7 @@ export class SelectTool {
           case "library":    { const o = (scene as any).getLibraryInstanceById(id); if (o) (scene as any).removeLibraryInstance(o); break; }
           case "door":       { const o = (scene as any).getDoorById?.(id);          if (o) (scene as any).removeDoor(o); break; }
           case "stair":      { const o = (scene as any).getStairById?.(id);         if (o) (scene as any).removeStair(o); break; }
+          case "infobox":    { const o = (scene as any).getInfoBoxById?.(id);       if (o) (scene as any).removeInfoBox(o); break; }
         }
       } catch { /* ignore individual failures */ }
     }
@@ -5388,6 +5401,7 @@ export class SelectTool {
       case "document":   return s.getDocumentById?.(id);
       case "library":    return s.getLibraryInstanceById?.(id);
       case "stair":      return s.getStairById?.(id);
+      case "infobox":    return s.getInfoBoxById?.(id);
       default: return null;
     }
   }
