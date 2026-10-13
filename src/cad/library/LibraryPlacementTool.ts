@@ -2,8 +2,8 @@
  * LibraryPlacementTool — Platzierung von Bibliotheksobjekten.
  *
  * Ablauf (analog zum bewährten Sticker-Ablauf, aber eigenständig):
- *   „placing“  → Geist-Vorschau folgt dem Cursor, Klick setzt den Ankerpunkt
- *   „rotating“ → Anker fix, Mausbewegung dreht, Klick bestätigt
+ *   „placing“  → Geist-Vorschau folgt dem Cursor, Klick setzt das Objekt
+ *   Drehen/Spiegeln/Maße kommen aus dem Vorschaufenster (1:1 übernommen)
  *   Esc        → Abbruch
  */
 import { v, type Vec2 } from "../geometry";
@@ -14,7 +14,7 @@ import { snapshotPoints, transformSnapshots } from "./libraryGeometry";
 import type { LibraryDefinition } from "./types";
 import { SelectionType, ToolIds } from "../constants";
 
-type Phase = "idle" | "placing" | "rotating";
+type Phase = "idle" | "placing";
 
 export class LibraryPlacementTool {
   app: CadApp;
@@ -25,6 +25,12 @@ export class LibraryPlacementTool {
   anchor: Vec2 | null = null;
   rotationRad = 0;
   scale = 1;
+  /** Unabhängige Achsenskalierung (Breite/Länge aus dem Vorschaufenster). */
+  scaleX = 1;
+  scaleY = 1;
+  /** Spiegelung des echten Objekts (wird bei der Platzierung übernommen). */
+  mirrorX = false;
+  mirrorY = false;
 
   /** UI-Callback (Panel-Status). */
   onStateChange?: () => void;
@@ -36,7 +42,24 @@ export class LibraryPlacementTool {
   get activeDefinitionId(): string | null { return this.activeDef?.id || null; }
 
   /** Bezugspunkt für den zentralen Hilfslinien-Controller. */
-  getGuideAnchor(): Vec2 | null { return this.phase === "rotating" ? this.anchor : null; }
+  getGuideAnchor(): Vec2 | null { return null; }
+
+  /** Effektive Transformation (ohne Position) – Vorschau und Objekt identisch. */
+  getTransform() {
+    return {
+      rotationRad: this.rotationRad,
+      scaleX: this.scaleX * (this.mirrorX ? -1 : 1),
+      scaleY: this.scaleY * (this.mirrorY ? -1 : 1),
+    };
+  }
+
+  setRotationDeg(deg: number) { this.rotationRad = (deg * Math.PI) / 180; this.onStateChange?.(); }
+  setMirror(mx: boolean, my: boolean) { this.mirrorX = mx; this.mirrorY = my; this.onStateChange?.(); }
+  setScale(sx: number, sy: number) {
+    if (sx > 0 && isFinite(sx)) this.scaleX = sx;
+    if (sy > 0 && isFinite(sy)) this.scaleY = sy;
+    this.onStateChange?.();
+  }
 
   /** Nur relevant, wenn tatsächlich platziert wird (siehe `beginPlacement`). */
   activate() {
@@ -72,6 +95,10 @@ export class LibraryPlacementTool {
     this.anchor = null;
     this.rotationRad = 0;
     this.scale = scale > 0 ? scale : 1;
+    this.scaleX = this.scale;
+    this.scaleY = this.scale;
+    this.mirrorX = false;
+    this.mirrorY = false;
     (this.app as any).activeTool = this;
     this.activate();
     this.app.clearSelection();
@@ -83,21 +110,10 @@ export class LibraryPlacementTool {
     if (!this.activeDef || this.phase === "idle") return;
     const mouseW = v(input.mouse.wx, input.mouse.wy);
 
-    if (this.phase === "placing") {
-      if (input.clicked) {
-        const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
-        this.anchor = (snap && snap.world) ? { x: snap.world.x, y: snap.world.y } : mouseW;
-        this.phase = "rotating";
-        this.onStateChange?.();
-      }
-      return;
-    }
-
-    if (this.phase === "rotating" && this.anchor) {
-      let a = Math.atan2(mouseW.y - this.anchor.y, mouseW.x - this.anchor.x);
-      if (input.keys.shift) a = Math.round(a / (Math.PI / 4)) * (Math.PI / 4);
-      this.rotationRad = a;
-      if (input.clicked) this.commit();
+    if (this.phase === "placing" && input.clicked) {
+      const snap = this.app.topology.findBestSnap(v(input.mouse.sx, input.mouse.sy), mouseW);
+      this.anchor = (snap && snap.world) ? { x: snap.world.x, y: snap.world.y } : mouseW;
+      this.commit();
     }
   }
 
@@ -110,9 +126,7 @@ export class LibraryPlacementTool {
           definitionId: def.id,
           definitionVersion: def.version,
           position: { x: anchor.x, y: anchor.y },
-          rotationRad: this.rotationRad,
-          scaleX: this.scale,
-          scaleY: this.scale,
+          ...this.getTransform(),
           labelId: this.app.activeDrawLabelId,
         });
     const run = (this.app as any).runAction;
@@ -134,8 +148,7 @@ export class LibraryPlacementTool {
 
   onKeyDown(e: KeyboardEvent): boolean {
     if (e.key === "Escape" && this.phase !== "idle") {
-      if (this.phase === "rotating") { this.phase = "placing"; this.anchor = null; }
-      else this.cancel();
+      this.cancel();
       this.onStateChange?.();
       return true;
     }
@@ -147,7 +160,7 @@ export class LibraryPlacementTool {
     const input: any = (this.app as any).input;
     const pos = this.anchor || { x: input?.mouse?.wx ?? 0, y: input?.mouse?.wy ?? 0 };
     const snaps = transformSnapshots(this.activeDef.geometry, {
-      position: pos, rotationRad: this.rotationRad, scaleX: this.scale, scaleY: this.scale,
+      position: pos, ...this.getTransform(),
     });
     ctx.save();
     ctx.strokeStyle = "rgba(120,110,255,0.9)";

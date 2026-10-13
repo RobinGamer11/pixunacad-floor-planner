@@ -1,3 +1,4 @@
+import { snapRotationDeg } from "@/components/cad/LibraryPlacementPreview";
 import { describe, expect, it, vi } from "vitest";
 import { SelectionType, ToolIds, PointEditAction } from "../constants";
 import { v } from "../geometry";
@@ -82,7 +83,7 @@ describe("Bibliotheksobjekt-Platzierung und -Transformation", () => {
     };
     const tool = new LibraryPlacementTool(app as unknown as import("../CadApp").CadApp);
     tool.activeDef = definition;
-    tool.phase = "rotating";
+    tool.phase = "placing";
     tool.anchor = v(3, 4);
     tool.rotationRad = Math.PI / 3;
 
@@ -99,6 +100,36 @@ describe("Bibliotheksobjekt-Platzierung und -Transformation", () => {
       handleIndex: null,
     });
     expect(commitHistorySnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it("übernimmt Drehung, Spiegelung und Maße aus dem Vorschaufenster 1:1 ins Objekt", () => {
+    const scene = new Scene();
+    const app = {
+      scene, activeDrawLabelId: "default-line", setTool: vi.fn(), setSelection: vi.fn(),
+      commitHistorySnapshot: vi.fn(), refreshLabelUI: vi.fn(),
+      pointEditMenu: { hide: vi.fn() }, hub: { hide: vi.fn() }, renderer: { overlay: null },
+    };
+    const tool = new LibraryPlacementTool(app as unknown as import("../CadApp").CadApp);
+    tool.activeDef = definition;
+    tool.phase = "placing";
+    tool.anchor = v(0, 0);
+    tool.setRotationDeg(90);
+    tool.setScale(2, 3);
+    tool.setMirror(true, false);
+    tool.commit();
+    const placed = scene.libraryInstances[0];
+    expect(placed.rotationRad).toBeCloseTo(Math.PI / 2);
+    expect(placed.scaleX).toBe(-2);
+    expect(placed.scaleY).toBe(3);
+  });
+
+  it("rastet den Drehregler bei 0/45/90/270/360° ein", () => {
+    expect(snapRotationDeg(43)).toBe(45);
+    expect(snapRotationDeg(92)).toBe(90);
+    expect(snapRotationDeg(268)).toBe(270);
+    expect(snapRotationDeg(358)).toBe(360);
+    expect(snapRotationDeg(2)).toBe(0);
+    expect(snapRotationDeg(60)).toBe(60);
   });
 
   it("verschiebt nur die Instanz vom gewählten Fangpunkt aus", () => {

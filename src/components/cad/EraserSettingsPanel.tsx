@@ -97,9 +97,10 @@ export const EraserModeSelect: React.FC<Props> = ({ app, rasterSelection = null 
         })}
       </div>
       {(mode === "smooth" || !smoothAllowed) && (
-        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] leading-snug" style={{ color: "hsl(var(--notice-beige))" }}>
-          <TriangleAlert size={12} className="shrink-0" />
-          <span>Weich nur bei Bilddateien (PNG/JPG).</span>
+        <div className="mt-2 flex items-center gap-2 rounded-md border-2 px-2.5 py-2 text-[12px] font-bold leading-snug"
+          style={{ color: "hsl(var(--notice-beige))", borderColor: "hsl(var(--notice-beige))", background: "hsl(var(--notice-beige) / 0.12)" }}>
+          <TriangleAlert size={18} className="shrink-0" />
+          <span>Weich nur bei Bilddateien (PNG/JPG)</span>
         </div>
       )}
     </div>
@@ -113,8 +114,6 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
   const [strength, setStrength] = useState(1);
   const [mode, setMode] = useState<"hard" | "smooth">("hard");
   const [softness, setSoftness] = useState(0.5);
-  /** Aus dem Schraffur-Werkzeug hierher verschoben: Kanten nach Radieren glätten. */
-  const [smoothEdges, setSmoothEdges] = useState(true);
   const smoothAllowed = useRasterSelection(app, rasterSelection);
 
   useEffect(() => {
@@ -123,7 +122,6 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
     setStrength(app.defaultEraserStrength);
     setMode(app.defaultEraserMode ?? "hard");
     setSoftness(app.defaultEraserSoftness ?? 0.5);
-    setSmoothEdges((app as any).defaultHatchAutoSmooth !== false);
   }, [app]);
 
   // Modus-Wechsel aus der Modus-Leiste oberhalb spiegeln.
@@ -135,8 +133,6 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
 
   if (!app) return null;
 
-  const framedBtn = "w-full flex items-center justify-between gap-2 h-9 px-2 rounded-md border text-xs transition-colors hover:bg-muted";
-  const framedStyle = { borderColor: "hsl(var(--hairline))" } as React.CSSProperties;
 
   return (
     <div className="space-y-3 text-xs">
@@ -167,19 +163,6 @@ export const EraserSettingsPanel: React.FC<Props> = ({ app, variant = "workspace
         </label>
       )}
 
-      <button
-        type="button"
-        onClick={() => { (app as any).defaultHatchAutoSmooth = !((app as any).defaultHatchAutoSmooth !== false); setSmoothEdges((app as any).defaultHatchAutoSmooth !== false); }}
-        aria-pressed={smoothEdges}
-        className={framedBtn}
-        style={framedStyle}
-      >
-        <span>Kanten glätten</span>
-        <span className="text-[11px] px-1.5 py-0.5 rounded border"
-          style={{ borderColor: "hsl(var(--hairline))", color: smoothEdges ? "hsl(var(--cad-accent))" : "hsl(var(--muted-foreground))" }}>
-          {smoothEdges ? "An" : "Aus"}
-        </span>
-      </button>
 
     </div>
   );

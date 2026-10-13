@@ -232,7 +232,6 @@ export class CadApp {
   defaultHatchStrokeWidthPx = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct = Defaults.hatchFillAlphaPct;
   /** Radierte Schraffur-Kanten automatisch glätten. */
-  defaultHatchAutoSmooth = true;
   defaultHatchPatternEnabled = false;
   defaultHatchPatternId = "mauerwerk";
   defaultHatchPatternScale = 60;

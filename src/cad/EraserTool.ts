@@ -101,7 +101,6 @@ export class EraserTool {
       if (this._erasing) {
         // Maus losgelassen → Schraffur-Pfad ausstanzen und History-Schritt setzen.
         this._commitHatchErase();
-        this._finalizeSmooth();
         (this.app as any).commitHistorySnapshot?.();
         (this.app as any).onEraseStrokeEnd?.();
       }
@@ -164,35 +163,18 @@ export class EraserTool {
         ...copyStrokeEffects(hatch),
       };
 
-      // Original-Ecken merken → nur die neuen (radierten) Kanten werden geglättet.
-      const origKeys = new Set<string>();
-      for (const p of hatch.points) origKeys.add(this._key(p.x, p.y));
-      for (const h of hatch.holes || []) for (const p of h) origKeys.add(this._key(p.x, p.y));
-
       scene.removeHatch(hatch);
       if (this.app.selection && (this.app.selection as any).hatchId === hatch.id) this.app.setSelection(null);
-      // Während des Radierens roh schneiden (schnell, keine Punktvermehrung);
-      // geglättet wird einmalig beim Loslassen in `_finalizeSmooth`.
-      this._touchedHatches.delete(hatch.id);
       for (const poly of result || []) {
         const rings = poly
           .map((ring: number[][]) => this._rawRing(ring))
           .filter((ring: Vec2[]) => ring.length > 2 && Math.abs(this._ringArea(ring)) > minArea);
         const outer = rings[0];
         if (!outer || outer.length < 3) continue;
-        for (const ring of rings) for (const q of ring) {
-          const k = this._key(q.x, q.y);
-          if (!origKeys.has(k)) this._cutKeys.add(k);
-        }
-        const created: any = scene.createHatch(outer, { ...style, holes: rings.slice(1) });
-        if (created?.id) this._touchedHatches.add(created.id);
+        scene.createHatch(outer, { ...style, holes: rings.slice(1) });
       }
 
     }
-  }
-
-  private _key(x: number, y: number) {
-    return `${x.toFixed(5)}|${y.toFixed(5)}`;
   }
 
   private _ringArea(ring: Vec2[]): number {
@@ -209,37 +191,6 @@ export class EraserTool {
     const pts = ring.map((p) => v(p[0], p[1]));
     if (pts.length > 1 && dist(pts[0], pts[pts.length - 1]) < 1e-9) pts.pop();
     return pts;
-  }
-
-  private _cutKeys = new Set<string>();
-  private _touchedHatches = new Set<string>();
-
-  /**
-   * Kanten glätten: einmal pro Radierzug. Neue Radierkanten werden erst
-   * vereinfacht (weniger Punkte) und dann leicht gerundet; Original-Ecken
-   * bleiben exakt erhalten.
-   */
-  private _finalizeSmooth() {
-    const auto = (this.app as any).defaultHatchAutoSmooth !== false;
-    const ids = [...this._touchedHatches];
-    const cut = this._cutKeys;
-    this._touchedHatches = new Set();
-    this._cutKeys = new Set();
-    if (!auto || !ids.length) return;
-    const r = this.app.defaultEraserRadiusM;
-    const tol = Math.max(0.0005, r * 0.04);
-    const scene: any = this.app.scene;
-    for (const id of ids) {
-      const h = scene.getHatchById?.(id);
-      if (!h) continue;
-      const fix = (ring: Vec2[]) => smoothCutRing(ring, ring.map((q) => cut.has(this._key(q.x, q.y))), tol);
-      const outer = fix(h.points);
-      if (outer.length < 3) continue;
-      h.points = outer;
-      h.bulges = outer.map(() => 0);
-      h.holes = (h.holes || []).map(fix).filter((x: Vec2[]) => x.length > 2);
-      h.holeBulges = h.holes.map((x: Vec2[]) => x.map(() => 0));
-    }
   }
 
   private _circleRing(c: Vec2, r: number, n = 24): number[][] {
@@ -495,64 +446,4 @@ export class EraserTool {
 
     ctx.restore();
   }
-}
-
-
-/** Douglas-Peucker auf einem offenen Punktzug. */
-function rdp(pts: Vec2[], tol: number): Vec2[] {
-  if (pts.length < 3) return pts.slice();
-  const a = pts[0], b = pts[pts.length - 1];
-  let idx = -1, max = 0;
-  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1e-12;
-  for (let i = 1; i < pts.length - 1; i++) {
-    const d = Math.abs((pts[i].x - a.x) * dy - (pts[i].y - a.y) * dx) / len;
-    if (d > max) { max = d; idx = i; }
-  }
-  if (max <= tol) return [a, b];
-  const l = rdp(pts.slice(0, idx + 1), tol);
-  return l.slice(0, -1).concat(rdp(pts.slice(idx), tol));
-}
-
-/**
- * Vereinfacht Läufe neuer Radierpunkte (RDP) und rundet sie mit einem
- * Chaikin-Durchgang. Ergebnis hat weniger Punkte als die Rohkante.
- */
-export function smoothCutRing(ring: Vec2[], isCut: boolean[], tol: number): Vec2[] {
-  const n = ring.length;
-  if (n < 4 || !isCut.some(Boolean)) return ring.slice();
-  // Ring an einem Originalpunkt beginnen lassen (falls vorhanden).
-  let start = isCut.findIndex((c) => !c);
-  if (start < 0) start = 0;
-  const P = [...ring.slice(start), ...ring.slice(0, start)];
-  const C = [...isCut.slice(start), ...isCut.slice(0, start)];
-  const allCut = C.every(Boolean);
-  // 1) Vereinfachen
-  const simp: Vec2[] = []; const flag: boolean[] = [];
-  if (allCut) {
-    const s = rdp([...P, P[0]], tol).slice(0, -1);
-    for (const q of s) { simp.push(q); flag.push(true); }
-  } else {
-    let i = 0;
-    while (i < n) {
-      if (!C[i]) { simp.push(P[i]); flag.push(false); i++; continue; }
-      let j = i; while (j < n && C[j]) j++;
-      const prev = P[i - 1], next = P[j % n];
-      const run = rdp([prev, ...P.slice(i, j), next], tol).slice(1, -1);
-      for (const q of run) { simp.push(q); flag.push(true); }
-      i = j;
-    }
-  }
-  if (simp.length < 3) return ring.slice();
-  // 2) Ein Chaikin-Durchgang nur an neuen Kanten
-  const out: Vec2[] = [];
-  const m = simp.length;
-  for (let i = 0; i < m; i++) {
-    const a = simp[i], b = simp[(i + 1) % m];
-    if (!flag[i]) out.push(a);
-    if (flag[i] || flag[(i + 1) % m]) {
-      out.push(v(a.x * 0.75 + b.x * 0.25, a.y * 0.75 + b.y * 0.25));
-      out.push(v(a.x * 0.25 + b.x * 0.75, a.y * 0.25 + b.y * 0.75));
-    }
-  }
-  return out.length >= 3 ? out : simp;
 }

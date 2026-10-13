@@ -176,6 +176,10 @@ export function transformSnapshot(snap: LibraryGeometrySnapshot, t: LibraryTrans
   const s = avgScale(t);
   const d: any = JSON.parse(JSON.stringify(snap.data));
   const P = (p: Pt) => txPoint(p, t, cs, sn);
+  // Spiegelung kehrt den Umlaufsinn um → Bogenrichtung (bulge) mitdrehen.
+  const flip = t.scaleX * t.scaleY < 0;
+  const negB = (b: any) => Array.isArray(b) ? b.map((x: any) => Array.isArray(x) ? x.map((y: number) => -y) : -x) : (typeof b === "number" ? -b : b);
+  if (flip) { if (d.bulges != null) d.bulges = negB(d.bulges); if (d.holeBulges != null) d.holeBulges = negB(d.holeBulges); }
 
   switch (snap.kind) {
     case "segment":
