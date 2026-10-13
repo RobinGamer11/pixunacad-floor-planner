@@ -5,9 +5,22 @@ import { initialsOf } from "@/lib/infoBoxUi";
 import { SelectTool } from "./SelectTool";
 
 describe("Infobox", () => {
-  it("selection follows the fixed-size pin bounds rather than the old card area", () => {
-    const points = (SelectTool.prototype as any)._elementPoints.call({ app: { camera: { scale: 80 } } }, "infobox", { x: 1, y: 2, sizePx: 240 });
-    expect(points).toEqual([{ x: 0.8, y: 1.6 }, { x: 1.2, y: 1.6 }, { x: 1.2, y: 2 }, { x: 0.8, y: 2 }]);
+  it("Standardbreite 0,50 m, unabhängig vom Zoom", () => {
+    for (const scale of [20, 80, 400]) {
+      const points = (SelectTool.prototype as any)._elementPoints.call({ app: { camera: { scale } } }, "infobox", { x: 1, y: 2 });
+      expect(points[1].x - points[0].x).toBeCloseTo(0.5);
+    }
+  });
+  it("eingestellte Breite wird übernommen und gespeichert", () => {
+    const points = (SelectTool.prototype as any)._elementPoints.call({ app: {} }, "infobox", { x: 0, y: 0, sizeM: 2 });
+    expect(points[1].x - points[0].x).toBeCloseTo(2);
+    const s = new Scene();
+    s.createInfoBox({ x: 0, y: 0, sizeM: 1.25 });
+    expect(serializeInfoBox(s.infoBoxes[0]).sizeM).toBe(1.25);
+  });
+  it("neue Infobox ist standardmäßig eine Information", () => {
+    const s = new Scene();
+    expect(s.createInfoBox({ x: 0, y: 0 }).kind).toBe("info");
   });
   it("wird gespeichert und geladen (Ebene, Art, Status, Größe)", () => {
     const s = new Scene();
