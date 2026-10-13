@@ -21,7 +21,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       const cam = app?.camera;
       const boxes: any[] = app?.scene?.infoBoxes || [];
       const key = cam
-        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.sizePx}${b.labelId}${b.authorInitials}${b.categoryId}`).join(",")}|${(app?.scene?.infoBoxCategories || []).map((c: any) => c.id + c.name + c.color).join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
+        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.sizePx}${b.labelId}${b.authorInitials}${b.categoryId}`).join(",")}|${(app?.scene?.infoBoxCategories || []).map((c: any) => c.id + c.name + c.color).join()}|${((app?.selectTool?.marqueeSelectedIds || []) as any[]).filter((m) => m.kind === "infobox").map((m) => m.id).join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
         : "";
       if (key !== last) { last = key; force(); }
       raf = requestAnimationFrame(tick);
@@ -75,7 +75,8 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     >
       {boxes.filter(visible).map((b) => {
         const p = cam.worldToScreen(b.x, b.y);
-        const active = sel.selectedId === b.id;
+        const active = sel.selectedId === b.id
+          || ((app.selectTool?.marqueeSelectedIds || []) as any[]).some((m) => m.kind === "infobox" && m.id === b.id);
         const task = b.kind === "task";
         const cat = (app.scene?.infoBoxCategories || []).find((c: any) => c.id === b.categoryId);
         const statusVar = b.status === "done" ? "--infobox-done" : "--infobox-open";
@@ -84,7 +85,24 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
             key={b.id}
             role="button"
             title={b.title || "Infobox"}
-            onPointerDown={(e) => { e.stopPropagation(); infoBoxUi.select(b.id); }}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              const st = app.selectTool;
+              const selectToolOn = !ui.mode && st && app.activeTool === st;
+              if (selectToolOn && e.shiftKey) {
+                // Shift: zur Mehrfachauswahl hinzufügen/entfernen.
+                const cur: any[] = st.marqueeSelectedIds || [];
+                if (!cur.length) st._seedMarqueeFromSelection?.();
+                const list: any[] = st.marqueeSelectedIds || [];
+                const i = list.findIndex((m) => m.kind === "infobox" && m.id === b.id);
+                st.marqueeSelectedIds = i >= 0 ? list.filter((_, j) => j !== i) : [...list, { kind: "infobox", id: b.id }];
+                infoBoxUi.clear();
+              } else {
+                if (st) st.marqueeSelectedIds = [{ kind: "infobox", id: b.id }];
+                infoBoxUi.select(b.id);
+              }
+              app.renderer?.render?.();
+            }}
             className="absolute rounded-md px-2 py-1.5 text-[11.5px] leading-tight shadow-md cursor-pointer select-none"
             style={{
               left: p.x, top: p.y, width: b.sizePx || 180, pointerEvents: "auto",

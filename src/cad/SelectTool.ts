@@ -5026,11 +5026,7 @@ export class SelectTool {
       ["libraryInstanceId", "library"],
       ["stairId", "stair"],
     ];
-    const ib = (globalThis as any).__pixunaInfoBoxSelectedId;
-    if (typeof ib === "string" && ib && (this.app.scene as any).getInfoBoxById?.(ib)) {
-      this.marqueeSelectedIds = [{ kind: "infobox", id: ib }];
-      return;
-    }
+
     for (const [prop, kind] of map) {
       const id = sel[prop];
       if (typeof id === "string" && id) {

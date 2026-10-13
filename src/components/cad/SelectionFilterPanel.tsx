@@ -22,6 +22,7 @@ export const SelectionFilterPanel: React.FC<{ app: CadApp }> = ({ app }) => {
 
   const ctx: FilterContext = useMemo(() => ({
     layers: ((app as any).labelManager?.list?.() ?? []).map((l: any) => ({ id: l.id, name: l.name })),
+    infoBoxCategories: (((app as any).scene?.infoBoxCategories ?? []) as any[]).map((c: any) => ({ id: c.id, name: c.name })),
   }), [app, count]);
 
   // Vorhandene Objekttypen und Farben im Plan (für Auswahl und Vorschläge).
