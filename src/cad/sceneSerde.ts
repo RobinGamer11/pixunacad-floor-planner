@@ -26,6 +26,7 @@ export interface SerializedScene {
   doors?: any[];
   stairs?: any[];
   infoBoxes?: any[];
+  infoBoxCategories?: any[];
 }
 
 /** Deserialize a scene JSON into the given Scene instance (in-place). */
@@ -44,6 +45,7 @@ export function restoreOneScene(scene: Scene, raw: SerializedScene | null | unde
   scene.doors = [];
   (scene as any).stairs = [];
   (scene as any).infoBoxes = [];
+  (scene as any).infoBoxCategories = [];
   scene.rulerGuide = null;
   scene.markWallsDirty();
   (scene as any)._rebuildSegIdMap?.();
@@ -250,4 +252,7 @@ function appendSceneObjectsInner(scene: Scene, data: SerializedScene): void {
     if (!b || !isFinite(b.x) || !isFinite(b.y)) continue;
     (scene as any).createInfoBox?.({ ...b });
   }
+  (scene as any).infoBoxCategories = (data.infoBoxCategories || [])
+    .filter((c: any) => c && typeof c.id === "string" && typeof c.name === "string")
+    .map((c: any) => ({ id: c.id, name: c.name, color: typeof c.color === "string" ? c.color : "#c9a96e" }));
 }

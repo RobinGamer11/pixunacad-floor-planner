@@ -315,7 +315,7 @@ const readFile = (f: File) => new Promise<string>((res, rej) => {
 
 const fmtMB = (b: number) => (b / (1024 * 1024)).toFixed(1).replace(".", ",");
 
-const AttachmentsSection: React.FC<{ app: any; obj: any }> = ({ app, obj }) => {
+export const AttachmentsSection: React.FC<{ app: any; obj: any }> = ({ app, obj }) => {
   const [, force] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
   const [preview, setPreview] = useState<ObjectAttachment | null>(null);
