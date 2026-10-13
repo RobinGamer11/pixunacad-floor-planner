@@ -226,7 +226,8 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
     if (!app || !instanceDefId) return;
     const d = app.getLibraryDefinition(instanceDefId);
     if (!d) return;
-    setMode((m) => (m.kind === "edit" && m.id === d.id ? m : (setMeta(metaFromDefinition(d)), { kind: "edit", id: d.id })));
+    setMeta(metaFromDefinition(d));
+    setMode({ kind: "edit", id: d.id });
   }, [app, instanceDefId, metaFromDefinition]);
 
   const categories = useMemo(
