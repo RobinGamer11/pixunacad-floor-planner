@@ -18,6 +18,7 @@ import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
 import { CadCommentLayer } from "@/components/cad/CadCommentLayer";
+import LibraryPlacementPreview from "@/components/cad/LibraryPlacementPreview";
 import { CadPresenceBar } from "@/components/cad/CadPresenceBar";
 import { CadCollabOverlay } from "@/components/cad/CadCollabOverlay";
 import { useCadCollab } from "@/lib/cadCollab/useCadCollab";
@@ -2176,6 +2177,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {!presenting && (
           <CadCollabOverlay app={appRef.current} status={collab.status} session={collab.session} />
         )}
+
+        {!presenting && <LibraryPlacementPreview app={appRef.current} />}
 
         {/* Kommentare (DOM-Overlay, kein Zeichenobjekt) */}
         {!presenting && (
