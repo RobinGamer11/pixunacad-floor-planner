@@ -281,6 +281,7 @@ export class IdPanel {
         this.app.scene.reassignTextBoxesLabel(group.id, fallbackId);
         (this.app.scene as any).reassignTablesLabel?.(group.id, fallbackId);
         (this.app.scene as any).reassignStairsLabel?.(group.id, fallbackId);
+        (this.app.scene as any).reassignInfoBoxesLabel?.(group.id, fallbackId);
         this.app.labelManager.deleteGroup(group.id);
         if (this.app.activeDrawLabelId === group.id) {
           this.app.setActiveDrawLabelId(fallbackId);

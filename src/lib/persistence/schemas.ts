@@ -101,6 +101,14 @@ export function migrateSceneData<T>(scene: T): T {
     fill(s, "direction", "up");
   });
 
+  // Infoboxen (additiv).
+  fill(scene, "infoBoxes", []);
+  mapArray(scene, "infoBoxes", (b) => {
+    fill(b, "kind", "info");
+    fill(b, "status", "open");
+    fill(b, "sizePx", 180);
+  });
+
   mapArray(scene, "tables", (t) => {
     fill(t, "rotationRad", 0);
     fill(t, "scale", 1);

@@ -55,7 +55,7 @@ import { RulerTool } from "./RulerTool";
 import { EraserTool } from "./EraserTool";
 import { WallTool } from "./WallTool";
 import { DoorTool } from "./DoorTool";
-import { serializeStair } from "./Scene";
+import { serializeStair, serializeInfoBox } from "./Scene";
 import { StairTool } from "./StairTool";
 
 import { IdPanel } from "./IdPanel";
@@ -982,6 +982,7 @@ export class CadApp {
         labelId: d.labelId,
       })),
       stairs: ((scene as any).stairs || []).map(serializeStair),
+      infoBoxes: ((scene as any).infoBoxes || []).map(serializeInfoBox),
 
     };
   }

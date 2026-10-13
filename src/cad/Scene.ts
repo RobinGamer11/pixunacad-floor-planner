@@ -1027,6 +1027,41 @@ export function serializeStair(s: Stair): any {
   };
 }
 
+/**
+ * Infobox (früher Kommentar): Zeichenobjekt mit fester Bildschirmgröße.
+ * Liegt in Ebene + Objekt-ID-System; kein Export-Inhalt.
+ */
+export class InfoBox {
+  id: string;
+  labelId: string = Defaults.defaultLabelId;
+  x = 0;
+  y = 0;
+  /** "info" = Information, "task" = Aufgabe. */
+  kind: "info" | "task" = "info";
+  status: "open" | "done" = "open";
+  title = "";
+  desc = "";
+  categoryId: string | null = null;
+  /** Kürzel der erstellenden Person (Aufgabe). */
+  authorInitials = "";
+  /** Feste Breite in Bildschirmpixeln (zoomt nicht mit). */
+  sizePx = 180;
+  showPreview = true;
+  constructor(init: Partial<InfoBox> & { id: string }) {
+    Object.assign(this, init);
+    this.id = init.id;
+    this.labelId = init.labelId || Defaults.defaultLabelId;
+  }
+}
+
+export function serializeInfoBox(b: InfoBox): any {
+  return {
+    id: b.id, labelId: b.labelId, x: b.x, y: b.y, kind: b.kind, status: b.status,
+    title: b.title, desc: b.desc, categoryId: b.categoryId, authorInitials: b.authorInitials,
+    sizePx: b.sizePx, showPreview: b.showPreview,
+  };
+}
+
 export class Scene {
   segments: Segment[] = [];
   freeStrokes: FreeStroke[] = [];
@@ -1042,6 +1077,8 @@ export class Scene {
   doors: Door[] = [];
   /** Semantische Treppen (Stufen werden nur abgeleitet). */
   stairs: Stair[] = [];
+  /** Infoboxen (Information / Aufgabe). */
+  infoBoxes: InfoBox[] = [];
   /**
    * Wenn !== null: alle danach via create* erzeugten Objekte werden mit dieser
    * Edit-Owner-ID markiert (Alt-Mechanismus, aktuell ungenutzt und immer null).
@@ -1859,6 +1896,16 @@ export class Scene {
     this.stairs.push(st);
     return st;
   }
+  createInfoBox(init: Partial<InfoBox>): InfoBox {
+    const b = new InfoBox({ ...init, id: init.id || this._makeId() });
+    this.infoBoxes.push(b);
+    return b;
+  }
+  getInfoBoxById(id: string): InfoBox | null { return this.infoBoxes.find(b => b.id === id) || null; }
+  getInfoBoxesByLabelId(labelId: string): InfoBox[] { return this.infoBoxes.filter(b => b.labelId === labelId); }
+  removeInfoBox(b: InfoBox) { this.infoBoxes = this.infoBoxes.filter(x => x !== b); }
+  assignInfoBoxesToLabel(ids: string[], labelId: string) { const set = new Set(ids); for (const b of this.infoBoxes) if (set.has(b.id)) b.labelId = labelId; }
+  reassignInfoBoxesLabel(oldId: string, newId: string) { for (const b of this.infoBoxes) if (b.labelId === oldId) b.labelId = newId; }
   getStairById(id: string): Stair | null { return this.stairs.find(s => s.id === id) || null; }
   getStairsByLabelId(labelId: string): Stair[] { return this.stairs.filter(s => s.labelId === labelId); }
   removeStair(st: Stair) { this.stairs = this.stairs.filter(s => s !== st); }

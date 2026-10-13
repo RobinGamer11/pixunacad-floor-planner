@@ -13,14 +13,14 @@ import { OBJECT_TYPE_LABELS, objectTypeKey } from "./selectionFilter";
 
 export const SCENE_OBJECT_KEYS = [
   "segments", "hatches", "walls", "dimensions", "textBoxes", "tables",
-  "libraryInstances", "documents", "freeStrokes", "doors", "stairs",
+  "libraryInstances", "documents", "freeStrokes", "doors", "stairs", "infoBoxes",
 ] as const;
 
 /** Auswahl-Art (wie in SelectTool) je Szenen-Liste. */
 const KIND_OF_KEY: Record<string, string> = {
   segments: "segment", hatches: "hatch", walls: "wall", dimensions: "dimension",
   textBoxes: "textbox", tables: "table", libraryInstances: "library", documents: "document",
-  freeStrokes: "freeStroke", doors: "door", stairs: "stair",
+  freeStrokes: "freeStroke", doors: "door", stairs: "stair", infoBoxes: "infobox",
 };
 
 export interface ObjectAttachment { id: string; name: string; type: string; size: number; dataUrl: string }

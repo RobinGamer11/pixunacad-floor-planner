@@ -31,6 +31,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 Änderungen, Dateien, Tests, Build, Push-Status, Commit; Ende mit PowerShell-Befehl.
 
 ## Architekturregeln
+- Unterordner haben eigene `AGENTS.md` – vor Änderungen dort lesen (z. B. `src/cad/AGENTS.md`).
 - Öffnen/Laden folgt nur `decideOpen` in `src/lib/cloudProjectState.ts` – Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
 - CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`) – sonst fehlen sie auf dem zweiten Gerät.
 - `ProjectAccess.cloud` und `.shared` sind getrennt; Realtime/Präsenz/Sperren nur bei weiteren Personen – keine Team-Kosten für Solo-Projekte.
@@ -38,11 +39,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Export = dieselbe `CadApp` (`?view=export`), Mutationen nur `CadApp.mutatePlans` (s. `docs/export-architecture.md`).
 - Export-Bedienzustände sind lokal/flüchtig, nie Cloud/Undo/Snapshot/localStorage; Fangpunkte von Hintergrundseiten nur über `TopologyEngine.tracingSnapScenes`.
 - Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt nur den Projekt-Payload (nie CAD/Export).
-- Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
-- Treppen-Knöpfe = DOM, nie Geometrie; Cursor-Reset in `CadApp.setTool`.
 - Export-Ausschnitt: Sitzung in `PlanController` (`_drag.preview`), Projection erst bei ✓/Enter.
-- Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges`.
-- Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M`); Podeste wachsen nie automatisch.
 
 ## Hilfslinien
 - Hilfslinien-Geometrie (Punkte, Kanten, anliegende Achsen) liefert nur `src/cad/guideGeometry.ts` aus echter Objektgeometrie (über `TopologyEngine.guideGeometry`) – nie Probeabfragen, nie Werkzeug-Sonderlogik.
@@ -55,3 +52,4 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 
 - Objektname/-ID/-Beschreibung nur über `cad/objectMeta.ts` (Serialisierung/Laden gekoppelt, Kopien ohne ID).
 - Flächen schneiden/vereinigen nur via `cad/cutGeometry.ts` (`restoreArcs` = echte Bögen).
+- Infoboxen sind Szenenobjekte (`Scene.infoBoxes`, Serialisierung wie Treppen); flüchtige Auswahl/Entwurf nur in `lib/infoBoxUi.ts`, Bearbeitung nur im Einstellungspanel – keine DB-Kommentare mehr im CAD.
