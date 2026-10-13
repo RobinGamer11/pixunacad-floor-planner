@@ -20,7 +20,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 ## 4. Prüfen & Schützen
 - Vor Abschluss: Typecheck/Lint, Build, betroffene Abläufe testen; bei Auth: Registrierung, Login, Logout, Session, Passwort-Reset, geschützte Routen. Nicht Durchgeführtes benennen.
 - Keine Features ohne Auftrag entfernen, keine Refactorings ohne Grund; Aufrufer, Stores, Hooks, Persistenz vor Änderungen per Suche prüfen; Kompilieren allein ist kein Erfolg.
-- Aufwand an Risiko anpassen; CAD-Logik, Persistenz, Supabase/Auth/RLS, Dateien, Projektdaten immer gründlich prüfen. Keine unnötigen Pakete.
+- CAD-Logik, Persistenz, Supabase/Auth/RLS, Dateien, Projektdaten immer gründlich prüfen. Keine unnötigen Pakete.
 
 ## 5. Daten, Deployment, Recht
 - Datenmodell: Nutzerdaten erhalten, nicht destruktiv, rückwärtskompatibel, Migrationen im Repo; Produktionsdaten nie ohne Freigabe löschen.
