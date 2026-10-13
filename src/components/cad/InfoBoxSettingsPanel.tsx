@@ -3,7 +3,8 @@
  * Erst die erste Eingabe setzt den Entwurf als Objekt (ein Undo-Schritt).
  */
 import React from "react";
-import { Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
+import { AttachmentsSection } from "@/components/cad/ObjectInfoTabs";
 import { infoBoxUi, initialsOf, useInfoBoxUi } from "@/lib/infoBoxUi";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ensureObjectCode, formatObjectId, setObjectName } from "@/cad/objectMeta";
@@ -124,6 +125,7 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
           {base.kind === "task" && (
             <div className="flex gap-2">{statusBtn("open", "Offen", "--infobox-open")}{statusBtn("done", "Erledigt", "--infobox-done")}</div>
           )}
+          <CategoryPicker app={app} value={base.categoryId ?? null} onChange={(id) => update({ categoryId: id })} />
           <label className="block">
             <span className="mb-1 block">Titel</span>
             <input className={inputCls} value={base.title} placeholder="Titel"
@@ -136,6 +138,8 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
               onChange={(e) => update({ desc: e.target.value }, false)}
               onBlur={() => box && app.commitHistorySnapshot?.()} />
           </label>
+          <SpotPreview app={app} x={box ? box.x : ui.draft!.x} y={box ? box.y : ui.draft!.y}
+            on={base.showPreview !== false} onToggle={() => update({ showPreview: base.showPreview === false })} />
           <div className="flex items-end gap-2 pt-1">
             <label className="block flex-1">
               <span className="mb-1 block">Größe (px)</span>
@@ -160,6 +164,118 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
                 onBlur={() => app.commitHistorySnapshot?.()} />
             </label>
           )}
+          {box && <AttachmentsSection app={app} obj={box} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DEFAULT_COLORS = ["#c9a96e", "#3b82f6", "#16a34a", "#dc2626", "#9333ea", "#ea580c"];
+
+/** Kategorie wählen, neu anlegen (Name + Farbe) oder löschen – je Blatt. */
+function CategoryPicker({ app, value, onChange }: { app: any; value: string | null; onChange: (id: string | null) => void }) {
+  const [, force] = React.useReducer((n: number) => n + 1, 0);
+  const [adding, setAdding] = React.useState(false);
+  const [name, setName] = React.useState("");
+  const [color, setColor] = React.useState(DEFAULT_COLORS[0]);
+  const cats: any[] = app.scene?.infoBoxCategories || [];
+  const cur = cats.find((c) => c.id === value) || null;
+
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    const id = `cat${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    app.runAction(() => { app.scene.infoBoxCategories = [...cats, { id, name: n, color }]; });
+    setAdding(false); setName("");
+    onChange(id);
+  };
+  const del = () => {
+    if (!cur) return;
+    app.runAction(() => {
+      app.scene.infoBoxCategories = cats.filter((c) => c.id !== cur.id);
+      for (const b of app.scene.infoBoxes || []) if (b.categoryId === cur.id) b.categoryId = null;
+    });
+    force();
+  };
+
+  return (
+    <div className="space-y-2">
+      <span className="block">Kategorie</span>
+      <div className="flex gap-2">
+        <select className="cad-settings-select h-9 min-w-0 flex-1 px-2 text-[12px]" value={value || ""}
+          onChange={(e) => onChange(e.target.value || null)}>
+          <option value="">Keine Kategorie</option>
+          {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        {cur && <span className="h-9 w-3 shrink-0 rounded" style={{ background: cur.color }} />}
+        <button type="button" title="Neue Kategorie" className="cad-toolbar-btn h-9 w-9 justify-center p-0" onClick={() => setAdding((a) => !a)}>
+          <Plus className="h-4 w-4" />
+        </button>
+        {cur && (
+          <button type="button" title="Kategorie löschen" className="cad-toolbar-btn h-9 w-9 justify-center p-0" onClick={del}>
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {adding && (
+        <div className="space-y-2 rounded-md border p-2" style={{ borderColor: "hsl(var(--cad-hub-border))" }}>
+          <input className={inputCls} value={name} placeholder="Name der Kategorie" autoFocus
+            onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+          <div className="flex items-center gap-1.5">
+            {DEFAULT_COLORS.map((c) => (
+              <button key={c} type="button" aria-label={`Farbe ${c}`} onClick={() => setColor(c)}
+                className="h-6 w-6 rounded-full" style={{ background: c, boxShadow: color === c ? "0 0 0 2px hsl(var(--foreground))" : undefined }} />
+            ))}
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-6 w-8 cursor-pointer" title="Eigene Farbe" />
+            <button type="button" onClick={add} disabled={!name.trim()} className="cad-toolbar-btn ml-auto h-8 px-3 text-[12px] font-semibold">Anlegen</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Ausschnitt der Zeichenfläche an der Stelle der Infobox (Augensymbol schaltet). */
+function SpotPreview({ app, x, y, on, onToggle }: { app: any; x: number; y: number; on: boolean; onToggle: () => void }) {
+  const ref = React.useRef<HTMLCanvasElement | null>(null);
+  const [inView, setInView] = React.useState(true);
+  React.useEffect(() => {
+    if (!on) return;
+    let raf = 0;
+    const draw = () => {
+      const c = ref.current, src: HTMLCanvasElement | undefined = app?.canvas, cam = app?.camera;
+      if (c && src && cam) {
+        const p = cam.worldToScreen(x, y);
+        const k = src.width / Math.max(1, src.clientWidth || src.width);
+        const half = 90;
+        const ok = p.x > -half && p.y > -half && p.x < (src.clientWidth || 0) + half && p.y < (src.clientHeight || 0) + half;
+        setInView(ok);
+        const ctx = c.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, c.width, c.height);
+          if (ok) ctx.drawImage(src, (p.x - half) * k, (p.y - half * 0.6) * k, half * 2 * k, half * 1.2 * k, 0, 0, c.width, c.height);
+          ctx.strokeStyle = "#c9a96e"; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(c.width / 2, c.height / 2, 6, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+      raf = window.setTimeout(() => requestAnimationFrame(draw), 250) as any;
+    };
+    draw();
+    return () => window.clearTimeout(raf);
+  }, [app, x, y, on]);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span>Vorschau der Stelle</span>
+        <button type="button" onClick={onToggle} title={on ? "Vorschau ausblenden" : "Vorschau einblenden"} className="cad-toolbar-btn h-7 w-7 justify-center p-0">
+          {on ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+        </button>
+      </div>
+      {on && (
+        <div className="relative overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--cad-hub-border))", background: "hsl(var(--card))" }}>
+          <canvas ref={ref} width={360} height={216} className="block h-auto w-full" />
+          {!inView && <div className="absolute inset-0 flex items-center justify-center text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stelle liegt außerhalb der Ansicht</div>}
         </div>
       )}
     </div>

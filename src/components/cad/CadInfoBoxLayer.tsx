@@ -21,7 +21,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       const cam = app?.camera;
       const boxes: any[] = app?.scene?.infoBoxes || [];
       const key = cam
-        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.sizePx}${b.labelId}${b.authorInitials}`).join(",")}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
+        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.sizePx}${b.labelId}${b.authorInitials}${b.categoryId}`).join(",")}|${(app?.scene?.infoBoxCategories || []).map((c: any) => c.id + c.name + c.color).join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
         : "";
       if (key !== last) { last = key; force(); }
       raf = requestAnimationFrame(tick);
@@ -77,6 +77,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
         const p = cam.worldToScreen(b.x, b.y);
         const active = sel.selectedId === b.id;
         const task = b.kind === "task";
+        const cat = (app.scene?.infoBoxCategories || []).find((c: any) => c.id === b.categoryId);
         const statusVar = b.status === "done" ? "--infobox-done" : "--infobox-open";
         return (
           <div
@@ -111,6 +112,12 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
                   Information
                 </div>
               </>
+            )}
+            {cat && (
+              <div className="mt-1 flex items-center gap-1.5 text-[10px]">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cat.color }} />
+                <span className="truncate">{cat.name}</span>
+              </div>
             )}
           </div>
         );
