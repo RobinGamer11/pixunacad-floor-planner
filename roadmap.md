@@ -1,10 +1,5 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
-## Aktueller Auftrag – Bibliothek und Infoboxen
-- [x] Bibliotheks-Rechtsklick auf überschaubare Hauptachsen begrenzen und Rahmenfangpunkte wieder anbinden
-- [ ] Frühere Infobox-Markierungen und Knopf prüfen; Platzieren, Zoom und Verschieben ohne blockierende Oberfläche testen
-- [ ] GitHub-main-Übertragung verifizieren (Lovable verwaltet Git; kein manueller Push verfügbar)
-
 ## Cutter & Bogenerhalt – 13.10.2026
 - [x] Cutter-Werkzeug (Axt-Symbol unter Lineal, 3-Schritt-Anleitung, Enter/Doppelklick teilt Objekte)
 - [x] Gewölbte Schraffurkanten beim Verbinden/Schneiden als echte Bögen erhalten
@@ -226,8 +221,10 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] SQL-Endfassung in Supabase einspielen (Nutzer)
 
 ## Radierer, Bibliothek, Infoboxen – 13.10.2026
-- [ ] Aktuelle Korrektur: Bibliotheks-Hilfslinien überschaubar halten und Rahmenpunkte wieder fangbar/rechtsklickbar machen
-- [ ] Aktuelle Korrektur: bisherige Infobox-Optik wiederherstellen und Zoomen/Verschieben im Infoboxmodus ermöglichen
+- [x] Aktuelle Korrektur: Bibliotheks-Hilfslinien überschaubar halten und Rahmenpunkte wieder fangbar/rechtsklickbar machen (Regressionstests)
+- [x] Aktuelle Korrektur: bisherige Infobox-Optik wiederherstellen und Zoomen/Verschieben im Infoboxmodus ermöglichen (Eingabetests)
+- [ ] Prüfung im angemeldeten CAD: kein verfügbarer Zugang; /cad führt zur Anmeldung
+- [ ] GitHub-main-Übertragung verifizieren: GitHub zeigt noch fc072408; Lovable verwaltet Commit/Push
 - [x] Paket 1: Kanten glätten entfernt, auffälliger Smooth-Hinweis, Bibliotheksliste schlank, Vorschaufenster mit Drehen/Spiegeln/Maßen (1:1 am Objekt)
 - [ ] Paket 2: Bearbeitung gesetzter Elemente, passgenauer Rahmen + Greifpunkte, R-Klick-Hilfslinien, „Verschieben“, Fangpunkte wie Schraffur
 - [ ] Paket 3: Infoboxen (Auswahl, Augen-Schalter, Filter im Auswahlfilter), Auswahlliste im Auswahlwerkzeug mit Shift

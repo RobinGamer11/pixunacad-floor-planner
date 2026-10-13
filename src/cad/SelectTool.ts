@@ -4883,8 +4883,8 @@ export class SelectTool {
         case "infobox": {
           // Feste Bildschirmgröße → Ausdehnung in Welt je nach Zoom.
           const k = 1 / ((this.app as any).camera?.scale || 80);
-          const w = (obj.sizePx || 180) * k, h = 44 * k;
-          return [{ x: obj.x, y: obj.y }, { x: obj.x + w, y: obj.y }, { x: obj.x + w, y: obj.y + h }, { x: obj.x, y: obj.y + h }] as any;
+          const half = 16 * k, h = 32 * k;
+          return [{ x: obj.x - half, y: obj.y - h }, { x: obj.x + half, y: obj.y - h }, { x: obj.x + half, y: obj.y }, { x: obj.x - half, y: obj.y }] as any;
         }
         case "library": {
           const geom = this._libraryGeometryOf(obj);
