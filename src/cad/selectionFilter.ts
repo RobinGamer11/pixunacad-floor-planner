@@ -15,6 +15,8 @@ export type FilterValueType = "multi" | "color" | "text" | "range";
 export interface FilterContext {
   /** Ebenen für Mehrfachauswahl-Optionen. */
   layers: { id: string; name: string }[];
+  /** Infobox-Kategorien des aktiven Blatts. */
+  infoBoxCategories?: { id: string; name: string }[];
 }
 
 export interface FilterProperty {
@@ -103,6 +105,25 @@ registerFilterProperty({
     const h = typeof o?.html === "string" ? o.html : typeof o?.text === "string" ? o.text : undefined;
     return h == null ? undefined : h.replace(/<[^>]*>/g, " ");
   },
+});
+
+registerFilterProperty({
+  id: "infoboxKind", label: "Infobox-Art", synonyms: ["aufgabe", "information", "info", "infobox", "art"],
+  type: "multi", types: ["infobox"],
+  read: (o) => o?.kind ?? undefined,
+  options: () => [{ value: "task", label: "Aufgabe" }, { value: "info", label: "Information" }],
+});
+registerFilterProperty({
+  id: "infoboxStatus", label: "Aufgaben-Status", synonyms: ["offen", "erledigt", "status", "aufgabe"],
+  type: "multi", types: ["infobox"],
+  read: (o) => (o?.kind === "task" ? o.status : undefined),
+  options: () => [{ value: "open", label: "Offen" }, { value: "done", label: "Erledigt" }],
+});
+registerFilterProperty({
+  id: "infoboxCategory", label: "Infobox-Kategorie", synonyms: ["kategorie", "category", "infobox"],
+  type: "multi", types: ["infobox"],
+  read: (o) => o?.categoryId ?? undefined,
+  options: (ctx) => (ctx.infoBoxCategories || []).map((c) => ({ value: c.id, label: c.name })),
 });
 
 /* -------------------------------------------------------------- Abgleich */
