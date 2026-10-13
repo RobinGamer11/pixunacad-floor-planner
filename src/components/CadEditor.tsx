@@ -17,7 +17,9 @@ import LibraryPanel from "@/components/cad/LibraryPanel";
 import { importFile, type ImportedPage } from "@/cad/documentImport";
 import { projectStore } from "@/lib/projectStore";
 import { CadTableLayer } from "@/components/cad/CadTableLayer";
-import { CadCommentLayer } from "@/components/cad/CadCommentLayer";
+import { CadInfoBoxLayer } from "@/components/cad/CadInfoBoxLayer";
+import InfoBoxSettingsPanel from "@/components/cad/InfoBoxSettingsPanel";
+import { infoBoxUi, useInfoBoxUi } from "@/lib/infoBoxUi";
 import LibraryPlacementPreview from "@/components/cad/LibraryPlacementPreview";
 import { CadPresenceBar } from "@/components/cad/CadPresenceBar";
 import { CadCollabOverlay } from "@/components/cad/CadCollabOverlay";
@@ -476,6 +478,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
+  const infoBoxState = useInfoBoxUi();
+  const infoBoxActive = !!(infoBoxState.selectedId || infoBoxState.draft);
+  useEffect(() => {
+    if (infoBoxActive) { setRightOpen(true); setRightTab("settings"); }
+  }, [infoBoxActive, infoBoxState.selectedId]);
   // Anzahl der Ebenen für den Ebenen-Button oben links (leichtgewichtiges Polling).
   const [layerCount, setLayerCount] = useState(1);
   useEffect(() => {
@@ -2180,10 +2187,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {!presenting && <LibraryPlacementPreview app={appRef.current} />}
 
-        {/* Kommentare (DOM-Overlay, kein Zeichenobjekt) */}
-        {!presenting && (
-          <CadCommentLayer app={appRef.current} projectId={projectId} />
-        )}
+        {/* Infoboxen (Zeichenobjekte, feste Bildschirmgröße) */}
+        {!presenting && <CadInfoBoxLayer app={appRef.current} />}
 
         {/* Hilfeanzeige — werkzeugabhängig. */}
         {!presenting && helpOn && (
@@ -2232,7 +2237,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           </button>
         </div>
 
-        <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" ? "block" : "none" }}>
+        {infoBoxActive && rightTab === "settings" && (
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2">
+            <InfoBoxSettingsPanel app={appRef.current} />
+          </div>
+        )}
+        <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" && !infoBoxActive ? "block" : "none" }}>
         {!gridPanelOpen && !selectionFilterOpen && appRef.current && (
           <ObjectInfoTabs app={appRef.current} tab={objInfoTab} onTab={setObjInfoTab} onHasObject={setObjInfoHas} />
         )}

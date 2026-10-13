@@ -562,7 +562,7 @@ export function CommentThread({
  */
 export function CommentModeButton({
   disabled,
-  title = "Kommentare",
+  title = "Infobox",
 }: {
   disabled?: boolean;
   title?: string;
@@ -571,20 +571,28 @@ export function CommentModeButton({
   const active = ui.mode;
   const count = ui.openCount;
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      title={disabled ? "Kommentare benötigen ein geöffnetes Projekt und eine Anmeldung" : title}
-      onClick={() => commentUi.toggleMode()}
-      className="relative h-12 w-12 rounded-full flex flex-col items-center justify-center gap-0.5 shadow-lg transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 pixuna-comments"
-      style={{
-        background: active ? "hsl(var(--primary))" : "hsl(var(--surface-card))",
-        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--ink))",
-        border: "2px solid hsl(var(--primary) / 0.75)",
-      }}
-    >
-      <MessageSquare size={18} />
-      <span className="text-[10px] font-semibold leading-none">{count}</span>
-    </button>
+    <div className="relative flex items-center">
+      <button
+        type="button"
+        disabled={disabled}
+        title={title}
+        onClick={() => { if (active) infoBoxUi.clear(); commentUi.toggleMode(); }}
+        className="relative h-12 w-12 rounded-full flex flex-col items-center justify-center gap-0.5 shadow-lg transition-transform hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 pixuna-comments"
+        style={{
+          background: active ? "hsl(var(--primary))" : "hsl(var(--surface-card))",
+          color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--ink))",
+          border: "2px solid hsl(var(--primary) / 0.75)",
+        }}
+      >
+        <Info size={18} />
+        <span className="text-[10px] font-semibold leading-none">{count}</span>
+      </button>
+      {active && (
+        <div className="pixuna-comments pointer-events-none absolute left-full ml-3 flex items-center" aria-live="polite">
+          <span className="h-0 w-0" style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent", borderRight: "7px solid hsl(var(--notice-beige))" }} />
+          <span className="rounded px-2.5 py-1 text-[11.5px] font-semibold whitespace-nowrap" style={{ background: "hsl(var(--notice-beige))", color: "hsl(var(--ink))" }}>Aktiviert</span>
+        </div>
+      )}
+    </div>
   );
 }

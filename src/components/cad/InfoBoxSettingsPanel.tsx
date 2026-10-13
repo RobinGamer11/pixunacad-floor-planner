@@ -95,7 +95,7 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
   const tabBtn = (t: "look" | "info", label: string) => (
     <button type="button" onClick={() => setTab(t)}
       className="flex-1 pb-1.5 text-[12.5px] font-semibold"
-      style={{ borderBottom: tab === t ? "2px solid hsl(var(--gold, 43 74% 52%))" : "2px solid transparent", color: tab === t ? undefined : "hsl(var(--cad-toolbar-muted))" }}
+      style={{ borderBottom: tab === t ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent", color: tab === t ? undefined : "hsl(var(--cad-toolbar-muted))" }}
     >{label}</button>
   );
 
