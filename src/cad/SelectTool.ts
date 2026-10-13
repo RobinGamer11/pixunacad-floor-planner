@@ -11,7 +11,7 @@ import { getEffectiveContourGeometry } from "./effectiveGeometry";
 
 import { pointInOrientedBox, boxCornersWorld, rotateVector } from "./textGeometry";
 import type { TextBox } from "./Scene";
-import { instanceCornersWorld, pointInInstanceBounds } from "./library/libraryGeometry";
+import { instanceCornersWorld, instanceExtremePointsWorld, pointInInstanceBounds } from "./library/libraryGeometry";
 import { pointInDocument, hitDocumentCorner, hitDocumentEdge, documentCornersWorld, documentCenterWorld, hitDocumentVisibleEdge, documentVisibleCornersWorld, documentEdgeMidpointsWorld, documentAnchorsWorld } from "./documentGeometry";
 import { pointInDocumentVisible } from "./documentGeometry";
 import { computeWallLines } from "./wallGeom";
@@ -205,12 +205,14 @@ export class SelectTool {
     inst.scaleY = this.libraryScaleYOriginal;
   }
 
-  /** Weltpunkte der Fangpunkte einer Instanz: 4 Ecken + Mittelpunkt (Index 4). */
+  /** Weltpunkte der Fangpunkte: 4 Ecken, Mittelpunkt (Index 4), dann äußerste Geometriepunkte (5+). */
   private _libraryHandleWorlds(inst: any): Vec2[] {
     const geom = this._libraryGeometryOf(inst);
     if (!geom) return [];
-    const corners = instanceCornersWorld(geom as any, this._libraryTransformOf(inst) as any);
-    return [...corners.map((c: any) => v(c.x, c.y)), v(inst.position.x, inst.position.y)];
+    const tr = this._libraryTransformOf(inst) as any;
+    const corners = instanceCornersWorld(geom as any, tr);
+    const extremes = instanceExtremePointsWorld(geom as any, tr);
+    return [...corners.map((c: any) => v(c.x, c.y)), v(inst.position.x, inst.position.y), ...extremes.map((c) => v(c.x, c.y))];
   }
 
   /** Fangpunkt-Treffer an der aktuell gewählten Bibliotheksinstanz. */
