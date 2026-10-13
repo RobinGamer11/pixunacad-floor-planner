@@ -221,6 +221,15 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
     folderId: d.folderId || null,
   }), []);
 
+  // Gesetztes Element angeklickt → direkt dessen Bearbeitung statt der ganzen Bibliothek.
+  useEffect(() => {
+    if (!app || !instanceDefId) return;
+    const d = app.getLibraryDefinition(instanceDefId);
+    if (!d) return;
+    setMeta(metaFromDefinition(d));
+    setMode({ kind: "edit", id: d.id });
+  }, [app, instanceDefId, metaFromDefinition]);
+
   const categories = useMemo(
     () => [...new Set(defs.map((d) => d.category).filter(Boolean))].sort(),
     [defs],

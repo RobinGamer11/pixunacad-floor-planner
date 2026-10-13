@@ -301,6 +301,28 @@ export function instanceCornersWorld(snaps: LibraryGeometrySnapshot[], t: Librar
   ].map((p) => txPoint(p, t, cs, sn));
 }
 
+/**
+ * Äußerste echte Geometriepunkte einer Instanz (links/rechts/oben/unten im
+ * lokalen System), transformiert in Weltkoordinaten. Liegen exakt auf dem
+ * Auswahlrahmen und dienen als zusätzliche Greifpunkte. Duplikate entfallen.
+ */
+export function instanceExtremePointsWorld(snaps: LibraryGeometrySnapshot[], t: LibraryTransform): Pt[] {
+  let l: Pt | null = null, r: Pt | null = null, lo: Pt | null = null, hi: Pt | null = null;
+  for (const s of snaps) for (const p of snapshotPoints(s)) {
+    if (!l || p.x < l.x) l = p;
+    if (!r || p.x > r.x) r = p;
+    if (!lo || p.y < lo.y) lo = p;
+    if (!hi || p.y > hi.y) hi = p;
+  }
+  const cs = Math.cos(t.rotationRad), sn = Math.sin(t.rotationRad);
+  const out: Pt[] = [];
+  for (const p of [l, r, lo, hi]) {
+    if (!p || out.some((q) => q === p)) continue;
+    out.push(p);
+  }
+  return out.map((p) => txPoint(p, t, cs, sn));
+}
+
 /** Liegt ein Weltpunkt in der (rotierten/skalierten) Bounding-Box? */
 export function pointInInstanceBounds(snaps: LibraryGeometrySnapshot[], t: LibraryTransform, world: Pt): boolean {
   const cs = Math.cos(-t.rotationRad), sn = Math.sin(-t.rotationRad);

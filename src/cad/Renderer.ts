@@ -23,7 +23,7 @@ import { applyDisplayGradientMask, isDisplayGradientActive } from "./displayGrad
 import { fillWithHatchPattern, PATTERN_BASE_TILE_M, patternBaseAngleDeg, patternAlwaysFollowsWall, isWallBoundPattern, type HatchPatternId } from "./hatchPatterns";
 import { computeWallLines, wallRefCorners, perpLeftScreen } from "./wallGeom";
 import type { LibraryDefinition, LibraryGeometrySnapshot } from "./library/types";
-import { createObjectsFromSnapshots, instanceCornersWorld, transformSnapshots } from "./library/libraryGeometry";
+import { createObjectsFromSnapshots, instanceCornersWorld, instanceExtremePointsWorld, transformSnapshots } from "./library/libraryGeometry";
 import { documentCornersWorld, documentCenterWorld, documentVisibleCornersWorld, documentAnchorsWorld } from "./documentGeometry";
 import { getOrCreateDocMask } from "./documentMask";
 import { applyFilterToCanvas, filterSignature } from "./documentFilters";
@@ -1432,20 +1432,22 @@ export class Renderer {
     ctx.closePath();
     ctx.fill(); ctx.stroke();
     ctx.setLineDash([]);
-    // Fangpunkte: vier Ecken + Mittelpunkt (Index 4).
-    const center = cam.worldToScreen(inst.position.x, inst.position.y);
+    // Fangpunkte wie beim Schraffurwerkzeug: 4 Ecken, Mitte (4), äußerste Punkte (5+).
+    const tr = { position: { x: inst.position.x, y: inst.position.y }, rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY };
+    const extremes = instanceExtremePointsWorld(def.geometry, tr).map(c => cam.worldToScreen(c.x, c.y));
+    const all = [...sc, cam.worldToScreen(inst.position.x, inst.position.y), ...extremes];
     const activeIdx = (this.selection as any).handleIndex;
-    const paint = (i: number) => {
-      ctx.fillStyle = activeIdx === i ? "#ffd166" : "rgba(120,110,255,0.95)";
-      ctx.strokeStyle = "#fff";
-    };
-    paint(4);
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(center.x, center.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    for (let i = 0; i < sc.length; i++) {
-      paint(i);
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.rect(sc[i].x - 4, sc[i].y - 4, 8, 8); ctx.fill(); ctx.stroke();
+    for (let i = 0; i < all.length; i++) {
+      const sp = all[i];
+      ctx.fillStyle = "rgba(77,163,255,0.12)";
+      ctx.strokeStyle = "rgba(77,163,255,0.95)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (activeIdx === i) {
+        ctx.fillStyle = "rgba(77,163,255,0.95)";
+        ctx.strokeStyle = "#fff";
+        ctx.beginPath(); ctx.arc(sp.x, sp.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
     }
     ctx.restore();
   }
