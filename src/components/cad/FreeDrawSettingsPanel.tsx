@@ -4,7 +4,7 @@ import type { MiniCad } from "@/cad/embed/MiniCad";
 import { ToolColorPicker } from "@/components/workspace/ToolColorPicker";
 import { StrokeEffectsSettings } from "@/components/cad/StrokeEffectsSettings";
 import { SettingsToggleButton } from "@/components/cad/SettingsToggleButton";
-import { previewSurface } from "@/components/cad/previewSurface";
+import { previewSurface, type PreviewSurface } from "@/components/cad/previewSurface";
 
 type FreeStyle = "solid" | "image";
 
