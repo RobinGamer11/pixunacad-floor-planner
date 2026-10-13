@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { MiniCad } from "@/cad/embed/MiniCad";
 import { SquareDashed, BoxSelect, SquareDashedMousePointer } from "lucide-react";
-import { formatObjectId, objectDisplayName } from "@/cad/objectMeta";
+import { objectDisplayName } from "@/cad/objectMeta";
 import { OBJECT_TYPE_LABELS, objectTypeKey } from "@/cad/selectionFilter";
 import { infoBoxUi } from "@/lib/infoBoxUi";
 
@@ -140,61 +140,61 @@ export const SelectSettingsPanel: React.FC<Props> = ({ app }) => {
   );
 };
 
-/** Liste aller ausgewählten Objekte: Klick = nur dieses, Shift-Klick = hinzufügen/entfernen. */
+/**
+ * Liste der ausgewählten Objekte. Die Liste bleibt stehen, während man darin
+ * klickt: Klick = nur dieses Objekt, Shift-Klick = hinzufügen/entfernen.
+ * Erst eine neue Auswahl außerhalb der Liste erneuert sie.
+ */
 const SelectedList: React.FC<{ app: any }> = ({ app }) => {
+  const st = app.selectTool;
+  const keyOf = (l: any[]) => l.map((m) => m.kind + ":" + m.id).join();
+  const [items, setItems] = useState<{ kind: string; id: string }[]>(() => [...(st.marqueeSelectedIds || [])]);
+  const ownKey = React.useRef<string>(keyOf(st.marqueeSelectedIds || []));
   const [, force] = useState(0);
   useEffect(() => {
-    let raf = 0; let last = "";
+    let raf = 0;
     const tick = () => {
-      const k = (app.selectTool.marqueeSelectedIds || []).map((m: any) => m.kind + m.id).join();
-      if (k !== last) { last = k; force((x) => x + 1); }
+      const cur = st.marqueeSelectedIds || [];
+      const k = keyOf(cur);
+      if (k !== ownKey.current) { ownKey.current = k; setItems([...cur]); }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [app]);
-  const st = app.selectTool;
-  const list: { kind: string; id: string }[] = st.marqueeSelectedIds || [];
-  const objOf = (m: { kind: string; id: string }) => (st as any)._getElementById?.(m.kind, m.id);
-  const [anchor, setAnchor] = useState<string | null>(null);
 
+  const selected = new Set((st.marqueeSelectedIds || []).map((m: any) => m.kind + ":" + m.id));
+  const apply = (next: { kind: string; id: string }[]) => {
+    st.marqueeSelectedIds = next;
+    ownKey.current = keyOf(next);
+    st.syncPrimarySelection?.();
+    if (next.length === 1 && next[0].kind === "infobox") infoBoxUi.select(next[0].id); else infoBoxUi.clear();
+    app.renderer?.render?.();
+    force((x) => x + 1);
+  };
   const click = (e: React.MouseEvent, m: { kind: string; id: string }) => {
     const key = m.kind + ":" + m.id;
     if (e.shiftKey) {
-      // Shift: Bereich ab dem letzten angeklickten Eintrag zusätzlich markieren.
-      const keys = list.map((x) => x.kind + ":" + x.id);
-      const a = anchor ? keys.indexOf(anchor) : -1;
-      if (a >= 0) {
-        const b = keys.indexOf(key);
-        const [lo, hi] = a < b ? [a, b] : [b, a];
-        st.marqueeSelectedIds = list.slice(lo, hi + 1);
-      }
-      setAnchor(key);
-      app.renderer?.render?.();
-      return;
-    }
-    setAnchor(key);
-    st.marqueeSelectedIds = [m];
-    st.syncPrimarySelection?.();
-    if (m.kind === "infobox") infoBoxUi.select(m.id); else infoBoxUi.clear();
-    app.renderer?.render?.();
+      const cur: any[] = st.marqueeSelectedIds || [];
+      apply(selected.has(key) ? cur.filter((x) => x.kind + ":" + x.id !== key) : [...cur, m]);
+    } else apply([m]);
   };
 
   return (
     <div className="max-h-56 overflow-y-auto rounded-md border" style={{ borderColor: "hsl(var(--border))" }}>
-      {list.map((m) => {
-        const o = objOf(m);
+      {items.map((m) => {
+        const o = st._getElementById?.(m.kind, m.id);
         if (!o) return null;
         const type = OBJECT_TYPE_LABELS[objectTypeKey(m.kind, o)] || m.kind;
-        let id = ""; try { id = formatObjectId(m.kind, o); } catch { /* */ }
         const name = (() => { try { return objectDisplayName(m.kind, o); } catch { return type; } })();
+        const on = selected.has(m.kind + ":" + m.id);
         return (
           <button key={m.kind + m.id} type="button" onClick={(e) => click(e, m)}
-            className="flex w-full items-center gap-2 border-b px-2 py-1.5 text-left text-[11px] last:border-b-0 hover:bg-muted"
-            style={{ borderColor: "hsl(var(--border))", background: anchor === m.kind + ":" + m.id ? "hsl(var(--muted))" : undefined }}
-            title="Klick: nur dieses Objekt auswählen · Shift-Klick: Bereich auswählen">
+            className="flex w-full items-center gap-2 border-b px-2 py-1.5 text-left text-[11px] last:border-b-0"
+            style={{ borderColor: "hsl(var(--border))", background: on ? "hsl(var(--primary) / 0.12)" : undefined, opacity: on ? 1 : 0.6 }}
+            title="Klick: nur dieses Objekt · Shift-Klick: hinzufügen/entfernen">
             <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
-            <span className="shrink-0 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{type}{id ? ` · ${id}` : ""}</span>
+            <span className="shrink-0 text-[10px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>{type}{o.objCode ? ` · #${o.objCode}` : ""}</span>
           </button>
         );
       })}

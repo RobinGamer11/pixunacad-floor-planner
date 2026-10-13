@@ -5010,7 +5010,7 @@ export class SelectTool {
    * Eintrag der Mehrfachauswahl, damit Shift-Klick auf ein zweites Objekt
    * beide markiert — auch für TextBoxen und Tabellen.
    */
-  private _seedMarqueeFromSelection(): void {
+  _seedMarqueeFromSelection(): void {
     if (this.marqueeSelectedIds.length) return;
     const sel: any = (this.app as any).selection;
     if (!sel) return;
@@ -5384,7 +5384,7 @@ export class SelectTool {
     }
   }
 
-  private _getElementById(kind: string, id: string): any {
+  _getElementById(kind: string, id: string): any {
     const s = this.app.scene as any;
     switch (kind) {
       case "segment":    return s.getSegmentById?.(id);
