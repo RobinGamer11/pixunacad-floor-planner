@@ -10,7 +10,7 @@ Aktuellen Stand von `main` nennen. Ist er nicht aktuell oder GitHub nicht erreic
 - Ohne Push: Arbeit behalten, Grund nennen und deutlich schreiben: `WICHTIG: Die Änderungen wurden noch nicht nach GitHub main übertragen. Vor der Weiterarbeit in Lovable muss der Commit/Push bzw. die GitHub-Verbindung noch abgeschlossen werden.`
 
 ## 2. Lovable
-Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; keine separate Codex-Version.
+Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 
 ## 3. Supabase, Secrets
 - Frontend nur `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Nie service_role, Secret Keys, DB-Passwörter, Tokens im Repo/Frontend.
@@ -39,7 +39,7 @@ Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; kein
 - Export-Bedienzustände sind lokal/flüchtig, nie Cloud/Undo/Snapshot/localStorage; Fangpunkte von Hintergrundseiten nur über `TopologyEngine.tracingSnapScenes`.
 - Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt nur den Projekt-Payload (nie CAD/Export).
 - Treppen sind ein einzelnes `Stair`-Objekt; Stufen, Podeste, Fangpunkte und Beschriftung leitet nur `src/cad/stairGeometry.ts` ab – nie als eigene Scene-Objekte speichern.
-- Treppen-Knöpfe sind DOM, nie Geometrie; Cursor-Reset in `CadApp.setTool`.
+- Treppen-Knöpfe = DOM, nie Geometrie; Cursor-Reset in `CadApp.setTool`.
 - Export-Ausschnitte: Sitzung in `PlanController` (`_drag.preview`), Projection erst bei ✓/Enter.
 - Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges`.
 - Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M`); Podeste wachsen nie automatisch.
@@ -54,4 +54,4 @@ Lovable-Strukturen nicht grundlos entfernen; Code bleibt in Lovable ladbar; kein
 - Auswahlfilter-Eigenschaften nur via `registerFilterProperty` (`cad/selectionFilter.ts`); Treffer in `marqueeSelectedIds`, Werte lokal.
 
 - Objektname/-ID/-Beschreibung nur über `cad/objectMeta.ts` (Serialisierung/Laden gekoppelt, Kopien ohne ID).
-- Flächen-Schnitt/-Vereinigung (Cutter, Schraffur verbinden) nur über `cad/cutGeometry.ts` – `restoreArcs` hält gewölbte Kanten als echte Bögen.
+- Flächen schneiden/vereinigen nur via `cad/cutGeometry.ts` (`restoreArcs` = echte Bögen).
