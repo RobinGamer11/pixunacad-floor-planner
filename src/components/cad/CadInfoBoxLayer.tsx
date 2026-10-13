@@ -4,9 +4,9 @@
  * bearbeitet wird ausschließlich in den Werkzeugeinstellungen.
  */
 import React from "react";
-import { Info } from "lucide-react";
+import { Move } from "lucide-react";
 import { commentUi, useCommentUi } from "@/lib/commentsStore";
-import { infoBoxUi, useInfoBoxUi } from "@/lib/infoBoxUi";
+import { infoBoxCornersWorld, infoBoxSizeWorld, infoBoxUi, useInfoBoxUi } from "@/lib/infoBoxUi";
 
 export function CadInfoBoxLayer({ app }: { app: any }) {
   const ui = useCommentUi();
@@ -22,7 +22,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       const cam = app?.camera;
       const boxes: any[] = app?.scene?.infoBoxes || [];
       const key = cam
-        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.sizePx}${b.labelId}${b.authorInitials}${b.categoryId}`).join(",")}|${(app?.scene?.infoBoxCategories || []).map((c: any) => c.id + c.name + c.color).join()}|${((app?.selectTool?.marqueeSelectedIds || []) as any[]).filter((m) => m.kind === "infobox").map((m) => m.id).join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
+        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.sizePx}${b.sizeM}${b.labelId}${b.authorInitials}${b.categoryId}`).join(",")}|${(app?.scene?.infoBoxCategories || []).map((c: any) => c.id + c.name + c.color).join()}|${((app?.selectTool?.marqueeSelectedIds || []) as any[]).filter((m) => m.kind === "infobox").map((m) => m.id).join()}|${infoBoxUi.get().hiddenIds.join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
         : "";
       if (key !== last) { last = key; force(); }
       raf = requestAnimationFrame(tick);
@@ -71,26 +71,73 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     return () => host.removeEventListener("wheel", onWheel);
   }, [app]);
 
-  // Offene Aufgaben für den Zähler am Knopf.
+  // Zähler am Knopf: alle Infoboxen des aktiven Blatts.
   const boxes: any[] = app?.scene?.infoBoxes || [];
-  const openCount = boxes.filter((b) => b.kind === "task" && b.status !== "done").length;
+  const openCount = boxes.length;
   React.useEffect(() => { commentUi.set({ openCount }); }, [openCount]);
+
+  // Verschieben über Fangpunkt (wie Schraffur): Ecke wählen → „Verschieben“ → Zielpunkt tippen.
+  const [pick, setPick] = React.useState<{ id: string; i: number } | null>(null);
+  const [armed, setArmed] = React.useState(false);
+  React.useEffect(() => { if (!sel.selectedId || pick?.id !== sel.selectedId) { setPick(null); setArmed(false); } }, [sel.selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (!app?.input || !armed || !pick) return;
+    const prev = app.input.canvasTapHandler;
+    const onTap = (sx: number, sy: number) => {
+      const b = app.scene.getInfoBoxById?.(pick.id);
+      if (!b) { setArmed(false); return; }
+      let w = app.camera.screenToWorld(sx, sy);
+      try { w = app.selectTool?.snapWorldPointPublic?.(w) ?? w; } catch { /* */ }
+      const c = infoBoxCornersWorld(b)[pick.i];
+      app.runAction(() => { b.x += w.x - c.x; b.y += w.y - c.y; });
+      setArmed(false); setPick(null);
+      app.renderer?.render?.();
+    };
+    app.input.canvasTapHandler = onTap;
+    return () => { if (app.input.canvasTapHandler === onTap) app.input.canvasTapHandler = prev && prev !== onTap ? prev : null; };
+  }, [app, armed, pick]);
 
   const cam = app?.camera;
   if (!cam) return null;
-  const visible = (b: any) => app.labelManager?.isVisible?.(b.labelId) !== false;
+  const visible = (b: any) => app.labelManager?.isVisible?.(b.labelId) !== false && !sel.hiddenIds.includes(b.id);
 
   const draft = sel.draft && sel.draft.sheetId === (app.activeSheetId || "default") ? sel.draft : null;
+
+  const choose = (e: React.PointerEvent, b: any) => {
+    e.stopPropagation();
+    if (e.button !== 0 || e.pointerType === "touch") {
+      app.canvas?.dispatchEvent(new PointerEvent("pointerdown", { pointerId: e.pointerId, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY, button: e.button, buttons: e.buttons, bubbles: true }));
+      if (e.button !== 0 || app.input?.cameraGesture) return;
+      app.input?.cancelCanvasTap();
+    }
+    const st = app.selectTool;
+    const selectToolOn = !ui.mode && st && app.activeTool === st;
+    if (selectToolOn && e.shiftKey) {
+      const cur: any[] = st.marqueeSelectedIds || [];
+      if (!cur.length) st._seedMarqueeFromSelection?.();
+      const list: any[] = st.marqueeSelectedIds || [];
+      const i = list.findIndex((m) => m.kind === "infobox" && m.id === b.id);
+      st.marqueeSelectedIds = i >= 0 ? list.filter((_, j) => j !== i) : [...list, { kind: "infobox", id: b.id }];
+      infoBoxUi.clear();
+    } else {
+      if (st) st.marqueeSelectedIds = [{ kind: "infobox", id: b.id }];
+      infoBoxUi.select(b.id);
+    }
+    app.renderer?.render?.();
+  };
 
   return (
     <div
       ref={hostRef}
       data-infobox-layer
-      className="pixuna-comments absolute inset-0"
+      className="pixuna-comments absolute inset-0 overflow-hidden"
       style={{ pointerEvents: "none", zIndex: 25 }}
     >
       {boxes.filter(visible).map((b) => {
         const p = cam.worldToScreen(b.x, b.y);
+        const { w: wm, h: hm } = infoBoxSizeWorld(b);
+        const w = Math.max(14, wm * cam.scale), h = Math.max(6, hm * cam.scale);
+        const icon = Math.max(4, h * 0.72);
         const active = sel.selectedId === b.id
           || ((app.selectTool?.marqueeSelectedIds || []) as any[]).some((m) => m.kind === "infobox" && m.id === b.id);
         const task = b.kind === "task";
@@ -100,56 +147,60 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
             key={b.id}
             role="button"
             title={b.title || "Infobox"}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              if (e.button !== 0 || e.pointerType === "touch") {
-                app.canvas?.dispatchEvent(new PointerEvent("pointerdown", { pointerId: e.pointerId, pointerType: e.pointerType, clientX: e.clientX, clientY: e.clientY, button: e.button, buttons: e.buttons, bubbles: true }));
-                if (e.button !== 0 || app.input?.cameraGesture) return;
-                // Touch on a pin selects it; never creates another box on release.
-                app.input?.cancelCanvasTap();
-              }
-              const st = app.selectTool;
-              const selectToolOn = !ui.mode && st && app.activeTool === st;
-              if (selectToolOn && e.shiftKey) {
-                // Shift: zur Mehrfachauswahl hinzufügen/entfernen.
-                const cur: any[] = st.marqueeSelectedIds || [];
-                if (!cur.length) st._seedMarqueeFromSelection?.();
-                const list: any[] = st.marqueeSelectedIds || [];
-                const i = list.findIndex((m) => m.kind === "infobox" && m.id === b.id);
-                st.marqueeSelectedIds = i >= 0 ? list.filter((_, j) => j !== i) : [...list, { kind: "infobox", id: b.id }];
-                infoBoxUi.clear();
-              } else {
-                if (st) st.marqueeSelectedIds = [{ kind: "infobox", id: b.id }];
-                infoBoxUi.select(b.id);
-              }
-              app.renderer?.render?.();
-            }}
-            className="absolute flex items-center justify-center shadow-md cursor-pointer select-none"
+            onPointerDown={(e) => choose(e, b)}
+            className="absolute flex items-center overflow-hidden cursor-pointer select-none"
             style={{
-              left: p.x, top: p.y, width: 32, height: 32, marginLeft: -16, marginTop: -32,
-              borderRadius: "50% 50% 50% 6px", pointerEvents: "auto", touchAction: "none",
-              background: "hsl(var(--card))",
-              color: "hsl(var(--foreground))",
-              border: `2px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
-              outline: active ? "2px solid hsl(var(--primary))" : undefined,
-              outlineOffset: 2,
+              left: p.x - w / 2, top: p.y - h / 2, width: w, height: h,
+              gap: h * 0.18, paddingLeft: h * 0.14, paddingRight: h * 0.2,
+              borderRadius: h * 0.22, pointerEvents: "auto", touchAction: "none",
+              background: "hsl(var(--card))", color: "hsl(var(--foreground))",
+              border: `${Math.max(1, h * 0.05)}px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
+              outline: active ? "2px solid hsl(var(--primary))" : undefined, outlineOffset: 1,
+              boxShadow: "0 1px 4px hsl(0 0% 0% / 0.18)",
             }}
           >
-            {task ? (
-              <div className="flex items-center justify-center">
-                <span
-                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold"
-                  style={{ background: `hsl(var(${statusVar}))`, color: "hsl(0 0% 100%)", boxShadow: "0 0 0 2px hsl(0 0% 100%)" }}
-                >
-                  {b.authorInitials || "?"}
-                </span>
-              </div>
-            ) : (
-              <Info size={20} />
+            <span className="inline-flex shrink-0 items-center justify-center rounded-full font-bold"
+              style={task
+                ? { width: icon, height: icon, fontSize: icon * 0.42, background: `hsl(var(${statusVar}))`, color: "hsl(0 0% 100%)", boxShadow: "0 0 0 1px hsl(0 0% 100%)" }
+                : { width: icon, height: icon, fontSize: icon * 0.7, fontFamily: "Georgia, serif", fontStyle: "italic", background: "hsl(var(--notice-beige))", color: "hsl(var(--ink))" }}>
+              {task ? (b.authorInitials || "?") : "i"}
+            </span>
+            {b.title && (
+              <span className="min-w-0 truncate font-medium leading-none" style={{ fontSize: icon * 0.55 }}>{b.title}</span>
             )}
           </div>
         );
       })}
+      {(() => {
+        const b = sel.selectedId ? boxes.find((x) => x.id === sel.selectedId) : null;
+        if (!b || !visible(b)) return null;
+        const pts = infoBoxCornersWorld(b).map((c) => cam.worldToScreen(c.x, c.y));
+        return (
+          <>
+            {pts.map((sp, i) => {
+              const on = pick?.i === i;
+              return (
+                <button key={i} type="button" aria-label="Fangpunkt der Infobox"
+                  onPointerDown={(e) => { e.stopPropagation(); setPick({ id: b.id, i }); setArmed(false); }}
+                  className="absolute rounded-full"
+                  style={{ left: sp.x - 9, top: sp.y - 9, width: 18, height: 18, pointerEvents: "auto", touchAction: "none",
+                    background: on ? "hsl(var(--primary))" : "hsl(var(--card))", border: "2px solid hsl(var(--primary))" }} />
+              );
+            })}
+            {pick && pick.id === b.id && (
+              <button type="button" title="Verschieben"
+                onPointerDown={(e) => { e.stopPropagation(); setArmed((a) => !a); }}
+                className="absolute flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold shadow-md"
+                style={{ left: pts[pick.i].x + 14, top: pts[pick.i].y - 46, pointerEvents: "auto",
+                  background: armed ? "hsl(var(--primary))" : "hsl(var(--card))",
+                  color: armed ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
+                  border: "1px solid hsl(var(--primary))" }}>
+                <Move size={15} /> {armed ? "Zielpunkt wählen" : "Verschieben"}
+              </button>
+            )}
+          </>
+        );
+      })()}
       {draft && (() => {
         const p = cam.worldToScreen(draft.x, draft.y);
         return (
