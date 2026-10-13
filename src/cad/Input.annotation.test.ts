@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Input } from "./Input";
+import { Camera } from "./Camera";
 
 let input: Input;
 function setup() {
@@ -16,7 +17,7 @@ function setup() {
   return { canvas, tap, pointer };
 }
 afterEach(() => {
-  input?.dispose();
+  input?.destroy();
   document.body.replaceChildren();
   delete (window as any).__pixunaTabletCommit;
 });
@@ -25,7 +26,7 @@ describe("Infobox navigation input", () => {
     const { tap, pointer } = setup();
     pointer("pointerdown", 1, 100, 80);
     pointer("pointerup", 1, 100, 80);
-    input.beginFrame();
+    input.update(new Camera());
     expect(tap).toHaveBeenCalledExactlyOnceWith(100, 80);
     expect(input.clicked).toBe(false);
     expect(input.mouse.left).toBe(false);
@@ -60,7 +61,7 @@ describe("Infobox navigation input", () => {
     expect(input.wheelDelta).not.toBe(0);
     pointer("pointerup", 2, 240, 80, "touch");
     pointer("pointerup", 1, 100, 80, "touch");
-    input.beginFrame();
+    input.update(new Camera());
     expect(input.cameraGesture).toBe(false);
     expect(input.clicked).toBe(false);
     expect(tap).not.toHaveBeenCalled();
