@@ -2794,6 +2794,9 @@ export class CadApp {
           }
           if (t === this.documentTool && this.documentTool.phase !== "idle") { e.preventDefault(); this.documentTool.cancel(); return; }
         }
+        // Esc hebt die Auswahl bewusst auf — auch die Mehrfachauswahl, damit
+        // der nachfolgende Werkzeugwechsel sie nicht wiederherstellt.
+        this.selectTool.marqueeSelectedIds = [];
         if (this.activeTool === this.lineTool) { this.lineTool.cancel(); this.clearSelection(); this.setSelectedLabelId(null); this.setTool(ToolIds.SELECT); return; }
         if (this.activeTool === this.polygonTool) {
           // ESC arbeitet stufenweise: laufende Kontur abbrechen, sonst Werkzeug verlassen.
