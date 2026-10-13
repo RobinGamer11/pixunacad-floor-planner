@@ -215,7 +215,6 @@ export function cutAlongLine(app: any, c: Vec2, d: Vec2): number {
       const [wa, wb] = res;
       applyObjectMeta(wa, current);
       applyObjectMeta(wb, current, { withCode: false });
-      if (!wb.customName) wb.customName = current.customName;
       ensureObjectCode(scenes, "wall", wb);
       current = wb; didSplit = true;
     }
