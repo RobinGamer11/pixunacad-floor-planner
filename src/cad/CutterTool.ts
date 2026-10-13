@@ -176,12 +176,15 @@ export function cutAlongLine(app: any, c: Vec2, d: Vec2): number {
     if (!ok(h.labelId)) continue;
     const idx = scene.hatches.indexOf(h);
     let made: any[] = [];
-    if (h.isPolygon && h.closed === false) {
-      const pieces = cutPolyline(h.points, h.bulges, false, c, d);
-      if (!pieces || pieces.length < 2) continue;
+    if (h.isPolygon && !(h.holes && h.holes.length)) {
+      // Polygone werden wie Linien geschnitten: nie eine automatische
+      // Schließkante entlang des Schnitts erzeugen.
+      const wasClosed = h.closed !== false;
+      const pieces = cutPolyline(h.points, h.bulges, wasClosed, c, d);
+      if (!pieces || pieces.length < (wasClosed ? 1 : 2)) continue;
       made = pieces.map((p, i) => {
         const o = i === 0 ? h : cloneObject(scene, h, ["points", "bulges"]);
-        o.points = p.points; o.bulges = p.bulges; o.shapeMode = "polygon";
+        o.points = p.points; o.bulges = p.bulges; o.shapeMode = "polygon"; o.closed = false;
         return o;
       });
     } else {

@@ -193,6 +193,11 @@ function writeSnapshot(ctx: Ctx, s: LibraryGeometrySnapshot) {
       return;
     case "hatch": {
       const pts: Pt[] = data.points || [];
+      if (data.isPolygon === true && data.closed === false) {
+        // Offene Polygone bleiben offen – keine Schließkante, keine Füllung.
+        if (pts.length >= 2) writePolyline(ctx, pts, data.bulges, false, layer, data.strokeColor || data.color || "#000000");
+        return;
+      }
       if (pts.length < 3) return;
       const holes: Pt[][] = data.holes || [];
       const filled = (data.fillAlphaPct ?? 0) > 0;
