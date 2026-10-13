@@ -969,7 +969,12 @@ export class HatchTool {
 
     const style = this.app.getCurrentHatchStyle();
     const fillCol = rgbaFromHex(style.fillColor, style.fillAlphaPct / 100);
-    const scaledStrokePx = this.app.renderer.scaledStrokePx(style.strokeWidthPx || 0);
+    // Polygon-Werkzeug speichert seine Strichstärke in Metern → Vorschau = echte Stärke.
+    const polyStyle = (this as any).constructor?.name === "PolygonTool"
+      ? (this.app as any).getCurrentPolygonStyle?.() : null;
+    const scaledStrokePx = polyStyle && typeof polyStyle.thicknessM === "number"
+      ? Math.max(1, this.app.renderer.segStrokePx(polyStyle.thicknessM))
+      : this.app.renderer.scaledStrokePx(style.strokeWidthPx || 0);
 
     if (this.drawMode === "rectangle") {
       if (this.rectState === "firstSide" && this.rectPointA) {
