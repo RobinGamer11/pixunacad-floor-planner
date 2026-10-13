@@ -163,28 +163,15 @@ export class EraserTool {
         ...copyStrokeEffects(hatch),
       };
 
-      // Original-Ecken merken → nur die neuen (radierten) Kanten werden geglättet.
-      const origKeys = new Set<string>();
-      for (const p of hatch.points) origKeys.add(this._key(p.x, p.y));
-      for (const h of hatch.holes || []) for (const p of h) origKeys.add(this._key(p.x, p.y));
-
       scene.removeHatch(hatch);
       if (this.app.selection && (this.app.selection as any).hatchId === hatch.id) this.app.setSelection(null);
-      // Während des Radierens roh schneiden (schnell, keine Punktvermehrung);
-      // geglättet wird einmalig beim Loslassen in `_finalizeSmooth`.
-      this._touchedHatches.delete(hatch.id);
       for (const poly of result || []) {
         const rings = poly
           .map((ring: number[][]) => this._rawRing(ring))
           .filter((ring: Vec2[]) => ring.length > 2 && Math.abs(this._ringArea(ring)) > minArea);
         const outer = rings[0];
         if (!outer || outer.length < 3) continue;
-        for (const ring of rings) for (const q of ring) {
-          const k = this._key(q.x, q.y);
-          if (!origKeys.has(k)) this._cutKeys.add(k);
-        }
-        const created: any = scene.createHatch(outer, { ...style, holes: rings.slice(1) });
-        if (created?.id) this._touchedHatches.add(created.id);
+        scene.createHatch(outer, { ...style, holes: rings.slice(1) });
       }
 
     }

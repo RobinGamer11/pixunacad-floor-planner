@@ -247,7 +247,6 @@ export class MiniCad {
   defaultHatchStrokeWidthPx: number = Defaults.hatchStrokePx;
   defaultHatchFillAlphaPct: number = Defaults.hatchFillAlphaPct;
   /** Radierte Schraffur-Kanten automatisch glätten. */
-  defaultHatchAutoSmooth: boolean = true;
   defaultHatchPatternEnabled: boolean = false;
   defaultHatchPatternId: string = "mauerwerk";
   /** Mappe-Weltmaßstab: UI-Wert 60 entspricht hier 60 * 0.02 (siehe HatchPatternBlock). */
