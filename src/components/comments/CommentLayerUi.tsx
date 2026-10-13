@@ -585,15 +585,9 @@ export function CommentModeButton({
           border: "2px solid hsl(var(--primary) / 0.75)",
         }}
       >
-        <Info size={18} />
+        <MessageSquare size={18} />
         <span className="text-[10px] font-semibold leading-none">{count}</span>
       </button>
-      {active && (
-        <div className="pixuna-comments pointer-events-none absolute left-full ml-3 flex items-center" aria-live="polite">
-          <span className="h-0 w-0" style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent", borderRight: "7px solid hsl(var(--notice-beige))" }} />
-          <span className="rounded px-2.5 py-1 text-[11.5px] font-semibold whitespace-nowrap" style={{ background: "hsl(var(--notice-beige))", color: "hsl(var(--ink))" }}>Aktiviert</span>
-        </div>
-      )}
     </div>
   );
 }

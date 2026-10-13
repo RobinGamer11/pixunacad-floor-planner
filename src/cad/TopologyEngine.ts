@@ -331,7 +331,9 @@ export class TopologyEngine {
     scn: Scene,
     considerPoint: (world: Vec2, segment: Segment | null, hatch: Hatch | null, pointIndex: number) => void,
     considerLine: (a: Vec2, b: Vec2, segment: Segment | null, hatch: Hatch | null, edgeIndex?: number | null, bulge?: number) => void,
+    frame: Vec2[] = [],
   ): void {
+    for (const p of frame) considerPoint(p, null, null, -1);
     const mid = (a: Vec2, b: Vec2) => v((a.x + b.x) / 2, (a.y + b.y) / 2);
     for (const seg of scn.segments) {
       considerPoint(seg.a, null, null, -1);
@@ -389,8 +391,8 @@ export class TopologyEngine {
 
   /** Schreibgeschützte Hilfslinien-Geometrie aller sichtbaren Quellen (inkl. Bibliothek, Hintergrundseiten). */
   guideGeometry(extraEdges: [Vec2, Vec2][] = [], extraPoints: Vec2[] = []): GuideGeometry {
-    const extraScenes: { id: string; type: GuideSourceType; scene: any }[] = [];
-    for (const ls of this._libraryScenes() as any[]) extraScenes.push({ id: ls.instanceId ?? ls.id ?? "library", type: "library", scene: ls.scene });
+    const extraScenes: { id: string; type: GuideSourceType; scene: any; frame?: Vec2[]; extremes?: Vec2[] }[] = [];
+    for (const ls of this._libraryScenes()) extraScenes.push({ id: ls.instanceId, type: "library", scene: ls.scene, frame: ls.frame, extremes: ls.extremes });
     this.overlayScenes.forEach((s, i) => extraScenes.push({ id: `sheet-overlay:${i}`, type: "extra", scene: s }));
     this.tracingSnapScenes.forEach((s, i) => extraScenes.push({ id: `tracing:${i}`, type: "line", scene: s }));
     return buildGuideGeometry({ scene: this.scene, isVisible: (id) => this.labels.isVisible(id as any), extraScenes, extraEdges, extraPoints });
@@ -678,7 +680,7 @@ export class TopologyEngine {
 
     // Bibliotheksinstanzen — schreibgeschützte Weltgeometrie der Container.
     for (const ls of this._libraryScenes(exclusions?.libraryInstanceIds)) {
-      this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+      this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine, ls.frame);
     }
     this._addStairSnaps(considerPoint, considerLine, exclusions?.stairIds);
 
@@ -785,7 +787,7 @@ export class TopologyEngine {
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex, (edge as any).bulge || 0);
     }
 
-    for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+    for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine, ls.frame);
     this._addStairSnaps(considerPoint, considerLine);
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
@@ -851,7 +853,7 @@ export class TopologyEngine {
       considerLine(edge.a, edge.b, null, edge.hatch, edge.edgeIndex, (edge as any).bulge || 0);
     }
 
-    for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine);
+    for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine, ls.frame);
     this._addStairSnaps(considerPoint, considerLine);
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {

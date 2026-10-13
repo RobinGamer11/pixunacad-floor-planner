@@ -221,6 +221,10 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] SQL-Endfassung in Supabase einspielen (Nutzer)
 
 ## Radierer, Bibliothek, Infoboxen – 13.10.2026
+- [x] Aktuelle Korrektur: Bibliotheks-Hilfslinien überschaubar halten und Rahmenpunkte wieder fangbar/rechtsklickbar machen (Regressionstests)
+- [x] Aktuelle Korrektur: bisherige Infobox-Optik wiederherstellen und Zoomen/Verschieben im Infoboxmodus ermöglichen (Eingabetests)
+- [ ] Prüfung im angemeldeten CAD: kein verfügbarer Zugang; /cad führt zur Anmeldung
+- [ ] GitHub-main-Übertragung verifizieren: GitHub zeigt noch fc072408; Lovable verwaltet Commit/Push
 - [x] Paket 1: Kanten glätten entfernt, auffälliger Smooth-Hinweis, Bibliotheksliste schlank, Vorschaufenster mit Drehen/Spiegeln/Maßen (1:1 am Objekt)
 - [ ] Paket 2: Bearbeitung gesetzter Elemente, passgenauer Rahmen + Greifpunkte, R-Klick-Hilfslinien, „Verschieben“, Fangpunkte wie Schraffur
 - [ ] Paket 3: Infoboxen (Auswahl, Augen-Schalter, Filter im Auswahlfilter), Auswahlliste im Auswahlwerkzeug mit Shift

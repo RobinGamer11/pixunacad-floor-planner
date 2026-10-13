@@ -12,13 +12,15 @@
  */
 import type { Scene } from "../Scene";
 import { Scene as SceneClass } from "../Scene";
-import { createObjectsFromSnapshots, transformSnapshots } from "./libraryGeometry";
+import { createObjectsFromSnapshots, transformSnapshots, instanceCornersWorld, instanceExtremePointsWorld } from "./libraryGeometry";
 import type { LibraryDefinition } from "./types";
 
 export interface LibrarySnapScene {
   instanceId: string;
   labelId: string;
   scene: Scene;
+  frame: { x: number; y: number }[];
+  extremes: { x: number; y: number }[];
 }
 
 export class LibrarySnapSource {
@@ -47,7 +49,12 @@ export class LibrarySnapSource {
     });
     const scene = new SceneClass();
     createObjectsFromSnapshots(scene, snaps, inst.labelId);
-    const entry: LibrarySnapScene = { instanceId: inst.id, labelId: inst.labelId, scene };
+    const transform = { position: inst.position, rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY };
+    const entry: LibrarySnapScene = {
+      instanceId: inst.id, labelId: inst.labelId, scene,
+      frame: instanceCornersWorld(def.geometry, transform),
+      extremes: instanceExtremePointsWorld(def.geometry, transform),
+    };
     this._cache.set(inst.id, { sig, entry });
     return entry;
   }
