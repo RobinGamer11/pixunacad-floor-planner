@@ -970,7 +970,7 @@ export class HatchTool {
     const style = this.app.getCurrentHatchStyle();
     const fillCol = rgbaFromHex(style.fillColor, style.fillAlphaPct / 100);
     // Polygon-Werkzeug speichert seine Strichstärke in Metern → Vorschau = echte Stärke.
-    const polyStyle = (this as any).constructor?.name === "PolygonTool"
+    const polyStyle = (this as any).id === "polygon"
       ? (this.app as any).getCurrentPolygonStyle?.() : null;
     const scaledStrokePx = polyStyle && typeof polyStyle.thicknessM === "number"
       ? Math.max(1, this.app.renderer.segStrokePx(polyStyle.thicknessM))
