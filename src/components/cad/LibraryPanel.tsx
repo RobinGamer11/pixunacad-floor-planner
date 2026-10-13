@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  Boxes, ChevronDown, ChevronRight, Folder, FolderPlus,
+  ChevronDown, ChevronRight, Folder, FolderPlus,
   ArrowRight, MoreHorizontal, Plus, Save, Ungroup, Upload, Wrench, X,
 } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";

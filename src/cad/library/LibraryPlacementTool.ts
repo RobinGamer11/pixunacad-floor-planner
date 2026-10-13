@@ -2,8 +2,8 @@
  * LibraryPlacementTool — Platzierung von Bibliotheksobjekten.
  *
  * Ablauf (analog zum bewährten Sticker-Ablauf, aber eigenständig):
- *   „placing“  → Geist-Vorschau folgt dem Cursor, Klick setzt den Ankerpunkt
- *   „rotating“ → Anker fix, Mausbewegung dreht, Klick bestätigt
+ *   „placing“  → Geist-Vorschau folgt dem Cursor, Klick setzt das Objekt
+ *   Drehen/Spiegeln/Maße kommen aus dem Vorschaufenster (1:1 übernommen)
  *   Esc        → Abbruch
  */
 import { v, type Vec2 } from "../geometry";
@@ -14,7 +14,7 @@ import { snapshotPoints, transformSnapshots } from "./libraryGeometry";
 import type { LibraryDefinition } from "./types";
 import { SelectionType, ToolIds } from "../constants";
 
-type Phase = "idle" | "placing" | "rotating";
+type Phase = "idle" | "placing";
 
 export class LibraryPlacementTool {
   app: CadApp;
