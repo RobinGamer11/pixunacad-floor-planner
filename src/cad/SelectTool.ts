@@ -1489,6 +1489,21 @@ export class SelectTool {
     this.app.hub.hide();
   }
 
+  /** Polygon aufschneiden: nächster Klick setzt den Schnittpunkt auf der Kante. */
+  beginPolygonSplit(hatchId: string, edgeIndex: number) {
+    const poly: any = this.app.scene.getHatchById(hatchId);
+    if (!poly || !poly.isPolygon || poly.points.length < 2) return;
+    const n = poly.points.length;
+    const edgeCount = poly.closed === false ? n - 1 : n;
+    if (edgeIndex < 0 || edgeIndex >= edgeCount) return;
+    this._clearTransformGuides();
+    this.activeEditAction = PointEditAction.SPLIT;
+    this.editTarget = { kind: "polygonSplit", hatchId, edgeIndex } as any;
+    this.splitPreview = null;
+    this.app.pointEditMenu.hide();
+    this.app.hub.hide();
+  }
+
   /** Aktueller Schnittpunkt (auf die gewählte — ggf. gewölbte — Kante projizierte Maus). */
   private _computeSplitPoint(input: any): Vec2 | null {
     const t: any = this.editTarget;
@@ -1504,6 +1519,12 @@ export class SelectTool {
       if (!wall) return null;
       A = wall.corners[t.edgeIndex]; B = wall.corners[t.edgeIndex + 1];
       bulge = Array.isArray(wall.bulges) ? (wall.bulges[t.edgeIndex] || 0) : 0;
+    } else if (t.kind === "polygonSplit") {
+      const poly: any = this.app.scene.getHatchById(t.hatchId);
+      if (!poly) return null;
+      const n = poly.points.length;
+      A = poly.points[t.edgeIndex]; B = poly.points[(t.edgeIndex + 1) % n];
+      bulge = Array.isArray(poly.bulges) ? (poly.bulges[t.edgeIndex] || 0) : 0;
     }
     if (!A || !B) return null;
     const raw = v(input.mouse.wx, input.mouse.wy);
@@ -1517,6 +1538,49 @@ export class SelectTool {
     const t: any = this.editTarget;
     if (!t) return;
     const scene: any = this.app.scene;
+
+    if (t.kind === "polygonSplit") {
+      const poly: any = scene.getHatchById(t.hatchId);
+      if (!poly) return;
+      const pts: Vec2[] = poly.points;
+      const n = pts.length;
+      const ei: number = t.edgeIndex;
+      const bul: number[] = Array.isArray(poly.bulges) ? poly.bulges : [];
+      const cut = splitBulgedEdge(pts[ei], pts[(ei + 1) % n], bul[ei] || 0, p);
+      const sp = cut.point;
+      const cp = (q: Vec2) => v(q.x, q.y);
+      if (poly.closed !== false) {
+        // Geschlossen → an der Schnittstelle öffnen: Kette beginnt und endet am Schnitt.
+        const order: Vec2[] = [cp(sp)];
+        const ob: number[] = [cut.bulgeB];
+        for (let k = 1; k <= n; k++) {
+          const idx = (ei + k) % n;
+          order.push(cp(pts[idx]));
+          ob.push(k === n ? cut.bulgeA : (bul[idx] || 0));
+        }
+        order.push(cp(sp));
+        poly.points = order;
+        poly.bulges = ob;
+        poly.closed = false;
+        poly.shapeMode = "polygon";
+      } else {
+        // Offen → zwei eigenständige Polygone, Stil wird übernommen.
+        const ptsA = pts.slice(0, ei + 1).map(cp).concat([cp(sp)]);
+        const ptsB = [cp(sp)].concat(pts.slice(ei + 1).map(cp));
+        const bulA = bul.slice(0, ei).concat([cut.bulgeA]);
+        const bulB = [cut.bulgeB].concat(bul.slice(ei + 1));
+        scene.createPolygon(ptsB, {
+          color: poly.strokeColor, thicknessM: poly.thicknessM, alpha: poly.alpha,
+          labelId: poly.labelId, bulges: bulB, midpointSnap: poly.midpointSnap,
+          divisionSnap: poly.divisionSnap, closed: false, shapeMode: "polygon",
+          strokePattern: poly.strokePattern, roughen: poly.roughen, appearanceSeed: poly.appearanceSeed,
+        });
+        poly.points = ptsA;
+        poly.bulges = bulA;
+      }
+      this.app.setSelection(null);
+      return;
+    }
 
     if (t.kind === "segmentSplit") {
       const seg: any = scene.getSegmentById(t.segmentId);
@@ -4246,7 +4310,9 @@ export class SelectTool {
           const midW = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
           const sp = this.app.camera.worldToScreen(midW.x, midW.y);
           this._lastHatchEdgeClickW = v(input.mouse.wx, input.mouse.wy);
-          this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.OFFSET, PointEditAction.INSERT_POINT, PointEditAction.BULGE]);
+          const edgeActions: string[] = [PointEditAction.OFFSET, PointEditAction.INSERT_POINT, PointEditAction.BULGE];
+          if ((edgeHit.hatch as any).isPolygon && edgeHit.holeIndex == null) edgeActions.push(PointEditAction.SPLIT);
+          this.app.pointEditMenu.showAt(sp.x, sp.y, edgeActions);
           return;
         }
       }

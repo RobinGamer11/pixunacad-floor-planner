@@ -758,6 +758,10 @@ export class CadApp {
           this.selectTool.beginWallSplit((sel as any).wallId, (sel as any).edgeIndex);
           return;
         }
+        if (sel.type === SelectionType.HATCH && (sel as any).hatchId && (sel as any).edgeIndex != null && (sel as any).holeIndex == null) {
+          this.selectTool.beginPolygonSplit((sel as any).hatchId, (sel as any).edgeIndex);
+          return;
+        }
         if ((sel as any).segmentId) {
           this.selectTool.beginSegmentSplit((sel as any).segmentId);
           return;
