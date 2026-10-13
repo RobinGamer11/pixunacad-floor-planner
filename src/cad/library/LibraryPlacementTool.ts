@@ -104,21 +104,25 @@ export class LibraryPlacementTool {
   /** Setzt genau eine Instanz und übergibt sie direkt an das Auswahlwerkzeug. */
   commit() {
     if (!this.activeDef || !this.anchor) return;
-    const inst = this.app.scene.createLibraryInstance({
-      definitionId: this.activeDef.id,
-      definitionVersion: this.activeDef.version,
-      position: { x: this.anchor.x, y: this.anchor.y },
-      rotationRad: this.rotationRad,
-      scaleX: this.scale,
-      scaleY: this.scale,
-      labelId: this.app.activeDrawLabelId,
-    });
+    const def = this.activeDef;
+    const anchor = this.anchor;
+    const create = () => this.app.scene.createLibraryInstance({
+          definitionId: def.id,
+          definitionVersion: def.version,
+          position: { x: anchor.x, y: anchor.y },
+          rotationRad: this.rotationRad,
+          scaleX: this.scale,
+          scaleY: this.scale,
+          labelId: this.app.activeDrawLabelId,
+        });
+    const run = (this.app as any).runAction;
+    const inst = run ? run.call(this.app, create) : (() => { const i = create(); this.app.commitHistorySnapshot?.(); return i; })();
+    if (!inst) return;
     this.phase = "idle";
     this.activeDef = null;
     this.anchor = null;
     this.rotationRad = 0;
     this.app.refreshLabelUI?.();
-    this.app.commitHistorySnapshot?.();
     this.app.setTool(ToolIds.SELECT);
     this.app.setSelection({
       type: SelectionType.LIBRARY_INSTANCE,
