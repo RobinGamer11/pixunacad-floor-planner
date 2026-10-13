@@ -5384,6 +5384,8 @@ export class SelectTool {
       case "textbox":    return s.getTextBoxById?.(id);
       case "table":      return s.getTableById?.(id);
       case "document":   return s.getDocumentById?.(id);
+      case "library":    return s.getLibraryInstanceById?.(id);
+      case "stair":      return s.getStairById?.(id);
       default: return null;
     }
   }
