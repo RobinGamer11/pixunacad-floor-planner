@@ -1046,6 +1046,8 @@ export class InfoBox {
   authorInitials = "";
   /** Feste Breite in Bildschirmpixeln (zoomt nicht mit). */
   sizePx = 180;
+  /** Breite auf dem Plan in Metern (maßstäblich, Standard 0,50 m). */
+  sizeM = 0.5;
   showPreview = true;
   constructor(init: Partial<InfoBox> & { id: string }) {
     Object.assign(this, init);
@@ -1060,7 +1062,7 @@ export function serializeInfoBox(b: InfoBox): any {
   return {
     id: b.id, labelId: b.labelId, x: b.x, y: b.y, kind: b.kind, status: b.status,
     title: b.title, desc: b.desc, categoryId: b.categoryId, authorInitials: b.authorInitials,
-    sizePx: b.sizePx, showPreview: b.showPreview,
+    sizePx: b.sizePx, sizeM: b.sizeM, showPreview: b.showPreview,
   };
 }
 

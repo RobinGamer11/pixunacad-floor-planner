@@ -38,7 +38,7 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
 
   const user = auth?.session?.user;
   const initials = initialsOf(user?.user_metadata?.display_name || user?.user_metadata?.name || user?.email);
-  const base = box ?? { kind: "info", status: "open", title: "", desc: "", sizePx: 180, labelId: app.activeDrawLabelId };
+  const base = box ?? { kind: "info", status: "open", title: "", desc: "", sizePx: 180, sizeM: 0.5, labelId: app.activeDrawLabelId };
 
   const labelOk = (id: string) => app.labelManager?.isEditable?.(id) !== false;
   const drawLabel = () => {
@@ -142,9 +142,9 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
             on={base.showPreview !== false} onToggle={() => update({ showPreview: base.showPreview === false })} />
           <div className="flex items-end gap-2 pt-1">
             <label className="block flex-1">
-              <span className="mb-1 block">Größe (px)</span>
-              <input type="number" min={120} max={480} step={10} className={inputCls} value={base.sizePx}
-                onChange={(e) => { const n = parseFloat(e.target.value); if (n >= 120 && n <= 480) update({ sizePx: n }); }} />
+              <span className="mb-1 block">Breite (m)</span>
+              <input type="number" min={0.1} max={10} step={0.05} className={inputCls} value={base.sizeM ?? 0.5}
+                onChange={(e) => { const n = parseFloat(e.target.value.replace(",", ".")); if (n >= 0.1 && n <= 10) update({ sizeM: n }); }} />
             </label>
             <button type="button" onClick={remove} title="Infobox löschen"
               className="cad-toolbar-btn h-9 gap-1.5 px-3 justify-center">

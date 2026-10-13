@@ -1060,8 +1060,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       // verlassen (Ordneransicht, Suche und Filter bleiben erhalten).
       if (app.activeTool === app.selectTool && activeToolRef.current !== ToolIds.LIBRARY) {
         // Der Ebenen-Reiter bleibt offen, wenn dort gerade gearbeitet wird.
-        const stairSel = (app.selectTool as any).marqueeSelectedIds?.some?.((m: any) => m.kind === "stair");
-        setRightTab((prev) => (prev === "layers" ? prev : (app.selection || app.doorTool.selectedDoorId || stairSel ? "settings" : "sheets")));
+        const stairSel = (app.selectTool as any).marqueeSelectedIds?.some?.((m: any) => m.kind === "stair" || m.kind === "infobox");
+        // Offener Auswahlfilter bleibt stehen – auch wenn nur Infoboxen getroffen werden.
+        setRightTab((prev) => (prev === "layers" ? prev : (app.selection || app.doorTool.selectedDoorId || stairSel || app.selectionFilterOpen ? "settings" : "sheets")));
       }
       setSelectedFreeStrokeId(app.getSelectedFreeStroke()?.id || null);
       setSelectedSegmentId(((app.selection as any)?.segmentId as string) || null);

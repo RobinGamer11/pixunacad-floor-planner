@@ -1,3 +1,4 @@
+import { infoBoxCornersWorld } from "@/lib/infoBoxUi";
 import { setSelectionTransformActive } from "./Input";
 import { hitStair, stairBoundsPoints } from "./stairGeometry";
 import { drawSnapDot } from "./snapDraw";
@@ -4880,12 +4881,7 @@ export class SelectTool {
         case "table":    return boxCornersWorld(obj);
         case "document": return documentCornersWorld(obj);
         case "stair": return stairBoundsPoints(obj) as any;
-        case "infobox": {
-          // Feste Bildschirmgröße → Ausdehnung in Welt je nach Zoom.
-          const k = 1 / ((this.app as any).camera?.scale || 80);
-          const half = 16 * k, h = 32 * k;
-          return [{ x: obj.x - half, y: obj.y - h }, { x: obj.x + half, y: obj.y - h }, { x: obj.x + half, y: obj.y }, { x: obj.x - half, y: obj.y }] as any;
-        }
+        case "infobox": return infoBoxCornersWorld(obj) as any;
         case "library": {
           const geom = this._libraryGeometryOf(obj);
           return geom ? instanceCornersWorld(geom, this._libraryTransformOf(obj)) as any : [];

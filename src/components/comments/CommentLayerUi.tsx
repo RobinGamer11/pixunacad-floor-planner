@@ -11,7 +11,7 @@
  * Alle Farben kommen aus den Design-Tokens → helles und dunkles Design.
  */
 import React from "react";
-import { ArrowUp, AtSign, Check, Info, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { ArrowUp, AtSign, Check, Eye, EyeOff, Info, MessageSquare, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import {
   commentUi,
   initialsOf,
@@ -20,7 +20,7 @@ import {
   type ProjectComment,
 } from "@/lib/commentsStore";
 import type { TeamMemberOption } from "@/lib/projectTeam";
-import { infoBoxUi } from "@/lib/infoBoxUi";
+import { infoBoxUi, useInfoBoxUi } from "@/lib/infoBoxUi";
 
 const OPEN_COLOR = "hsl(38 92% 50%)";
 const DONE_COLOR = "hsl(150 45% 42%)";
@@ -569,10 +569,18 @@ export function CommentModeButton({
   title?: string;
 }) {
   const ui = useCommentUi();
+  const ib = useInfoBoxUi();
   const active = ui.mode;
   const count = ui.openCount;
+  const eyeBtn = (on: boolean, label: string, icon: React.ReactNode, act: () => void) => (
+    <button type="button" disabled={!on} title={label} aria-label={label} onClick={act}
+      className="h-9 w-9 rounded-full flex items-center justify-center shadow-md disabled:opacity-35 pixuna-comments"
+      style={{ background: "hsl(var(--surface-card))", color: "hsl(var(--ink))", border: "1px solid hsl(var(--primary) / 0.5)" }}>
+      {icon}
+    </button>
+  );
   return (
-    <div className="relative flex items-center">
+    <div className="relative flex items-center gap-2">
       <button
         type="button"
         disabled={disabled}
@@ -585,9 +593,17 @@ export function CommentModeButton({
           border: "2px solid hsl(var(--primary) / 0.75)",
         }}
       >
-        <MessageSquare size={18} />
+        <Info size={18} />
         <span className="text-[10px] font-semibold leading-none">{count}</span>
       </button>
+      {eyeBtn(!!ib.selectedId, "Gewählte Infobox ausblenden", <EyeOff size={16} />, () => { const id = ib.selectedId; infoBoxUi.clear(); if (id) infoBoxUi.hide([id]); })}
+      {eyeBtn(ib.hiddenIds.length > 0, "Ausgeblendete Infoboxen einblenden", <Eye size={16} />, () => infoBoxUi.showAll())}
+      {active && (
+        <div className="pixuna-comments pointer-events-none flex items-center" aria-live="polite">
+          <span className="h-0 w-0" style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent", borderRight: "7px solid hsl(var(--notice-beige))" }} />
+          <span className="rounded px-2.5 py-1 text-[11.5px] font-semibold whitespace-nowrap" style={{ background: "hsl(var(--notice-beige))", color: "hsl(var(--ink))" }}>Aktiviert</span>
+        </div>
+      )}
     </div>
   );
 }

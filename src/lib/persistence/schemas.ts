@@ -107,6 +107,7 @@ export function migrateSceneData<T>(scene: T): T {
     fill(b, "kind", "info");
     fill(b, "status", "open");
     fill(b, "sizePx", 180);
+    fill(b, "sizeM", 0.5);
   });
 
   mapArray(scene, "tables", (t) => {

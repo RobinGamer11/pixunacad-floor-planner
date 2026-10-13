@@ -1,3 +1,4 @@
+import { infoBoxCornersWorld } from "@/lib/infoBoxUi";
 import { Defaults, SnapType } from "./constants";
 import { computeStairGeometry } from "./stairGeometry";
 import { buildGuideGeometry, type GuideGeometry, type GuideSourceType } from "./guideGeometry";
@@ -327,6 +328,14 @@ export class TopologyEngine {
    * Alle Kandidaten sind „freie" Snaps (segment/hatch = null), damit kein
    * Werkzeug die enthaltene Geometrie auswählt, teilt oder bearbeitet.
    */
+  /** Eckpunkte sichtbarer Infoboxen (maßstäblich) als Fangpunkte. */
+  private _addInfoBoxSnaps(considerPoint: (p: Vec2, a: any, b: any, i: number) => void) {
+    for (const b of ((this.scene as any).infoBoxes || []) as any[]) {
+      if (!this.labels.isVisible(b.labelId)) continue;
+      for (const c of infoBoxCornersWorld(b)) considerPoint(v(c.x, c.y), null, null, -1);
+    }
+  }
+
   private _addLibrarySceneSnaps(
     scn: Scene,
     considerPoint: (world: Vec2, segment: Segment | null, hatch: Hatch | null, pointIndex: number) => void,
@@ -682,6 +691,7 @@ export class TopologyEngine {
     for (const ls of this._libraryScenes(exclusions?.libraryInstanceIds)) {
       this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine, ls.frame);
     }
+    this._addInfoBoxSnaps(considerPoint);
     this._addStairSnaps(considerPoint, considerLine, exclusions?.stairIds);
 
 
@@ -788,6 +798,7 @@ export class TopologyEngine {
     }
 
     for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine, ls.frame);
+    this._addInfoBoxSnaps(considerPoint);
     this._addStairSnaps(considerPoint, considerLine);
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
@@ -854,6 +865,7 @@ export class TopologyEngine {
     }
 
     for (const ls of this._libraryScenes()) this._addLibrarySceneSnaps(ls.scene, considerPoint, considerLine, ls.frame);
+    this._addInfoBoxSnaps(considerPoint);
     this._addStairSnaps(considerPoint, considerLine);
 
     this._addWallSnapsTo(mouseS, mouseW, (cand, score) => {
