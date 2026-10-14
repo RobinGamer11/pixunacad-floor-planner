@@ -183,10 +183,10 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       const list: any[] = st.marqueeSelectedIds || [];
       const i = list.findIndex((m) => m.kind === "infobox" && m.id === b.id);
       st.marqueeSelectedIds = i >= 0 ? list.filter((_, j) => j !== i) : [...list, { kind: "infobox", id: b.id }];
-      app.renderer?.render?.();
-      return;
       infoBoxUi.clear();
     } else {
+      // Andere Objektauswahl lösen, damit rechts sicher die Infobox erscheint.
+      try { if (app.selection) app.setSelection?.(null); } catch { /* */ }
       if (st) st.marqueeSelectedIds = [{ kind: "infobox", id: b.id }];
       infoBoxUi.select(b.id);
     }
