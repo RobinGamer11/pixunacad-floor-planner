@@ -10,7 +10,7 @@ import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input, setLmbHint } from "./Input";
 import { drawPendingPointHint } from "./pendingPointHint";
-import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects, styleCarry } from "./Scene";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "./strokeEffects";
 
 /** Aufrauen-Werkzeugstandards in CAD: Regler jeweils auf 50 (= Detail 4, 400 %). */
