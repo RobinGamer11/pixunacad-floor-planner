@@ -3,11 +3,11 @@ import { Camera } from "./Camera";
 
 /**
  * Globale Flags aus dem Tablet-Hilfsrad:
- *  - __pixunaPenOnly:  true  → nur Stift zeichnet, Finger dient zum Pan/Pinch/Auswählen
  *  - __pixunaZoomLock: true  → Kamera ist eingefroren (kein Pan, kein Zoom)
  */
+/** Stift-Modus ist entfernt: Stift verhält sich immer wie ein Finger. */
 function isPenOnly(): boolean {
-  return typeof window !== "undefined" && !!(window as any).__pixunaPenOnly;
+  return false;
 }
 function isZoomLocked(): boolean {
   return typeof window !== "undefined" && !!(window as any).__pixunaZoomLock;

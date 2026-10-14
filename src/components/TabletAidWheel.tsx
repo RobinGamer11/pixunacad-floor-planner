@@ -256,10 +256,11 @@ export function TabletAidWheel() {
 }
 
 function CenterToggles() {
-  // Stift-Modus bleibt aktiv (frühere Standardeinstellung); der Mittelknopf ist jetzt SPACE.
+  // Kein Stift-Modus: Stift verhält sich wie ein Finger.
   const [space, setSpace] = useState(false);
   useEffect(() => {
-    (window as any).__pixunaPenOnly = true;
+    (window as any).__pixunaPenOnly = false;
+    try { localStorage.removeItem("pixuna.penOnly"); } catch {}
     return () => {
       (window as any).__pixunaPenOnly = false;
       (window as any).__pixunaZoomLock = false;

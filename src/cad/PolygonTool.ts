@@ -66,21 +66,6 @@ export class PolygonTool extends HatchTool {
     (this.app as any).notifyPolygonCreated?.(poly);
   }
 
-  /** SPACE + Klick: Umrandung → geschlossenes Polygon (Form wie Umrandung). */
-  protected override _createFromOutline(loop: Vec2[]) {
-    const style = (this.app as any).getCurrentPolygonStyle?.() ?? {};
-    let poly: any = null;
-    (this.app as any).runAction(() => {
-      poly = (this.app as any).scene.createPolygon(loop, {
-        ...style,
-        ...((this.app as any).getStrokeEffectDefaults?.("polygon") ?? {}),
-        shapeMode: "polygon",
-        closed: true,
-      });
-    });
-    if (poly) (this.app as any).notifyPolygonCreated?.(poly);
-  }
-
   /**
    * Kreis: Mittelpunkt setzen → Radius bestimmen → fertig.
    * Es gibt keinen Sektor-/Bogenmodus, ein Kreis ist immer eine geschlossene
