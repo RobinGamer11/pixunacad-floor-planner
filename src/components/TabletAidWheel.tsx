@@ -69,7 +69,7 @@ export function TabletAidWheel() {
     const margin = 8;
     const bottomSafe = safeInset("--sab") || 0;
     const maxX = Math.max(margin, w - size - margin);
-    const maxY = Math.max(margin, h - size - margin - bottomSafe);
+    const maxY = Math.max(margin, h - totalHeight - margin - bottomSafe);
     return {
       x: Math.min(Math.max(margin, p.x), maxX),
       y: Math.min(Math.max(margin, p.y), maxY),
