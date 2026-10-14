@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Keyboard, Pencil } from "lucide-react";
+import { Keyboard } from "lucide-react";
 import { setLmbHint as setGlobalLmbHint } from "@/cad/Input";
 import {
   virtualMouseClick,
@@ -256,62 +256,38 @@ export function TabletAidWheel() {
 }
 
 function CenterToggles() {
-  const [penOnly, setPenOnly] = useState<boolean>(() => {
-    // Default: Stift-Modus ist beim Einblenden des Rades immer aktiv.
-    try { return localStorage.getItem("pixuna.penOnly") !== "0"; } catch { return true; }
-  });
+  // Stift-Modus bleibt aktiv (frühere Standardeinstellung); der Mittelknopf ist jetzt SPACE.
+  const [space, setSpace] = useState(false);
   useEffect(() => {
-    (window as any).__pixunaPenOnly = penOnly;
-    try { localStorage.setItem("pixuna.penOnly", penOnly ? "1" : "0"); } catch {}
-  }, [penOnly]);
-  useEffect(() => {
+    (window as any).__pixunaPenOnly = true;
     return () => {
       (window as any).__pixunaPenOnly = false;
       (window as any).__pixunaZoomLock = false;
+      (window as any).__pixunaVirtualSpace = false;
     };
   }, []);
-
-
-  const btn = (active: boolean): React.CSSProperties => ({
-    width: 46,
-    height: 22,
-    borderRadius: 6,
-    fontSize: 9,
-    fontWeight: 700,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    border: active ? "1px solid hsl(var(--overlay-gold))" : "1px solid hsl(var(--overlay-surface) / 0.28)",
-    background: active ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.12)",
-    color: active ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))",
-    cursor: "pointer",
-  });
+  useEffect(() => { (window as any).__pixunaVirtualSpace = space; }, [space]);
 
   return (
-    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-      <div className="text-[9px] font-semibold uppercase tracking-[0.16em] pointer-events-none" style={{ color: "hsl(var(--overlay-surface) / 0.72)" }}>
-        Tablet
-      </div>
+    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
       <button
         type="button"
-        title="Stift-Modus: nur Stift zeichnet, Finger = pan/zoom/auswählen"
+        title="SPACE: bleibt aktiv, bis erneut angetippt"
+        aria-pressed={space}
         tabIndex={-1}
         onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPenOnly((v) => !v); }}
-        style={btn(penOnly)}
-      >
-        <Pencil size={11} />
-        Stift
-      </button>
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setSpace((v) => !v); }}
+        style={{
+          width: 64, height: 28, borderRadius: 6, fontSize: 10, fontWeight: 800, letterSpacing: "0.12em",
+          display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          border: space ? "1px solid hsl(var(--overlay-gold))" : "1px solid hsl(var(--overlay-surface) / 0.28)",
+          background: space ? "hsl(var(--overlay-gold))" : "hsl(var(--overlay-surface) / 0.12)",
+          color: space ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))",
+        }}
+      >SPACE</button>
     </div>
   );
 }
-
-
-
-
-
 
 /**
  * Globale Registry aller Rad-Knöpfe.

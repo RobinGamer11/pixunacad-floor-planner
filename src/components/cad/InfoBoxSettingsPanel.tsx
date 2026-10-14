@@ -135,7 +135,9 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
               onChange={(e) => update({ desc: e.target.value }, false)}
               onBlur={() => box && app.commitHistorySnapshot?.()} />
           </label>
-          <div className="flex items-end justify-end gap-2 pt-1">
+          <div className="flex items-end justify-between gap-2 pt-1">
+            <SizeField value={typeof base.sizeM === "number" && base.sizeM > 0 ? base.sizeM : 0.5}
+              onCommit={(m) => update({ sizeM: m })} />
             <button type="button" onClick={remove} title="Infobox löschen"
               className="cad-toolbar-btn h-9 gap-1.5 px-3 justify-center">
               <Trash2 className="h-4 w-4" /> Löschen
@@ -158,6 +160,27 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Freie Boxgröße in Metern (Standard 0,50 m); übernimmt bei Enter/Verlassen. */
+function SizeField({ value, onCommit }: { value: number; onCommit: (m: number) => void }) {
+  const fmt = (n: number) => n.toFixed(2).replace(".", ",");
+  const [txt, setTxt] = React.useState(fmt(value));
+  React.useEffect(() => { setTxt(fmt(value)); }, [value]);
+  const commit = () => {
+    const n = parseFloat(txt.replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) { setTxt(fmt(value)); return; }
+    const m = Math.min(100, Math.max(0.05, n));
+    if (Math.abs(m - value) > 1e-9) onCommit(m); else setTxt(fmt(value));
+  };
+  return (
+    <label className="block flex-1">
+      <span className="mb-1 block">Boxgröße (m)</span>
+      <input className={inputCls} inputMode="decimal" value={txt}
+        onChange={(e) => setTxt(e.target.value)} onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+    </label>
   );
 }
 
