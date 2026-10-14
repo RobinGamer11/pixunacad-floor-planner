@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Keyboard } from "lucide-react";
+import { Keyboard, Trash2 } from "lucide-react";
 import { setLmbHint as setGlobalLmbHint } from "@/cad/Input";
 import {
   virtualMouseClick,
@@ -56,6 +56,8 @@ function safeInset(name: string): number {
 export function TabletAidWheel() {
   const STORAGE_KEY = "pixuna.tabletAid.pos";
   const size = 190;
+  // Unter dem Rad sitzt zusätzlich der kleine ENTF-Knopf.
+  const totalHeight = size + 50;
 
   /**
    * Begrenzt eine gespeicherte Position auf den sichtbaren Bereich.
@@ -67,12 +69,12 @@ export function TabletAidWheel() {
     const margin = 8;
     const bottomSafe = safeInset("--sab") || 0;
     const maxX = Math.max(margin, w - size - margin);
-    const maxY = Math.max(margin, h - size - margin - bottomSafe);
+    const maxY = Math.max(margin, h - totalHeight - margin - bottomSafe);
     return {
       x: Math.min(Math.max(margin, p.x), maxX),
       y: Math.min(Math.max(margin, p.y), maxY),
     };
-  }, [size]);
+  }, [size, totalHeight]);
 
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     let stored: { x: number; y: number } | null = null;
@@ -83,12 +85,12 @@ export function TabletAidWheel() {
     const { h } = visibleViewport();
     const base = stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)
       ? stored
-      : { x: 16, y: Math.max(8, h - size - 24) };
+      : { x: 16, y: Math.max(8, h - totalHeight - 24) };
     const { w: vw, h: vh } = visibleViewport();
     const margin = 8;
     return {
       x: Math.min(Math.max(margin, base.x), Math.max(margin, vw - size - margin)),
-      y: Math.min(Math.max(margin, base.y), Math.max(margin, vh - size - margin)),
+      y: Math.min(Math.max(margin, base.y), Math.max(margin, vh - totalHeight - margin)),
     };
   });
   useEffect(() => {
@@ -177,7 +179,7 @@ export function TabletAidWheel() {
         left: pos.x,
         top: pos.y,
         width: size,
-        height: size,
+        height: totalHeight,
         touchAction: "none",
         // Immer im Vordergrund — über Panels, Hubs, Dialogen und Overlays.
         zIndex: 2147483000,
@@ -186,14 +188,18 @@ export function TabletAidWheel() {
       }}
     >
 
-      {/* Rand = Drag-Griff */}
+      {/* Rand = Drag-Griff (nur das runde Rad selbst) */}
       <div
         onPointerDown={onDragStart}
         onPointerMove={onDragMove}
         onPointerUp={onDragEnd}
         onPointerCancel={onDragEnd}
-        className="absolute inset-0 rounded-full"
+        className="absolute rounded-full"
         style={{
+          top: 0,
+          left: 0,
+          width: size,
+          height: size,
           border: "1px solid hsl(var(--overlay-surface) / 0.28)",
           background: "hsl(var(--overlay-ink) / 0.82)",
           boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
@@ -250,6 +256,16 @@ export function TabletAidWheel() {
         onHold={(on) => virtualKeyHold("Shift", on)}
         toggleHold
         icon={<Keyboard size={24} strokeWidth={1.45} />} />
+
+      {/* Kleiner ENTF-Knopf ganz unten unter dem Rad */}
+      <WheelSmallButton
+        tooltip="Entf: Auswahl löschen (Entf-Taste)"
+        onTap={() => {
+          if ((window as any).__pixunaCameraGesture) return;
+          virtualKeyPress("Delete");
+        }}
+        icon={<Trash2 size={18} strokeWidth={1.45} />}
+      />
 
     </div>
   );
@@ -518,6 +534,61 @@ function WheelButton({
       {icon}
       <span className="text-[8px] font-semibold leading-none">{label}</span>
       <span className="max-w-[48px] truncate text-[6px] leading-none opacity-70">{description}</span>
+    </button>
+  );
+}
+
+/** Kleiner Knopf unter dem Rad (z. B. ENTF) — gleicher Stil, nur kompakter. */
+function WheelSmallButton({
+  tooltip, icon, onTap,
+}: {
+  tooltip: string;
+  icon: React.ReactNode;
+  onTap: () => void;
+}) {
+  const buttonSize = 44;
+  const elRef = useRef<HTMLButtonElement | null>(null);
+
+  // Callbacks stabil halten, damit die Registry-Registrierung nur einmal läuft.
+  const cbs = useRef({ onTap });
+  cbs.current = { onTap };
+
+  useEffect(() => {
+    const handle: BtnHandle = {
+      getRect: () => elRef.current?.getBoundingClientRect() ?? null,
+      begin: () => cbs.current.onTap(),
+      end: () => {},
+      cancel: () => {},
+    };
+    WHEEL_BUTTONS.add(handle);
+    return () => { WHEEL_BUTTONS.delete(handle); };
+  }, []);
+
+  return (
+    <button
+      ref={elRef}
+      title={tooltip}
+      type="button"
+      tabIndex={-1}
+      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      className="absolute rounded-full flex items-center justify-center border transition-colors"
+      style={{
+        left: "50%",
+        transform: "translateX(-50%)",
+        top: 196,
+        width: buttonSize,
+        height: buttonSize,
+        borderColor: "hsl(var(--overlay-surface) / 0.28)",
+        background: "hsl(var(--overlay-surface) / 0.11)",
+        color: "hsl(var(--overlay-surface))",
+        touchAction: "none",
+        pointerEvents: "auto",
+        zIndex: 2,
+      }}
+    >
+      {icon}
     </button>
   );
 }
