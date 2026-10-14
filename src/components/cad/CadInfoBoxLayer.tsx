@@ -117,24 +117,51 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
   const openCount = boxes.length;
   React.useEffect(() => { commentUi.set({ openCount }); }, [openCount]);
 
-  // Verschieben über den Fangpunkt (Pinspitze): Punkt wählen → „Verschieben“ → Zielpunkt tippen.
+  // Verschieben wie beim Linienwerkzeug: Fangpunkt (Pinspitze) wählen →
+  // „Verschieben“ → Vorschau folgt Maus/Finger (mit Fang, Länge/Winkel) →
+  // Tippen/Klick setzt den Zielpunkt als genau einen Undo-Schritt.
   const [pick, setPick] = React.useState<string | null>(null);
   const [armed, setArmed] = React.useState(false);
+  const [preview, setPreview] = React.useState<{ x: number; y: number } | null>(null);
   React.useEffect(() => { if (!sel.selectedId || pick !== sel.selectedId) { setPick(null); setArmed(false); } }, [sel.selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
-    if (!app?.input || !armed || !pick) return;
+    if (!app?.input || !armed || !pick) { setPreview(null); return; }
     const prev = app.input.canvasTapHandler;
+    const snapAt = (sx: number, sy: number) => {
+      let w = app.camera.screenToWorld(sx, sy);
+      try { w = app.selectTool?.snapWorldPointPublic?.(w) ?? w; } catch { /* */ }
+      return w;
+    };
+    const onMove = (e: PointerEvent) => {
+      const r = app.canvas?.getBoundingClientRect?.();
+      if (!r) return;
+      const w = snapAt(e.clientX - r.left, e.clientY - r.top);
+      setPreview({ x: w.x, y: w.y });
+      const b = app.scene.getInfoBoxById?.(pick);
+      if (b) {
+        const dx = w.x - b.x, dy = w.y - b.y;
+        try { app.hub?.showAt?.(e.clientX - r.left, e.clientY - r.top); app.hub?.updateDisplay?.(Math.hypot(dx, dy), (Math.atan2(dy, dx) * 180) / Math.PI); } catch { /* */ }
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setArmed(false); } };
     const onTap = (sx: number, sy: number) => {
       const b = app.scene.getInfoBoxById?.(pick);
       if (!b) { setArmed(false); return; }
-      let w = app.camera.screenToWorld(sx, sy);
-      try { w = app.selectTool?.snapWorldPointPublic?.(w) ?? w; } catch { /* */ }
+      const w = snapAt(sx, sy);
       app.runAction(() => { b.x = w.x; b.y = w.y; });
       setArmed(false); setPick(null);
       app.renderer?.render?.();
     };
     app.input.canvasTapHandler = onTap;
-    return () => { if (app.input.canvasTapHandler === onTap) app.input.canvasTapHandler = prev && prev !== onTap ? prev : null; };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("keydown", onKey, true);
+      try { app.hub?.hide?.(); } catch { /* */ }
+      setPreview(null);
+      if (app.input.canvasTapHandler === onTap) app.input.canvasTapHandler = prev && prev !== onTap ? prev : null;
+    };
   }, [app, armed, pick]);
 
   const cam = app?.camera;
@@ -158,6 +185,8 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       st.marqueeSelectedIds = i >= 0 ? list.filter((_, j) => j !== i) : [...list, { kind: "infobox", id: b.id }];
       infoBoxUi.clear();
     } else {
+      // Andere Objektauswahl lösen, damit rechts sicher die Infobox erscheint.
+      try { if (app.selection) app.setSelection?.(null); } catch { /* */ }
       if (st) st.marqueeSelectedIds = [{ kind: "infobox", id: b.id }];
       infoBoxUi.select(b.id);
     }
@@ -173,8 +202,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     >
       {boxes.filter(visible).map((b) => {
         const p = cam.worldToScreen(b.x, b.y);
-        const active = sel.selectedId === b.id
-          || ((app.selectTool?.marqueeSelectedIds || []) as any[]).some((m) => m.kind === "infobox" && m.id === b.id);
         const task = b.kind === "task";
         const statusVar = b.status === "done" ? "--infobox-done" : "--infobox-open";
         return (
@@ -190,8 +217,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
               background: "hsl(var(--card))",
               color: "hsl(var(--foreground))",
               border: `2px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
-              outline: active ? "2px solid hsl(var(--primary))" : undefined,
-              outlineOffset: 2,
             }}
           >
             {task ? (
@@ -219,11 +244,25 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
         const on = pick === b.id;
         return (
           <>
+            {armed && preview && (() => {
+              const tp = cam.worldToScreen(preview.x, preview.y);
+              return (
+                <>
+                  <svg className="absolute inset-0 h-full w-full" style={{ pointerEvents: "none", overflow: "visible" }}>
+                    <line x1={sp.x} y1={sp.y} x2={tp.x} y2={tp.y} stroke="hsl(var(--primary))" strokeWidth={1.5} strokeDasharray="6 4" />
+                  </svg>
+                  <div className="absolute" style={{ left: tp.x, top: tp.y, width: PIN, height: PIN, marginLeft: -PIN / 2, marginTop: -PIN,
+                    borderRadius: "50% 50% 50% 6px", pointerEvents: "none", opacity: 0.55,
+                    background: "hsl(var(--card))", border: "2px dashed hsl(var(--primary))" }} />
+                </>
+              );
+            })()}
             <button type="button" aria-label="Fangpunkt der Infobox"
               onPointerDown={(e) => { e.stopPropagation(); setPick(on ? null : b.id); setArmed(false); }}
               className="absolute rounded-full"
-              style={{ left: sp.x - 8, top: sp.y - 8, width: 16, height: 16, pointerEvents: "auto", touchAction: "none",
-                background: on ? "hsl(var(--primary))" : "hsl(var(--card))", border: "2px solid hsl(var(--primary))" }} />
+              style={{ left: sp.x - 5, top: sp.y - 5, width: 10, height: 10, pointerEvents: "auto", touchAction: "none",
+                background: on ? "hsl(var(--primary))" : "hsl(var(--card))", border: "1.5px solid hsl(var(--primary))",
+                boxShadow: "0 0 0 8px transparent" }} />
             {on && (
               <button type="button" title="Verschieben"
                 onPointerDown={(e) => { e.stopPropagation(); setArmed((a) => !a); }}

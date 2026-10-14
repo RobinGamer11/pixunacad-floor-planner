@@ -482,7 +482,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const infoBoxActive = !!(infoBoxState.selectedId || infoBoxState.draft);
   useEffect(() => {
     if (infoBoxActive) { setRightOpen(true); setRightTab("settings"); }
-  }, [infoBoxActive, infoBoxState.selectedId]);
+  }, [infoBoxActive, infoBoxState.selectedId, infoBoxState.openTick]);
   // Anzahl der Ebenen für den Ebenen-Button oben links (leichtgewichtiges Polling).
   const [layerCount, setLayerCount] = useState(1);
   useEffect(() => {
