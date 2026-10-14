@@ -74,7 +74,7 @@ export function TabletAidWheel() {
       x: Math.min(Math.max(margin, p.x), maxX),
       y: Math.min(Math.max(margin, p.y), maxY),
     };
-  }, [size]);
+  }, [size, totalHeight]);
 
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     let stored: { x: number; y: number } | null = null;
@@ -85,7 +85,7 @@ export function TabletAidWheel() {
     const { h } = visibleViewport();
     const base = stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)
       ? stored
-      : { x: 16, y: Math.max(8, h - size - 24) };
+      : { x: 16, y: Math.max(8, h - totalHeight - 24) };
     const { w: vw, h: vh } = visibleViewport();
     const margin = 8;
     return {
