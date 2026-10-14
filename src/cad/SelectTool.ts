@@ -4110,6 +4110,18 @@ export class SelectTool {
         }
       }
 
+      // Fangpunkte des AUSGEWÄHLTEN Objekts liegen immer im Vordergrund –
+      // vor deckungsgleichen Punkten anderer Objekte (Wand, Treppe, Bibliothek …).
+      if (!input.keys?.shift) {
+        const own = this._selectedObjectPointHit(input);
+        if (own) {
+          this.app.setSelection(own);
+          if ((own as any).segmentId) this.app.showLineSettingsPanel(true);
+          if ((own as any).hatchId) this.app.showHatchSettingsPanel(true);
+          return;
+        }
+      }
+
       {
         // Bibliotheksinstanzen (eigener Objekttyp) vor den normalen Objekten prüfen.
         if (!input.keys?.shift) {
