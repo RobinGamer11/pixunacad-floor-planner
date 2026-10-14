@@ -347,9 +347,12 @@ export class Renderer {
   /** Hintergrundfarbe der dunklen Zeichenfläche (entspricht invertiertem Weiß). */
   static readonly DARK_BG = "#1a1a1a";
 
+  /** Nach jedem Zeichnen synchron aufgerufen (DOM-Overlays exakt mitführen). */
+  readonly afterRender = new Set<() => void>();
+
   render() {
-    if (isCanvasDark()) { this._renderDark(); return; }
-    this._renderInner();
+    if (isCanvasDark()) this._renderDark(); else this._renderInner();
+    for (const fn of this.afterRender) { try { fn(); } catch { /* Overlay optional */ } }
   }
 
   /** Zeichnet `fn` in eine Offscreen-Ebene und blendet sie invertiert auf. */
