@@ -183,6 +183,8 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       const list: any[] = st.marqueeSelectedIds || [];
       const i = list.findIndex((m) => m.kind === "infobox" && m.id === b.id);
       st.marqueeSelectedIds = i >= 0 ? list.filter((_, j) => j !== i) : [...list, { kind: "infobox", id: b.id }];
+      app.renderer?.render?.();
+      return;
       infoBoxUi.clear();
     } else {
       if (st) st.marqueeSelectedIds = [{ kind: "infobox", id: b.id }];
@@ -217,8 +219,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
               background: "hsl(var(--card))",
               color: "hsl(var(--foreground))",
               border: `2px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
-              outline: active ? "2px solid hsl(var(--primary))" : undefined,
-              outlineOffset: 2,
             }}
           >
             {task ? (
@@ -246,11 +246,25 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
         const on = pick === b.id;
         return (
           <>
+            {armed && preview && (() => {
+              const tp = cam.worldToScreen(preview.x, preview.y);
+              return (
+                <>
+                  <svg className="absolute inset-0 h-full w-full" style={{ pointerEvents: "none", overflow: "visible" }}>
+                    <line x1={sp.x} y1={sp.y} x2={tp.x} y2={tp.y} stroke="hsl(var(--primary))" strokeWidth={1.5} strokeDasharray="6 4" />
+                  </svg>
+                  <div className="absolute" style={{ left: tp.x, top: tp.y, width: PIN, height: PIN, marginLeft: -PIN / 2, marginTop: -PIN,
+                    borderRadius: "50% 50% 50% 6px", pointerEvents: "none", opacity: 0.55,
+                    background: "hsl(var(--card))", border: "2px dashed hsl(var(--primary))" }} />
+                </>
+              );
+            })()}
             <button type="button" aria-label="Fangpunkt der Infobox"
               onPointerDown={(e) => { e.stopPropagation(); setPick(on ? null : b.id); setArmed(false); }}
               className="absolute rounded-full"
-              style={{ left: sp.x - 8, top: sp.y - 8, width: 16, height: 16, pointerEvents: "auto", touchAction: "none",
-                background: on ? "hsl(var(--primary))" : "hsl(var(--card))", border: "2px solid hsl(var(--primary))" }} />
+              style={{ left: sp.x - 5, top: sp.y - 5, width: 10, height: 10, pointerEvents: "auto", touchAction: "none",
+                background: on ? "hsl(var(--primary))" : "hsl(var(--card))", border: "1.5px solid hsl(var(--primary))",
+                boxShadow: "0 0 0 8px transparent" }} />
             {on && (
               <button type="button" title="Verschieben"
                 onPointerDown={(e) => { e.stopPropagation(); setArmed((a) => !a); }}
