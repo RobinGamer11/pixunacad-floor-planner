@@ -1,4 +1,5 @@
 import { attachObjectMeta } from "./objectMeta";
+import { infoBoxUi } from "@/lib/infoBoxUi";
 import { mergeHatchGeometry } from "./hatchMerge";
 import { emptyFilterState, objectMatchesFilter, type SelectionFilterState } from "./selectionFilter";
 import { toast } from "sonner";
@@ -1419,6 +1420,8 @@ export class CadApp {
         && (selection as any).textBoxId === this.tableEditId;
       if (!stillSameTable) this.endTableEdit();
     }
+    // Andere Auswahl schließt die Einstellungen einer gewählten Infobox.
+    if (infoBoxUi.get().selectedId || infoBoxUi.get().draft) infoBoxUi.clear();
     this.selection = selection;
     // Gesetzte Tabellen sind bei Auswahl automatisch im Zellmodus.
     if (!this.tableEditId && selection && (selection as any).type === SelectionType.TEXTBOX) {
@@ -3372,8 +3375,13 @@ export class CadApp {
     // er bestimmt, welche Objekte "Alles"/Strg+A auswählt.
     const objTool = asObjectToolId(id);
     if (objTool) this.selectionFilterTool = objTool;
-    // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
+    // Werkzeugwechsel beendet immer den Tabellen-Zellmodus …
     this.endTableEdit();
+    // … und schließt eine gewählte Infobox (wie bei allen Objekten).
+    if (infoBoxUi.get().selectedId || infoBoxUi.get().draft) infoBoxUi.clear();
+    if (this.selectTool.marqueeSelectedIds.some((m: any) => m.kind === "infobox")) {
+      this.selectTool.marqueeSelectedIds = this.selectTool.marqueeSelectedIds.filter((m: any) => m.kind !== "infobox");
+    }
     if (this.pastePreviewActive) this.cancelPastePreview();
     // Ein anderes Werkzeug (z. B. Bibliotheks-/Dokumentplatzierung) beendet
     // den Mehrfach-Einfüge-Modus sauber.
