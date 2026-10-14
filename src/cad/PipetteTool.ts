@@ -8,6 +8,8 @@ import { getDimensionGeometry } from "./dimensionGeometry";
 import { pointInOrientedBox } from "./textGeometry";
 import { pointInDocument, documentCornersWorld } from "./documentGeometry";
 import { wallRefCorners } from "./wallGeom";
+import { styleCarry } from "./Scene";
+import { ToolIds } from "./constants";
 
 type PickKind = "segment" | "hatch" | "dimension" | "textbox" | "free" | "wall" | "table" | "document";
 
@@ -50,6 +52,19 @@ const STYLE_KEYS: Record<PickKind, string[]> = {
   document: ["opacity", "filters", "activeFilterId", "displayGradient"],
 };
 
+
+/** Werkzeug zum Weiterzeichnen je Objektart (Polygone → Polygonwerkzeug). */
+const CONTINUE_TOOL: Partial<Record<PickKind, string>> = {
+  segment: ToolIds.LINE, hatch: ToolIds.HATCH, free: ToolIds.FREE,
+  dimension: ToolIds.MEASURE, textbox: ToolIds.TEXT, wall: ToolIds.WALL,
+};
+/** Zusätzliche Eigenschaften, die beim Weiterzeichnen mitkommen. */
+const CONTINUE_EXTRA: Partial<Record<PickKind, string[]>> = {
+  segment: ["labelId", "arrowStart", "arrowEnd", "arrowScale", "midpointSnap", "divisionSnap"],
+  hatch: ["labelId", "color", "thicknessM", "alpha", "areaLabel", "lineStyle", "gapM", "dashLengthM"],
+  free: ["labelId"], dimension: ["labelId", "style"], textbox: ["labelId"],
+  wall: ["labelId", "thicknessM", "heightM", "alignment", "justification"],
+};
 
 const snapshotStyle = (kind: PickKind, obj: any): Record<string, any> => {
   const out: Record<string, any> = {};
@@ -116,6 +131,35 @@ export class PipetteTool {
   }
 
   finish() {}
+
+  /**
+   * Enter nach dem Aufnehmen: mit dem Werkzeug der Quelle und all ihren
+   * Darstellungseigenschaften weiterzeichnen. Die Übertragung per Klick bleibt.
+   */
+  continueDrawing(): boolean {
+    const src = this.pickedSource;
+    if (!src) return false;
+    const obj: any = src.obj;
+    const poly = src.kind === "hatch" && !!obj.isPolygon;
+    const tool = CONTINUE_TOOL[src.kind] && (poly ? ToolIds.POLYGON : CONTINUE_TOOL[src.kind]);
+    if (!tool) {
+      try { toast("Pipette", { description: `Mit ${KIND_LABEL[src.kind] === "Tabelle" ? "einer Tabelle" : "einem " + KIND_LABEL[src.kind]} kann nicht weitergezeichnet werden.` }); } catch { /* */ }
+      return false;
+    }
+    const snap = snapshotStyle(src.kind, obj);
+    for (const k of CONTINUE_EXTRA[src.kind] || []) {
+      if (!(k in obj)) continue;
+      const val = obj[k];
+      snap[k] = val && typeof val === "object" ? JSON.parse(JSON.stringify(val)) : val;
+    }
+    if (snap.labelId && (this.app as any).labelManager?.isEditable?.(snap.labelId) === false) delete snap.labelId;
+    if (src.kind === "hatch") snap.isPolygon = poly;
+    this.clearSource();
+    styleCarry.tool = tool; styleCarry.kind = src.kind; styleCarry.snap = snap;
+    this.app.setTool(tool);
+    try { toast("Pipette", { description: `Weiterzeichnen mit den Eigenschaften der ${KIND_LABEL[src.kind]}.` }); } catch { /* */ }
+    return true;
+  }
 
   getCursor() { return "crosshair"; }
 

@@ -2713,6 +2713,11 @@ export class CadApp {
         if (this.hatchTool.finishFromKey()) { e.preventDefault(); return; }
       }
 
+      // ENTER mit der Pipette: mit Werkzeug + Eigenschaften der Quelle weiterzeichnen.
+      if (e.key === "Enter" && this.activeTool === this.pipetteTool && !isHubInput) {
+        if (this.pipetteTool.continueDrawing()) { e.preventDefault(); return; }
+      }
+
       if (e.key === "Enter" && this.activeTool === this.lineTool && !isHubInput) {
         if (this.lineTool.finishFromKey()) { e.preventDefault(); return; }
         if (this.lineTool.isDrawing()) { e.preventDefault(); this.lineTool.finish(); return; }
@@ -3375,6 +3380,8 @@ export class CadApp {
     // er bestimmt, welche Objekte "Alles"/Strg+A auswählt.
     const objTool = asObjectToolId(id);
     if (objTool) this.selectionFilterTool = objTool;
+    // Pipetten-Weiterzeichnen gilt nur für das übernommene Werkzeug.
+    if (styleCarry.tool && styleCarry.tool !== id) { styleCarry.tool = null; styleCarry.kind = null; styleCarry.snap = null; }
     // Werkzeugwechsel beendet immer den Tabellen-Zellmodus …
     this.endTableEdit();
     // … und schließt eine gewählte Infobox (wie bei allen Objekten).

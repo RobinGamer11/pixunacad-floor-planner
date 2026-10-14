@@ -1975,6 +1975,7 @@ export const styleCarry: { tool: string | null; kind: string | null; snap: Recor
   };
   wrap("createSegment", "segment");
   wrap("createHatch", "hatch");
+  wrap("createPolygon", "hatch");
   wrap("createFreeStroke", "free");
   wrap("createDimension", "dimension");
   wrap("createTextBox", "textbox");
