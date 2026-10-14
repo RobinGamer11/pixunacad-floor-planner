@@ -5,6 +5,7 @@ import type { MiniCad } from "@/cad/embed/MiniCad";
 const STEPS = [
   "Objekt auswählen (L-Klick)",
   "Auf anderes Objekt übertragen (L-Klick)",
+  "Oder: Enter – mit gleichem Werkzeug und allen Eigenschaften weiterzeichnen",
 ];
 
 /**
@@ -29,7 +30,7 @@ export const PipetteSettingsPanel: React.FC<{ app: CadApp | MiniCad | null }> = 
   return (
     <div className="space-y-1.5">
       {STEPS.map((label, i) => {
-        const active = i === current;
+        const active = i === current || (hasSource && i === 2);
         return (
           <div
             key={label}
