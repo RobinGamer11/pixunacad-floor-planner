@@ -117,24 +117,51 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
   const openCount = boxes.length;
   React.useEffect(() => { commentUi.set({ openCount }); }, [openCount]);
 
-  // Verschieben über den Fangpunkt (Pinspitze): Punkt wählen → „Verschieben“ → Zielpunkt tippen.
+  // Verschieben wie beim Linienwerkzeug: Fangpunkt (Pinspitze) wählen →
+  // „Verschieben“ → Vorschau folgt Maus/Finger (mit Fang, Länge/Winkel) →
+  // Tippen/Klick setzt den Zielpunkt als genau einen Undo-Schritt.
   const [pick, setPick] = React.useState<string | null>(null);
   const [armed, setArmed] = React.useState(false);
+  const [preview, setPreview] = React.useState<{ x: number; y: number } | null>(null);
   React.useEffect(() => { if (!sel.selectedId || pick !== sel.selectedId) { setPick(null); setArmed(false); } }, [sel.selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
-    if (!app?.input || !armed || !pick) return;
+    if (!app?.input || !armed || !pick) { setPreview(null); return; }
     const prev = app.input.canvasTapHandler;
+    const snapAt = (sx: number, sy: number) => {
+      let w = app.camera.screenToWorld(sx, sy);
+      try { w = app.selectTool?.snapWorldPointPublic?.(w) ?? w; } catch { /* */ }
+      return w;
+    };
+    const onMove = (e: PointerEvent) => {
+      const r = app.canvas?.getBoundingClientRect?.();
+      if (!r) return;
+      const w = snapAt(e.clientX - r.left, e.clientY - r.top);
+      setPreview({ x: w.x, y: w.y });
+      const b = app.scene.getInfoBoxById?.(pick);
+      if (b) {
+        const dx = w.x - b.x, dy = w.y - b.y;
+        try { app.hub?.showAt?.(e.clientX - r.left, e.clientY - r.top); app.hub?.updateDisplay?.(Math.hypot(dx, dy), (Math.atan2(dy, dx) * 180) / Math.PI); } catch { /* */ }
+      }
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setArmed(false); } };
     const onTap = (sx: number, sy: number) => {
       const b = app.scene.getInfoBoxById?.(pick);
       if (!b) { setArmed(false); return; }
-      let w = app.camera.screenToWorld(sx, sy);
-      try { w = app.selectTool?.snapWorldPointPublic?.(w) ?? w; } catch { /* */ }
+      const w = snapAt(sx, sy);
       app.runAction(() => { b.x = w.x; b.y = w.y; });
       setArmed(false); setPick(null);
       app.renderer?.render?.();
     };
     app.input.canvasTapHandler = onTap;
-    return () => { if (app.input.canvasTapHandler === onTap) app.input.canvasTapHandler = prev && prev !== onTap ? prev : null; };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("keydown", onKey, true);
+      try { app.hub?.hide?.(); } catch { /* */ }
+      setPreview(null);
+      if (app.input.canvasTapHandler === onTap) app.input.canvasTapHandler = prev && prev !== onTap ? prev : null;
+    };
   }, [app, armed, pick]);
 
   const cam = app?.camera;
