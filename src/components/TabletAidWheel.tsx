@@ -90,7 +90,7 @@ export function TabletAidWheel() {
     const margin = 8;
     return {
       x: Math.min(Math.max(margin, base.x), Math.max(margin, vw - size - margin)),
-      y: Math.min(Math.max(margin, base.y), Math.max(margin, vh - size - margin)),
+      y: Math.min(Math.max(margin, base.y), Math.max(margin, vh - totalHeight - margin)),
     };
   });
   useEffect(() => {
