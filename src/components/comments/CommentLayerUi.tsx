@@ -596,14 +596,14 @@ export function CommentModeButton({
         <Info size={18} />
         <span className="text-[10px] font-semibold leading-none">{count}</span>
       </button>
-      {eyeBtn(!!ib.selectedId, "Gewählte Infobox ausblenden", <EyeOff size={16} />, () => { const id = ib.selectedId; infoBoxUi.clear(); if (id) infoBoxUi.hide([id]); })}
-      {eyeBtn(ib.hiddenIds.length > 0, "Ausgeblendete Infoboxen einblenden", <Eye size={16} />, () => infoBoxUi.showAll())}
       {active && (
         <div className="pixuna-comments pointer-events-none flex items-center" aria-live="polite">
           <span className="h-0 w-0" style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent", borderRight: "7px solid hsl(var(--notice-beige))" }} />
-          <span className="rounded px-2.5 py-1 text-[11.5px] font-semibold whitespace-nowrap" style={{ background: "hsl(var(--notice-beige))", color: "hsl(var(--ink))" }}>Aktiviert</span>
+          <span className="rounded px-2.5 py-1 text-[11.5px] font-semibold whitespace-nowrap" style={{ background: "hsl(var(--notice-beige))", color: "hsl(0 0% 0%)" }}>Aktiviert</span>
         </div>
       )}
+      {active && eyeBtn(!!ib.selectedId, "Gewählte Infobox ausblenden", <EyeOff size={16} />, () => { const id = ib.selectedId; infoBoxUi.clear(); if (id) infoBoxUi.hide([id]); })}
+      {active && eyeBtn(ib.hiddenIds.length > 0, "Ausgeblendete Infoboxen einblenden", <Eye size={16} />, () => infoBoxUi.showAll())}
     </div>
   );
 }
