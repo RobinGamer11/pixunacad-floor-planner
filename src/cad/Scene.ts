@@ -1959,7 +1959,7 @@ export const styleCarry: { tool: string | null; kind: string | null; snap: Recor
     proto[method] = function (this: any, ...args: any[]) {
       const obj = orig.apply(this, args);
       const snap = styleCarry.snap;
-      if (obj && snap && styleCarry.kind === kind) {
+      if (obj && snap && styleCarry.kind === kind && !obj.isGuide) {
         // Polygon und Schraffur teilen sich createHatch – nur passende Art färben.
         const okPoly = kind !== "hatch" || !!obj.isPolygon === !!snap.isPolygon;
         if (okPoly) {
