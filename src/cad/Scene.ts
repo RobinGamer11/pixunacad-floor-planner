@@ -1944,3 +1944,39 @@ export class Scene {
   removeDoorsByLabelId(labelId: string) { this.doors = this.doors.filter(d => d.labelId !== labelId); }
   reassignDoorsLabel(oldId: string, newId: string) { for (const d of this.doors) if (d.labelId === oldId) d.labelId = newId; }
 }
+
+/**
+ * Pipette „Weiterzeichnen“: Stil, den neu gezeichnete Objekte des passenden
+ * Werkzeugs bei der Erzeugung übernehmen (flüchtig, nie gespeichert).
+ */
+export const styleCarry: { tool: string | null; kind: string | null; snap: Record<string, any> | null } = { tool: null, kind: null, snap: null };
+
+{
+  const wrap = (method: string, kind: string) => {
+    const proto: any = Scene.prototype;
+    const orig = proto[method];
+    if (typeof orig !== "function") return;
+    proto[method] = function (this: any, ...args: any[]) {
+      const obj = orig.apply(this, args);
+      const snap = styleCarry.snap;
+      if (obj && snap && styleCarry.kind === kind) {
+        // Polygon und Schraffur teilen sich createHatch – nur passende Art färben.
+        const okPoly = kind !== "hatch" || !!obj.isPolygon === !!snap.isPolygon;
+        if (okPoly) {
+          for (const k of Object.keys(snap)) {
+            if (k === "isPolygon") continue;
+            const val = snap[k];
+            obj[k] = val && typeof val === "object" ? JSON.parse(JSON.stringify(val)) : val;
+          }
+        }
+      }
+      return obj;
+    };
+  };
+  wrap("createSegment", "segment");
+  wrap("createHatch", "hatch");
+  wrap("createFreeStroke", "free");
+  wrap("createDimension", "dimension");
+  wrap("createTextBox", "textbox");
+  wrap("createWall", "wall");
+}
