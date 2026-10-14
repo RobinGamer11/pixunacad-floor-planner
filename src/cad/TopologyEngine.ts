@@ -1,4 +1,3 @@
-import { infoBoxCornersWorld } from "@/lib/infoBoxUi";
 import { Defaults, SnapType } from "./constants";
 import { computeStairGeometry } from "./stairGeometry";
 import { buildGuideGeometry, type GuideGeometry, type GuideSourceType } from "./guideGeometry";
