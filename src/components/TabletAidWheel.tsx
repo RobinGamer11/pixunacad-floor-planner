@@ -538,3 +538,58 @@ function WheelButton({
   );
 }
 
+/** Kleiner Knopf unter dem Rad (z. B. ENTF) — gleicher Stil, nur kompakter. */
+function WheelSmallButton({
+  tooltip, icon, onTap,
+}: {
+  tooltip: string;
+  icon: React.ReactNode;
+  onTap: () => void;
+}) {
+  const buttonSize = 44;
+  const elRef = useRef<HTMLButtonElement | null>(null);
+
+  // Callbacks stabil halten, damit die Registry-Registrierung nur einmal läuft.
+  const cbs = useRef({ onTap });
+  cbs.current = { onTap };
+
+  useEffect(() => {
+    const handle: BtnHandle = {
+      getRect: () => elRef.current?.getBoundingClientRect() ?? null,
+      begin: () => cbs.current.onTap(),
+      end: () => {},
+      cancel: () => {},
+    };
+    WHEEL_BUTTONS.add(handle);
+    return () => { WHEEL_BUTTONS.delete(handle); };
+  }, []);
+
+  return (
+    <button
+      ref={elRef}
+      title={tooltip}
+      type="button"
+      tabIndex={-1}
+      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      className="absolute rounded-full flex items-center justify-center border transition-colors"
+      style={{
+        left: "50%",
+        transform: "translateX(-50%)",
+        top: 196,
+        width: buttonSize,
+        height: buttonSize,
+        borderColor: "hsl(var(--overlay-surface) / 0.28)",
+        background: "hsl(var(--overlay-surface) / 0.11)",
+        color: "hsl(var(--overlay-surface))",
+        touchAction: "none",
+        pointerEvents: "auto",
+        zIndex: 2,
+      }}
+    >
+      {icon}
+    </button>
+  );
+}
+
