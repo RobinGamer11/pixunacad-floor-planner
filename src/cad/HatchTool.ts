@@ -749,6 +749,17 @@ export class HatchTool {
 
     // Right-click: toggle guide anchors/parallel guides
 
+    // SPACE + Klick (noch nichts begonnen): Umrandung einer geschlossenen
+    // Fläche übernehmen → neue Schraffur bzw. neues Polygon in dieser Form.
+    if (
+      this.drawMode !== "fill" && input.clicked && input.keys.space &&
+      this.state === "idle" && this.rectState === "idle" && this.circleState === "idle"
+    ) {
+      this.app.hub.hide();
+      this._onFillClick(input);
+      return;
+    }
+
     if (this.drawMode === "fill") {
       this.app.hub.hide();
       if (input.clicked) this._onFillClick(input);
@@ -871,11 +882,15 @@ export class HatchTool {
       });
       return;
     }
-    const fillLoop = loop;
-    this.app.runAction(() => {
-      const filledHatch = this.app.scene.createHatch(fillLoop, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
-    });
+    this._createFromOutline(loop.map((p) => v(p.x, p.y)));
     this.app.clearSelection();
+  }
+
+  /** Erzeugt aus einer übernommenen Umrandung das Objekt dieses Werkzeugs. */
+  protected _createFromOutline(loop: Vec2[]) {
+    this.app.runAction(() => {
+      this.app.scene.createHatch(loop, { ...this.app.getCurrentHatchStyle(), ...((this.app as any).getStrokeEffectDefaults?.("hatch") ?? {}) });
+    });
   }
 
 

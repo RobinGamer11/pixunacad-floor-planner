@@ -86,7 +86,8 @@ export class Input {
   /** Shift/Space — das Tablet-Hilfsrad kann Shift sticky halten (globales Flag). */
   get keys() {
     const virtualShift = typeof window !== "undefined" && !!(window as any).__pixunaVirtualShift;
-    return { shift: this._keys.shift || virtualShift, space: this._keys.space };
+    const virtualSpace = typeof window !== "undefined" && !!(window as any).__pixunaVirtualSpace;
+    return { shift: this._keys.shift || virtualShift, space: this._keys.space || virtualSpace };
   }
 
 
