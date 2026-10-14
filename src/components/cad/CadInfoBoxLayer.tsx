@@ -202,8 +202,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     >
       {boxes.filter(visible).map((b) => {
         const p = cam.worldToScreen(b.x, b.y);
-        void sel.selectedId;
-          || ((app.selectTool?.marqueeSelectedIds || []) as any[]).some((m) => m.kind === "infobox" && m.id === b.id);
         const task = b.kind === "task";
         const statusVar = b.status === "done" ? "--infobox-done" : "--infobox-open";
         return (
