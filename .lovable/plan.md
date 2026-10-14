@@ -1,27 +1,33 @@
-# Speicherschonender Pixelmodus und kontrollierter Projektspeicher
+# Infoboxen und Bibliotheksvorschau gezielt korrigieren
 
-Ausgangsstand: GitHub `main` = `155d077b` (identisch mit dem im Auftrag geprüften Stand, keine zwischenzeitlichen Änderungen).
+## Geprüfter Ausgangsstand
 
-Der Auftrag ist zu groß für einen einzigen Schritt. Er wird in den neun Phasen aus Abschnitt 16 umgesetzt, jede Phase mit eigenem Commit, Typprüfung, Tests und Build. Keine Phase wird als Erfüllung des Gesamtauftrags gemeldet. Bedienung (Vektor/Pixel-Schalter, Tablet-Regeln, Undo-Größe 20) bleibt unverändert; die DPI-/Supersampling-Regler im Pixel-Bereich entfallen (Abschnitt 2.1).
+Lokaler Stand, `origin/main` und GitHub `RobinGamer11/pixunacad-floor-planner/main` stimmen überein: `23f6341df`.
 
-## Phasen
+## Änderungen
 
-1. **Ablehnungen und Aktionsabschluss eindeutig** – `rasterizeIntoLayer` liefert `ok | cancelled | rejected | failed`; Bildobjekt-Fallback in `maybeRasterize` entfernt; `strokeCount` einmal je Aktion; 4096-Kachel-Wache meldet Ablehnung statt stillem Abbruch; neues `runActionAsync` mit Action-/Generations-ID, `settleHistoryState`/Werkzeugwechsel bestätigen nie laufende Jobs; 250-ms-Prüfung vergleicht nur noch Revisionsmarker.
-2. **Sparse, begrenzte Arbeitsbilder + RasterPolicy** – neues `src/cad/raster/RasterPolicy.ts` (einzige Stelle für Auflösung/Budget, Halbierungsstufen, Mindestdetail, sonst Ablehnung); kachelweise Verarbeitung mit Randbereich, Kandidaten gegen echte Strich-/Flächengeometrie, leere Kacheln verworfen, kein `alphaTrimBox` auf Großbildern; Fortschritt + Abbrechen.
-3. **Lokale Ablage auf IndexedDB** – Manifeste, Blob-Kacheln, Outbox, temporäre Aktionen; `CadEditor.persist()` schreibt keine Base64-Pixel mehr in localStorage, revisionsgesteuert und gebündelt; sichtbarer Speicherstatus (lokal vs. Cloud), Quota-Fehler sichtbar.
-4. **Manifestmodell** – `solidFill`, `patternFill`, `paint`, `erase`, `checkpoint` je Ebene mit stabiler ID/Revision/Reihenfolge; korrekte Komposition (Radierung wirkt nicht auf spätere Striche), Checkpoints in ruhigen Phasen; Bildschraffuren referenzieren ihr Muster einmal.
-5. **Gemischte Auflösungen + gemeinsames RAM-Budget** – Kacheln mit eigener Auflösung je Aktion; ein Ressourcenmanager (Start 64 MiB Cache / 16 MiB Jobs) mit räumlichem Index, LRU, Vorschaustufen, bedarfsweisem Laden; Cache-Miss ≠ transparent ≠ beschädigt.
-6. **Alle Rasterkonsumenten anbinden** – Renderer, Radierer, `isOpaqueAt`/`drawIntoMask`, Flächenerkennung, Pipette, MiniCad, Blattvorschauen, Ausschnitte, Transparentpause, `PlanProjections`, `PlanPdfExport` (portionsweise).
-7. **Cloud-Sync der Manifeste** – Manifeste als eigene Strukturobjekte über `cad_write_object` mit Revisionsprüfung und Paginierung; Kacheln als Assets; Solo/Geteilt bleiben getrennt; `decideOpen` unverändert.
-8. **Serverseitige Quoten** – SQL-Migration im Repo: Konto-/Projekt-/globale Budgets (Zuordnung über `owner_id`), atomare Upload-Reservierungen, Assetmetadaten/Referenzen, Löschstatus, Prüffunktionen mit sicherem `search_path`; `project-attachments` und große JSON-Schreibwege angebunden. Ohne eingetragene Betreiberwerte werden nur speichervergrößernde Cloud-Schreibvorgänge blockiert.
-9. **Migration und Bereinigung** – neue Formatversion in `schemas.ts`; alte `rasterLayersByKey` und eigene Muster resumierbar übernehmen; alte aktive Data-URL-Wege entfernen; `AGENTS.md`-Regel „nie verkleinern“ gezielt ersetzen.
+1. **Stellenvorschau entfernen:** Den gesamten Bereich „Vorschau der Stelle“ einschließlich Augenschalter aus den Infobox-Einstellungen entfernen. Bestehende gespeicherte Infoboxen bleiben erhalten.
+2. **Informationsbox kompakt verbreitern:** Das „i“-Symbol bleibt sichtbar; rechts daneben steht der Titel. Die Box wächst passend zum Titel nach rechts, bei unverändertem Ankerpunkt und fester Bildschirmgröße beim Zoomen. Lange Titel bleiben innerhalb der Zeichenfläche lesbar, nötigenfalls mehrzeilig. Aufgabenboxen und der obere Infobox-Knopf bleiben unverändert.
+3. **Einstellungen bei Werkzeugwechsel schließen:** Die Infobox-Auswahl und ihre flüchtige Bearbeitung beim Wechsel zu einem anderen Werkzeug beenden – auch wenn der Infobox-Setzmodus nicht aktiv ist. Rechts erscheinen die Einstellungen des neuen Werkzeugs; keine Infobox-Einstellungen bleiben darüber liegen.
+4. **Kein blauer Auswahlrahmen:** Den noch gemeldeten Rahmen im tatsächlichen Auswahlablauf lokalisieren und ausschließlich für Infoboxen unterdrücken. Der einzelne Fang-/Greifpunkt und das Verschieben mit Vorschau bleiben bedienbar, auch per Tablet. Andere Objektarten behalten ihre Auswahlmarkierungen.
+5. **Großer Auflösen-Knopf:** In „Darstellung“ eines ausgewählten Bibliotheksexemplars einen großen, hervorgehobenen Knopf „Ausgewähltes Exemplar auflösen“ mit passendem Symbol ergänzen. Er nutzt dieselbe Aktion wie der vorhandene Knopf unter der Bibliothek, wirkt nur auf das gewählte Exemplar und erzeugt genau einen Rückgängig-Schritt.
+6. **Keine falsche Polygon-Schlusslinie:** Bibliotheksvorschauen respektieren offene Polygone: keine zusätzliche Verbindung zwischen letztem und erstem Punkt und keine künstliche Füllfläche. Tatsächlich geschlossene Polygone bleiben geschlossen. Gilt für kleine Bibliotheksbilder und die Platzierungsvorschau.
 
-## Wichtige Hinweise
+## Technische Details
 
-- Das Projekt hat in Lovable keine verbundene Cloud; die SQL-Migrationen aus Phase 8 werden nur im Repo bereitgestellt und müssen von euch angewendet werden. Bis dahin bleiben neue Cloud-Assetuploads gesperrt.
-- Betreiberwerte (Konto-, Projekt-, Dateilimit, globale Reserve) erfinde ich nicht; sie werden als Platzhalter dokumentiert.
-- Geräte-, Last- und Mehrgerätetests übernehmt ihr.
+- `InfoBoxSettingsPanel.tsx`: `SpotPreview`, dessen Aufruf und nicht mehr benötigte Augen-Imports entfernen; keine destruktive Änderung gespeicherter Felder.
+- `CadInfoBoxLayer.tsx`: Informationsdarstellung mit festem Symbol und kompakter Titelbreite; Anker, Navigation und Verschiebeablauf erhalten.
+- Werkzeugwechsel und Panelpriorität in `CadApp.ts`/`CadEditor.tsx` prüfen; flüchtige Auswahl über `infoBoxUi` zurücksetzen. Aktuell überwacht die Infobox-Ebene den Werkzeugwechsel nur bei aktivem Setzmodus.
+- Die Herkunft des verbleibenden blauen Rahmens ist noch nicht bestätigt; Auswahlzeichnung einschließlich `SelectTool` untersuchen, bevor sie geändert wird.
+- `LibraryPanel.tsx`: Auflösen auch im Bearbeitungszweig anbieten. Dieser Zweig beendet die Darstellung derzeit vor dem vorhandenen Knopf am Listenende.
+- `LibraryGeometryPreview.tsx`: Der Vorschaupfad für `hatch` schließt und füllt derzeit immer. Vorhandene Snapshot-Felder `isPolygon` und `closed` berücksichtigen; gespeicherte Geometrie nicht umschreiben.
+- Keine neuen Pakete, keine Datenbankänderungen, keine Änderung am allgemeinen Hilfslinienprinzip.
 
-## Vorgehen
+## Prüfung und Abschluss
 
-Nach Freigabe starte ich mit Phase 1 und 2 im selben Durchgang und melde danach den Stand mit Commit und offenen Phasen.
+- Gezielte Regressionstests für Werkzeugwechsel, offene/geschlossene Polygongeometrie und Auflösen einschließlich Rückgängig-Verhalten.
+- Vorhandene Infobox- und Bibliothekstests ausführen; automatische Build-Ausgabe und vorhandene Fehler prüfen.
+- Bedienung in der laufenden Anwendung mit Maus und Tablet-Berührung prüfen: Box öffnen → Werkzeug wechseln, Titel ändern, zoomen, Fangpunkt/Verschiebevorschau, Bibliotheksexemplar auflösen und rückgängig machen.
+- Änderungen und nicht durchführbare Prüfungen knapp benennen. Lovable verwaltet Commit und Synchronisierung; GitHub-main anschließend lesend verifizieren und einen nicht erfolgten Transfer ausdrücklich melden.
+
+PowerShell zum sicheren Abruf des GitHub-Stands im lokalen Repository: `git fetch origin main` (ändert keine Arbeitsdateien).
