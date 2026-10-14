@@ -648,6 +648,14 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
             </div>
           )}
 
+          {mode.kind === "edit" && instanceDefId && (
+            <button type="button" className="cad-toolbar-btn w-full justify-center h-12 text-[13.5px] font-semibold border-2"
+              style={{ borderColor: "hsl(var(--primary))", background: "hsl(var(--primary) / 0.12)", color: "hsl(var(--foreground))" }}
+              onClick={() => { if (!app.explodeSelectedLibraryInstance()) window.alert("Das Bibliotheksobjekt konnte nicht aufgelöst werden."); }}>
+              <Ungroup className="h-5 w-5" /> Ausgewähltes Exemplar auflösen
+            </button>
+          )}
+
           {metaFields}
 
           <div className="space-y-2">
@@ -799,13 +807,6 @@ export default function LibraryPanel({ app, onlyWhenInstance }: Props) {
         )}
       </div>
 
-      {/* Auflösen bleibt an die ausgewählte Instanz auf der Zeichenfläche gebunden. */}
-      {instanceDefId && (
-        <button type="button" className="cad-toolbar-btn mt-2 w-full justify-center h-9 text-[12px]"
-          onClick={() => { if (!app.explodeSelectedLibraryInstance()) window.alert("Das Bibliotheksobjekt konnte nicht aufgelöst werden."); }}>
-          <Ungroup className="h-4 w-4" /> Ausgewähltes Exemplar auflösen
-        </button>
-      )}
     </div>
   );
 }

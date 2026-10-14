@@ -5142,6 +5142,8 @@ export class SelectTool {
         }
 
 
+        // Infoboxen: kein Auswahlrahmen (eigener Fangpunkt in der Infobox-Ebene).
+        if (kind === "infobox") continue;
         // Fallback: dicker blauer Umriss entlang der Geometrie.
         const rawPts = this._elementPoints(kind, obj);
         if (!rawPts || rawPts.length < 2) continue;
@@ -5171,6 +5173,7 @@ export class SelectTool {
     if (this.marqueeSelectedIds.length) {
       const seenPt = new Set<string>();
       for (const { kind, id } of this.marqueeSelectedIds) {
+        if (kind === "infobox") continue;
         const obj = this._getElementById(kind, id);
         if (!obj) continue;
         for (const p of this._elementPoints(kind, obj) || []) {

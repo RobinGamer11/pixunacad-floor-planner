@@ -71,7 +71,8 @@ export default function LibraryGeometryPreview({ geometry, size = 40, className,
       };
       if (snap.kind === "segment") poly([d.a!, d.b!], false);
       else if (snap.kind === "hatch") {
-        poly(d.points, true, true);
+        const open = (d as any).isPolygon === true && (d as any).closed === false;
+        poly(d.points, !open, !open);
         for (const loop of d.holes || []) poly(loop, true);
       } else if (snap.kind === "wall") poly(d.corners, false);
       else if (snap.kind === "freeStroke") poly(d.points, false);
