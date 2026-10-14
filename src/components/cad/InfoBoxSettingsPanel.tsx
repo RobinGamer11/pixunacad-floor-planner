@@ -3,7 +3,7 @@
  * Erst die erste Eingabe setzt den Entwurf als Objekt (ein Undo-Schritt).
  */
 import React from "react";
-import { Eye, EyeOff, Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { AttachmentsSection } from "@/components/cad/ObjectInfoTabs";
 import { infoBoxUi, initialsOf, useInfoBoxUi } from "@/lib/infoBoxUi";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -138,8 +138,6 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
               onChange={(e) => update({ desc: e.target.value }, false)}
               onBlur={() => box && app.commitHistorySnapshot?.()} />
           </label>
-          <SpotPreview app={app} x={box ? box.x : ui.draft!.x} y={box ? box.y : ui.draft!.y}
-            on={base.showPreview !== false} onToggle={() => update({ showPreview: base.showPreview === false })} />
           <div className="flex items-end justify-end gap-2 pt-1">
             <button type="button" onClick={remove} title="Infobox löschen"
               className="cad-toolbar-btn h-9 gap-1.5 px-3 justify-center">
@@ -225,52 +223,6 @@ function CategoryPicker({ app, value, onChange }: { app: any; value: string | nu
             <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="h-6 w-8 cursor-pointer" title="Eigene Farbe" />
             <button type="button" onClick={add} disabled={!name.trim()} className="cad-toolbar-btn ml-auto h-8 px-3 text-[12px] font-semibold">Anlegen</button>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Ausschnitt der Zeichenfläche an der Stelle der Infobox (Augensymbol schaltet). */
-function SpotPreview({ app, x, y, on, onToggle }: { app: any; x: number; y: number; on: boolean; onToggle: () => void }) {
-  const ref = React.useRef<HTMLCanvasElement | null>(null);
-  const [inView, setInView] = React.useState(true);
-  React.useEffect(() => {
-    if (!on) return;
-    let raf = 0;
-    const draw = () => {
-      const c = ref.current, src: HTMLCanvasElement | undefined = app?.canvas, cam = app?.camera;
-      if (c && src && cam) {
-        const p = cam.worldToScreen(x, y);
-        const k = src.width / Math.max(1, src.clientWidth || src.width);
-        const half = 90;
-        const ok = p.x > -half && p.y > -half && p.x < (src.clientWidth || 0) + half && p.y < (src.clientHeight || 0) + half;
-        setInView(ok);
-        const ctx = c.getContext("2d");
-        if (ctx) {
-          ctx.clearRect(0, 0, c.width, c.height);
-          if (ok) ctx.drawImage(src, (p.x - half) * k, (p.y - half * 0.6) * k, half * 2 * k, half * 1.2 * k, 0, 0, c.width, c.height);
-          ctx.strokeStyle = "#c9a96e"; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(c.width / 2, c.height / 2, 6, 0, Math.PI * 2); ctx.stroke();
-        }
-      }
-      raf = window.setTimeout(() => requestAnimationFrame(draw), 250) as any;
-    };
-    draw();
-    return () => window.clearTimeout(raf);
-  }, [app, x, y, on]);
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <span>Vorschau der Stelle</span>
-        <button type="button" onClick={onToggle} title={on ? "Vorschau ausblenden" : "Vorschau einblenden"} className="cad-toolbar-btn h-7 w-7 justify-center p-0">
-          {on ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-        </button>
-      </div>
-      {on && (
-        <div className="relative overflow-hidden rounded-md border" style={{ borderColor: "hsl(var(--cad-hub-border))", background: "hsl(var(--card))" }}>
-          <canvas ref={ref} width={360} height={216} className="block h-auto w-full" />
-          {!inView && <div className="absolute inset-0 flex items-center justify-center text-[11px]" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>Stelle liegt außerhalb der Ansicht</div>}
         </div>
       )}
     </div>

@@ -34,7 +34,7 @@ export function useInfoBoxUi(): State {
 /** Standardbreite einer Infobox in Metern (maßstäblich auf dem Plan). */
 export const INFOBOX_DEFAULT_WIDTH_M = 0.5;
 /** Höhe/Breite einer Infobox. */
-export const INFOBOX_ASPECT = 0.3;
+export const INFOBOX_ASPECT = 1;
 
 /** Weltmaße einer Infobox (zentriert um x/y). */
 export function infoBoxSizeWorld(b: { sizeM?: number }): { w: number; h: number } {
@@ -42,13 +42,20 @@ export function infoBoxSizeWorld(b: { sizeM?: number }): { w: number; h: number 
   return { w, h: w * INFOBOX_ASPECT };
 }
 
-/** Eckpunkte (Fang-/Greifpunkte) einer Infobox in Weltkoordinaten. */
-export function infoBoxCornersWorld(b: { x: number; y: number; sizeM?: number }): { x: number; y: number }[] {
+/** Zusätzliche Breite (Zeichnungsmaß) für den Titel einer Informationsbox. */
+export function infoBoxTitleExtraWorld(b: { kind?: string; title?: string; sizeM?: number }): number {
+  if (b.kind === "task" || !b.title) return 0;
+  const { w } = infoBoxSizeWorld(b);
+  return Math.min(String(b.title).length, 28) * w * 0.2 + w * 0.25;
+}
+
+/** Eckpunkte einer Infobox in Weltkoordinaten (Spitze unten mittig auf x/y). */
+export function infoBoxCornersWorld(b: { x: number; y: number; sizeM?: number; kind?: string; title?: string }): { x: number; y: number }[] {
   const { w, h } = infoBoxSizeWorld(b);
-  const hw = w / 2, hh = h / 2;
+  const l = b.x - w / 2, r = b.x + w / 2 + infoBoxTitleExtraWorld(b);
   return [
-    { x: b.x - hw, y: b.y - hh }, { x: b.x + hw, y: b.y - hh },
-    { x: b.x + hw, y: b.y + hh }, { x: b.x - hw, y: b.y + hh },
+    { x: l, y: b.y - h }, { x: r, y: b.y - h },
+    { x: r, y: b.y }, { x: l, y: b.y },
   ];
 }
 

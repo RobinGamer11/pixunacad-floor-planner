@@ -6,7 +6,7 @@
 import React from "react";
 import { Info, Move } from "lucide-react";
 import { commentUi, useCommentUi } from "@/lib/commentsStore";
-import { infoBoxUi, initialsOf, useInfoBoxUi } from "@/lib/infoBoxUi";
+import { infoBoxUi, infoBoxSizeWorld, infoBoxTitleExtraWorld, initialsOf, useInfoBoxUi } from "@/lib/infoBoxUi";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ensureObjectCode } from "@/cad/objectMeta";
 
@@ -17,7 +17,6 @@ function scenesOf(app: any): any[] {
   return out;
 }
 
-const PIN = 32;
 
 export function CadInfoBoxLayer({ app }: { app: any }) {
   const ui = useCommentUi();
@@ -36,7 +35,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       const cam = app?.camera;
       const boxes: any[] = app?.scene?.infoBoxes || [];
       const key = cam
-        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.labelId}${b.authorInitials}`).join(",")}|${((app?.selectTool?.marqueeSelectedIds || []) as any[]).filter((m) => m.kind === "infobox").map((m) => m.id).join()}|${infoBoxUi.get().hiddenIds.join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
+        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.sizeM}${b.title}${b.kind}${b.status}${b.labelId}${b.authorInitials}`).join(",")}|${((app?.selectTool?.marqueeSelectedIds || []) as any[]).filter((m) => m.kind === "infobox").map((m) => m.id).join()}|${infoBoxUi.get().hiddenIds.join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
         : "";
       if (key !== last) { last = key; force(); }
       raf = requestAnimationFrame(tick);
@@ -62,6 +61,24 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [app, ui.mode]);
+
+  // Werkzeugwechsel schließt eine gewählte Infobox (auch ohne Setzmodus).
+  React.useEffect(() => {
+    if (!sel.selectedId || !app) return;
+    const startTool = app.activeTool;
+    let raf = 0;
+    const tick = () => {
+      if (app.activeTool !== startTool) {
+        infoBoxUi.clear();
+        const st = app.selectTool;
+        if (st?.marqueeSelectedIds?.some?.((m: any) => m.kind === "infobox")) st.marqueeSelectedIds = st.marqueeSelectedIds.filter((m: any) => m.kind !== "infobox");
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [app, sel.selectedId]);
 
   // Esc: erst Auswahl aufheben, dann die Funktion ganz deaktivieren.
   React.useEffect(() => {
@@ -203,6 +220,8 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       {boxes.filter(visible).map((b) => {
         const p = cam.worldToScreen(b.x, b.y);
         const task = b.kind === "task";
+        const pin = Math.max(1, infoBoxSizeWorld(b).w * cam.scale);
+        const extra = infoBoxTitleExtraWorld(b) * cam.scale;
         const statusVar = b.status === "done" ? "--infobox-done" : "--infobox-open";
         return (
           <div
@@ -212,27 +231,32 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
             onPointerDown={(e) => choose(e, b)}
             className="absolute flex items-center justify-center overflow-hidden shadow-md cursor-pointer select-none"
             style={{
-              left: p.x, top: p.y, width: PIN, height: PIN, marginLeft: -PIN / 2, marginTop: -PIN,
-              borderRadius: "50% 50% 50% 6px", pointerEvents: "auto", touchAction: "none",
+              left: p.x, top: p.y, width: pin + extra, height: pin, marginLeft: -pin / 2, marginTop: -pin,
+              borderRadius: extra ? `${pin / 2}px ${pin / 2}px ${pin / 2}px ${pin * 0.19}px` : "50% 50% 50% 19%",
+              borderWidth: Math.max(1, pin * 0.06), justifyContent: extra ? "flex-start" : "center", pointerEvents: "auto", touchAction: "none",
               background: "hsl(var(--card))",
               color: "hsl(var(--foreground))",
-              border: `2px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
+              borderStyle: "solid", borderColor: `hsl(var(${task ? statusVar : "--notice-beige"}))`,
             }}
           >
             {task ? (
               <span
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold"
-                style={{ background: `hsl(var(${statusVar}))`, color: "hsl(0 0% 100%)", boxShadow: "0 0 0 2px hsl(0 0% 100%)" }}
+                className="inline-flex shrink-0 items-center justify-center rounded-full font-bold"
+                style={{ width: pin * 0.75, height: pin * 0.75, fontSize: pin * 0.33, background: `hsl(var(${statusVar}))`, color: "hsl(0 0% 100%)", boxShadow: "0 0 0 2px hsl(0 0% 100%)" }}
               >
                 {b.authorInitials || "?"}
               </span>
-            ) : b.title ? (
-              <span className="block w-6 text-center text-[7.5px] font-semibold leading-[1.05] break-words"
-                style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                {b.title}
-              </span>
             ) : (
-              <Info size={20} />
+              <>
+                <span className="inline-flex shrink-0 items-center justify-center" style={{ width: pin * 0.9, height: pin }}>
+                  <Info size={pin * 0.62} />
+                </span>
+                {b.title && (
+                  <span className="truncate font-semibold" style={{ fontSize: pin * 0.36, lineHeight: 1, paddingRight: pin * 0.2 }}>
+                    {b.title}
+                  </span>
+                )}
+              </>
             )}
           </div>
         );
@@ -246,13 +270,15 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
           <>
             {armed && preview && (() => {
               const tp = cam.worldToScreen(preview.x, preview.y);
+              const gp = Math.max(1, infoBoxSizeWorld(b).w * cam.scale);
+              const gw = gp + infoBoxTitleExtraWorld(b) * cam.scale;
               return (
                 <>
                   <svg className="absolute inset-0 h-full w-full" style={{ pointerEvents: "none", overflow: "visible" }}>
                     <line x1={sp.x} y1={sp.y} x2={tp.x} y2={tp.y} stroke="hsl(var(--primary))" strokeWidth={1.5} strokeDasharray="6 4" />
                   </svg>
-                  <div className="absolute" style={{ left: tp.x, top: tp.y, width: PIN, height: PIN, marginLeft: -PIN / 2, marginTop: -PIN,
-                    borderRadius: "50% 50% 50% 6px", pointerEvents: "none", opacity: 0.55,
+                  <div className="absolute" style={{ left: tp.x, top: tp.y, width: gw, height: gp, marginLeft: -gp / 2, marginTop: -gp,
+                    borderRadius: "50% 50% 50% 19%", pointerEvents: "none", opacity: 0.55,
                     background: "hsl(var(--card))", border: "2px dashed hsl(var(--primary))" }} />
                 </>
               );
