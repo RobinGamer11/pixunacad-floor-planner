@@ -257,6 +257,16 @@ export function TabletAidWheel() {
         toggleHold
         icon={<Keyboard size={24} strokeWidth={1.45} />} />
 
+      {/* Kleiner ENTF-Knopf ganz unten unter dem Rad */}
+      <WheelSmallButton
+        tooltip="Entf: Auswahl löschen (Entf-Taste)"
+        onTap={() => {
+          if ((window as any).__pixunaCameraGesture) return;
+          virtualKeyPress("Delete");
+        }}
+        icon={<Trash2 size={18} strokeWidth={1.45} />}
+      />
+
     </div>
   );
 }
