@@ -242,3 +242,8 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Klick setzt direkt eine Aufgabe-Box (kein Platzhalterpunkt)
 - [x] Werkzeugwechsel/andere Auswahl beendet den Infobox-Modus
 - [x] Ebenenzählung inkl. Bibliothekselemente, Infoboxen, Tabellen, Türen
+
+## Tablet-Hilfsrad – 14.10.2026
+- [x] Stift-Modus entfernt (Stift wie Finger), SPACE-Knopf in der Mitte
+- [x] Umranden mit SPACE bei Polygon & Schraffur wieder entfernt (Absturz)
+- [x] Kleiner ENTF-Knopf mit Mültonnen-Symbol ganz unten unter dem Rad
