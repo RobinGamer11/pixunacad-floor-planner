@@ -569,6 +569,9 @@ export function CommentModeButton({
   title?: string;
 }) {
   const ui = useCommentUi();
+  const active = ui.mode;
+  const count = ui.openCount;
+
   return (
     <div className="relative flex items-center gap-2">
       <button
