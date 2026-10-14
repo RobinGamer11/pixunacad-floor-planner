@@ -2624,10 +2624,15 @@ export class SelectTool {
     const segs: any[] = [];
     const hatches: any[] = [];
     const s0 = this.app.getSelectedSegment(); if (s0) segs.push(s0);
-    const h0 = this.app.getSelectedHatch(); if (h0) hatches.push(h0);
+    // Auch Polygone (isPolygon) – getSelectedHatch() blendet sie bewusst aus.
+    const selAny: any = this.app.selection;
+    const h0 = selAny?.hatchId ? this.app.scene.getHatchById(selAny.hatchId) : null; if (h0) hatches.push(h0);
+    const walls: any[] = [];
+    const w0 = selAny?.wallId ? this.app.scene.getWallById(selAny.wallId) : null; if (w0) walls.push(w0);
     for (const m of this.marqueeSelectedIds) {
       if (m.kind === "segment") { const o = this.app.scene.getSegmentById(m.id); if (o && !segs.includes(o)) segs.push(o); }
-      else if (m.kind === "hatch") { const o = this.app.scene.getHatchById(m.id); if (o && !hatches.includes(o)) hatches.push(o); }
+      else if (m.kind === "hatch" || m.kind === "polygon") { const o = this.app.scene.getHatchById(m.id); if (o && !hatches.includes(o)) hatches.push(o); }
+      else if (m.kind === "wall") { const o = this.app.scene.getWallById(m.id); if (o && !walls.includes(o)) walls.push(o); }
     }
     let best: any = null, bestPx: number = Defaults.hitPx;
     const consider = (d: number, hit: any) => { if (d <= bestPx) { bestPx = d; best = hit; } };
@@ -2640,6 +2645,10 @@ export class SelectTool {
       if (!this.app.labelManager.isEditable(h.labelId)) continue;
       h.points.forEach((p: Vec2, i: number) => consider(px(p), { type: SelectionType.POINT, hatchId: h.id, pointIndex: i }));
       (h.holes || []).forEach((loop: Vec2[], hi: number) => loop.forEach((p, i) => consider(px(p), { type: SelectionType.POINT, hatchId: h.id, holeIndex: hi, pointIndex: i })));
+    }
+    for (const w of walls) {
+      if (!this.app.labelManager.isEditable(w.labelId)) continue;
+      w.corners.forEach((p: Vec2, i: number) => { if (!this._isHiddenWallCorner(w, i)) consider(px(p), { type: SelectionType.POINT, wallId: w.id, pointIndex: i }); });
     }
     return best;
   }
@@ -4149,6 +4158,14 @@ export class SelectTool {
           this.app.setSelection(own);
           if ((own as any).segmentId) this.app.showLineSettingsPanel(true);
           if ((own as any).hatchId) this.app.showHatchSettingsPanel(true);
+          if ((own as any).wallId) {
+            const wall = this.app.scene.getWallById((own as any).wallId);
+            const p = wall?.corners[(own as any).pointIndex];
+            if (p) {
+              const sp = this.app.camera.worldToScreen(p.x, p.y);
+              this.app.pointEditMenu.showAt(sp.x, sp.y, [PointEditAction.MOVE, PointEditAction.TRANSLATE, PointEditAction.ROTATE, PointEditAction.DELETE]);
+            }
+          }
           return;
         }
       }
