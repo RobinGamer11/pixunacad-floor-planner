@@ -749,17 +749,6 @@ export class HatchTool {
 
     // Right-click: toggle guide anchors/parallel guides
 
-    // SPACE + Klick (noch nichts begonnen): Umrandung einer geschlossenen
-    // Fläche übernehmen → neue Schraffur bzw. neues Polygon in dieser Form.
-    if (
-      this.drawMode !== "fill" && input.clicked && input.keys.space &&
-      this.state === "idle" && this.rectState === "idle" && this.circleState === "idle"
-    ) {
-      this.app.hub.hide();
-      this._onFillClick(input);
-      return;
-    }
-
     if (this.drawMode === "fill") {
       this.app.hub.hide();
       if (input.clicked) this._onFillClick(input);
