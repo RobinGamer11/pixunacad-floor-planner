@@ -9,3 +9,8 @@
 - Treppen-Knöpfe = DOM, nie Geometrie; Cursor-Reset in `CadApp.setTool`.
 - Treppengriffe laufen über das gemeinsame `PointEditMenu` (CadApp leitet im Bearbeitungsmodus an `StairTool.onPointMenuAction` weiter); bearbeitbare Kanten liefert nur `stairEditableEdges`.
 - Restlängen vor Podesten verteilt nur `computeStairGeometry` (max. `MAX_TREAD_ADJUST_M`); Podeste wachsen nie automatisch.
+
+## Pipette & Fangvorrang
+- Pipetten-„Weiterzeichnen“ läuft nur über `styleCarry` in `Scene.ts` (flüchtig, beim Werkzeugwechsel gelöscht) – nie Werkzeug-Defaults dauerhaft überschreiben.
+- Fangpunkte des ausgewählten Objekts prüft `SelectTool._selectedObjectPointHit` vor allen anderen Treffern, damit deckungsgleiche Fremdpunkte nie gewinnen.
+- Infobox-Pins folgen `Renderer.afterRender` synchron; Werkzeug-/Auswahlwechsel schließen Infobox-Einstellungen in `CadApp.setTool`/`setSelection`.
