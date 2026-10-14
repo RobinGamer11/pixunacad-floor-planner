@@ -4,15 +4,29 @@
  * bearbeitet wird ausschließlich in den Werkzeugeinstellungen.
  */
 import React from "react";
-import { Move } from "lucide-react";
+import { Info, Move } from "lucide-react";
 import { commentUi, useCommentUi } from "@/lib/commentsStore";
-import { infoBoxCornersWorld, infoBoxSizeWorld, infoBoxUi, useInfoBoxUi } from "@/lib/infoBoxUi";
+import { infoBoxUi, initialsOf, useInfoBoxUi } from "@/lib/infoBoxUi";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ensureObjectCode } from "@/cad/objectMeta";
+
+function scenesOf(app: any): any[] {
+  const out: any[] = [];
+  try { for (const s of app.scenesById?.values?.() || []) out.push(s); } catch { /* */ }
+  if (app.scene && !out.includes(app.scene)) out.push(app.scene);
+  return out;
+}
+
+const PIN = 32;
 
 export function CadInfoBoxLayer({ app }: { app: any }) {
   const ui = useCommentUi();
   const sel = useInfoBoxUi();
+  const auth = useAuth() as any;
   const hostRef = React.useRef<HTMLDivElement | null>(null);
   const [, force] = React.useReducer((n: number) => n + 1, 0);
+  const user = auth?.session?.user;
+  const initials = initialsOf(user?.user_metadata?.display_name || user?.user_metadata?.name || user?.email);
 
   // Kamera, Blatt, Ebenen und Undo pro Frame nachführen.
   React.useEffect(() => {
@@ -22,7 +36,7 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       const cam = app?.camera;
       const boxes: any[] = app?.scene?.infoBoxes || [];
       const key = cam
-        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.sizePx}${b.sizeM}${b.labelId}${b.authorInitials}${b.categoryId}`).join(",")}|${(app?.scene?.infoBoxCategories || []).map((c: any) => c.id + c.name + c.color).join()}|${((app?.selectTool?.marqueeSelectedIds || []) as any[]).filter((m) => m.kind === "infobox").map((m) => m.id).join()}|${infoBoxUi.get().hiddenIds.join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
+        ? `${cam.scale}|${cam.offsetX}|${cam.offsetY}|${app?.activeSheetId ?? ""}|${boxes.map((b) => `${b.id}${b.x}${b.y}${b.title}${b.kind}${b.status}${b.labelId}${b.authorInitials}`).join(",")}|${((app?.selectTool?.marqueeSelectedIds || []) as any[]).filter((m) => m.kind === "infobox").map((m) => m.id).join()}|${infoBoxUi.get().hiddenIds.join()}|${(app?.labelManager?.list?.() || []).map((l: any) => `${l.id}${l.visible}`).join()}`
         : "";
       if (key !== last) { last = key; force(); }
       raf = requestAnimationFrame(tick);
@@ -31,7 +45,25 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     return () => cancelAnimationFrame(raf);
   }, [app]);
 
-  // Esc: erst Entwurf/Auswahl abbrechen, dann die Funktion ganz deaktivieren.
+  // Anderes Werkzeug oder andere Objektauswahl beendet den Infobox-Modus.
+  React.useEffect(() => {
+    if (!ui.mode || !app) return;
+    const startTool = app.activeTool;
+    const startSel = app.selection;
+    let raf = 0;
+    const tick = () => {
+      if (app.activeTool !== startTool || (app.selection && app.selection !== startSel)) {
+        commentUi.exitMode();
+        infoBoxUi.clear();
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [app, ui.mode]);
+
+  // Esc: erst Auswahl aufheben, dann die Funktion ganz deaktivieren.
   React.useEffect(() => {
     if (!ui.mode) return;
     const onKey = (e: KeyboardEvent) => {
@@ -48,15 +80,25 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
 
   React.useEffect(() => () => { commentUi.exitMode(); infoBoxUi.clear(); }, []);
 
+  // Tippen setzt sofort eine echte Aufgabe-Box (ein Undo-Schritt), kein Platzhalter.
   React.useEffect(() => {
     if (!app?.input || !ui.mode) return;
     const onTap = (sx: number, sy: number) => {
       const w = app.camera.screenToWorld(sx, sy);
-      infoBoxUi.set({ selectedId: null, draft: { x: w.x, y: w.y, sheetId: app.activeSheetId || "default" } });
+      const lm = app.labelManager;
+      let labelId = app.activeDrawLabelId;
+      if (lm?.isEditable?.(labelId) === false) labelId = lm.list?.().find((g: any) => lm.isEditable(g.id))?.id ?? labelId;
+      const made = app.runAction(() => {
+        const b = app.scene.createInfoBox({ x: w.x, y: w.y, labelId, authorInitials: initials, kind: "task", status: "open" });
+        ensureObjectCode(scenesOf(app), "infobox", b);
+        return b;
+      });
+      if (made) infoBoxUi.select(made.id);
+      app.renderer?.render?.();
     };
     app.input.canvasTapHandler = onTap;
     return () => { if (app.input.canvasTapHandler === onTap) app.input.canvasTapHandler = null; };
-  }, [app, ui.mode]);
+  }, [app, ui.mode, initials]);
 
   // Wheel over a pin also uses the canvas' existing, non-passive zoom listener.
   React.useEffect(() => {
@@ -71,25 +113,23 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     return () => host.removeEventListener("wheel", onWheel);
   }, [app]);
 
-  // Zähler am Knopf: alle Infoboxen des aktiven Blatts.
   const boxes: any[] = app?.scene?.infoBoxes || [];
   const openCount = boxes.length;
   React.useEffect(() => { commentUi.set({ openCount }); }, [openCount]);
 
-  // Verschieben über Fangpunkt (wie Schraffur): Ecke wählen → „Verschieben“ → Zielpunkt tippen.
-  const [pick, setPick] = React.useState<{ id: string; i: number } | null>(null);
+  // Verschieben über den Fangpunkt (Pinspitze): Punkt wählen → „Verschieben“ → Zielpunkt tippen.
+  const [pick, setPick] = React.useState<string | null>(null);
   const [armed, setArmed] = React.useState(false);
-  React.useEffect(() => { if (!sel.selectedId || pick?.id !== sel.selectedId) { setPick(null); setArmed(false); } }, [sel.selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { if (!sel.selectedId || pick !== sel.selectedId) { setPick(null); setArmed(false); } }, [sel.selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (!app?.input || !armed || !pick) return;
     const prev = app.input.canvasTapHandler;
     const onTap = (sx: number, sy: number) => {
-      const b = app.scene.getInfoBoxById?.(pick.id);
+      const b = app.scene.getInfoBoxById?.(pick);
       if (!b) { setArmed(false); return; }
       let w = app.camera.screenToWorld(sx, sy);
       try { w = app.selectTool?.snapWorldPointPublic?.(w) ?? w; } catch { /* */ }
-      const c = infoBoxCornersWorld(b)[pick.i];
-      app.runAction(() => { b.x += w.x - c.x; b.y += w.y - c.y; });
+      app.runAction(() => { b.x = w.x; b.y = w.y; });
       setArmed(false); setPick(null);
       app.renderer?.render?.();
     };
@@ -100,8 +140,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
   const cam = app?.camera;
   if (!cam) return null;
   const visible = (b: any) => app.labelManager?.isVisible?.(b.labelId) !== false && !sel.hiddenIds.includes(b.id);
-
-  const draft = sel.draft && sel.draft.sheetId === (app.activeSheetId || "default") ? sel.draft : null;
 
   const choose = (e: React.PointerEvent, b: any) => {
     e.stopPropagation();
@@ -135,9 +173,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
     >
       {boxes.filter(visible).map((b) => {
         const p = cam.worldToScreen(b.x, b.y);
-        const { w: wm, h: hm } = infoBoxSizeWorld(b);
-        const w = Math.max(14, wm * cam.scale), h = Math.max(6, hm * cam.scale);
-        const icon = Math.max(4, h * 0.72);
         const active = sel.selectedId === b.id
           || ((app.selectTool?.marqueeSelectedIds || []) as any[]).some((m) => m.kind === "infobox" && m.id === b.id);
         const task = b.kind === "task";
@@ -148,25 +183,31 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
             role="button"
             title={b.title || "Infobox"}
             onPointerDown={(e) => choose(e, b)}
-            className="absolute flex items-center overflow-hidden cursor-pointer select-none"
+            className="absolute flex items-center justify-center overflow-hidden shadow-md cursor-pointer select-none"
             style={{
-              left: p.x - w / 2, top: p.y - h / 2, width: w, height: h,
-              gap: h * 0.18, paddingLeft: h * 0.14, paddingRight: h * 0.2,
-              borderRadius: h * 0.22, pointerEvents: "auto", touchAction: "none",
-              background: "hsl(var(--card))", color: "hsl(var(--foreground))",
-              border: `${Math.max(1, h * 0.05)}px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
-              outline: active ? "2px solid hsl(var(--primary))" : undefined, outlineOffset: 1,
-              boxShadow: "0 1px 4px hsl(0 0% 0% / 0.18)",
+              left: p.x, top: p.y, width: PIN, height: PIN, marginLeft: -PIN / 2, marginTop: -PIN,
+              borderRadius: "50% 50% 50% 6px", pointerEvents: "auto", touchAction: "none",
+              background: "hsl(var(--card))",
+              color: "hsl(var(--foreground))",
+              border: `2px solid hsl(var(${task ? statusVar : "--notice-beige"}))`,
+              outline: active ? "2px solid hsl(var(--primary))" : undefined,
+              outlineOffset: 2,
             }}
           >
-            <span className="inline-flex shrink-0 items-center justify-center rounded-full font-bold"
-              style={task
-                ? { width: icon, height: icon, fontSize: icon * 0.42, background: `hsl(var(${statusVar}))`, color: "hsl(0 0% 100%)", boxShadow: "0 0 0 1px hsl(0 0% 100%)" }
-                : { width: icon, height: icon, fontSize: icon * 0.7, fontFamily: "Georgia, serif", fontStyle: "italic", background: "hsl(var(--notice-beige))", color: "hsl(var(--ink))" }}>
-              {task ? (b.authorInitials || "?") : "i"}
-            </span>
-            {b.title && (
-              <span className="min-w-0 truncate font-medium leading-none" style={{ fontSize: icon * 0.55 }}>{b.title}</span>
+            {task ? (
+              <span
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10.5px] font-bold"
+                style={{ background: `hsl(var(${statusVar}))`, color: "hsl(0 0% 100%)", boxShadow: "0 0 0 2px hsl(0 0% 100%)" }}
+              >
+                {b.authorInitials || "?"}
+              </span>
+            ) : b.title ? (
+              <span className="block w-6 text-center text-[7.5px] font-semibold leading-[1.05] break-words"
+                style={{ display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                {b.title}
+              </span>
+            ) : (
+              <Info size={20} />
             )}
           </div>
         );
@@ -174,24 +215,20 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
       {(() => {
         const b = sel.selectedId ? boxes.find((x) => x.id === sel.selectedId) : null;
         if (!b || !visible(b)) return null;
-        const pts = infoBoxCornersWorld(b).map((c) => cam.worldToScreen(c.x, c.y));
+        const sp = cam.worldToScreen(b.x, b.y);
+        const on = pick === b.id;
         return (
           <>
-            {pts.map((sp, i) => {
-              const on = pick?.i === i;
-              return (
-                <button key={i} type="button" aria-label="Fangpunkt der Infobox"
-                  onPointerDown={(e) => { e.stopPropagation(); setPick({ id: b.id, i }); setArmed(false); }}
-                  className="absolute rounded-full"
-                  style={{ left: sp.x - 9, top: sp.y - 9, width: 18, height: 18, pointerEvents: "auto", touchAction: "none",
-                    background: on ? "hsl(var(--primary))" : "hsl(var(--card))", border: "2px solid hsl(var(--primary))" }} />
-              );
-            })}
-            {pick && pick.id === b.id && (
+            <button type="button" aria-label="Fangpunkt der Infobox"
+              onPointerDown={(e) => { e.stopPropagation(); setPick(on ? null : b.id); setArmed(false); }}
+              className="absolute rounded-full"
+              style={{ left: sp.x - 8, top: sp.y - 8, width: 16, height: 16, pointerEvents: "auto", touchAction: "none",
+                background: on ? "hsl(var(--primary))" : "hsl(var(--card))", border: "2px solid hsl(var(--primary))" }} />
+            {on && (
               <button type="button" title="Verschieben"
                 onPointerDown={(e) => { e.stopPropagation(); setArmed((a) => !a); }}
                 className="absolute flex h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold shadow-md"
-                style={{ left: pts[pick.i].x + 14, top: pts[pick.i].y - 46, pointerEvents: "auto",
+                style={{ left: sp.x + 14, top: sp.y + 6, pointerEvents: "auto",
                   background: armed ? "hsl(var(--primary))" : "hsl(var(--card))",
                   color: armed ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
                   border: "1px solid hsl(var(--primary))" }}>
@@ -199,15 +236,6 @@ export function CadInfoBoxLayer({ app }: { app: any }) {
               </button>
             )}
           </>
-        );
-      })()}
-      {draft && (() => {
-        const p = cam.worldToScreen(draft.x, draft.y);
-        return (
-          <div
-            className="absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full"
-            style={{ left: p.x, top: p.y, background: "hsl(var(--notice-beige))", boxShadow: "0 0 0 2px hsl(var(--cad-settings-bg))" }}
-          />
         );
       })()}
     </div>
