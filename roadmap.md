@@ -1,5 +1,12 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Infobox, Pipette, Fangpunkte – 14.10.2026
+- [x] Infobox-Einstellungen schließen bei Werkzeug-/Auswahlwechsel automatisch, ohne X
+- [x] Ausgewählte Infoboxen leuchten blau; Augen im Kopf entfernt
+- [x] Infoboxen sitzen beim Bewegen/Zoomen exakt fest
+- [x] Pipette: Enter = mit Werkzeug + Eigenschaften der Quelle weiterzeichnen (Optionsschritt)
+- [x] Fangpunkte des ausgewählten Objekts haben Vorrang vor deckungsgleichen Punkten
+
 ## Cutter & Bogenerhalt – 13.10.2026
 - [x] Cutter-Werkzeug (Axt-Symbol unter Lineal, 3-Schritt-Anleitung, Enter/Doppelklick teilt Objekte)
 - [x] Gewölbte Schraffurkanten beim Verbinden/Schneiden als echte Bögen erhalten

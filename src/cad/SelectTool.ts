@@ -2613,6 +2613,37 @@ export class SelectTool {
     return false;
   }
 
+  /**
+   * Eckpunkt-Treffer ausschließlich am aktuell ausgewählten Objekt (Linie oder
+   * Schraffur, auch aus der Mehrfachauswahl). Gewinnt vor allen anderen Treffern.
+   */
+  _selectedObjectPointHit(input: Input): any | null {
+    const mouseS = v(input.mouse.sx, input.mouse.sy);
+    const cam = this.app.camera;
+    const px = (p: Vec2) => { const sp = cam.worldToScreen(p.x, p.y); return Math.hypot(sp.x - mouseS.x, sp.y - mouseS.y); };
+    const segs: any[] = [];
+    const hatches: any[] = [];
+    const s0 = this.app.getSelectedSegment(); if (s0) segs.push(s0);
+    const h0 = this.app.getSelectedHatch(); if (h0) hatches.push(h0);
+    for (const m of this.marqueeSelectedIds) {
+      if (m.kind === "segment") { const o = this.app.scene.getSegmentById(m.id); if (o && !segs.includes(o)) segs.push(o); }
+      else if (m.kind === "hatch") { const o = this.app.scene.getHatchById(m.id); if (o && !hatches.includes(o)) hatches.push(o); }
+    }
+    let best: any = null, bestPx: number = Defaults.hitPx;
+    const consider = (d: number, hit: any) => { if (d <= bestPx) { bestPx = d; best = hit; } };
+    for (const seg of segs) {
+      if (!this.app.labelManager.isEditable(seg.labelId)) continue;
+      consider(px(seg.a), { type: SelectionType.POINT, segmentId: seg.id, pointIndex: 0 });
+      consider(px(seg.b), { type: SelectionType.POINT, segmentId: seg.id, pointIndex: 1 });
+    }
+    for (const h of hatches) {
+      if (!this.app.labelManager.isEditable(h.labelId)) continue;
+      h.points.forEach((p: Vec2, i: number) => consider(px(p), { type: SelectionType.POINT, hatchId: h.id, pointIndex: i }));
+      (h.holes || []).forEach((loop: Vec2[], hi: number) => loop.forEach((p, i) => consider(px(p), { type: SelectionType.POINT, hatchId: h.id, holeIndex: hi, pointIndex: i })));
+    }
+    return best;
+  }
+
   private _hitTestWithForegroundPriority(input: Input) {
     const mouseW = v(input.mouse.wx, input.mouse.wy);
     const mouseS = v(input.mouse.sx, input.mouse.sy);
@@ -4107,6 +4138,18 @@ export class SelectTool {
               this.app.documentHubState = { visible: false, screenX: 0, screenY: 0, docId: null, cornerIndex: 0, anchorWorld: null, cropSide: null };
             }
           }
+        }
+      }
+
+      // Fangpunkte des AUSGEWÄHLTEN Objekts liegen immer im Vordergrund –
+      // vor deckungsgleichen Punkten anderer Objekte (Wand, Treppe, Bibliothek …).
+      if (!input.keys?.shift) {
+        const own = this._selectedObjectPointHit(input);
+        if (own) {
+          this.app.setSelection(own);
+          if ((own as any).segmentId) this.app.showLineSettingsPanel(true);
+          if ((own as any).hatchId) this.app.showHatchSettingsPanel(true);
+          return;
         }
       }
 

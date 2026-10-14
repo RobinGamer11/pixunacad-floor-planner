@@ -1,4 +1,5 @@
 import { attachObjectMeta } from "./objectMeta";
+import { infoBoxUi } from "@/lib/infoBoxUi";
 import { mergeHatchGeometry } from "./hatchMerge";
 import { emptyFilterState, objectMatchesFilter, type SelectionFilterState } from "./selectionFilter";
 import { toast } from "sonner";
@@ -9,7 +10,7 @@ import { clamp, v, Vec2 } from "./geometry";
 import { Camera } from "./Camera";
 import { Input, setLmbHint } from "./Input";
 import { drawPendingPointHint } from "./pendingPointHint";
-import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects } from "./Scene";
+import { Scene, AreaLabel, DimensionStyle, TextBoxStyle, TextBox, copyStrokeEffects, styleCarry } from "./Scene";
 import { DEFAULT_ROUGHEN, DEFAULT_STROKE_PATTERN, type RoughenParams, type StrokePatternParams } from "./strokeEffects";
 
 /** Aufrauen-Werkzeugstandards in CAD: Regler jeweils auf 50 (= Detail 4, 400 %). */
@@ -1419,6 +1420,8 @@ export class CadApp {
         && (selection as any).textBoxId === this.tableEditId;
       if (!stillSameTable) this.endTableEdit();
     }
+    // Andere Auswahl schließt die Einstellungen einer gewählten Infobox.
+    if (infoBoxUi.get().selectedId || infoBoxUi.get().draft) infoBoxUi.clear();
     this.selection = selection;
     // Gesetzte Tabellen sind bei Auswahl automatisch im Zellmodus.
     if (!this.tableEditId && selection && (selection as any).type === SelectionType.TEXTBOX) {
@@ -2710,6 +2713,11 @@ export class CadApp {
         if (this.hatchTool.finishFromKey()) { e.preventDefault(); return; }
       }
 
+      // ENTER mit der Pipette: mit Werkzeug + Eigenschaften der Quelle weiterzeichnen.
+      if (e.key === "Enter" && this.activeTool === this.pipetteTool && !isHubInput) {
+        if (this.pipetteTool.continueDrawing()) { e.preventDefault(); return; }
+      }
+
       if (e.key === "Enter" && this.activeTool === this.lineTool && !isHubInput) {
         if (this.lineTool.finishFromKey()) { e.preventDefault(); return; }
         if (this.lineTool.isDrawing()) { e.preventDefault(); this.lineTool.finish(); return; }
@@ -3372,8 +3380,15 @@ export class CadApp {
     // er bestimmt, welche Objekte "Alles"/Strg+A auswählt.
     const objTool = asObjectToolId(id);
     if (objTool) this.selectionFilterTool = objTool;
-    // Werkzeugwechsel beendet immer den Tabellen-Zellmodus.
+    // Pipetten-Weiterzeichnen gilt nur für das übernommene Werkzeug.
+    if (styleCarry.tool && styleCarry.tool !== id) { styleCarry.tool = null; styleCarry.kind = null; styleCarry.snap = null; }
+    // Werkzeugwechsel beendet immer den Tabellen-Zellmodus …
     this.endTableEdit();
+    // … und schließt eine gewählte Infobox (wie bei allen Objekten).
+    if (infoBoxUi.get().selectedId || infoBoxUi.get().draft) infoBoxUi.clear();
+    if (this.selectTool.marqueeSelectedIds.some((m: any) => m.kind === "infobox")) {
+      this.selectTool.marqueeSelectedIds = this.selectTool.marqueeSelectedIds.filter((m: any) => m.kind !== "infobox");
+    }
     if (this.pastePreviewActive) this.cancelPastePreview();
     // Ein anderes Werkzeug (z. B. Bibliotheks-/Dokumentplatzierung) beendet
     // den Mehrfach-Einfüge-Modus sauber.

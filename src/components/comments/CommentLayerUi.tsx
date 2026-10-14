@@ -569,16 +569,9 @@ export function CommentModeButton({
   title?: string;
 }) {
   const ui = useCommentUi();
-  const ib = useInfoBoxUi();
   const active = ui.mode;
   const count = ui.openCount;
-  const eyeBtn = (on: boolean, label: string, icon: React.ReactNode, act: () => void) => (
-    <button type="button" disabled={!on} title={label} aria-label={label} onClick={act}
-      className="h-9 w-9 rounded-full flex items-center justify-center shadow-md disabled:opacity-35 pixuna-comments"
-      style={{ background: "hsl(var(--surface-card))", color: "hsl(var(--ink))", border: "1px solid hsl(var(--primary) / 0.5)" }}>
-      {icon}
-    </button>
-  );
+
   return (
     <div className="relative flex items-center gap-2">
       <button
@@ -602,8 +595,6 @@ export function CommentModeButton({
           <span className="rounded px-2.5 py-1 text-[11.5px] font-semibold whitespace-nowrap" style={{ background: "hsl(var(--notice-beige))", color: "hsl(0 0% 0%)" }}>Aktiviert</span>
         </div>
       )}
-      {active && eyeBtn(!!ib.selectedId, "Gewählte Infobox ausblenden", <EyeOff size={16} />, () => { const id = ib.selectedId; infoBoxUi.clear(); if (id) infoBoxUi.hide([id]); })}
-      {active && eyeBtn(ib.hiddenIds.length > 0, "Ausgeblendete Infoboxen einblenden", <Eye size={16} />, () => infoBoxUi.showAll())}
     </div>
   );
 }
