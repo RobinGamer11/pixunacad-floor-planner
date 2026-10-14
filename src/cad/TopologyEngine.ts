@@ -328,11 +328,11 @@ export class TopologyEngine {
    * Alle Kandidaten sind „freie" Snaps (segment/hatch = null), damit kein
    * Werkzeug die enthaltene Geometrie auswählt, teilt oder bearbeitet.
    */
-  /** Eckpunkte sichtbarer Infoboxen (maßstäblich) als Fangpunkte. */
+  /** Pinspitze sichtbarer Infoboxen als Fangpunkt. */
   private _addInfoBoxSnaps(considerPoint: (p: Vec2, a: any, b: any, i: number) => void) {
     for (const b of ((this.scene as any).infoBoxes || []) as any[]) {
       if (!this.labels.isVisible(b.labelId)) continue;
-      for (const c of infoBoxCornersWorld(b)) considerPoint(v(c.x, c.y), null, null, -1);
+      considerPoint(v(b.x, b.y), null, null, -1);
     }
   }
 
