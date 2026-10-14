@@ -6,9 +6,9 @@
 import { useSyncExternalStore } from "react";
 
 export interface InfoBoxDraft { x: number; y: number; sheetId: string }
-interface State { selectedId: string | null; draft: InfoBoxDraft | null; hiddenIds: string[] }
+interface State { selectedId: string | null; draft: InfoBoxDraft | null; hiddenIds: string[]; openTick?: number }
 
-let state: State = { selectedId: null, draft: null, hiddenIds: [] };
+let state: State = { selectedId: null, draft: null, hiddenIds: [], openTick: 0 };
 const listeners = new Set<() => void>();
 
 export const infoBoxUi = {
@@ -16,11 +16,12 @@ export const infoBoxUi = {
   subscribe(fn: () => void) { listeners.add(fn); return () => { listeners.delete(fn); }; },
   set(patch: Partial<State>) {
     const next = { ...state, ...patch };
-    if (next.selectedId === state.selectedId && next.draft === state.draft && next.hiddenIds === state.hiddenIds) return;
+    if (next.selectedId === state.selectedId && next.draft === state.draft && next.hiddenIds === state.hiddenIds && next.openTick === state.openTick) return;
     state = next;
     listeners.forEach((fn) => fn());
   },
-  select(id: string | null) { infoBoxUi.set({ selectedId: id, draft: null }); },
+  /** Jede Auswahl (auch erneut dieselbe Box) öffnet rechts die Einstellungen. */
+  select(id: string | null) { infoBoxUi.set({ selectedId: id, draft: null, openTick: (state.openTick || 0) + 1 }); },
   clear() { infoBoxUi.set({ selectedId: null, draft: null }); },
   hide(ids: string[]) { if (ids.length) infoBoxUi.set({ hiddenIds: [...new Set([...state.hiddenIds, ...ids])] }); },
   showAll() { if (state.hiddenIds.length) infoBoxUi.set({ hiddenIds: [] }); },
