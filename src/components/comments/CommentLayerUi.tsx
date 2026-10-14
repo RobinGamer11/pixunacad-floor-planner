@@ -569,16 +569,6 @@ export function CommentModeButton({
   title?: string;
 }) {
   const ui = useCommentUi();
-  const ib = useInfoBoxUi();
-  const active = ui.mode;
-  const count = ui.openCount;
-  const eyeBtn = (on: boolean, label: string, icon: React.ReactNode, act: () => void) => (
-    <button type="button" disabled={!on} title={label} aria-label={label} onClick={act}
-      className="h-9 w-9 rounded-full flex items-center justify-center shadow-md disabled:opacity-35 pixuna-comments"
-      style={{ background: "hsl(var(--surface-card))", color: "hsl(var(--ink))", border: "1px solid hsl(var(--primary) / 0.5)" }}>
-      {icon}
-    </button>
-  );
   return (
     <div className="relative flex items-center gap-2">
       <button

@@ -106,9 +106,6 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
         <div className="min-w-0 flex-1 text-center text-[13px] font-semibold truncate">
           {box ? formatObjectId("infobox", box) : "Neue Infobox"}
         </div>
-        <button type="button" title="Schließen (Esc)" className="cad-toolbar-btn h-7 w-7 justify-center p-0" onClick={() => infoBoxUi.clear()}>
-          <X className="h-4 w-4" />
-        </button>
       </div>
       <div className="flex gap-2">{tabBtn("look", "Darstellung")}{tabBtn("info", "Info")}</div>
 
