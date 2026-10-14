@@ -179,7 +179,7 @@ export function TabletAidWheel() {
         left: pos.x,
         top: pos.y,
         width: size,
-        height: size,
+        height: totalHeight,
         touchAction: "none",
         // Immer im Vordergrund — über Panels, Hubs, Dialogen und Overlays.
         zIndex: 2147483000,
@@ -188,14 +188,18 @@ export function TabletAidWheel() {
       }}
     >
 
-      {/* Rand = Drag-Griff */}
+      {/* Rand = Drag-Griff (nur das runde Rad selbst) */}
       <div
         onPointerDown={onDragStart}
         onPointerMove={onDragMove}
         onPointerUp={onDragEnd}
         onPointerCancel={onDragEnd}
-        className="absolute inset-0 rounded-full"
+        className="absolute rounded-full"
         style={{
+          top: 0,
+          left: 0,
+          width: size,
+          height: size,
           border: "1px solid hsl(var(--overlay-surface) / 0.28)",
           background: "hsl(var(--overlay-ink) / 0.82)",
           boxShadow: "0 12px 32px rgba(0,0,0,0.32)",
