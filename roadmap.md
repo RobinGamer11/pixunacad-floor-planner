@@ -228,3 +228,10 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Paket 1: Kanten glätten entfernt, auffälliger Smooth-Hinweis, Bibliotheksliste schlank, Vorschaufenster mit Drehen/Spiegeln/Maßen (1:1 am Objekt)
 - [ ] Paket 2: Bearbeitung gesetzter Elemente, passgenauer Rahmen + Greifpunkte, R-Klick-Hilfslinien, „Verschieben“, Fangpunkte wie Schraffur
 - [ ] Paket 3: Infoboxen (Auswahl, Augen-Schalter, Filter im Auswahlfilter), Auswahlliste im Auswahlwerkzeug mit Shift
+
+## Infobox – Korrektur 14.10.2026
+- [x] Altes Pin-Design, bei Information Titel statt Kürzel
+- [x] Augen erst bei aktivem Modus, „Aktiviert“ schwarz
+- [x] Klick setzt direkt eine Aufgabe-Box (kein Platzhalterpunkt)
+- [x] Werkzeugwechsel/andere Auswahl beendet den Infobox-Modus
+- [x] Ebenenzählung inkl. Bibliothekselemente, Infoboxen, Tabellen, Türen

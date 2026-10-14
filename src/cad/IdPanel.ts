@@ -150,7 +150,13 @@ export class IdPanel {
       const stairCount = this.app.scene.getStairsByLabelId(group.id).length;
       let extraCount = 0;
       try { extraCount = (this.app as any).externalLabelCounter?.(group.id) ?? 0; } catch {}
-      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount + stairCount + docCount + extraCount;
+      // Bibliothekselemente, Infoboxen, Tabellen und Türen zählen ebenfalls mit.
+      const sc: any = this.app.scene;
+      const otherCount = (sc.libraryInstances?.length ? sc.getLibraryInstancesByLabelId(group.id).length : 0)
+        + (sc.infoBoxes || []).filter((b: any) => b.labelId === group.id).length
+        + (sc.tables || []).filter((t: any) => t.labelId === group.id).length
+        + (sc.doors || []).filter((d: any) => d.labelId === group.id).length;
+      const count = segCount + hatchCount + dimCount + textCount + freeCount + wallCount + stairCount + docCount + extraCount + otherCount;
       const row = document.createElement("div");
       row.className = "id-row";
       row.dataset.id = group.id;

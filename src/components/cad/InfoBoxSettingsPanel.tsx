@@ -140,12 +140,7 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
           </label>
           <SpotPreview app={app} x={box ? box.x : ui.draft!.x} y={box ? box.y : ui.draft!.y}
             on={base.showPreview !== false} onToggle={() => update({ showPreview: base.showPreview === false })} />
-          <div className="flex items-end gap-2 pt-1">
-            <label className="block flex-1">
-              <span className="mb-1 block">Breite (m)</span>
-              <input type="number" min={0.1} max={10} step={0.05} className={inputCls} value={base.sizeM ?? 0.5}
-                onChange={(e) => { const n = parseFloat(e.target.value.replace(",", ".")); if (n >= 0.1 && n <= 10) update({ sizeM: n }); }} />
-            </label>
+          <div className="flex items-end justify-end gap-2 pt-1">
             <button type="button" onClick={remove} title="Infobox löschen"
               className="cad-toolbar-btn h-9 gap-1.5 px-3 justify-center">
               <Trash2 className="h-4 w-4" /> Löschen
