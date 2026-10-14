@@ -602,8 +602,6 @@ export function CommentModeButton({
           <span className="rounded px-2.5 py-1 text-[11.5px] font-semibold whitespace-nowrap" style={{ background: "hsl(var(--notice-beige))", color: "hsl(0 0% 0%)" }}>Aktiviert</span>
         </div>
       )}
-      {active && eyeBtn(!!ib.selectedId, "Gewählte Infobox ausblenden", <EyeOff size={16} />, () => { const id = ib.selectedId; infoBoxUi.clear(); if (id) infoBoxUi.hide([id]); })}
-      {active && eyeBtn(ib.hiddenIds.length > 0, "Ausgeblendete Infoboxen einblenden", <Eye size={16} />, () => infoBoxUi.showAll())}
     </div>
   );
 }
