@@ -56,8 +56,8 @@ function safeInset(name: string): number {
 export function TabletAidWheel() {
   const STORAGE_KEY = "pixuna.tabletAid.pos";
   const size = 190;
-  // Unter dem Rad sitzt zusätzlich der kleine ENTF-Knopf.
-  const totalHeight = size + 50;
+  // Unter dem Rad sitzt zusätzlich der kleine ENTF-Knopf (8 px Abstand).
+  const totalHeight = size + 8 + 44;
 
   /**
    * Begrenzt eine gespeicherte Position auf den sichtbaren Bereich.
@@ -577,7 +577,7 @@ function WheelSmallButton({
       style={{
         left: "50%",
         transform: "translateX(-50%)",
-        top: 196,
+        top: 198,
         width: buttonSize,
         height: buttonSize,
         borderColor: "hsl(var(--overlay-surface) / 0.28)",
