@@ -57,7 +57,7 @@ export function TabletAidWheel() {
   const STORAGE_KEY = "pixuna.tabletAid.pos";
   const size = 190;
   // Unter dem Rad sitzt zusätzlich der kleine ENTF-Knopf (8 px Abstand).
-  const totalHeight = size + 8 + 44;
+  const totalHeight = size;
 
   /**
    * Begrenzt eine gespeicherte Position auf den sichtbaren Bereich.
@@ -257,15 +257,9 @@ export function TabletAidWheel() {
         toggleHold
         icon={<Keyboard size={24} strokeWidth={1.45} />} />
 
-      {/* Kleiner ENTF-Knopf ganz unten unter dem Rad */}
-      <WheelSmallButton
-        tooltip="Entf: Auswahl löschen (Entf-Taste)"
-        onTap={() => {
-          if ((window as any).__pixunaCameraGesture) return;
-          virtualKeyPress("Delete");
-        }}
-        icon={<Trash2 size={18} strokeWidth={1.45} />}
-      />
+      <WheelButton angle={90} size={size} label="Entf" description="Löschen" tooltip="Entf: Auswahl löschen"
+        onTap={() => { if (!(window as any).__pixunaCameraGesture) virtualKeyPress("Delete"); }}
+        icon={<Trash2 size={22} strokeWidth={1.45} />} />
 
     </div>
   );
@@ -537,60 +531,3 @@ function WheelButton({
     </button>
   );
 }
-
-/** Kleiner Knopf unter dem Rad (z. B. ENTF) — gleicher Stil, nur kompakter. */
-function WheelSmallButton({
-  tooltip, icon, onTap,
-}: {
-  tooltip: string;
-  icon: React.ReactNode;
-  onTap: () => void;
-}) {
-  const buttonSize = 44;
-  const elRef = useRef<HTMLButtonElement | null>(null);
-
-  // Callbacks stabil halten, damit die Registry-Registrierung nur einmal läuft.
-  const cbs = useRef({ onTap });
-  cbs.current = { onTap };
-
-  useEffect(() => {
-    const handle: BtnHandle = {
-      getRect: () => elRef.current?.getBoundingClientRect() ?? null,
-      begin: () => cbs.current.onTap(),
-      end: () => {},
-      cancel: () => {},
-    };
-    WHEEL_BUTTONS.add(handle);
-    return () => { WHEEL_BUTTONS.delete(handle); };
-  }, []);
-
-  return (
-    <button
-      ref={elRef}
-      title={tooltip}
-      type="button"
-      tabIndex={-1}
-      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-      className="absolute rounded-full flex items-center justify-center border transition-colors"
-      style={{
-        left: "50%",
-        transform: "translateX(-50%)",
-        top: 198,
-        width: buttonSize,
-        height: buttonSize,
-        borderColor: "hsl(var(--overlay-surface) / 0.28)",
-        background: "hsl(var(--overlay-ink) / 0.82)",
-        color: "hsl(var(--overlay-surface))",
-        boxShadow: "0 8px 20px rgba(0,0,0,0.28)",
-        touchAction: "none",
-        pointerEvents: "auto",
-        zIndex: 2,
-      }}
-    >
-      {icon}
-    </button>
-  );
-}
-
