@@ -204,6 +204,27 @@ export function cutAlongLine(app: any, c: Vec2, d: Vec2): number {
   }
   try { scene._rebuildHatchIdMap(); } catch {}
 
+  // Freihandlinien (als Polylinie geschnitten, Stil bleibt erhalten)
+  for (const fs of [...(scene.freeStrokes || [])]) {
+    if (!ok(fs.labelId)) continue;
+    if (!fs.points || fs.points.length < 2) continue;
+    const pieces = cutPolyline(fs.points, null, false, c, d);
+    if (!pieces || pieces.length < 2) continue;
+    const idx = scene.freeStrokes.indexOf(fs);
+    const parts = pieces.map((p, i) => {
+      const o = i === 0 ? fs : cloneObject(scene, fs, ["points", "pressures", "autoShapeSource"]);
+      o.points = p.points.map((q) => v(q.x, q.y));
+      if ("pressures" in o) o.pressures = null;
+      o.autoShapeSource = null;
+      return o;
+    });
+    scene.freeStrokes.splice(idx + 1, 0, ...parts.slice(1));
+    for (const o of parts.slice(1)) ensureObjectCode(scenes, "freeStroke", o);
+    count++;
+  }
+  try { scene._rebuildFreeIdMap(); } catch {}
+
+
   // Wände (an jedem Schnittpunkt der Bezugslinie)
   for (const wall of [...scene.walls]) {
     if (!ok(wall.labelId)) continue;
