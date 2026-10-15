@@ -1172,7 +1172,14 @@ export class Renderer {
   private _drawDocumentSnapAffordances() {
     const ctx = this.ctx;
     const cam = this.camera;
+    // Blaue Marker nur für ausgewählte Dokumente; Fangen bleibt unverändert.
+    const selIds = new Set<string>();
+    for (const s of [this.selection, ...(this.extraSelections || [])]) {
+      if (s && s.type === SelectionType.DOCUMENT && s.documentId) selIds.add(s.documentId);
+    }
+    if (!selIds.size) return;
     for (const doc of this.scene.documents) {
+      if (!selIds.has(doc.id)) continue;
       if (!this.labels.isVisible(doc.labelId)) continue;
       const corners = documentVisibleCornersWorld(doc).map(c => cam.worldToScreen(c.x, c.y));
       ctx.save();
