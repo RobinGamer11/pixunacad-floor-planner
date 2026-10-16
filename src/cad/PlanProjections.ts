@@ -193,12 +193,14 @@ export function itemsBoundsM(items: ProjectionItem[]): { minX: number; minY: num
     if (x > maxX) maxX = x;
     if (y > maxY) maxY = y;
   };
+  let maxExpand = 0;
   for (const it of items) {
     if (it.kind === "segment" || it.kind === "dimension-line") {
       if (it.a) acc(it.a.x, it.a.y);
       if (it.b) acc(it.b.x, it.b.y);
-    } else if (it.kind === "hatch") {
+    } else if (it.kind === "hatch" || it.kind === "bound-box") {
       for (const p of it.points || []) acc(p.x, p.y);
+      if (it.kind === "bound-box" && it.expandM) maxExpand = Math.max(maxExpand, it.expandM);
     } else if (it.kind === "textbox-rect" || it.kind === "document-rect") {
       const w = (it.widthM || 0) / 2;
       const h = (it.heightM || 0) / 2;
@@ -209,6 +211,10 @@ export function itemsBoundsM(items: ProjectionItem[]): { minX: number; minY: num
     }
   }
   if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  if (maxExpand > 0) {
+    minX -= maxExpand; minY -= maxExpand;
+    maxX += maxExpand; maxY += maxExpand;
+  }
   return { minX, minY, maxX, maxY };
 }
 
