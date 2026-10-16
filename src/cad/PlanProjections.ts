@@ -45,8 +45,14 @@ export interface ProjectionItem {
   expandM?: number;
 }
 
-/** Konvertiert eine serialisierte Sheet-Scene (siehe CadApp._serializeOneScene) in flache Items. */
-export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
+/**
+ * Konvertiert eine serialisierte Sheet-Scene (siehe CadApp._serializeOneScene) in flache Items.
+ * Die sichtbaren Items decken die einfachen Objektarten ab; Wände, Türen, Treppen,
+ * Freihand, Tabellen und Bibliothekselemente laufen als `bound-box` ein (nur Begrenzung)
+ * und werden vom echten Renderer gezeichnet (siehe ProjectionRender.drawSheetSnapshotContent).
+ * `definitions` = projektweite Bibliotheksdefinitionen (für die Begrenzung von Instanzen).
+ */
+export function flattenSheetSnapshot(snapshot: any, definitions?: any[]): ProjectionItem[] {
   const items: ProjectionItem[] = [];
   if (!snapshot || typeof snapshot !== "object") return items;
   for (const h of snapshot.hatches || []) {
