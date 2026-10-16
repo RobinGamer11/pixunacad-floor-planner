@@ -17,7 +17,8 @@ import { rgbaFromHex } from "./geometry";
 import { modelToPaperFactor, normalizeScaleDen } from "@/lib/scale";
 
 export interface ProjectionItem {
-  kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line";
+  kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line"
+    | "bound-box";
   /** CAD-Ebene des Quellobjekts (für die Ebenenreihenfolge im Ausschnitt). */
   labelId?: string;
   // segment
@@ -37,6 +38,8 @@ export interface ProjectionItem {
   heightM?: number;
   rotationRad?: number;
   label?: string;
+  // bound-box: nur für die Bounding-Box (Begrenzung/Ausschnitt), nicht sichtbar.
+  expandM?: number;
 }
 
 /** Konvertiert eine serialisierte Sheet-Scene (siehe CadApp._serializeOneScene) in flache Items. */
