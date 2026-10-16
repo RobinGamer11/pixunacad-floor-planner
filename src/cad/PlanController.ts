@@ -118,7 +118,7 @@ export class PlanController {
   }
 
   /** Verknüpfte Ausschnitte: Cache je Quellblatt, gesteuert über CadApp.contentRevision. */
-  private _linkedCache = new Map<string, { rev: string; json: string; items: ProjectionItem[] }>();
+  private _linkedCache = new Map<string, { rev: string; json: string; items: ProjectionItem[]; snap: any }>();
 
   /** true, wenn das Quellblatt eines verknüpften Ausschnitts fehlt (Platzhalter). */
   isSourceMissing(proj: Projection): boolean {
