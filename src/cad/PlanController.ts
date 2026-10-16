@@ -90,6 +90,17 @@ export class PlanController {
     return this._vectorItems(proj);
   }
 
+  /** Snapshot des Quellblatts (für das vollständige Renderer-Zeichnen des Ausschnitts). */
+  getSnapshot(proj: Projection): any {
+    if (proj.mode === "linked") {
+      const scene = this.app.scenesById.get(proj.sourceSheetId);
+      if (!scene) return null;
+      this._linkedItems(proj); // stellt den Cache sicher
+      return this._linkedCache.get(proj.sourceSheetId)?.snap ?? null;
+    }
+    return proj.sceneSnapshot ?? null;
+  }
+
   private _vectorItems(proj: Projection): ProjectionItem[] {
     if (proj.mode === "linked") return this._linkedItems(proj);
     let items = this._itemsCache.get(proj.id);
