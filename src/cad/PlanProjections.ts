@@ -362,7 +362,6 @@ export function drawProjection(
     } catch (err) {
       console.warn("[PlanProjections] Inhalt zeichnen fehlgeschlagen:", err);
     }
-    ctx.restore();
   } else
   for (const it of items) {
     if (it.kind === "hatch" && it.points && it.points.length >= 3) {
