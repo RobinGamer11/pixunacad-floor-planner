@@ -13,11 +13,15 @@
  */
 import { Camera } from "./Camera";
 import { Defaults } from "./constants";
-import { rgbaFromHex } from "./geometry";
+import { rgbaFromHex, tessellateWithBulges } from "./geometry";
 import { modelToPaperFactor, normalizeScaleDen } from "@/lib/scale";
+import { sceneFromSnapshot, drawSheetSnapshotContent, ProjectionCamera } from "./ProjectionRender";
+import { doorGeometry } from "./doorGeom";
+import { instanceCornersWorld } from "./library/libraryGeometry";
 
 export interface ProjectionItem {
-  kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line";
+  kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line"
+    | "bound-box";
   /** CAD-Ebene des Quellobjekts (für die Ebenenreihenfolge im Ausschnitt). */
   labelId?: string;
   // segment
@@ -37,10 +41,18 @@ export interface ProjectionItem {
   heightM?: number;
   rotationRad?: number;
   label?: string;
+  // bound-box: nur für die Bounding-Box (Begrenzung/Ausschnitt), nicht sichtbar.
+  expandM?: number;
 }
 
-/** Konvertiert eine serialisierte Sheet-Scene (siehe CadApp._serializeOneScene) in flache Items. */
-export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
+/**
+ * Konvertiert eine serialisierte Sheet-Scene (siehe CadApp._serializeOneScene) in flache Items.
+ * Die sichtbaren Items decken die einfachen Objektarten ab; Wände, Türen, Treppen,
+ * Freihand, Tabellen und Bibliothekselemente laufen als `bound-box` ein (nur Begrenzung)
+ * und werden vom echten Renderer gezeichnet (siehe ProjectionRender.drawSheetSnapshotContent).
+ * `definitions` = projektweite Bibliotheksdefinitionen (für die Begrenzung von Instanzen).
+ */
+export function flattenSheetSnapshot(snapshot: any, definitions?: any[]): ProjectionItem[] {
   const items: ProjectionItem[] = [];
   if (!snapshot || typeof snapshot !== "object") return items;
   for (const h of snapshot.hatches || []) {
@@ -95,6 +107,80 @@ export function flattenSheetSnapshot(snapshot: any): ProjectionItem[] {
       label: doc.name || "Dokument",
     });
   }
+
+  // Bound-Boxes für die Objektarten, die der echte Renderer zeichnet
+  // (nur für Begrenzung/Ausschnitt/Hit-Test — nicht sichtbar).
+  const scene = sceneFromSnapshot(snapshot);
+  if (scene) {
+    for (const w of scene.walls) {
+      if (!w.corners || w.corners.length < 2) continue;
+      const pts = tessellateWithBulges(w.corners, (w as any).bulges, false, 24);
+      items.push({
+        kind: "bound-box",
+        labelId: w.labelId,
+        points: pts.map(p => ({ x: p.x, y: p.y })),
+        expandM: (w.thicknessM || 0) + 0.01,
+      });
+    }
+    const wallById = new Map(scene.walls.map(w => [w.id, w]));
+    for (const d of scene.doors) {
+      const w = wallById.get(d.wallId);
+      if (!w) continue;
+      const g = doorGeometry(w, d);
+      if (!g) continue;
+      items.push({
+        kind: "bound-box",
+        labelId: d.labelId,
+        points: [g.hinge, g.leafEnd, g.closedEnd, g.leftEnd, g.rightEnd].map(p => ({ x: p.x, y: p.y })),
+        expandM: (w.thicknessM || 0) + 0.01,
+      });
+    }
+    for (const st of (scene as any).stairs || []) {
+      if (!st.path || st.path.length === 0) continue;
+      items.push({
+        kind: "bound-box",
+        labelId: st.labelId,
+        points: st.path.map((p: any) => ({ x: p.x, y: p.y })),
+        expandM: Math.max(0.1, st.stairWidthM || 1.2),
+      });
+    }
+    for (const s of scene.freeStrokes) {
+      if (!s.points || s.points.length === 0) continue;
+      items.push({
+        kind: "bound-box",
+        labelId: s.labelId,
+        points: s.points.map(p => ({ x: p.x, y: p.y })),
+        expandM: (s.thicknessM || 0) * 2 + 0.02,
+      });
+    }
+    for (const t of (scene as any).tables || []) {
+      items.push({
+        kind: "bound-box",
+        labelId: t.labelId,
+        points: [{ x: t.center.x, y: t.center.y }],
+        expandM: Math.max(t.widthM || 0, t.heightM || 0) / 2 + 0.05,
+      });
+    }
+    if (Array.isArray(definitions) && definitions.length > 0) {
+      const defById = new Map(definitions.map((d: any) => [d.id, d]));
+      for (const inst of scene.libraryInstances || []) {
+        const def = defById.get(inst.definitionId);
+        if (!def) continue;
+        try {
+          const corners = instanceCornersWorld(def.geometry, {
+            position: { x: inst.position.x, y: inst.position.y },
+            rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY,
+          });
+          if (!corners || corners.length === 0) continue;
+          items.push({
+            kind: "bound-box",
+            labelId: inst.labelId,
+            points: corners.map(p => ({ x: p.x, y: p.y })),
+          });
+        } catch { /* Instanz ohne Begrenzung überspringen */ }
+      }
+    }
+  }
   return items;
 }
 
@@ -107,12 +193,14 @@ export function itemsBoundsM(items: ProjectionItem[]): { minX: number; minY: num
     if (x > maxX) maxX = x;
     if (y > maxY) maxY = y;
   };
+  let maxExpand = 0;
   for (const it of items) {
     if (it.kind === "segment" || it.kind === "dimension-line") {
       if (it.a) acc(it.a.x, it.a.y);
       if (it.b) acc(it.b.x, it.b.y);
-    } else if (it.kind === "hatch") {
+    } else if (it.kind === "hatch" || it.kind === "bound-box") {
       for (const p of it.points || []) acc(p.x, p.y);
+      if (it.kind === "bound-box" && it.expandM) maxExpand = Math.max(maxExpand, it.expandM);
     } else if (it.kind === "textbox-rect" || it.kind === "document-rect") {
       const w = (it.widthM || 0) / 2;
       const h = (it.heightM || 0) / 2;
@@ -123,6 +211,10 @@ export function itemsBoundsM(items: ProjectionItem[]): { minX: number; minY: num
     }
   }
   if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  if (maxExpand > 0) {
+    minX -= maxExpand; minY -= maxExpand;
+    maxX += maxExpand; maxY += maxExpand;
+  }
   return { minX, minY, maxX, maxY };
 }
 
@@ -224,6 +316,7 @@ export function drawProjection(
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: { left: number; right: number; top: number; bottom: number } },
   isSelected: boolean,
   isHover: boolean,
+  opts?: { snapshot?: any; definitions?: any[] },
 ) {
   const layout = computeProjectionLayout(items, proj);
 
@@ -256,6 +349,20 @@ export function drawProjection(
     y: offY + y * itemScalePxPerSheetM,
   });
 
+  // Vollständiger Inhalt über den echten Renderer (Wände, Türen, Treppen,
+  // Freihand, Tabellen, Textfelder, Dokumente, Bibliothekselemente).
+  if (opts?.snapshot) {
+    try {
+      drawSheetSnapshotContent(
+        ctx,
+        opts.snapshot,
+        new ProjectionCamera(itemScalePxPerSheetM, offX, offY),
+        opts.definitions,
+      );
+    } catch (err) {
+      console.warn("[PlanProjections] Inhalt zeichnen fehlgeschlagen:", err);
+    }
+  } else
   for (const it of items) {
     if (it.kind === "hatch" && it.points && it.points.length >= 3) {
       const fillAlpha = (it.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
