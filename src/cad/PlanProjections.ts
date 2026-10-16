@@ -316,6 +316,7 @@ export function drawProjection(
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: { left: number; right: number; top: number; bottom: number } },
   isSelected: boolean,
   isHover: boolean,
+  opts?: { snapshot?: any; definitions?: any[] },
 ) {
   const layout = computeProjectionLayout(items, proj);
 
