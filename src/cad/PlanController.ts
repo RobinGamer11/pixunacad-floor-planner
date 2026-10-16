@@ -144,7 +144,7 @@ export class PlanController {
       filtered[k] = Array.isArray(v) ? v.filter((o: any) => !o || !hiddenSet.has(o.labelId)) : v;
     }
     const items = flattenSheetSnapshot(filtered);
-    this._linkedCache.set(proj.sourceSheetId, { rev, json, items });
+    this._linkedCache.set(proj.sourceSheetId, { rev, json, items, snap: filtered });
     return items;
   }
 
