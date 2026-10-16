@@ -13,8 +13,11 @@
  */
 import { Camera } from "./Camera";
 import { Defaults } from "./constants";
-import { rgbaFromHex } from "./geometry";
+import { rgbaFromHex, tessellateWithBulges } from "./geometry";
 import { modelToPaperFactor, normalizeScaleDen } from "@/lib/scale";
+import { sceneFromSnapshot } from "./ProjectionRender";
+import { doorGeometry } from "./doorGeom";
+import { instanceCornersWorld } from "./library/libraryGeometry";
 
 export interface ProjectionItem {
   kind: "segment" | "hatch" | "textbox-rect" | "document-rect" | "dimension-line"
