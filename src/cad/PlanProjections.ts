@@ -107,6 +107,80 @@ export function flattenSheetSnapshot(snapshot: any, definitions?: any[]): Projec
       label: doc.name || "Dokument",
     });
   }
+
+  // Bound-Boxes für die Objektarten, die der echte Renderer zeichnet
+  // (nur für Begrenzung/Ausschnitt/Hit-Test — nicht sichtbar).
+  const scene = sceneFromSnapshot(snapshot);
+  if (scene) {
+    for (const w of scene.walls) {
+      if (!w.corners || w.corners.length < 2) continue;
+      const pts = tessellateWithBulges(w.corners, (w as any).bulges, false, 24);
+      items.push({
+        kind: "bound-box",
+        labelId: w.labelId,
+        points: pts.map(p => ({ x: p.x, y: p.y })),
+        expandM: (w.thicknessM || 0) + 0.01,
+      });
+    }
+    const wallById = new Map(scene.walls.map(w => [w.id, w]));
+    for (const d of scene.doors) {
+      const w = wallById.get(d.wallId);
+      if (!w) continue;
+      const g = doorGeometry(w, d);
+      if (!g) continue;
+      items.push({
+        kind: "bound-box",
+        labelId: d.labelId,
+        points: [g.hinge, g.leafEnd, g.closedEnd, g.leftEnd, g.rightEnd].map(p => ({ x: p.x, y: p.y })),
+        expandM: (w.thicknessM || 0) + 0.01,
+      });
+    }
+    for (const st of (scene as any).stairs || []) {
+      if (!st.path || st.path.length === 0) continue;
+      items.push({
+        kind: "bound-box",
+        labelId: st.labelId,
+        points: st.path.map((p: any) => ({ x: p.x, y: p.y })),
+        expandM: Math.max(0.1, st.stairWidthM || 1.2),
+      });
+    }
+    for (const s of scene.freeStrokes) {
+      if (!s.points || s.points.length === 0) continue;
+      items.push({
+        kind: "bound-box",
+        labelId: s.labelId,
+        points: s.points.map(p => ({ x: p.x, y: p.y })),
+        expandM: (s.thicknessM || 0) * 2 + 0.02,
+      });
+    }
+    for (const t of (scene as any).tables || []) {
+      items.push({
+        kind: "bound-box",
+        labelId: t.labelId,
+        points: [{ x: t.center.x, y: t.center.y }],
+        expandM: Math.max(t.widthM || 0, t.heightM || 0) / 2 + 0.05,
+      });
+    }
+    if (Array.isArray(definitions) && definitions.length > 0) {
+      const defById = new Map(definitions.map((d: any) => [d.id, d]));
+      for (const inst of scene.libraryInstances || []) {
+        const def = defById.get(inst.definitionId);
+        if (!def) continue;
+        try {
+          const corners = instanceCornersWorld(def.geometry, {
+            position: { x: inst.position.x, y: inst.position.y },
+            rotationRad: inst.rotationRad, scaleX: inst.scaleX, scaleY: inst.scaleY,
+          });
+          if (!corners || corners.length === 0) continue;
+          items.push({
+            kind: "bound-box",
+            labelId: inst.labelId,
+            points: corners.map(p => ({ x: p.x, y: p.y })),
+          });
+        } catch { /* Instanz ohne Begrenzung überspringen */ }
+      }
+    }
+  }
   return items;
 }
 
