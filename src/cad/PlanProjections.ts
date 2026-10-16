@@ -15,7 +15,7 @@ import { Camera } from "./Camera";
 import { Defaults } from "./constants";
 import { rgbaFromHex, tessellateWithBulges } from "./geometry";
 import { modelToPaperFactor, normalizeScaleDen } from "@/lib/scale";
-import { sceneFromSnapshot } from "./ProjectionRender";
+import { sceneFromSnapshot, drawSheetSnapshotContent, ProjectionCamera } from "./ProjectionRender";
 import { doorGeometry } from "./doorGeom";
 import { instanceCornersWorld } from "./library/libraryGeometry";
 
