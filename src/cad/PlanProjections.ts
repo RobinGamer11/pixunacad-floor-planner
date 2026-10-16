@@ -349,6 +349,21 @@ export function drawProjection(
     y: offY + y * itemScalePxPerSheetM,
   });
 
+  // Vollständiger Inhalt über den echten Renderer (Wände, Türen, Treppen,
+  // Freihand, Tabellen, Textfelder, Dokumente, Bibliothekselemente).
+  if (opts?.snapshot) {
+    try {
+      drawSheetSnapshotContent(
+        ctx,
+        opts.snapshot,
+        new ProjectionCamera(itemScalePxPerSheetM, offX, offY),
+        opts.definitions,
+      );
+    } catch (err) {
+      console.warn("[PlanProjections] Inhalt zeichnen fehlgeschlagen:", err);
+    }
+    ctx.restore();
+  } else
   for (const it of items) {
     if (it.kind === "hatch" && it.points && it.points.length >= 3) {
       const fillAlpha = (it.fillAlphaPct ?? Defaults.hatchFillAlphaPct) / 100;
