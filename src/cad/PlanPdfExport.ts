@@ -111,6 +111,39 @@ function rot(p: { x: number; y: number }, ang: number): { x: number; y: number }
   return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
 }
 
+/** Dezenter Platzhalter für PDF-Seiten-Dokumente (im Offscreen-Durchlauf nicht renderbar). */
+function drawDocumentPlaceholderPdf(
+  page: PDFPage,
+  doc: any,
+  toLocalMm: (sx: number, sy: number) => { x: number; y: number },
+  clip: ClipRect,
+  localToPdf: (lx: number, ly: number) => { x: number; y: number },
+) {
+  const w = (doc.widthM || 0) / 2;
+  const h = (doc.heightM || 0) / 2;
+  const cRot = doc.rotationRad || 0;
+  const cx = doc.position.x + w, cy = doc.position.y + h;
+  const corners = [
+    { x: -w, y: -h }, { x: w, y: -h }, { x: w, y: h }, { x: -w, y: h },
+  ].map(c => {
+    const r = rot(c, cRot);
+    return { x: cx + r.x, y: cy + r.y };
+  });
+  const localPoly = corners.map(p => toLocalMm(p.x, p.y));
+  const clipped = clipPolygon(localPoly, clip);
+  if (clipped.length < 3) return;
+  const path = clipped.map((p, i) => {
+    const q = localToPdf(p.x, p.y);
+    return `${i === 0 ? "M" : "L"}${q.x.toFixed(2)},${q.y.toFixed(2)}`;
+  }).join(" ") + " Z";
+  page.drawSvgPath(path, {
+    color: rgb(0.47, 0.47, 0.47),
+    opacity: 0.18,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 0.3,
+  });
+}
+
 /**
  * Zeichnet eine einzelne Projektion auf die PDF-Seite.
  * Koordinaten-Pipeline:
