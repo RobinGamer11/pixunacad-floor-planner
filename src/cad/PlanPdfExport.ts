@@ -8,7 +8,7 @@
  *  - Geometrisches Clipping (Liang-Barsky für Linien, Sutherland-Hodgman für Polygone)
  *    am Clip-Rechteck im lokalen, rotierten Plan-mm-System
  */
-import { PDFDocument, PDFPage, rgb } from "pdf-lib";
+import { PDFDocument, PDFPage, rgb, degrees } from "pdf-lib";
 import type { Plan } from "./PlanManager";
 import { getPlanPaperSize, type SpreadRect } from "./PlanManager";
 import {
@@ -16,6 +16,7 @@ import {
   computeProjectionLayout,
   type ProjectionItem,
 } from "./PlanProjections";
+import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "./ProjectionRender";
 import { Defaults } from "./constants";
 
 import { MM_TO_PT } from "@/lib/scale";
