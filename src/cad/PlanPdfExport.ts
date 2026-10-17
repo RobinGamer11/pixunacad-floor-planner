@@ -331,6 +331,8 @@ export async function exportPlansToPdf(
   renderAnnotationPng?: (plan: Plan, widthMm: number, heightMm: number) => Promise<Uint8Array | null>,
   /** Optional: Verbund einer Seite (Schlüssel + Seitenrechtecke in mm). */
   spreadOf?: (plan: Plan) => { key: string; rects: SpreadRect[] } | null,
+  /** Optional: projektweite Bibliotheksdefinitionen (für Ausschnitt-Inhalt). */
+  definitions?: any[],
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle("PixunaCAD Druckpläne");
