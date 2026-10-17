@@ -245,8 +245,6 @@ async function drawProjectionToPdf(
   }
 
   for (const it of items) {
-
-  for (const it of items) {
     if (it.kind === "segment" && it.a && it.b) {
       const a = toLocalMm(it.a.x, it.a.y);
       const b = toLocalMm(it.b.x, it.b.y);
