@@ -119,8 +119,14 @@ function rot(p: { x: number; y: number }, ang: number): { x: number; y: number }
  *   → Rotation (rotation)
  *   → Translation: paperCenterMm + (proj.x, proj.y)  [wobei proj.x/y bereits mm sind, vom Papier-Center weg]
  *   → mm → pt; PDF-Y ist nach OBEN, daher Y invertieren (paperHeightPt - y)
+ *
+ * Mit `content.snapshot` wird der volle Inhalt (Wände, Türen, Treppen, Freihand,
+ * Tabellen, Textfelder, Dokumente, Bibliothekselemente) einmalig über den echten
+ * Renderer gerastert und als PNG eingebettet — gedruckt mit bis zu 300 dpi.
+ * Ohne Snapshot läuft die vereinfachte Vektor-Pipeline (Fallback).
  */
-function drawProjectionToPdf(
+async function drawProjectionToPdf(
+  pdf: PDFDocument,
   page: PDFPage,
   paperWidthMm: number,
   paperHeightMm: number,
@@ -128,6 +134,7 @@ function drawProjectionToPdf(
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: ClipRect },
   /** Lage der Seite auf der PDF-Seite (Verbund): Versatz oben links und Gesamthöhe in mm. */
   place: { offXMm: number; offYMm: number; pageHeightMm: number } = { offXMm: 0, offYMm: 0, pageHeightMm: paperHeightMm },
+  content?: { snapshot?: any; definitions?: any[]; docImages?: Map<string, HTMLImageElement> },
 ) {
   const layout = computeProjectionLayout(items, proj);
   const factor = layout.factor; // sheet-m → plan-m
@@ -155,6 +162,56 @@ function drawProjectionToPdf(
     const mmY = place.offYMm + paperCenterMmY + proj.y + rotated.y;
     return { x: mmX * MM_TO_PT, y: (place.pageHeightMm - mmY) * MM_TO_PT };
   };
+
+  // ---------- Vollständiger Inhalt: einmalig rastern, als PNG einbetten ----------
+  if (content?.snapshot) {
+    const clipW = clip.right - clip.left;
+    const clipH = clip.bottom - clip.top;
+    if (clipW > 0 && clipH > 0) {
+      const DPI_PX_PER_MM = 300 / 25.4;
+      const MAX_DIM_PX = 4096;
+      const pxPerMm = Math.min(DPI_PX_PER_MM, MAX_DIM_PX / Math.max(clipW, clipH));
+      const pxPerSheetM = factor * 1000 * pxPerMm;
+      const cam = new ProjectionCamera(
+        pxPerSheetM,
+        (offMmX - clip.left) * pxPerMm,
+        (offMmY - clip.top) * pxPerMm,
+      );
+      const canvas = renderProjectionCanvas(
+        content.snapshot, content.definitions, cam,
+        clipW * pxPerMm, clipH * pxPerMm, content.docImages,
+      );
+      if (canvas) {
+        try {
+          // Anker = Ecke unten-links des Clip-Rechtecks im lokalen mm-System;
+          // das Bild wird um dieselbe Rotation gedreht, die auch die Vektor-
+          // Pipeline auf lokale Punkte anwendet (Vorzeichen: PDF-Y zeigt nach oben).
+          const anchorMm = rot({ x: clip.left, y: clip.bottom }, rotation);
+          const mmX = place.offXMm + paperCenterMmX + proj.x + anchorMm.x;
+          const mmY = place.offYMm + paperCenterMmY + proj.y + anchorMm.y;
+          const img = await pdf.embedPng(canvas.toDataURL("image/png"));
+          page.drawImage(img, {
+            x: mmX * MM_TO_PT,
+            y: (place.pageHeightMm - mmY) * MM_TO_PT,
+            width: clipW * MM_TO_PT,
+            height: clipH * MM_TO_PT,
+            rotate: degrees(-rotation * 180 / Math.PI),
+          });
+          // PDF-Seiten-Dokumente (pdf.js) sind im Offscreen-Durchlauf nicht
+          // verfügbar — dafür bleibt ein dezenter Platzhalter.
+          for (const d of (content.snapshot.documents || []) as any[]) {
+            if (!d || !d.pdfSourceB64 || (d as any)._snapOnly) continue;
+            drawDocumentPlaceholderPdf(page, d, toLocalMm, clip, localToPdf);
+          }
+          return;
+        } catch (err) {
+          console.warn("[PlanPdfExport] Raster-Projektion fehlgeschlagen, Vektor-Fallback:", err);
+        }
+      }
+    }
+  }
+
+  for (const it of items) {
 
   for (const it of items) {
     if (it.kind === "segment" && it.a && it.b) {
