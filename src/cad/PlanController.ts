@@ -289,7 +289,10 @@ export class PlanController {
       const items = this.getItems(proj);
       const isSel = proj.id === this.selectedProjectionId;
       const isHov = proj.id === this.hoverProjectionId && !isSel;
-      drawProjection(ctx, this.app.camera, items, proj, isSel, isHov);
+      drawProjection(ctx, this.app.camera, items, proj, isSel, isHov, {
+        snapshot: this.getSnapshot(real),
+        definitions: (this.app as any).libraryDefinitions,
+      });
       if (this.isSourceMissing(real)) {
         const sc = this.app.camera.worldToScreen(proj.x / 1000, proj.y / 1000);
         ctx.save();

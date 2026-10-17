@@ -4502,6 +4502,7 @@ export class CadApp {
       const bytes = await exportPlansToPdf(
         sel, resolveSheet, (p, w, h) => this._renderPlanAnnotationPng(p, w, h),
         (p) => p.spreadId ? { key: p.spreadId, rects: this.planManager.spreadRects(p.spreadId) } : null,
+        this.libraryDefinitions,
       );
 
       const ts = new Date();

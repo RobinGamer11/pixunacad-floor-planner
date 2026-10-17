@@ -8,7 +8,7 @@
  *  - Geometrisches Clipping (Liang-Barsky für Linien, Sutherland-Hodgman für Polygone)
  *    am Clip-Rechteck im lokalen, rotierten Plan-mm-System
  */
-import { PDFDocument, PDFPage, rgb } from "pdf-lib";
+import { PDFDocument, PDFPage, rgb, degrees } from "pdf-lib";
 import type { Plan } from "./PlanManager";
 import { getPlanPaperSize, type SpreadRect } from "./PlanManager";
 import {
@@ -16,6 +16,7 @@ import {
   computeProjectionLayout,
   type ProjectionItem,
 } from "./PlanProjections";
+import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "./ProjectionRender";
 import { Defaults } from "./constants";
 
 import { MM_TO_PT } from "@/lib/scale";
@@ -110,6 +111,39 @@ function rot(p: { x: number; y: number }, ang: number): { x: number; y: number }
   return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
 }
 
+/** Dezenter Platzhalter für PDF-Seiten-Dokumente (im Offscreen-Durchlauf nicht renderbar). */
+function drawDocumentPlaceholderPdf(
+  page: PDFPage,
+  doc: any,
+  toLocalMm: (sx: number, sy: number) => { x: number; y: number },
+  clip: ClipRect,
+  localToPdf: (lx: number, ly: number) => { x: number; y: number },
+) {
+  const w = (doc.widthM || 0) / 2;
+  const h = (doc.heightM || 0) / 2;
+  const cRot = doc.rotationRad || 0;
+  const cx = doc.position.x + w, cy = doc.position.y + h;
+  const corners = [
+    { x: -w, y: -h }, { x: w, y: -h }, { x: w, y: h }, { x: -w, y: h },
+  ].map(c => {
+    const r = rot(c, cRot);
+    return { x: cx + r.x, y: cy + r.y };
+  });
+  const localPoly = corners.map(p => toLocalMm(p.x, p.y));
+  const clipped = clipPolygon(localPoly, clip);
+  if (clipped.length < 3) return;
+  const path = clipped.map((p, i) => {
+    const q = localToPdf(p.x, p.y);
+    return `${i === 0 ? "M" : "L"}${q.x.toFixed(2)},${q.y.toFixed(2)}`;
+  }).join(" ") + " Z";
+  page.drawSvgPath(path, {
+    color: rgb(0.47, 0.47, 0.47),
+    opacity: 0.18,
+    borderColor: rgb(0, 0, 0),
+    borderWidth: 0.3,
+  });
+}
+
 /**
  * Zeichnet eine einzelne Projektion auf die PDF-Seite.
  * Koordinaten-Pipeline:
@@ -118,8 +152,14 @@ function rot(p: { x: number; y: number }, ang: number): { x: number; y: number }
  *   → Rotation (rotation)
  *   → Translation: paperCenterMm + (proj.x, proj.y)  [wobei proj.x/y bereits mm sind, vom Papier-Center weg]
  *   → mm → pt; PDF-Y ist nach OBEN, daher Y invertieren (paperHeightPt - y)
+ *
+ * Mit `content.snapshot` wird der volle Inhalt (Wände, Türen, Treppen, Freihand,
+ * Tabellen, Textfelder, Dokumente, Bibliothekselemente) einmalig über den echten
+ * Renderer gerastert und als PNG eingebettet — gedruckt mit bis zu 300 dpi.
+ * Ohne Snapshot läuft die vereinfachte Vektor-Pipeline (Fallback).
  */
-function drawProjectionToPdf(
+async function drawProjectionToPdf(
+  pdf: PDFDocument,
   page: PDFPage,
   paperWidthMm: number,
   paperHeightMm: number,
@@ -127,6 +167,7 @@ function drawProjectionToPdf(
   proj: { x: number; y: number; rotation: number; scaleDen?: number; scale?: number; clip: ClipRect },
   /** Lage der Seite auf der PDF-Seite (Verbund): Versatz oben links und Gesamthöhe in mm. */
   place: { offXMm: number; offYMm: number; pageHeightMm: number } = { offXMm: 0, offYMm: 0, pageHeightMm: paperHeightMm },
+  content?: { snapshot?: any; definitions?: any[]; docImages?: Map<string, HTMLImageElement> },
 ) {
   const layout = computeProjectionLayout(items, proj);
   const factor = layout.factor; // sheet-m → plan-m
@@ -154,6 +195,54 @@ function drawProjectionToPdf(
     const mmY = place.offYMm + paperCenterMmY + proj.y + rotated.y;
     return { x: mmX * MM_TO_PT, y: (place.pageHeightMm - mmY) * MM_TO_PT };
   };
+
+  // ---------- Vollständiger Inhalt: einmalig rastern, als PNG einbetten ----------
+  if (content?.snapshot) {
+    const clipW = clip.right - clip.left;
+    const clipH = clip.bottom - clip.top;
+    if (clipW > 0 && clipH > 0) {
+      const DPI_PX_PER_MM = 300 / 25.4;
+      const MAX_DIM_PX = 4096;
+      const pxPerMm = Math.min(DPI_PX_PER_MM, MAX_DIM_PX / Math.max(clipW, clipH));
+      const pxPerSheetM = factor * 1000 * pxPerMm;
+      const cam = new ProjectionCamera(
+        pxPerSheetM,
+        (offMmX - clip.left) * pxPerMm,
+        (offMmY - clip.top) * pxPerMm,
+      );
+      const canvas = renderProjectionCanvas(
+        content.snapshot, content.definitions, cam,
+        clipW * pxPerMm, clipH * pxPerMm, content.docImages,
+      );
+      if (canvas) {
+        try {
+          // Anker = Ecke unten-links des Clip-Rechtecks im lokalen mm-System;
+          // das Bild wird um dieselbe Rotation gedreht, die auch die Vektor-
+          // Pipeline auf lokale Punkte anwendet (Vorzeichen: PDF-Y zeigt nach oben).
+          const anchorMm = rot({ x: clip.left, y: clip.bottom }, rotation);
+          const mmX = place.offXMm + paperCenterMmX + proj.x + anchorMm.x;
+          const mmY = place.offYMm + paperCenterMmY + proj.y + anchorMm.y;
+          const img = await pdf.embedPng(canvas.toDataURL("image/png"));
+          page.drawImage(img, {
+            x: mmX * MM_TO_PT,
+            y: (place.pageHeightMm - mmY) * MM_TO_PT,
+            width: clipW * MM_TO_PT,
+            height: clipH * MM_TO_PT,
+            rotate: degrees(-rotation * 180 / Math.PI),
+          });
+          // PDF-Seiten-Dokumente (pdf.js) sind im Offscreen-Durchlauf nicht
+          // verfügbar — dafür bleibt ein dezenter Platzhalter.
+          for (const d of (content.snapshot.documents || []) as any[]) {
+            if (!d || !d.pdfSourceB64 || (d as any)._snapOnly) continue;
+            drawDocumentPlaceholderPdf(page, d, toLocalMm, clip, localToPdf);
+          }
+          return;
+        } catch (err) {
+          console.warn("[PlanPdfExport] Raster-Projektion fehlgeschlagen, Vektor-Fallback:", err);
+        }
+      }
+    }
+  }
 
   for (const it of items) {
     if (it.kind === "segment" && it.a && it.b) {
@@ -240,6 +329,8 @@ export async function exportPlansToPdf(
   renderAnnotationPng?: (plan: Plan, widthMm: number, heightMm: number) => Promise<Uint8Array | null>,
   /** Optional: Verbund einer Seite (Schlüssel + Seitenrechtecke in mm). */
   spreadOf?: (plan: Plan) => { key: string; rects: SpreadRect[] } | null,
+  /** Optional: projektweite Bibliotheksdefinitionen (für Ausschnitt-Inhalt). */
+  definitions?: any[],
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   pdf.setTitle("PixunaCAD Druckpläne");
@@ -264,6 +355,24 @@ export async function exportPlansToPdf(
     }
   }
 
+  // Dokumentbilder aller Projektionen vorab dekodieren (einmaliger Rasterdurchlauf).
+  const docImages = new Map<string, HTMLImageElement>();
+  try {
+    const snaps = new Set<any>();
+    for (const group of groups) {
+      for (const plan of group.members) {
+        for (const proj of plan.projections) {
+          const snap = proj.sceneSnapshot ?? resolveSheetSnapshot(proj.sourceSheetId);
+          if (snap) snaps.add(snap);
+        }
+      }
+    }
+    for (const s of snaps) {
+      const m = await preloadSnapshotDocImages(s);
+      m.forEach((v, k) => docImages.set(k, v));
+    }
+  } catch { /* Bilder fehlen → Projektion erscheint ohne sie */ }
+
   for (const group of groups) {
     const pageW = Math.max(...group.rects.map(r => r.x + r.width));
     const pageH = Math.max(...group.rects.map(r => r.y + r.height));
@@ -285,11 +394,15 @@ export async function exportPlansToPdf(
       for (const proj of plan.projections) {
         const snap = proj.sceneSnapshot ?? resolveSheetSnapshot(proj.sourceSheetId);
         if (!snap) continue;
-        const items = flattenSheetSnapshot(snap);
+        const items = flattenSheetSnapshot(snap, definitions);
         if (items.length === 0) continue;
         const pj = { x: proj.x, y: proj.y, rotation: proj.rotation, scale: proj.scale, clip: proj.clip };
         try {
-          drawProjectionToPdf(page, size.width, size.height, items, pj, place);
+          await drawProjectionToPdf(pdf, page, size.width, size.height, items, pj, place, {
+            snapshot: snap,
+            definitions,
+            docImages,
+          });
         } catch (err) {
           console.warn("[PlanPdfExport] Projektion fehlgeschlagen:", proj.id, err);
         }
