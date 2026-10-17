@@ -396,11 +396,15 @@ export async function exportPlansToPdf(
       for (const proj of plan.projections) {
         const snap = proj.sceneSnapshot ?? resolveSheetSnapshot(proj.sourceSheetId);
         if (!snap) continue;
-        const items = flattenSheetSnapshot(snap);
+        const items = flattenSheetSnapshot(snap, definitions);
         if (items.length === 0) continue;
         const pj = { x: proj.x, y: proj.y, rotation: proj.rotation, scale: proj.scale, clip: proj.clip };
         try {
-          drawProjectionToPdf(page, size.width, size.height, items, pj, place);
+          await drawProjectionToPdf(pdf, page, size.width, size.height, items, pj, place, {
+            snapshot: snap,
+            definitions,
+            docImages,
+          });
         } catch (err) {
           console.warn("[PlanPdfExport] Projektion fehlgeschlagen:", proj.id, err);
         }
