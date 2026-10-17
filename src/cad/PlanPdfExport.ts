@@ -357,6 +357,24 @@ export async function exportPlansToPdf(
     }
   }
 
+  // Dokumentbilder aller Projektionen vorab dekodieren (einmaliger Rasterdurchlauf).
+  const docImages = new Map<string, HTMLImageElement>();
+  try {
+    const snaps = new Set<any>();
+    for (const group of groups) {
+      for (const plan of group.members) {
+        for (const proj of plan.projections) {
+          const snap = proj.sceneSnapshot ?? resolveSheetSnapshot(proj.sourceSheetId);
+          if (snap) snaps.add(snap);
+        }
+      }
+    }
+    for (const s of snaps) {
+      const m = await preloadSnapshotDocImages(s);
+      m.forEach((v, k) => docImages.set(k, v));
+    }
+  } catch { /* Bilder fehlen → Projektion erscheint ohne sie */ }
+
   for (const group of groups) {
     const pageW = Math.max(...group.rects.map(r => r.x + r.width));
     const pageH = Math.max(...group.rects.map(r => r.y + r.height));
