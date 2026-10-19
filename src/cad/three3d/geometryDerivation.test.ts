@@ -49,8 +49,9 @@ describe("3D-Ableitung", () => {
   it("Blätter ohne 3D-Teilnahme werden ausgelassen", () => {
     const s = new Scene();
     s.createHatch([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }]);
-    expect(deriveProject3D([sheet({ participatesIn3D: false })], () => s)).toHaveLength(0);
-    expect(deriveProject3D([sheet()], () => s)).toHaveLength(1);
+    expect(deriveProject3D([sheet()], () => s)).toHaveLength(0);
+    expect(deriveProject3D([sheet()], () => s, { activeSheetId: sheet().id })).toHaveLength(1);
+    expect(deriveProject3D([sheet({ participatesIn3D: true })], () => s)).toHaveLength(1);
   });
 });
 
