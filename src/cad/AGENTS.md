@@ -18,3 +18,6 @@
 ## 3D
 - 3D-Körper leitet nur `src/cad/three3d/geometryDerivation.ts` aus bestehenden Szene-Objekten ab – flüchtig, nie gespeichert; 2D bleibt führend.
 - Welthöhe = `sheetElevationM` (Blatt) + `objectElevationM` (Objekt, über `objectMeta.ts` serialisiert); `heightM` bleibt Körper-/Maßhöhe, kein zweites Höhenfeld.
+- 3D-Ansicht (`/project/:id/3d`) ist ein Overlay über derselben `CadApp`; Lesen/Ändern nur über `three3d/projectBridge.ts` (Änderungen via `runAction`) – keine zweite CAD-Instanz.
+- 3D-Blattzusammenstellung: aktives Blatt immer, weitere nur mit `participatesIn3D === true` (verhindert ungefragte Überlagerung von Varianten).
+- Körperbeziehungen liegen als `relations3D` (Ziel = Blatt + Objekt-ID, Fläche = top/bottom + keep) am Quellobjekt über `objectMeta.ts`; ausgewertet nur flüchtig in `three3d/relations.ts`, Kopien übernehmen sie nicht.
