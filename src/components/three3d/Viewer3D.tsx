@@ -308,7 +308,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       g.visible = visible && opacity > 0.001;
       const mats = Array.isArray(g.material) ? g.material : [g.material];
       for (const m of mats) { m.transparent = true; m.opacity = Math.max(0, Math.min(1, opacity)); m.depthWrite = opacity >= 0.99; m.needsUpdate = true; }
-      st.current.gridOn = visible;
+      st.current.gridOn = g.visible;
     },
     move: (dir, on) => { const h: Set<string> | undefined = st.current.held; if (!h) return; on ? h.add(dir) : h.delete(dir); },
   }));
