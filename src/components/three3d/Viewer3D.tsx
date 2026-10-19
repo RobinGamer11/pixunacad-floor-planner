@@ -8,7 +8,15 @@ import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
 import * as THREE from "three";
 import type { Derived3D } from "@/cad/three3d/geometryDerivation";
 
-export interface Viewer3DHandle { fitAll(): void; move(dir: "f" | "b" | "l" | "r" | "u" | "d", on: boolean): void }
+export interface CameraState { tx: number; ty: number; tz: number; r: number; theta: number; phi: number }
+export interface Viewer3DHandle {
+  fitAll(): void;
+  move(dir: "f" | "b" | "l" | "r" | "u" | "d", on: boolean): void;
+  getCamera(): CameraState | null;
+  setCamera(c: CameraState): void;
+  /** Aktuelles Bild ohne Raster/UI; projiziert Weltpunkte (x, Höhe z, y) auf Bildpixel. */
+  capture(points: { id: string; x: number; y: number; z: number }[]): { png: string; w: number; h: number; badges: { id: string; x: number; y: number }[] } | null;
+}
 interface Props {
   items: Derived3D[];
   selectedKey: string | null;
@@ -194,6 +202,20 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
 
   useImperativeHandle(ref, () => ({
     fitAll: fit,
+    getCamera: () => { const o = st.current.orbit; return o ? { tx: o.target.x, ty: o.target.y, tz: o.target.z, r: o.r, theta: o.theta, phi: o.phi } : null; },
+    setCamera: (c) => { const o = st.current.orbit; if (!o) return; o.target.set(c.tx, c.ty, c.tz); o.r = c.r; o.theta = c.theta; o.phi = c.phi; st.current.apply(); st.current.fitted = true; },
+    capture: (points) => {
+      const { renderer, scene, camera, grid } = st.current; if (!renderer) return null;
+      grid.visible = false; renderer.render(scene, camera);
+      const png = renderer.domElement.toDataURL("image/png");
+      grid.visible = true;
+      const w = renderer.domElement.width, h = renderer.domElement.height;
+      const badges = points.map(p => {
+        const v = new THREE.Vector3(p.x, p.z, p.y).project(camera);
+        return { id: p.id, x: (v.x + 1) / 2 * w, y: (1 - v.y) / 2 * h, vis: v.z < 1 };
+      }).filter(b => b.vis).map(({ id, x, y }) => ({ id, x, y }));
+      return { png, w, h, badges };
+    },
     move: (dir, on) => { const h: Set<string> | undefined = st.current.held; if (!h) return; on ? h.add(dir) : h.delete(dir); },
   }));
 

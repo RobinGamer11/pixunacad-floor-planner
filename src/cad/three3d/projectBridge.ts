@@ -7,6 +7,9 @@ import type { CadApp } from "../CadApp";
 import { SelectionType } from "../constants";
 import { snapshotsBounds } from "../library/libraryGeometry";
 import { deriveProject3D, type Derived3D } from "./geometryDerivation";
+import { objectDisplayName } from "../objectMeta";
+import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "../ProjectionRender";
+import type { DossierInput, DossierObject } from "./dossier";
 import { applyRelations3D, objKey, wouldCreateCycle, type Relation3D, type RelationIssue, type RelationSource } from "./relations";
 
 export const OBJECT_LISTS = ["walls", "hatches", "stairs", "documents", "textBoxes", "tables", "libraryInstances", "segments", "dimensions", "freeStrokes"] as const;
@@ -102,4 +105,51 @@ export function objectLabel(app: CadApp, sheetId: string, id: string): string {
   const sheet = app.sheetManager.getById(sheetId);
   const name = hit?.obj?.objName || hit?.obj?.objCode || hit?.list || "Objekt";
   return `${name}${hit?.obj?.objCode && hit.obj.objName ? ` (${hit.obj.objCode})` : ""} · ${sheet?.name ?? "Blatt"}`;
+}
+
+const KIND: Record<string, string> = { walls: "wall", hatches: "hatch", stairs: "stair", documents: "document", textBoxes: "textbox", tables: "table", libraryInstances: "library", segments: "segment", dimensions: "dimension", freeStrokes: "freeStroke" };
+
+/** Objektangaben für das Render-Dossier. */
+export function dossierInfo(app: CadApp, key: string): DossierInput | null {
+  const [sheetId, id] = key.split("::");
+  const hit = findObject(app, sheetId, id);
+  if (!hit) return null;
+  const kind = KIND[hit.list] || hit.list;
+  return {
+    key, kind,
+    sheetName: app.sheetManager.getById(sheetId)?.name ?? "Blatt",
+    name: objectDisplayName(kind, hit.obj),
+    objCode: hit.obj.objCode || null,
+    description: hit.obj.objDesc || "",
+    attachments: hit.obj.objAttachments || [],
+  };
+}
+
+/** 2D-Draufsicht der beteiligten Blätter mit Kennungs-Positionen (für das Dossier). */
+export async function render2DView(app: CadApp, objects: DossierObject[]): Promise<{ png: string; w: number; h: number; badges: { id: string; x: number; y: number }[] } | null> {
+  const sheetIds = [...new Set(objects.map(o => o.sheetId))];
+  if (!sheetIds.length) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const o of objects) {
+    minX = Math.min(minX, o.center.x - o.sizeM.x / 2); maxX = Math.max(maxX, o.center.x + o.sizeM.x / 2);
+    minY = Math.min(minY, o.center.y - o.sizeM.y / 2); maxY = Math.max(maxY, o.center.y + o.sizeM.y / 2);
+  }
+  const pad = Math.max(0.5, (maxX - minX + maxY - minY) * 0.04);
+  minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+  const MAX = 3000;
+  const scale = MAX / Math.max(maxX - minX, maxY - minY, 0.01);
+  const w = Math.ceil((maxX - minX) * scale), h = Math.ceil((maxY - minY) * scale);
+  const cam = new ProjectionCamera(scale, -minX * scale, -minY * scale);
+  const out = document.createElement("canvas"); out.width = w; out.height = h;
+  const ctx = out.getContext("2d"); if (!ctx) return null;
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+  for (const sid of sheetIds) {
+    const snap = app.serializeSheetSnapshot(sid); if (!snap) continue;
+    let imgs: Map<string, HTMLImageElement> | undefined;
+    try { imgs = await preloadSnapshotDocImages(snap); } catch { /* ohne Bilder */ }
+    const c = renderProjectionCanvas(snap, (app as any).libraryDefinitions, cam, w, h, imgs);
+    if (c) ctx.drawImage(c, 0, 0);
+  }
+  const badges = objects.map(o => { const p = cam.worldToScreen(o.center.x, o.center.y); return { id: o.dossierId, x: p.x, y: p.y }; });
+  return { png: out.toDataURL("image/png"), w, h, badges };
 }
