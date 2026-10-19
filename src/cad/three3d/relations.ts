@@ -190,7 +190,7 @@ export function applyRelations3D(items: Derived3D[], sources: RelationSource[]):
         const keep = r.keep === "above" ? "above" : "below";
         const faces = tgt.map(t => facesOf(t, face));
         if (faces.some(f => !f)) { issues.push({ sourceKey: sk, targetKey: tk, message: "Die Zielfläche ist nicht eindeutig bestimmbar – Originalgeometrie bleibt erhalten." }); continue; }
-        let cur = src;
+        let cur: Derived3D[] = src;
         for (const f of faces.flat() as Face[]) {
           cur = cur.flatMap(d => {
             if (d.type !== "prism" && !(d.type === "mesh" && d.closed)) return [d];
