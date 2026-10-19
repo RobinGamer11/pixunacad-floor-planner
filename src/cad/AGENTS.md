@@ -23,3 +23,7 @@
 - Körperbeziehungen liegen als `relations3D` (Ziel = Blatt + Objekt-ID, Fläche = top/bottom + keep) am Quellobjekt über `objectMeta.ts`; ausgewertet nur flüchtig in `three3d/relations.ts`, Kopien übernehmen sie nicht.
 - Render-Dossier: Kennungen (D001 …) vergibt nur `three3d/dossier.ts` je Blatt+Objekt; Bildvorgaben liegen in `project.settings.renderPresets`.
 - 3D-Platteninhalte (Dokumente/Texte/Tabellen) zeichnet nur `three3d/planeTextures.ts` über den normalen CAD-Renderer (ein Objekt je Bild, flüchtig); Tiefenversatz statt Höhenverschiebung gegen Flackern.
+- Schraffurneigung = `tilt3D` (Bezugskante + Winkel) über `objectMeta.ts`; Achse/Kantenauflösung nur in `three3d/tiltGeometry.ts` – 2D-Punkte bleiben unverändert, verlorene Kante wird gemeldet statt ersetzt.
+- Geneigte/verschnittene Körper sind `Mesh3D`; echte Volumen-Verschneidung nur über `three3d/solidMesh.ts` (three-bvh-csg), senkrechte Prismen weiter exakt über polygon-clipping.
+- 3D-Wände nutzen den geheilten 2D-Wandring (`deriveWalls`); Überlappungen angrenzender Wände nur im gemeinsamen Höhenbereich abziehen, jede Wand bleibt eigener Körper.
+- Tür-/Fensterlage in 3D = Brüstung (`breakHeightM`) über Wandunterkante – kein eigenes Höhenfeld; 3D-Einstellungen nur über `components/cad/Object3DSettings.tsx`.
