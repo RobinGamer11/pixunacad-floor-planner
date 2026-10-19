@@ -2,6 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent, screen, act } from "@testing-library/react";
 import { Object3DSettings, snapTiltAngle } from "./Object3DSettings";
 
+// jsdom kennt keine PointerEvents – minimal nachbilden (Maus-Koordinaten + pointerId).
+if (typeof (globalThis as any).PointerEvent === "undefined") {
+  (globalThis as any).PointerEvent = class extends MouseEvent {
+    pointerId: number;
+    constructor(type: string, init: any = {}) { super(type, init); this.pointerId = init.pointerId ?? 1; }
+  };
+}
+
 const sq = (x0: number, y0: number, x1: number, y1: number) => [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
 
 function fakeApp(obj: any) {
