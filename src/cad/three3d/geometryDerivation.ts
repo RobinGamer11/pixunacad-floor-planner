@@ -106,42 +106,95 @@ function rect(center: Vec2, w: number, h: number, rot: number): Vec2[] {
   }));
 }
 
-/** Wand mit echten Durchbrüchen für Türen/Fenster. */
-export function deriveWall(wall: any, doors: any[], sheetId: string, base: number): Prism3D[] {
-  const h = Math.max(0, Number(wall.heightM) || 0);
-  if (h <= EPS || !wall.corners || wall.corners.length < 2) return [];
-  const z0 = base + objectElevationM(wall);
-  const color = wall.fillColor || "#d9d4c7";
-  const mk = (fp: Vec2[], a: number, b: number): Prism3D => ({
-    type: "prism", source: "wall", sourceId: wall.id, sheetId, footprint: fp, holes: [],
-    z0: z0 + a, z1: z0 + b, color,
-  });
-  const own = doors.filter(d => d && d.wallId === wall.id);
-  if (!own.length) {
-    const ring = buildWallSolidRing(wall);
-    return ring.length >= 3 ? [mk(ring, 0, h)] : [];
-  }
+/** Räumliche Körperhöhe eines Bibliothekselements (nie die 2D-Größe). */
+export function libraryBodyHeightM(li: any, fallback = 1): number {
+  const v = li?.bodyHeightM;
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  return Number.isFinite(li?.heightM) && li.heightM > 0 ? li.heightM : fallback;
+}
+
+/** Öffnungen einer Wand: Unterkante = Brüstung über Wandunterkante, Oberkante = Brüstung + Öffnungshöhe. */
+export function wallOpenings(wall: any, doors: any[]) {
   const { total } = wallReferenceLengths(wall);
-  const half = wall.thicknessM / 2;
-  const openings = own
+  return doors.filter(d => d && d.wallId === wall.id)
     .map(d => ({
       from: Math.max(0, d.posM - d.widthM / 2),
       to: Math.min(total, d.posM + d.widthM / 2),
       sill: Math.max(0, Number(d.breakHeightM) || 0),
       top: Math.max(0, Number(d.breakHeightM) || 0) + Math.max(0, Number(d.heightM) || 0),
     }))
-    .filter(o => o.to - o.from > EPS)
+    .filter(o => o.to - o.from > EPS && o.top - o.sill > EPS)
     .sort((a, b) => a.from - b.from);
-  const out: Prism3D[] = [];
-  let s = 0;
-  for (const o of openings) {
-    if (o.from > s + EPS) out.push(mk(wallBandPolygon(wall, s, o.from, half), 0, h));
-    const band = wallBandPolygon(wall, Math.max(s, o.from), o.to, half);
-    if (o.sill > EPS) out.push(mk(band, 0, Math.min(o.sill, h)));
-    if (o.top < h - EPS) out.push(mk(band, o.top, h));
-    s = Math.max(s, o.to);
+}
+
+const polyArea = (r: Vec2[]) => { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p.x * q.y - q.x * p.y; } return Math.abs(a / 2); };
+
+/**
+ * Wand mit echten Durchbrüchen für Türen/Fenster. Mit `others` wird der
+ * geheilte Wandring wie im 2D verwendet (Gehrungen, L-/T-Anschlüsse, Kreuzungen);
+ * Öffnungen werden danach aus diesem Körper geschnitten und zerstören die
+ * Anschlüsse nicht.
+ */
+export function deriveWall(wall: any, doors: any[], sheetId: string, base: number, others?: any[], graph?: any): Prism3D[] {
+  const h = Math.max(0, Number(wall.heightM) || 0);
+  if (h <= EPS || !wall.corners || wall.corners.length < 2) return [];
+  const z0 = base + objectElevationM(wall);
+  const color = wall.fillColor || "#d9d4c7";
+  let ring: Vec2[] = [];
+  if (others) { try { ring = buildHealedWallSolidRing(wall, others, graph); } catch { ring = []; } }
+  if (ring.length < 3) ring = buildWallSolidRing(wall);
+  if (ring.length < 3) return [];
+  const full: Prism3D = { type: "prism", source: "wall", sourceId: wall.id, sheetId, footprint: ring, holes: [], z0, z1: z0 + h, color };
+  const openings = wallOpenings(wall, doors);
+  if (!openings.length) return [full];
+  const across = Math.max(0, Number(wall.thicknessM) || 0) + 0.05;
+  const cutters: Prism3D[] = openings
+    .filter(o => o.sill < h - EPS)
+    .map(o => ({ ...full, footprint: wallBandPolygon(wall, o.from, o.to, across), z0: z0 + o.sill, z1: z0 + Math.min(o.top, h) }));
+  try { return subtractPrism(full, cutters).filter(p => polyArea(p.footprint) > 1e-9); }
+  catch { return [full]; }
+}
+
+function distPointSeg(p: Vec2, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+  const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Zwei Wände schließen aneinander an (Endpunkt der einen auf der Achse der anderen). */
+export function wallsConnected(a: any, b: any): boolean {
+  const ca: Vec2[] = a.corners || [], cb: Vec2[] = b.corners || [];
+  if (ca.length < 2 || cb.length < 2) return false;
+  const tol = Math.max(Number(a.thicknessM) || 0, Number(b.thicknessM) || 0) * 0.75 + 1e-3;
+  const touches = (ends: Vec2[], line: Vec2[]) => ends.some(p => line.some((q, i) => i > 0 && distPointSeg(p, line[i - 1], q) <= tol));
+  return touches([ca[0], ca[ca.length - 1]], cb) || touches([cb[0], cb[cb.length - 1]], ca);
+}
+
+/**
+ * Alle Wände eines Blattes mit automatischen Anschlüssen. Überlappende
+ * Anschlussbereiche angrenzender Wände werden nur im tatsächlich gemeinsamen
+ * Höhenbereich bereinigt; jede Wand bleibt ein eigener, auswählbarer Körper.
+ */
+export function deriveWalls(scene: any, doors: any[], sheetId: string, base: number, vis: (o: any) => boolean = () => true): Map<any, Prism3D[]> {
+  const all: any[] = scene?.walls || [];
+  let graph: any;
+  try { graph = scene?.getWallTopology?.(); } catch { graph = undefined; }
+  const out = new Map<any, Prism3D[]>();
+  const done: any[] = [];
+  for (const w of all) {
+    if (!vis(w)) continue;
+    let parts = deriveWall(w, doors, sheetId, base, all, graph);
+    for (const prev of done) {
+      if (!parts.length) break;
+      if (!wallsConnected(prev, w)) continue;
+      const cutters = out.get(prev) || [];
+      if (!cutters.length) continue;
+      try { parts = parts.flatMap(p => subtractPrism(p, cutters)).filter(p => polyArea(p.footprint) > 1e-8); }
+      catch { /* Bereinigung fehlgeschlagen – Wandkörper bleibt vollständig */ }
+    }
+    out.set(w, parts);
+    done.push(w);
   }
-  if (total > s + EPS) out.push(mk(wallBandPolygon(wall, s, total, half), 0, h));
   return out;
 }
 

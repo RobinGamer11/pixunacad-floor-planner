@@ -57,7 +57,7 @@ function solidFootprint(d: Derived3D): { outer: Vec2[]; holes: Vec2[][]; z0: num
 }
 
 /** Zieh das Volumen der Quell-Prismen vom Ziel-Prisma ab. */
-function subtractPrism(t: Prism3D, cutters: Prism3D[]): Prism3D[] {
+export function subtractPrism(t: Prism3D, cutters: Prism3D[]): Prism3D[] {
   let pieces: Prism3D[] = [t];
   for (const c of cutters) {
     const next: Prism3D[] = [];
