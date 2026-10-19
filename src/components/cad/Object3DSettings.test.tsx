@@ -46,14 +46,13 @@ describe("3D-Einstellungen – Neigen", () => {
     fireEvent.pointerDown(hit);
     expect(app.runAction).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("Neigen"));
-    const svg = container.querySelector("svg")!;
+    const svg = container.querySelector('svg[viewBox="0 0 240 150"]')!;
     const angleText = () => Number((svg.querySelector("text")?.textContent || "").split("°")[0].replace(",", "."));
     // erster Kontakt startet ohne Sprung
     ptr(svg, "pointerDown", 100, 100);
     expect(angleText()).toBe(0);
     ptr(svg, "pointerMove", 100, 99.95);
     ptr(svg, "pointerUp", 100, 99.95);
-    console.log("DBG", svg.querySelector("text")?.textContent, svg.outerHTML.length);
     const a1 = angleText();
     expect(Math.abs(a1)).toBeGreaterThan(1);
     // Finger angehoben: nichts gespeichert, Vorschau bleibt
@@ -83,7 +82,7 @@ describe("3D-Einstellungen – Neigen", () => {
     vi.useRealTimers();
     fireEvent.pointerDown(container.querySelector('line[stroke-width="14"]')!);
     fireEvent.click(screen.getByText("Neigen"));
-    const svg = container.querySelector("svg")!;
+    const svg = container.querySelector('svg[viewBox="0 0 240 150"]')!;
     ptr(svg, "pointerDown", 10, 10); ptr(svg, "pointerMove", 10, 9.95); ptr(svg, "pointerUp", 10, 9.95);
     fireEvent.keyDown(window, { key: "Escape" });
     expect(app.runAction).not.toHaveBeenCalled();
