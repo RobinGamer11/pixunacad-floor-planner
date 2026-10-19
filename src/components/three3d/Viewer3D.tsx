@@ -116,7 +116,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         pan(mid.x - lastMid.x, mid.y - lastMid.y);
         lastPinch = d; lastMid = mid;
       } else if (mode === "pan") pan(dx, dy);
-      else if (mode === "look") { look(dx * 0.004, dy * 0.004); return; }
+      else if (mode === "look") { look(dx * 0.004, -dy * 0.004); return; }
       else { orbit.theta += dx * 0.008; orbit.phi -= dy * 0.008; }
       apply();
     };
@@ -169,7 +169,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         orbit.target.addScaledVector(fwd, -sticks.move.y * speed).addScaledVector(right, sticks.move.x * speed);
         apply();
       }
-      if (sticks.look.x || sticks.look.y) look(sticks.look.x * dt * 1.6, sticks.look.y * dt * 1.2);
+      if (sticks.look.x || sticks.look.y) look(sticks.look.x * dt * 1.6, -sticks.look.y * dt * 1.2);
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
