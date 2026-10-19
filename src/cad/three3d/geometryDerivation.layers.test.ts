@@ -25,7 +25,7 @@ describe("3D-Korrekturen", () => {
   });
 
   it("Stapelreihenfolge wird an die 3D-Körper weitergegeben", () => {
-    const sc = { documents: [doc({ stackOrder: 99 })], hatches: [{ id: "h", labelId: "L", points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }] }] };
+    const sc = { documents: [doc({ stackOrder: 5_000_000 })], hatches: [{ id: "h", labelId: "L", points: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }] }] };
     const out = deriveScene3D(sc, sheet) as any[];
     const d = out.find((x) => x.sourceId === "d1"), h = out.find((x) => x.sourceId === "h");
     expect(d.order).toBeGreaterThan(h.order);
