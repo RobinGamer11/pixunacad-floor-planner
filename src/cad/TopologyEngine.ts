@@ -12,6 +12,7 @@ import { computeHealedWallLines } from "./wallHeal";
 import { doorGeometry } from "./doorGeom";
 import { getDimensionGeometry } from "./dimensionGeometry";
 import { collectSceneSnapGeometry } from "./tracingSnapGeometry";
+import { stackKey } from "./stackOrder";
 
 // Wall-Snap nutzt primär wall.corners (Bezugslinie); optional zusätzlich
 // die Sub-Linien-Eckpunkte/-Kanten (gegenüberliegende Wandkante), wenn das
@@ -152,17 +153,21 @@ export class TopologyEngine {
   _segmentsFrontToBack(): Segment[] {
     const order = this.labels.list();
     const rank = new Map(order.map((g, i) => [g.id, i]));
+    const idx = new Map(this.scene.segments.map((s, i) => [s, i]));
     return [...this.scene.segments]
       .filter(s => this.labels.isVisible(s.labelId))
-      .sort((a, b) => (rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0));
+      .sort((a, b) => ((rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0))
+        || (stackKey("segments", b, idx.get(b)!) - stackKey("segments", a, idx.get(a)!)));
   }
 
   _hatchesFrontToBack(): Hatch[] {
     const order = this.labels.list();
     const rank = new Map(order.map((g, i) => [g.id, i]));
+    const idx = new Map(this.scene.hatches.map((h, i) => [h, i]));
     return [...this.scene.hatches]
       .filter(h => this.labels.isVisible(h.labelId))
-      .sort((a, b) => (rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0));
+      .sort((a, b) => ((rank.get(b.labelId) || 0) - (rank.get(a.labelId) || 0))
+        || (stackKey("hatches", b, idx.get(b)!) - stackKey("hatches", a, idx.get(a)!)));
   }
 
   /**

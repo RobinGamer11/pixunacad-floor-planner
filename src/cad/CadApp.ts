@@ -1,4 +1,5 @@
 import { attachObjectMeta } from "./objectMeta";
+import { normalizeStackOrder, resetStackTracking, moveStack, type StackRef } from "./stackOrder";
 import { infoBoxUi } from "@/lib/infoBoxUi";
 import { mergeHatchGeometry } from "./hatchMerge";
 import { emptyFilterState, objectMatchesFilter, type SelectionFilterState } from "./selectionFilter";
@@ -997,6 +998,7 @@ export class CadApp {
    * Objekte nach Undo/Redo wieder auf „Durchgezogen“ zurücksprangen.
    */
   private _restoreOneScene(scene: Scene, data: any) {
+    resetStackTracking(scene);
     restoreOneScene(scene, data);
     if (!data) return;
     // Sticker-Besitzer der Tabellen ergänzen (positionsgleiche Reihenfolge).
@@ -1009,7 +1011,51 @@ export class CadApp {
 
 
   /** Stand für Verlauf/Vergleich. */
-  private _snapHistory(): string { return this._serializeScene(); }
+  private _snapHistory(): string {
+    // Neue Objekte / Ebenenwechsel landen vorne in ihrer Ebene.
+    if (!this._isRestoring) {
+      for (const sc of this.scenesById.values()) normalizeStackOrder(sc);
+      normalizeStackOrder(this.scene);
+    }
+    return this._serializeScene();
+  }
+
+  /** Aktuelle Auswahl als Objekt-Referenzen (Einzel- oder Mehrfachauswahl). */
+  getStackSelectionRefs(): StackRef[] {
+    const multi = ((this.selectTool as any)?.marqueeSelectedIds || []) as StackRef[];
+    if (multi.length) return multi.slice();
+    const out: StackRef[] = [];
+    const sel: any = this.selection;
+    if (sel) {
+      if (sel.segmentId && sel.type !== "point") out.push({ kind: "segment", id: sel.segmentId });
+      else if (sel.hatchId && sel.type !== "point") out.push({ kind: "hatch", id: sel.hatchId });
+      else if (sel.wallId) out.push({ kind: "wall", id: sel.wallId });
+      else if (sel.freeStrokeId) out.push({ kind: "freeStroke", id: sel.freeStrokeId });
+      else if (sel.dimensionId) out.push({ kind: "dimension", id: sel.dimensionId });
+      else if (sel.textBoxId) out.push({ kind: (this.scene as any).getTableById?.(sel.textBoxId) ? "table" : "textbox", id: sel.textBoxId });
+      else if (sel.documentId) out.push({ kind: "document", id: sel.documentId });
+      else if (sel.libraryInstanceId) out.push({ kind: "library", id: sel.libraryInstanceId });
+      else if (sel.stairId) out.push({ kind: "stair", id: sel.stairId });
+      else if (sel.type === "point" && sel.segmentId) out.push({ kind: "segment", id: sel.segmentId });
+      else if (sel.type === "point" && sel.hatchId) out.push({ kind: "hatch", id: sel.hatchId });
+    }
+    const doorId = (this as any).doorTool?.selectedDoorId;
+    if (!out.length && doorId) out.push({ kind: "door", id: doorId });
+    return out;
+  }
+
+  /** Auswahl in den Vorder-/Hintergrund ihrer Ebene. Genau ein Undo-Schritt. */
+  moveSelectionStack(dir: "front" | "back"): boolean {
+    const refs = this.getStackSelectionRefs();
+    if (!refs.length) return false;
+    let changed = false;
+    this.runAction(() => {
+      changed = moveStack(this.scene, refs, dir, (l) => this.labelManager.isEditable(l));
+      if (!changed) throw new Error("__noop__");
+    });
+    if (changed) this.renderer?.render?.();
+    return changed;
+  }
 
   private _serializeScene(): string {
     const scenesObj: Record<string, any> = {};
