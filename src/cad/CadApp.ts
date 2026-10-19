@@ -1014,7 +1014,7 @@ export class CadApp {
   private _snapHistory(): string {
     // Neue Objekte / Ebenenwechsel landen vorne in ihrer Ebene.
     if (!this._isRestoring) {
-      for (const sc of this.scenesById.values()) normalizeStackOrder(sc);
+      for (const sc of this.scenesById?.values?.() ?? []) normalizeStackOrder(sc);
       normalizeStackOrder(this.scene);
     }
     return this._serializeScene();
