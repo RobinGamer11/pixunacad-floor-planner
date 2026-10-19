@@ -14,6 +14,10 @@ export interface Viewer3DHandle {
   move(dir: "f" | "b" | "l" | "r" | "u" | "d", on: boolean): void;
   getCamera(): CameraState | null;
   setCamera(c: CameraState): void;
+  /** Analoge Steuerung (Joysticks): Werte −1…1; move = laufen, look = Blick drehen. */
+  setStick(kind: "move" | "look", x: number, y: number): void;
+  /** Raster ein/aus und Sichtbarkeit (0…1). */
+  setGrid(visible: boolean, opacity: number): void;
   /** Aktuelles Bild ohne Raster/UI; projiziert Weltpunkte (x, Höhe z, y) auf Bildpixel. */
   capture(points: { id: string; x: number; y: number; z: number }[]): { png: string; w: number; h: number; badges: { id: string; x: number; y: number }[] } | null;
 }
@@ -74,19 +78,31 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
 
     // Pointer-Navigation (Maus und Touch)
     const pts = new Map<number, { x: number; y: number }>();
-    let mode: "rot" | "pan" | null = null, downAt = { x: 0, y: 0, t: 0 }, lastPinch = 0, lastMid = { x: 0, y: 0 };
+    let mode: "rot" | "pan" | "look" | null = null, downAt = { x: 0, y: 0, t: 0 }, lastPinch = 0, lastMid = { x: 0, y: 0 };
     const pan = (dx: number, dy: number) => {
       const s = orbit.r * 0.0015;
       const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
       const fwd = new THREE.Vector3(-Math.cos(orbit.theta), 0, -Math.sin(orbit.theta));
       orbit.target.addScaledVector(right, -dx * s).addScaledVector(fwd, dy * s);
     };
+    // Blick drehen: Kamerastandpunkt bleibt, Zielpunkt dreht sich um die Kamera.
+    const look = (dTheta: number, dPhi: number) => {
+      const pos = camera.position.clone();
+      orbit.theta += dTheta; orbit.phi += dPhi;
+      orbit.phi = Math.min(Math.PI - 0.05, Math.max(0.05, orbit.phi));
+      orbit.target.set(
+        pos.x - orbit.r * Math.sin(orbit.phi) * Math.cos(orbit.theta),
+        pos.y - orbit.r * Math.cos(orbit.phi),
+        pos.z - orbit.r * Math.sin(orbit.phi) * Math.sin(orbit.theta));
+      apply();
+    };
+    const sticks = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
     const el = renderer.domElement;
     const onDown = (e: PointerEvent) => {
       el.setPointerCapture(e.pointerId);
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
-      mode = e.button === 2 || e.button === 1 || e.shiftKey ? "pan" : "rot";
+      mode = e.shiftKey ? "look" : e.button === 2 || e.button === 1 ? "pan" : "rot";
       if (pts.size === 2) { const [a, b] = [...pts.values()]; lastPinch = Math.hypot(a.x - b.x, a.y - b.y); lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
     };
     const onMove = (e: PointerEvent) => {
@@ -100,6 +116,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         pan(mid.x - lastMid.x, mid.y - lastMid.y);
         lastPinch = d; lastMid = mid;
       } else if (mode === "pan") pan(dx, dy);
+      else if (mode === "look") { look(dx * 0.004, -dy * 0.004); return; }
       else { orbit.theta += dx * 0.008; orbit.phi -= dy * 0.008; }
       apply();
     };
@@ -145,12 +162,20 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         if (held.has("d")) orbit.target.y -= speed;
         apply();
       }
+      if (sticks.move.x || sticks.move.y) {
+        const speed = Math.max(1.5, orbit.r * 0.6) * dt;
+        const fwd = new THREE.Vector3(-Math.cos(orbit.theta), 0, -Math.sin(orbit.theta));
+        const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+        orbit.target.addScaledVector(fwd, -sticks.move.y * speed).addScaledVector(right, sticks.move.x * speed);
+        apply();
+      }
+      if (sticks.look.x || sticks.look.y) look(sticks.look.x * dt * 1.6, -sticks.look.y * dt * 1.2);
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
 
-    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid };
+    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
       window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true);
@@ -269,13 +294,21 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       const { renderer, scene, camera, grid } = st.current; if (!renderer) return null;
       grid.visible = false; renderer.render(scene, camera);
       const png = renderer.domElement.toDataURL("image/png");
-      grid.visible = true;
+      grid.visible = st.current.gridOn !== false;
       const w = renderer.domElement.width, h = renderer.domElement.height;
       const badges = points.map(p => {
         const v = new THREE.Vector3(p.x, p.z, p.y).project(camera);
         return { id: p.id, x: (v.x + 1) / 2 * w, y: (1 - v.y) / 2 * h, vis: v.z < 1 };
       }).filter(b => b.vis).map(({ id, x, y }) => ({ id, x, y }));
       return { png, w, h, badges };
+    },
+    setStick: (kind, x, y) => { const s = st.current.sticks; if (s) s[kind] = { x, y }; },
+    setGrid: (visible, opacity) => {
+      const g = st.current.grid; if (!g) return;
+      g.visible = visible && opacity > 0.001;
+      const mats = Array.isArray(g.material) ? g.material : [g.material];
+      for (const m of mats) { m.transparent = true; m.opacity = Math.max(0, Math.min(1, opacity)); m.depthWrite = opacity >= 0.99; m.needsUpdate = true; }
+      st.current.gridOn = g.visible;
     },
     move: (dir, on) => { const h: Set<string> | undefined = st.current.held; if (!h) return; on ? h.add(dir) : h.delete(dir); },
   }));

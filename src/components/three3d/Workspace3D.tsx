@@ -14,13 +14,21 @@ import { sheetParticipatesIn3D, sheetElevationM } from "@/cad/SheetManager";
 import type { Viewer3DHandle } from "./Viewer3D";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { DEFAULT_PRESETS, PRESET_OPTIONS, type RenderPresets } from "@/cad/three3d/dossier";
-import { Camera, FileDown, FileJson, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, Maximize2, Pencil, Trash2 } from "lucide-react";
+import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Mouse } from "lucide-react";
+import { Joystick3D } from "./Joystick3D";
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
 
 const ID_FIELDS = ["wallId", "doorId", "hatchId", "stairId", "documentId", "textBoxId", "libraryInstanceId", "segmentId", "dimensionId", "freeStrokeId"];
 
-export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; projectId?: string; onEditInCad: () => void }) {
+export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, tabletAidOn = false }: { app: CadApp; projectId?: string; onEditInCad: () => void; helpOn?: boolean; tabletAidOn?: boolean }) {
+  const [open, setOpen] = useState<null | "sheets" | "dossier">(null);
+  // Raster: lokaler Bedienzustand pro Gerät (nie Projekt/Cloud).
+  const [grid, setGrid] = useState<{ on: boolean; opacity: number }>(() => {
+    try { const g = JSON.parse(localStorage.getItem("pixuna.3d.grid") || "null"); if (g && typeof g.on === "boolean") return g; } catch {}
+    return { on: true, opacity: 1 };
+  });
+  const [gridPanel, setGridPanel] = useState(false);
   const project = useProject(projectId);
   const presets: RenderPresets = { ...DEFAULT_PRESETS, ...(project?.settings?.renderPresets ?? {}) };
   const setPresets = (patch: Partial<RenderPresets>) => { if (projectId) projectStore.setRenderPresets(projectId, { ...presets, ...patch }); };
@@ -87,6 +95,12 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
     return () => window.clearTimeout(t);
   }, [items.length]);
 
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.3d.grid", JSON.stringify(grid)); } catch {}
+    const apply = () => viewer.current?.setGrid(grid.on, grid.opacity);
+    apply(); const t = window.setTimeout(apply, 400); return () => window.clearTimeout(t);
+  }, [grid, items.length]);
+
   const makeDossier = async (format: "pdf" | "json") => {
     setBusy(true); setDossierMsg(null);
     try {
@@ -128,14 +142,6 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
   };
 
   const btn = "h-8 px-2.5 rounded-md text-xs font-medium border hover:bg-muted disabled:opacity-40";
-  const padBtn = "h-11 w-11 rounded-lg flex items-center justify-center border bg-card active:bg-muted select-none";
-  const hold = (d: Parameters<Viewer3DHandle["move"]>[0]) => ({
-    onPointerDown: (e: React.PointerEvent) => { (e.target as HTMLElement).setPointerCapture?.(e.pointerId); viewer.current?.move(d, true); },
-    onPointerUp: () => viewer.current?.move(d, false),
-    onPointerCancel: () => viewer.current?.move(d, false),
-    onPointerLeave: () => viewer.current?.move(d, false),
-  });
-
   return (
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
@@ -147,22 +153,50 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
             Zielkörper anklicken … <button className="underline ml-2" onClick={() => setPicking(null)}>Abbrechen</button>
           </div>
         )}
-        <div className="absolute left-3 bottom-3 grid grid-cols-3 gap-1.5" title="Bewegen (auch W A S D / Pfeiltasten, Q/E für runter/hoch)">
-          <button className={padBtn} {...hold("d")} aria-label="Runter"><ChevronsDown size={16} /></button>
-          <button className={padBtn} {...hold("f")} aria-label="Vorwärts"><ArrowUp size={16} /></button>
-          <button className={padBtn} {...hold("u")} aria-label="Hoch"><ChevronsUp size={16} /></button>
-          <button className={padBtn} {...hold("l")} aria-label="Links"><ArrowLeft size={16} /></button>
-          <button className={padBtn} {...hold("b")} aria-label="Rückwärts"><ArrowDown size={16} /></button>
-          <button className={padBtn} {...hold("r")} aria-label="Rechts"><ArrowRight size={16} /></button>
+        {/* Oben links: Render-Dossier */}
+        <div className="absolute left-3 top-3 z-10 w-[280px]">
+          <button className={`${btn} bg-card flex items-center gap-1.5`} onClick={() => setOpen(open === "dossier" ? null : "dossier")}>
+            <FileText size={14} /> Render-Dossier <ChevronDown size={13} className={open === "dossier" ? "rotate-180" : ""} />
+          </button>
+          {open === "dossier" && <div className="mt-1.5 rounded-lg border bg-card p-3 shadow-lg space-y-2 max-h-[70vh] overflow-y-auto" style={{ borderColor: "hsl(var(--hairline))" }}>        <section className="pt-2 border-t space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          
+          <div className="flex gap-1">
+            {(["3d", "2d"] as const).map(v => (
+              <button key={v} className={`${btn} flex-1`} style={presets.view === v ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" } : undefined}
+                onClick={() => setPresets({ view: v })}>{v === "3d" ? "3D-Kamera" : "2D-Draufsicht"}</button>
+            ))}
+          </div>
+          {presets.view === "3d" && (
+            <button className={`${btn} w-full flex items-center justify-center gap-1.5`} onClick={() => { const c = viewer.current?.getCamera(); if (c) { setPresets({ camera: c }); setDossierMsg("Blickrichtung gespeichert."); } }}>
+              <Camera size={13} /> Aktuelle Blickrichtung übernehmen{presets.camera ? " ✓" : ""}
+            </button>
+          )}
+          {([["timeOfDay", "Tageszeit"], ["weather", "Wetter"], ["season", "Jahreszeit"], ["style", "Darstellungsstil"], ["mood", "Bildwirkung"]] as const).map(([k, label]) => (
+            <label key={k} className="flex items-center gap-2 text-xs">
+              <span className="w-24 shrink-0">{label}</span>
+              <select className="flex-1 h-8 rounded border bg-background px-1" value={presets[k]} onChange={e => setPresets({ [k]: e.target.value } as any)}>
+                {PRESET_OPTIONS[k].map(o => <option key={o}>{o}</option>)}
+              </select>
+            </label>
+          ))}
+          <textarea className="w-full min-h-[60px] rounded border bg-background p-1.5 text-xs" placeholder="Freitext (z. B. Bepflanzung, Personen, Lichtstimmung)"
+            defaultValue={presets.freeText} key={presets.freeText}
+            onBlur={e => { if (e.target.value !== presets.freeText) setPresets({ freeText: e.target.value }); }} />
+          <div className="flex gap-1.5">
+            <button className={`${btn} flex-1 flex items-center justify-center gap-1.5`} disabled={busy} onClick={() => makeDossier("pdf")}><FileDown size={13} /> PDF-Dossier</button>
+            <button className={`${btn} flex-1 flex items-center justify-center gap-1.5`} disabled={busy} onClick={() => makeDossier("json")}><FileJson size={13} /> JSON</button>
+          </div>
+          {dossierMsg && <div className="text-xs text-muted-foreground">{dossierMsg}</div>}
+        </section>
+</div>}
         </div>
-        <button className={`${btn} absolute right-3 bottom-3 bg-card flex items-center gap-1.5`} onClick={() => viewer.current?.fitAll()}>
-          <Maximize2 size={14} /> Gesamte Szene zeigen
-        </button>
-      </div>
-
-      <aside className="w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-        <section>
-          <h3 className="font-semibold mb-2">Blätter in 3D</h3>
+        {/* Oben rechts: Blätter in 3D */}
+        <div className="absolute right-3 top-3 z-10 w-[280px] flex flex-col items-end">
+          <button className={`${btn} bg-card flex items-center gap-1.5`} onClick={() => setOpen(open === "sheets" ? null : "sheets")}>
+            <Layers size={14} /> Blätter in 3D <ChevronDown size={13} className={open === "sheets" ? "rotate-180" : ""} />
+          </button>
+          {open === "sheets" && <div className="mt-1.5 w-full rounded-lg border bg-card p-3 shadow-lg max-h-[70vh] overflow-y-auto text-sm" style={{ borderColor: "hsl(var(--hairline))" }}>        <section>
+          
           <p className="text-xs text-muted-foreground mb-2">Das aktive Blatt wird immer gezeigt. Weitere Blätter bewusst hinzunehmen – die Auswahl wird im Projekt gespeichert.</p>
           <div className="space-y-1.5">
             {sheets.map(s => {
@@ -181,6 +215,51 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
             })}
           </div>
         </section>
+</div>}
+        </div>
+        {/* Unten rechts: Raster, Gesamtansicht, Joysticks */}
+        <div className="absolute right-3 bottom-3 z-10 flex flex-col items-end gap-2">
+          <div className="flex items-center gap-1.5">
+            {gridPanel && (
+              <div className="h-8 rounded-md border bg-card px-2 flex items-center gap-2 text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <button className="font-medium underline-offset-2 hover:underline" onClick={() => setGrid(g => ({ ...g, on: !g.on }))}>{grid.on ? "Ein" : "Aus"}</button>
+                <input type="range" min={0.1} max={1} step={0.05} value={grid.opacity} disabled={!grid.on} aria-label="Rasterstärke"
+                  onChange={e => setGrid(g => ({ ...g, opacity: parseFloat(e.target.value) }))} className="w-28" />
+              </div>
+            )}
+            <button className={`${btn} bg-card w-8 px-0 grid place-items-center`} title="Raster ein/aus und Stärke"
+              style={grid.on ? { color: "hsl(var(--accent-gold))" } : { opacity: 0.6 }} onClick={() => setGridPanel(v => !v)}>
+              <Grid3x3 size={15} />
+            </button>
+            <button className={`${btn} bg-card flex items-center gap-1.5`} onClick={() => viewer.current?.fitAll()}>
+              <Maximize2 size={14} /> Gesamte Szene zeigen
+            </button>
+          </div>
+          {tabletAidOn && (
+            <div className="flex items-end gap-3">
+              <Joystick3D label="Laufen" onChange={(x, y) => viewer.current?.setStick("move", x, y)} />
+              <Joystick3D label="Blick" onChange={(x, y) => viewer.current?.setStick("look", x, y)} />
+            </div>
+          )}
+        </div>
+        {/* Bedienungshilfe unten mittig */}
+        {helpOn && (
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-3 z-10 rounded-lg border bg-card px-3 py-2 shadow-sm flex items-center gap-4 text-[11px] pointer-events-none"
+            style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
+            <div className="flex items-center gap-2">
+              <div className="grid grid-cols-3 gap-0.5">
+                <span /><Key k="W" a="▲" /><span />
+                <Key k="A" a="◀" /><Key k="S" a="▼" /><Key k="D" a="▶" />
+              </div>
+              <span>Bewegen</span>
+            </div>
+            <div className="flex items-center gap-1.5"><Mouse size={16} /><span>gedrückt: Kamera bewegen</span></div>
+            <div className="flex items-center gap-1.5"><Key k="Shift" /><span>+</span><Mouse size={16} /><span>Mausrad gedrückt: Drehen</span></div>
+          </div>
+        )}
+      </div>
+
+      <aside className="w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
 
         <section>
           <h3 className="font-semibold mb-2">Auswahl</h3>
@@ -216,36 +295,6 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
           )}
         </section>
 
-        <section className="pt-2 border-t space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <h3 className="font-semibold">Render-Dossier</h3>
-          <div className="flex gap-1">
-            {(["3d", "2d"] as const).map(v => (
-              <button key={v} className={`${btn} flex-1`} style={presets.view === v ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" } : undefined}
-                onClick={() => setPresets({ view: v })}>{v === "3d" ? "3D-Kamera" : "2D-Draufsicht"}</button>
-            ))}
-          </div>
-          {presets.view === "3d" && (
-            <button className={`${btn} w-full flex items-center justify-center gap-1.5`} onClick={() => { const c = viewer.current?.getCamera(); if (c) { setPresets({ camera: c }); setDossierMsg("Blickrichtung gespeichert."); } }}>
-              <Camera size={13} /> Aktuelle Blickrichtung übernehmen{presets.camera ? " ✓" : ""}
-            </button>
-          )}
-          {([["timeOfDay", "Tageszeit"], ["weather", "Wetter"], ["season", "Jahreszeit"], ["style", "Darstellungsstil"], ["mood", "Bildwirkung"]] as const).map(([k, label]) => (
-            <label key={k} className="flex items-center gap-2 text-xs">
-              <span className="w-24 shrink-0">{label}</span>
-              <select className="flex-1 h-8 rounded border bg-background px-1" value={presets[k]} onChange={e => setPresets({ [k]: e.target.value } as any)}>
-                {PRESET_OPTIONS[k].map(o => <option key={o}>{o}</option>)}
-              </select>
-            </label>
-          ))}
-          <textarea className="w-full min-h-[60px] rounded border bg-background p-1.5 text-xs" placeholder="Freitext (z. B. Bepflanzung, Personen, Lichtstimmung)"
-            defaultValue={presets.freeText} key={presets.freeText}
-            onBlur={e => { if (e.target.value !== presets.freeText) setPresets({ freeText: e.target.value }); }} />
-          <div className="flex gap-1.5">
-            <button className={`${btn} flex-1 flex items-center justify-center gap-1.5`} disabled={busy} onClick={() => makeDossier("pdf")}><FileDown size={13} /> PDF-Dossier</button>
-            <button className={`${btn} flex-1 flex items-center justify-center gap-1.5`} disabled={busy} onClick={() => makeDossier("json")}><FileJson size={13} /> JSON</button>
-          </div>
-          {dossierMsg && <div className="text-xs text-muted-foreground">{dossierMsg}</div>}
-        </section>
 
         {issues.length > 0 && (
           <section>
@@ -253,8 +302,17 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
             {issues.map((x, i) => <div key={i} className="text-xs text-muted-foreground">{x.message}</div>)}
           </section>
         )}
-        <p className="text-xs text-muted-foreground">Ziehen: drehen · Rechts/Shift-Ziehen oder zwei Finger: schieben · Rad/Zwei-Finger-Zoom · W A S D: bewegen</p>
+        <p className="text-xs text-muted-foreground">Ziehen: Kamera bewegen · Shift + Ziehen: Blick drehen · Rechts-Ziehen oder zwei Finger: schieben · Rad: Zoom · W A S D: laufen</p>
       </aside>
     </div>
+  );
+}
+
+function Key({ k, a }: { k: string; a?: string }) {
+  return (
+    <span className="min-w-[20px] h-5 px-1 rounded border grid place-items-center leading-none text-[9px] font-semibold"
+      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}>
+      {a ? <span className="flex flex-col items-center"><span className="text-[6px] opacity-60">{a}</span>{k}</span> : k}
+    </span>
   );
 }
