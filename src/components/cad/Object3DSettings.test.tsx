@@ -53,6 +53,7 @@ describe("3D-Einstellungen – Neigen", () => {
     expect(angleText()).toBe(0);
     ptr(svg, "pointerMove", 100, 99.95);
     ptr(svg, "pointerUp", 100, 99.95);
+    console.log("DBG", svg.querySelector("text")?.textContent, svg.outerHTML.length);
     const a1 = angleText();
     expect(Math.abs(a1)).toBeGreaterThan(1);
     // Finger angehoben: nichts gespeichert, Vorschau bleibt
