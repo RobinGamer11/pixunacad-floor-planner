@@ -154,7 +154,7 @@ const CadPage = () => {
           presenting={presenting}
           helpOn={helpOn}
         />
-        {view3d && cadApp && <Suspense fallback={null}><Workspace3D app={cadApp} projectId={projectId} onEditInCad={() => navigate(`/project/${projectId}/cad`)} /></Suspense>}
+        {view3d && cadApp && <Suspense fallback={null}><Workspace3D app={cadApp} projectId={projectId} onEditInCad={() => navigate(`/project/${projectId}/cad`)} helpOn={helpOn && !presenting} tabletAidOn={tabletAidOn} /></Suspense>}
         {!presenting && <LocalSaveIndicator projectId={projectId} />}
         {presenting && (
           <button
