@@ -2367,7 +2367,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
-<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
+<Object3DSettings app={appRef.current} onlyKinds={["segment"]} className="mt-4 mb-3 rounded-md border" />
               </div>
               <div className="mt-3">
               </div>
@@ -2389,7 +2389,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             {activeTool !== ToolIds.LINE && (
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
-<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
+<Object3DSettings app={appRef.current} onlyKinds={["segment"]} className="mt-4 mb-3 rounded-md border" />
               </div>
             )}
             {activeTool === ToolIds.LINE && <LineModeSelect app={appRef.current} />}
@@ -3079,7 +3079,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="space-y-3 mb-3">
                 <CadEbeneSelect target={idSelectRef} />
-<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
+<Object3DSettings app={appRef.current} onlyKinds={["freeStroke"]} className="mt-4 mb-3 rounded-md border" />
               </div>
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -3141,7 +3141,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               {/* EBENE — gemeinsame Reihenfolge aller Werkzeuge */}
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
-<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
+<Object3DSettings app={appRef.current} onlyKinds={["door"]} className="mt-4 mb-3 rounded-md border" />
               </div>
 
               {/* MODUS — außerhalb des Einstellungsrahmens */}

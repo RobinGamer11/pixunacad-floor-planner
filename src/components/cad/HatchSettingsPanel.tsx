@@ -57,47 +57,6 @@ const MeasureInput: React.FC<{
 };
 
 
-/** Einfacher 3D-Körper mit Höhenmaßkette (rein illustrativ). */
-const HeightIllustration: React.FC<{ heightM: number }> = ({ heightM }) => {
-  const h = 14 + Math.min(1, heightM / 3) * 26;
-  const top = 46 - h;
-  return (
-    <svg viewBox="0 0 64 56" className="h-14 w-16 shrink-0" aria-hidden>
-      <polygon points={`8,${top + 6} 30,${top} 50,${top + 6} 28,${top + 12}`} fill="hsl(var(--cad-height-body))" stroke="hsl(var(--cad-height-outline))" strokeWidth="0.8" />
-      <polygon points={`8,${top + 6} 28,${top + 12} 28,52 8,46`} fill="hsl(var(--cad-height-body))" stroke="hsl(var(--cad-height-outline))" strokeWidth="0.8" />
-      <polygon points={`28,${top + 12} 50,${top + 6} 50,46 28,52`} fill="hsl(var(--cad-height-body))" stroke="hsl(var(--cad-height-outline))" strokeWidth="0.8" />
-      <line x1="57" y1={top + 6} x2="57" y2="46" stroke="hsl(var(--cad-accent))" strokeWidth="0.8" />
-      <line x1="54" y1={top + 6} x2="60" y2={top + 6} stroke="hsl(var(--cad-accent))" strokeWidth="0.8" />
-      <line x1="54" y1="46" x2="60" y2="46" stroke="hsl(var(--cad-accent))" strokeWidth="0.8" />
-    </svg>
-  );
-};
-
-const Hatch3DSection: React.FC<{ value: number; onChange: (v: number) => void }> = ({ value, onChange }) => {
-  const [open, setOpen] = useState(true);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="mb-1.5 flex w-full items-center justify-between text-[10px] font-semibold tracking-wider text-muted-foreground"
-      >
-        <span>3D-EIGENSCHAFTEN</span>
-        <span className="text-[10px]">{open ? "▾" : "▸"}</span>
-      </button>
-      {open && (
-        <div className="flex items-end gap-2">
-          <div className="min-w-0 flex-1">
-            <MeasureInput label="Objekthöhe (m)" value={value} digits={3} onChange={(v) => onChange(v)} />
-          </div>
-          <HeightIllustration heightM={value} />
-        </div>
-      )}
-    </div>
-  );
-};
-
 /** Großer Knopf: mehrere ausgewählte Schraffuren zu einer verbinden. */
 const HatchMergeButton: React.FC<{ app: CadApp | MiniCad | null }> = ({ app }) => {
   const [count, setCount] = useState(0);
@@ -298,15 +257,6 @@ export const HatchSettingsPanel: React.FC<Props> = ({ app, projectId, pxPerMm = 
           <span className="pr-2 text-[9px] text-muted-foreground">%</span>
         </span>
       </div>
-
-      {/* 3D-Eigenschaften (reine Information) */}
-      <Hatch3DSection
-        value={(selected() as any)?.heightM ?? (app as any)?.defaultHatchHeightM ?? 0}
-        onChange={(v) => {
-          apply((h) => { h.heightM = v; }, () => { if (app) (app as any).defaultHatchHeightM = v; });
-          if (selected()) { try { (app as any)?.commitHistorySnapshot?.(); } catch { /* noop */ } }
-        }}
-      />
 
       {/* Aufrauen */}
       <StrokeEffectsSettings app={app} kind="hatch" sections={["roughen"]} />
