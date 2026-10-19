@@ -75,7 +75,7 @@ describe("Geneigte Schraffur", () => {
   });
 
   it("Gelöschte Bezugskante wird gemeldet, keine andere Kante verwendet", () => {
-    const h: any = roof(30); h.points = [...h.points, { x: -1, y: 1 }];
+    const h: any = roof(30); h.points = [{ x: 0.5, y: -0.5 }, ...h.points.slice(1), { x: -1, y: 1 }];
     const [d] = deriveScene3D({ hatches: [h] }, sheet);
     expect(d.type).toBe("prism");
     expect(d.note).toMatch(/nicht mehr eindeutig/);
