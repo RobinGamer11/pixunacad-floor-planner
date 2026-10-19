@@ -6,7 +6,7 @@
  */
 import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
 import * as THREE from "three";
-import type { Derived3D } from "@/cad/three3d/geometryDerivation";
+import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 
 export interface CameraState { tx: number; ty: number; tz: number; r: number; theta: number; phi: number }
 export interface Viewer3DHandle {
@@ -21,6 +21,8 @@ interface Props {
   items: Derived3D[];
   selectedKey: string | null;
   onPick: (sheetId: string, id: string) => void;
+  /** Inhalt einer flachen Platte (Dokument, Text, Tabelle) als Bild. */
+  textureFor?: (d: Plane3D) => Promise<{ canvas: HTMLCanvasElement; transparent: boolean; failed: boolean } | null>;
 }
 
 const keyOf = (d: Derived3D) => `${d.sheetId}::${d.sourceId}`;
@@ -31,7 +33,7 @@ function shapeOf(outer: { x: number; y: number }[], holes: { x: number; y: numbe
   return s;
 }
 
-const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick }, ref) {
+const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, textureFor }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
 
@@ -164,6 +166,21 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const g: THREE.Group | undefined = st.current.group;
     if (!g) return;
     disposeGroup(g);
+    const gen = (st.current.gen = (st.current.gen || 0) + 1);
+    // Höhengleiche flache Flächen: Tiefenversatz nach Ebenen-/Stapelreihenfolge
+    // (reale Höhe bleibt unverändert). Vorderste Fläche = kein Versatz.
+    const planeRank = new Map<Derived3D, number>();
+    {
+      const byZ = new Map<number, Plane3D[]>();
+      for (const d of items) if (d.type === "plane") {
+        const k = Math.round(d.z * 1000);
+        (byZ.get(k) || byZ.set(k, []).get(k)!).push(d);
+      }
+      for (const list of byZ.values()) {
+        list.sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
+        list.forEach((d, i) => planeRank.set(d, i));
+      }
+    }
     for (const d of items) {
       const sel = keyOf(d) === selectedKey;
       const color = new THREE.Color(sel ? "#3b82f6" : d.color);
@@ -179,18 +196,48 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
           edges.position.y = d.z1; edges.raycast = () => {}; g.add(edges);
         } else if (d.type === "plane") {
           if (d.outline.length < 3) continue;
-          const geo = new THREE.ShapeGeometry(shapeOf(d.outline, d.holes)); geo.rotateX(Math.PI / 2);
-          const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.9 }));
-          m.position.y = d.z + 0.002; obj = m;
+          const rank = planeRank.get(d) ?? 0;
+          const mat = new THREE.MeshStandardMaterial({
+            color, side: THREE.DoubleSide, roughness: 0.9,
+            polygonOffset: true, polygonOffsetFactor: 1 + rank, polygonOffsetUnits: 4 * (1 + rank),
+          });
+          let geo: THREE.BufferGeometry;
+          if (d.texture && d.outline.length === 4) {
+            // Eigenes Viereck mit Bildkoordinaten: oben-links = (0,1) …
+            const [a, b, c, e] = d.outline;
+            geo = new THREE.BufferGeometry();
+            geo.setAttribute("position", new THREE.Float32BufferAttribute([a.x, 0, a.y, b.x, 0, b.y, c.x, 0, c.y, e.x, 0, e.y], 3));
+            geo.setAttribute("uv", new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 0], 2));
+            geo.setIndex([0, 1, 2, 0, 2, 3]);
+            geo.computeVertexNormals();
+          } else {
+            geo = new THREE.ShapeGeometry(shapeOf(d.outline, d.holes)); geo.rotateX(Math.PI / 2);
+          }
+          const m = new THREE.Mesh(geo, mat);
+          m.position.y = d.z; m.renderOrder = -rank; obj = m;
+          if (d.texture && textureFor) {
+            textureFor(d).then((res) => {
+              if (!res || st.current.gen !== gen || !m.parent) return;
+              const tex = new THREE.CanvasTexture(res.canvas);
+              tex.colorSpace = THREE.SRGBColorSpace;
+              tex.anisotropy = 4;
+              mat.map = tex;
+              if (!sel) mat.color.set("#ffffff");
+              if (res.transparent) { mat.transparent = true; mat.depthWrite = false; mat.alphaTest = 0.01; }
+              mat.needsUpdate = true;
+              (m.userData as any).tex = tex;
+            }).catch(() => { /* Platte bleibt einfarbig */ });
+          }
         } else {
-          const geo = new THREE.BufferGeometry().setFromPoints(d.points.map(p => new THREE.Vector3(p.x, d.z + 0.004, p.y)));
+          const geo = new THREE.BufferGeometry().setFromPoints(d.points.map(p => new THREE.Vector3(p.x, d.z, p.y)));
           obj = new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));
+          obj.renderOrder = 1;
         }
       } catch { continue; }
-      if (obj) { obj.userData = { sheetId: d.sheetId, sourceId: d.sourceId }; g.add(obj); }
+      if (obj) { obj.userData = { ...obj.userData, sheetId: d.sheetId, sourceId: d.sourceId }; g.add(obj); }
     }
     if (!st.current.fitted && items.length) { st.current.fitted = true; fit(); }
-  }, [items, selectedKey]);
+  }, [items, selectedKey, textureFor]);
 
   const fit = () => {
     const { group, orbit, apply } = st.current; if (!group) return;
@@ -226,6 +273,7 @@ function disposeGroup(g: THREE.Group) {
   for (const c of [...g.children]) {
     g.remove(c);
     const any = c as any;
+    any.userData?.tex?.dispose?.();
     any.geometry?.dispose?.();
     (Array.isArray(any.material) ? any.material : [any.material]).forEach((m: any) => m?.dispose?.());
   }
