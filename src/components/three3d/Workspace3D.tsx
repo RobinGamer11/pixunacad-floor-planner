@@ -6,6 +6,8 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D } from "@/cad/three3d/geometryDerivation";
 import type { Relation3D, RelationIssue } from "@/cad/three3d/relations";
+import { libraryDefinitionsOf, sheetSnapshotOf } from "@/cad/three3d/projectBridge";
+import { renderPlaneTexture } from "@/cad/three3d/planeTextures";
 import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
 import { sheetParticipatesIn3D, sheetElevationM } from "@/cad/SheetManager";
 import type { Viewer3DHandle } from "./Viewer3D";
@@ -34,6 +36,31 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
   const [keep, setKeep] = useState<"below" | "above">("below");
   const [msg, setMsg] = useState<string | null>(null);
   const lastSig = useRef("");
+  const texCache = useRef(new Map<string, Promise<any>>());
+  const snapCache = useRef(new Map<string, any>());
+
+  /** Inhalt eines Objekts kurz zusammengefasst (lange Bilddaten nur angedeutet). */
+  const contentKey = (o: any) => JSON.stringify(o, (_k, v) => (typeof v === "string" && v.length > 400 ? `${v.length}:${v.slice(-48)}` : v));
+  const texturedKey = (d: Derived3D) => {
+    if (d.type !== "plane" || !d.texture) return "";
+    const o = (app as any).scenesById?.get(d.sheetId)?.[d.texture.list]?.find((x: any) => x?.id === d.sourceId)
+      ?? (d.sheetId === app.activeSheetId ? (app as any).scene?.[d.texture.list]?.find((x: any) => x?.id === d.sourceId) : null);
+    return o ? contentKey(o) : "";
+  };
+  const textureFor = useCallback((d: Plane3D) => {
+    if (!d.texture) return Promise.resolve(null);
+    const key = `${d.sheetId}::${d.sourceId}::${JSON.stringify(d.outline)}::${texturedKey(d)}`;
+    let p = texCache.current.get(key);
+    if (!p) {
+      let snap = snapCache.current.get(d.sheetId);
+      if (snap === undefined) { snap = sheetSnapshotOf(app, d.sheetId); snapCache.current.set(d.sheetId, snap); }
+      p = renderPlaneTexture(snap, d.texture.list, d.sourceId, d.outline, libraryDefinitionsOf(app));
+      if (texCache.current.size > 300) texCache.current.clear();
+      texCache.current.set(key, p);
+    }
+    return p;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app]);
 
   // Gemeinsamen Projektzustand beobachten (kein eigener Zustand, nur Lesen).
   useEffect(() => {
@@ -42,9 +69,10 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
       const sel: any = app.selection;
       const id = sel ? ID_FIELDS.map(f => sel[f]).find(Boolean) : null;
       const sk = id ? `${app.activeSheetId}::${id}` : null;
-      const sig = JSON.stringify([r.items, app.sheetManager.toJSON(), app.activeSheetId, sk, r.issues]);
+      const sig = JSON.stringify([r.items, app.sheetManager.toJSON(), app.activeSheetId, sk, r.issues, r.items.map(texturedKey)]);
       if (sig === lastSig.current) return;
       lastSig.current = sig;
+      snapCache.current.clear();
       setItems(r.items); setIssues(r.issues); setSelKey(sk); setTick(t => t + 1);
     };
     read();
@@ -110,7 +138,7 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} />
+          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} textureFor={textureFor} />
         </Suspense>
         {picking && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 rounded-md border bg-card px-3 py-1.5 text-xs shadow">
