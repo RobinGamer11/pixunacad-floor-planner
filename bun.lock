@@ -59,6 +59,8 @@
         "tailwind-merge": "^2.6.0",
         "tailwindcss-animate": "^1.0.7",
         "three": "0.169.0",
+        "three-bvh-csg": "0.0.17",
+        "three-mesh-bvh": "0.8.3",
         "vaul": "^0.9.9",
         "zod": "^3.25.76",
       },
@@ -1152,6 +1154,10 @@
     "thenify-all": ["thenify-all@1.6.0", "", { "dependencies": { "thenify": ">= 3.1.0 < 4" } }, "sha512-RNxQH/qI8/t3thXJDwcstUO4zeqo64+Uy/+sNVRBx4Xn2OX+OZ9oP+iJnNFqplFra2ZUVeKCSa2oVWi3T4uVmA=="],
 
     "three": ["three@0.169.0", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/three/-/three-0.169.0.tgz", {}, "sha512-Ed906MA3dR4TS5riErd4QBsRGPcx+HBDX2O5yYE5GqJeFQTPU+M56Va/f/Oph9X7uZo3W3o4l2ZhBZ6f6qUv0w=="],
+
+    "three-bvh-csg": ["three-bvh-csg@0.0.17", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/three-bvh-csg/-/three-bvh-csg-0.0.17.tgz", { "peerDependencies": { "three": ">=0.151.0", "three-mesh-bvh": ">=0.6.6" } }, "sha512-iEkHDF8GRfGM6593Cuw8SnF1vfENCp46gIAtRzuL4nGXGWPcR1sbTBwM9ptDONb5twqlZp5WkAKya5aBKe2qcA=="],
+
+    "three-mesh-bvh": ["three-mesh-bvh@0.8.3", "https://europe-west4-npm.pkg.dev/lovable-core-prod/sandbox-npm-cache/three-mesh-bvh/-/three-mesh-bvh-0.8.3.tgz", { "peerDependencies": { "three": ">= 0.159.0" } }, "sha512-4G5lBaF+g2auKX3P0yqx+MJC6oVt6sB5k+CchS6Ob0qvH0YIhuUk1eYr7ktsIpY+albCqE80/FVQGV190PmiAg=="],
 
     "tiny-invariant": ["tiny-invariant@1.3.3", "", {}, "sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg=="],
 
