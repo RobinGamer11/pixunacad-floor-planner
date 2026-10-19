@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { LocalSaveIndicator } from "@/components/cad/LocalSaveIndicator";
-import { Workspace3D } from "@/components/three3d/Workspace3D";
+const Workspace3D = lazy(() => import("@/components/three3d/Workspace3D").then(m => ({ default: m.Workspace3D })));
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import type { CadApp } from "@/cad/CadApp";
 import { getLocalActivePage, setLocalActivePage } from "@/lib/exportLocalState";
@@ -154,7 +154,7 @@ const CadPage = () => {
           presenting={presenting}
           helpOn={helpOn}
         />
-        {view3d && cadApp && <Workspace3D app={cadApp} projectId={projectId} onEditInCad={() => navigate(`/project/${projectId}/cad`)} />}
+        {view3d && cadApp && <Suspense fallback={null}><Workspace3D app={cadApp} projectId={projectId} onEditInCad={() => navigate(`/project/${projectId}/cad`)} /></Suspense>}
         {!presenting && <LocalSaveIndicator projectId={projectId} />}
         {presenting && (
           <button

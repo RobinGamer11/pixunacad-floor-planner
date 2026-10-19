@@ -249,5 +249,11 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Kleiner ENTF-Knopf mit Mültonnen-Symbol ganz unten unter dem Rad
 
 - [x] Paket 01 / Schritt 1: Blatt-/Objekthöhen, Anlagenkategorie, 3D-Ableitung
-- [ ] Paket 01 / Schritt 2: 3D-Ansicht (Three.js, Navigation, Auswahl), Körperbeziehungen
-- [ ] Paket 01 / Schritt 3: Render-Dossier (PDF/JSON)
+- [x] Paket 01 / Schritt 2: 3D-Ansicht (Three.js, Navigation, Auswahl), Körperbeziehungen
+- [x] Paket 01 / Schritt 3: Render-Dossier (PDF/JSON)
+
+## 3D-Einstellungen, Neigung, Wandanschlüsse – 19.10.2026
+- [x] Darstellung → 3D-Einstellungen je Objektart (nur wirksame Werte)
+- [x] Schraffur neigen (Kante wählen, ziehen/Zahl/Regler, ✓/Enter, Zurücksetzen)
+- [x] Begrenzen/Durchbrechen mit geneigten Körpern (echtes Volumen)
+- [x] Automatische Wandanschlüsse in 3D (gemeinsame Höhen bereinigt)

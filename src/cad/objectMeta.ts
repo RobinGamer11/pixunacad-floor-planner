@@ -27,7 +27,10 @@ const KIND_OF_KEY: Record<string, string> = {
 export type AttachmentCategory = "Material" | "Vorderseite" | "Rückseite" | "Seitenansicht";
 export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = ["Material", "Vorderseite", "Rückseite", "Seitenansicht"];
 export interface ObjectAttachment { id: string; name: string; type: string; size: number; dataUrl: string; category?: AttachmentCategory }
-export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number; relations3D?: Relation3D[]; stackOrder?: number }
+export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number; relations3D?: Relation3D[]; stackOrder?: number; tilt3D?: Tilt3D; bodyHeightM?: number }
+
+/** Räumliche Neigung einer Schraffur (Bezugskante + Winkel); 2D-Punkte bleiben unverändert. */
+export interface Tilt3D { edgeIndex: number; a: { x: number; y: number }; b: { x: number; y: number }; count: number; angleDeg: number }
 
 /** 3D-Körperbeziehung, am Quellobjekt gespeichert (Ziel über Blatt + Objekt-ID). */
 export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above" }
@@ -36,6 +39,13 @@ export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: 
 export function objectElevationM(obj: any): number {
   const v = obj?.elevationM;
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+/** Räumliche Körperhöhe eines Bibliothekselements (nie die 2D-Größe). */
+export function libraryBodyHeightM(li: any, fallback = 1): number {
+  const v = li?.bodyHeightM;
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  return Number.isFinite(li?.heightM) && li.heightM > 0 ? li.heightM : fallback;
 }
 
 /** Maximaler Anlagenspeicher je Objekt (Bytes). */
@@ -165,6 +175,10 @@ export function copyObjectMeta(obj: any, opts: { withCode?: boolean } = {}): Obj
   if (typeof obj?.objDesc === "string" && obj.objDesc) out.objDesc = obj.objDesc;
   if (Array.isArray(obj?.objAttachments) && obj.objAttachments.length) out.objAttachments = obj.objAttachments.map((a: ObjectAttachment) => ({ ...a }));
   if (typeof obj?.elevationM === "number" && Number.isFinite(obj.elevationM) && obj.elevationM !== 0) out.elevationM = obj.elevationM;
+  // Räumliche Form gehört zum Objekt: Kopien behalten Neigung und Körperhöhe.
+  const t = obj?.tilt3D;
+  if (t && Number.isFinite(t.angleDeg) && t.angleDeg !== 0 && t.a && t.b) out.tilt3D = { edgeIndex: t.edgeIndex | 0, a: { x: +t.a.x, y: +t.a.y }, b: { x: +t.b.x, y: +t.b.y }, count: t.count | 0, angleDeg: +t.angleDeg };
+  if (typeof obj?.bodyHeightM === "number" && Number.isFinite(obj.bodyHeightM) && obj.bodyHeightM > 0) out.bodyHeightM = obj.bodyHeightM;
   // Beziehungen hängen an der Identität: Kopien (ohne Kennung) übernehmen sie nicht.
   if (opts.withCode !== false && Array.isArray(obj?.relations3D) && obj.relations3D.length) out.relations3D = obj.relations3D.map((r: Relation3D) => ({ ...r }));
   // Stapelreihenfolge gehört zur Identität; Kopien kommen ohnehin nach vorne.
@@ -183,6 +197,8 @@ export function applyObjectMeta(obj: any, src: any, opts: { withCode?: boolean }
   if (typeof m.elevationM === "number") obj.elevationM = m.elevationM;
   if (m.relations3D) obj.relations3D = m.relations3D;
   if (typeof m.stackOrder === "number") obj.stackOrder = m.stackOrder;
+  if (m.tilt3D) obj.tilt3D = m.tilt3D;
+  if (typeof m.bodyHeightM === "number") obj.bodyHeightM = m.bodyHeightM;
 }
 
 /** Hängt die Objektdaten an eine serialisierte Szene (Zuordnung über id). */
@@ -212,7 +228,7 @@ export function restoreObjectMeta(scene: any, data: any, before: Record<string, 
   if (!data) return;
   for (const key of SCENE_OBJECT_KEYS) {
     const raw = data[key];
-    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments || typeof r.elevationM === "number" || r.relations3D || typeof r.stackOrder === "number"))) continue;
+    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments || typeof r.elevationM === "number" || r.relations3D || typeof r.stackOrder === "number" || r.tilt3D || typeof r.bodyHeightM === "number"))) continue;
     const created = ((scene?.[key] || []) as any[]).slice(before[key] ?? 0);
     if (created.length !== raw.length) continue;
     raw.forEach((r: any, i: number) => applyObjectMeta(created[i], r));

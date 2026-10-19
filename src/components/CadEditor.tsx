@@ -40,6 +40,7 @@ import { WallSettingsPanel } from "@/components/cad/WallSettingsPanel";
 import { HatchPatternBlock } from "@/components/cad/HatchPatternBlock";
 import { HatchSettingsPanel, HatchModeSelect } from "@/components/cad/HatchSettingsPanel";
 import { ObjectInfoTabs, type ObjectInfoTab } from "@/components/cad/ObjectInfoTabs";
+import { Object3DSettings } from "@/components/cad/Object3DSettings";
 import { LineModeSelect } from "@/components/cad/LineModeSelect";
 
 
@@ -2249,6 +2250,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <DragScrollDiv axis="y" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-2 cursor-grab active:cursor-grabbing" style={{ display: rightTab === "settings" && !infoBoxActive ? "block" : "none" }}>
         {!gridPanelOpen && !selectionFilterOpen && appRef.current && (
           <ObjectInfoTabs app={appRef.current} tab={objInfoTab} onTab={setObjInfoTab} onHasObject={setObjInfoHas} />
+        )}
+        {!gridPanelOpen && !selectionFilterOpen && appRef.current && objInfoHas && objInfoTab === "darstellung" && (
+          <Object3DSettings app={appRef.current} />
         )}
         {/* Settings area (scrollable) — kompakter, keine horizontale Overflow-Falle. */}
         <div

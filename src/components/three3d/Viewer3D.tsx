@@ -228,6 +228,20 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
               (m.userData as any).tex = tex;
             }).catch(() => { /* Platte bleibt einfarbig */ });
           }
+        } else if (d.type === "mesh") {
+          // CAD (x, y, Höhe z) → Szene (x, z, y); Spiegelung → Umlaufsinn tauschen.
+          const p = d.mesh.positions, pos = new Float32Array(p.length);
+          for (let i = 0; i < p.length; i += 3) { pos[i] = p[i]; pos[i + 1] = p[i + 2]; pos[i + 2] = p[i + 1]; }
+          const ix = d.mesh.indices, idx: number[] = [];
+          for (let i = 0; i < ix.length; i += 3) idx.push(ix[i], ix[i + 2], ix[i + 1]);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+          geo.setIndex(idx);
+          geo.computeVertexNormals();
+          const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: d.closed ? THREE.FrontSide : THREE.DoubleSide, flatShading: true }));
+          obj = m;
+          const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3a352c, transparent: true, opacity: 0.35 }));
+          edges.raycast = () => {}; g.add(edges);
         } else {
           const geo = new THREE.BufferGeometry().setFromPoints(d.points.map(p => new THREE.Vector3(p.x, d.z, p.y)));
           obj = new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));

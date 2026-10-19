@@ -5,7 +5,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
-import type { Relation3D, RelationIssue } from "@/cad/three3d/relations";
+import { topOfItems, type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
+import { Object3DSettings } from "@/components/cad/Object3DSettings";
 import { libraryDefinitionsOf, sheetSnapshotOf } from "@/cad/three3d/projectBridge";
 import { renderPlaneTexture } from "@/cad/three3d/planeTextures";
 import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
@@ -17,7 +18,7 @@ import { Camera, FileDown, FileJson, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, 
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
 
-const ID_FIELDS = ["wallId", "hatchId", "stairId", "documentId", "textBoxId", "libraryInstanceId", "segmentId", "dimensionId", "freeStrokeId"];
+const ID_FIELDS = ["wallId", "doorId", "hatchId", "stairId", "documentId", "textBoxId", "libraryInstanceId", "segmentId", "dimensionId", "freeStrokeId"];
 
 export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; projectId?: string; onEditInCad: () => void }) {
   const project = useProject(projectId);
@@ -114,6 +115,7 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
   const sel = selKey ? { sheetId: selKey.split("::")[0], id: selKey.split("::")[1] } : null;
   const selObj = sel ? findObject(app, sel.sheetId, sel.id)?.obj : null;
   const rels: Relation3D[] = selObj?.relations3D || [];
+  const selTop = selKey ? topOfItems(items.filter(d => `${d.sheetId}::${d.sourceId}` === selKey)) : null;
 
   const onPick = (sheetId: string, id: string) => {
     if (picking && sel) {
@@ -186,6 +188,8 @@ export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; proj
             <div className="space-y-2">
               <div className="text-xs">{objectLabel(app, sel.sheetId, sel.id)}</div>
               <button className={`${btn} flex items-center gap-1.5`} onClick={onEditInCad}><Pencil size={13} /> Im CAD bearbeiten</button>
+              {selTop !== null && <div className="text-xs text-muted-foreground">Höchste verbleibende Stelle: {selTop.toFixed(2).replace(".", ",")} m</div>}
+              <Object3DSettings app={app} defaultOpen />
               <div className="pt-2 border-t space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <div className="font-medium text-xs">Körperbeziehungen</div>
                 <button className={btn} onClick={() => { setMsg(null); setPicking("cutout"); }}>Durchbricht … (Ziel wählen)</button>
