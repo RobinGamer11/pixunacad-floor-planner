@@ -4488,6 +4488,12 @@ export class CadApp {
   }
 
 
+  /** Serialisierte Momentaufnahme eines Blattes (nur lesend, z. B. für das Render-Dossier). */
+  serializeSheetSnapshot(sheetId: string): any | null {
+    const sc = this.scenesById.get(sheetId);
+    return sc ? this._serializeOneScene(sc) : null;
+  }
+
   private async _exportPlansPdf(sel: import("./PlanManager").Plan[]) {
     try {
       // Der Druckplan wird 1:1 in seiner Papiergröße exportiert. Jede

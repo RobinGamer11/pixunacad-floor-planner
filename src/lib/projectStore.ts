@@ -210,6 +210,8 @@ export interface ProjectSettings {
   timelinePosition?: "top" | "bottom";
   /** Projektbezogene Schnellhilfe in CAD, Export und Board. Fehlend bedeutet initial aktiv. */
   helpOn?: boolean;
+  /** Bildvorgaben des Render-Dossiers (3D-Bereich). */
+  renderPresets?: import("@/cad/three3d/dossier").RenderPresets;
 }
 
 export interface Project {
@@ -908,6 +910,13 @@ export const projectStore = {
       p.id === projectId
         ? { ...p, settings: { ...(p.settings ?? {}), helpOn } }
         : p
+    );
+    return commitProjectUiProjects(projects);
+  },
+
+  setRenderPresets: (projectId: string, renderPresets: import("@/cad/three3d/dossier").RenderPresets) => {
+    const projects = state.projects.map((p) =>
+      p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), renderPresets } } : p
     );
     return commitProjectUiProjects(projects);
   },
