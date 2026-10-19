@@ -39,8 +39,9 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   useEffect(() => {
     try { localStorage.setItem("pixuna.3d.sens", JSON.stringify(sens)); } catch {}
     const apply = () => viewer.current?.setSensitivity(sens.move / 100, sens.look / 100);
-    apply(); const t = window.setTimeout(apply, 400); return () => window.clearTimeout(t);
-  }, [sens, items.length]);
+    apply(); const t = window.setInterval(() => { if (viewer.current) { apply(); window.clearInterval(t); } }, 250);
+    return () => window.clearInterval(t);
+  }, [sens]);
   const project = useProject(projectId);
   const presets: RenderPresets = { ...DEFAULT_PRESETS, ...(project?.settings?.renderPresets ?? {}) };
   const setPresets = (patch: Partial<RenderPresets>) => { if (projectId) projectStore.setRenderPresets(projectId, { ...presets, ...patch }); };
