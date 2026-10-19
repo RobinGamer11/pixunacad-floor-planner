@@ -117,9 +117,9 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const held = new Set<string>();
     const keyMap: Record<string, string> = { w: "f", arrowup: "f", s: "b", arrowdown: "b", a: "l", arrowleft: "l", d: "r", arrowright: "r", e: "u", q: "d" };
     const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-    const kd = (e: KeyboardEvent) => { const k = keyMap[e.key.toLowerCase()]; if (k && !typing(e.target)) { held.add(k); e.preventDefault(); } };
-    const ku = (e: KeyboardEvent) => { const k = keyMap[e.key.toLowerCase()]; if (k) held.delete(k); };
-    window.addEventListener("keydown", kd); window.addEventListener("keyup", ku);
+    const kd = (e: KeyboardEvent) => { const k = keyMap[e.key.toLowerCase()]; if (k && !typing(e.target)) { held.add(k); e.preventDefault(); e.stopImmediatePropagation(); } };
+    const ku = (e: KeyboardEvent) => { const k = keyMap[e.key.toLowerCase()]; if (k) { held.delete(k); if (!typing(e.target)) e.stopImmediatePropagation(); } };
+    window.addEventListener("keydown", kd, true); window.addEventListener("keyup", ku, true);
     let raf = 0, last = performance.now();
     const loop = (t: number) => {
       const dt = Math.min(0.05, (t - last) / 1000); last = t;
@@ -143,7 +143,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
-      window.removeEventListener("keydown", kd); window.removeEventListener("keyup", ku);
+      window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true);
       disposeGroup(group); grid.geometry.dispose(); (grid.material as THREE.Material).dispose?.();
       renderer.dispose(); renderer.forceContextLoss?.(); el.remove();
     };
