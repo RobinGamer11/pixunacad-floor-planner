@@ -66,6 +66,7 @@ import { WarpSection, FlipSection } from "@/components/page/CadDocumentInspector
 import { CanvasFabBar, LayerFab, LayersHelpCard, LayersPanelTitle } from "@/components/cad/LayerHelp";
 import { RailFlyout } from "@/components/cad/RailFlyout";
 import { CommentModeButton } from "@/components/comments/CommentLayerUi";
+import { StackOrderButtons } from "@/components/cad/StackOrderButtons";
 import { ExportSidebar } from "@/components/export/ExportSidebar";
 import { ExportPageSettings } from "@/components/export/ExportPageSettings";
 import { SpreadHandles } from "@/components/export/SpreadHandles";
@@ -346,6 +347,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const textEditorSymbolRef = useRef<HTMLSelectElement>(null);
 
   const appRef = useRef<CadApp | null>(null);
+  const getStackApp = useCallback(() => appRef.current, []);
   const exportModeRef = useRef(exportMode);
   exportModeRef.current = exportMode;
   const onAppReadyRef = useRef(onAppReady);
@@ -2153,6 +2155,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {!presenting && (
           <CanvasFabBar>
             <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />
+            <StackOrderButtons getApp={getStackApp} />
             <CommentModeButton disabled={!projectId} />
           </CanvasFabBar>
         )}
