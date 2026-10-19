@@ -4,6 +4,7 @@ import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
 import { LocalSaveIndicator } from "@/components/cad/LocalSaveIndicator";
+import { Workspace3D } from "@/components/three3d/Workspace3D";
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import type { CadApp } from "@/cad/CadApp";
 import { getLocalActivePage, setLocalActivePage } from "@/lib/exportLocalState";
@@ -23,6 +24,7 @@ const CadPage = () => {
   const [multiPaste, setMultiPaste] = useState(false);
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
   // Export ist derselbe CAD-Bereich (dieselbe Engine/Verlauf) mit Exportseite aktiv.
+  const view3d = location.pathname.endsWith("/3d");
   const exportView = location.pathname.endsWith("/export") || new URLSearchParams(location.search).get("view") === "export";
   useEffect(() => {
     if (!cadApp) return;
@@ -107,7 +109,7 @@ const CadPage = () => {
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
-        mode={exportView ? "export" : "cad"}
+        mode={view3d ? "3d" : exportView ? "export" : "cad"}
         canUndo={canUndo}
         canRedo={canRedo}
         onUndo={() => editorRef.current?.undo()}
@@ -152,6 +154,7 @@ const CadPage = () => {
           presenting={presenting}
           helpOn={helpOn}
         />
+        {view3d && cadApp && <Workspace3D app={cadApp} onEditInCad={() => navigate(`/project/${projectId}/cad`)} />}
         {!presenting && <LocalSaveIndicator projectId={projectId} />}
         {presenting && (
           <button

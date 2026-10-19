@@ -41,9 +41,10 @@ import {
   HelpCircle,
   TabletSmartphone,
   Wallet,
+  Box,
 } from "lucide-react";
 
-export type WorkspaceMode = "cad" | "export" | "finance" | "board";
+export type WorkspaceMode = "cad" | "export" | "3d" | "finance" | "board";
 
 interface Props {
   projectId?: string;
@@ -111,6 +112,7 @@ export function WorkspaceHeader({
 
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
   const goExport = () => projectId && navigate(`/project/${projectId}/export`);
+  const go3d = () => projectId && navigate(`/project/${projectId}/3d`);
   const showExportTab = isExportAreaEnabled() || mode === "export";
 
   return (
@@ -194,7 +196,8 @@ export function WorkspaceHeader({
               />
             </>
           )}
-
+          <ModeDivider />
+          <ModeButton icon={<Box size={13} />} label="3D" active={mode === "3d"} onClick={go3d} />
         </div>
       </div>
 
