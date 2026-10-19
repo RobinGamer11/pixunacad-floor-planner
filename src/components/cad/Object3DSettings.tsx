@@ -63,7 +63,7 @@ const ReadRow: React.FC<{ label: string; value: string }> = ({ label, value }) =
   <div className="flex items-center justify-between text-[10px]"><span className="text-muted-foreground">{label}</span><span className="tabular-nums">{value}</span></div>
 );
 
-export const Object3DSettings: React.FC<{ app: any; defaultOpen?: boolean }> = ({ app, defaultOpen = false }) => {
+export const Object3DSettings: React.FC<{ app: any; defaultOpen?: boolean; onlyKinds?: string[]; exceptKinds?: string[]; className?: string }> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className }) => {
   const [open, setOpen] = useState(defaultOpen);
   const [, force] = useState(0);
   const [items, setItems] = useState<{ kind: string; obj: any }[]>([]);
@@ -79,6 +79,8 @@ export const Object3DSettings: React.FC<{ app: any; defaultOpen?: boolean }> = (
     return () => window.clearInterval(t);
   }, [app]);
   if (!app || !items.length) return null;
+  if (onlyKinds && !onlyKinds.includes(items[0].kind)) return null;
+  if (exceptKinds && exceptKinds.includes(items[0].kind)) return null;
 
   const sheet = app.sheetManager?.getById?.(app.activeSheetId);
   const sheetZ = sheet ? sheetElevationM(sheet) : 0;
@@ -96,7 +98,7 @@ export const Object3DSettings: React.FC<{ app: any; defaultOpen?: boolean }> = (
   const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0) delete x.obj.elevationM; else x.obj.elevationM = v; } });
 
   return (
-    <div className="mb-2 rounded-md border" style={{ borderColor: HAIRLINE }}>
+    <div className={className ?? "mb-2 rounded-md border"} style={{ borderColor: HAIRLINE }}>
       <button type="button" onClick={() => setOpen(o => !o)} className="flex w-full items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold">
         {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />} 3D-Einstellungen
       </button>

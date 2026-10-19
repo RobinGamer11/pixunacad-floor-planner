@@ -2252,7 +2252,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
           <ObjectInfoTabs app={appRef.current} tab={objInfoTab} onTab={setObjInfoTab} onHasObject={setObjInfoHas} />
         )}
         {!gridPanelOpen && !selectionFilterOpen && appRef.current && objInfoHas && objInfoTab === "darstellung" && (
-          <Object3DSettings app={appRef.current} />
+          <Object3DSettings app={appRef.current} exceptKinds={["segment","hatch","freeStroke","door","dimension","textbox"]} />
         )}
         {/* Settings area (scrollable) — kompakter, keine horizontale Overflow-Falle. */}
         <div
@@ -2367,6 +2367,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
               </div>
               <div className="mt-3">
               </div>
@@ -2388,6 +2389,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             {activeTool !== ToolIds.LINE && (
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
               </div>
             )}
             {activeTool === ToolIds.LINE && <LineModeSelect app={appRef.current} />}
@@ -2487,6 +2489,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["hatch"]} className="mt-4 mb-3 rounded-md border" />
               </div>
               {activeTool === ToolIds.POLYGON && <PolygonModeSelect app={appRef.current} />}
               <div className="mt-3 rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -2500,6 +2503,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="mb-3">
                 <CadEbeneSelect target={hatchIdSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["hatch"]} className="mt-4 mb-3 rounded-md border" />
               </div>
               {activeTool === ToolIds.HATCH && <HatchModeSelect app={appRef.current} />}
 
@@ -2715,6 +2719,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="space-y-3">
               <div className="mb-1">
                 <CadEbeneSelect target={measureIdSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["dimension"]} className="mt-4 mb-3 rounded-md border" />
               </div>
 
               <CadSegmentedProxy
@@ -2828,6 +2833,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
                 <select ref={textIdSelectRef} className="cad-settings-select w-full" />
               </div>
               <CadEbeneSelect target={textIdSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["textbox"]} className="mt-4 mb-3 rounded-md border" />
               <div>
                 <div className="text-[10px] font-semibold tracking-wider mb-1.5" style={{ color: "hsl(var(--cad-toolbar-muted))" }}>MODUS</div>
                 <div className="hidden">
@@ -3073,6 +3079,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
             <div className="cad-settings-panel mb-2">
               <div className="space-y-3 mb-3">
                 <CadEbeneSelect target={idSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
               </div>
 
               <div className="rounded-md border p-2" style={{ borderColor: "hsl(var(--hairline))" }}>
@@ -3134,6 +3141,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
               {/* EBENE — gemeinsame Reihenfolge aller Werkzeuge */}
               <div className="mb-3">
                 <CadEbeneSelect target={idSelectRef} />
+<Object3DSettings app={appRef.current} onlyKinds={["segment","freeStroke","door"]} className="mt-4 mb-3 rounded-md border" />
               </div>
 
               {/* MODUS — außerhalb des Einstellungsrahmens */}
