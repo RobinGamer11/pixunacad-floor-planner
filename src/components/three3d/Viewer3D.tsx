@@ -16,6 +16,8 @@ export interface Viewer3DHandle {
   setCamera(c: CameraState): void;
   /** Analoge Steuerung (Joysticks): Werte −1…1; move = laufen, look = Blick drehen. */
   setStick(kind: "move" | "look", x: number, y: number): void;
+  /** Empfindlichkeit (1 = 100 %) für Laufen und Blick. */
+  setSensitivity(move: number, look: number): void;
   /** Raster ein/aus und Sichtbarkeit (0…1). */
   setGrid(visible: boolean, opacity: number): void;
   /** Aktuelles Bild ohne Raster/UI; projiziert Weltpunkte (x, Höhe z, y) auf Bildpixel. */
@@ -97,6 +99,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       apply();
     };
     const sticks = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
+    const sens = { move: 1, look: 1 };
     const el = renderer.domElement;
     const onDown = (e: PointerEvent) => {
       el.setPointerCapture(e.pointerId);
@@ -116,8 +119,8 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         pan(mid.x - lastMid.x, mid.y - lastMid.y);
         lastPinch = d; lastMid = mid;
       } else if (mode === "pan") pan(dx, dy);
-      else if (mode === "look") { look(dx * 0.004, -dy * 0.004); return; }
-      else { orbit.theta += dx * 0.008; orbit.phi -= dy * 0.008; }
+      else if (mode === "look") { look(dx * 0.004 * sens.look, -dy * 0.004 * sens.look); return; }
+      else { orbit.theta += dx * 0.008 * sens.look; orbit.phi -= dy * 0.008 * sens.look; }
       apply();
     };
     const ray = new THREE.Raycaster();
@@ -151,7 +154,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const loop = (t: number) => {
       const dt = Math.min(0.05, (t - last) / 1000); last = t;
       if (held.size) {
-        const speed = Math.max(1.5, orbit.r * 0.6) * dt;
+        const speed = Math.max(1.5, orbit.r * 0.6) * dt * sens.move;
         const fwd = new THREE.Vector3(-Math.cos(orbit.theta), 0, -Math.sin(orbit.theta));
         const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
         if (held.has("f")) orbit.target.addScaledVector(fwd, speed);
@@ -163,19 +166,19 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         apply();
       }
       if (sticks.move.x || sticks.move.y) {
-        const speed = Math.max(1.5, orbit.r * 0.6) * dt;
+        const speed = Math.max(1.5, orbit.r * 0.6) * dt * sens.move;
         const fwd = new THREE.Vector3(-Math.cos(orbit.theta), 0, -Math.sin(orbit.theta));
         const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
         orbit.target.addScaledVector(fwd, -sticks.move.y * speed).addScaledVector(right, sticks.move.x * speed);
         apply();
       }
-      if (sticks.look.x || sticks.look.y) look(sticks.look.x * dt * 1.6, -sticks.look.y * dt * 1.2);
+      if (sticks.look.x || sticks.look.y) look(sticks.look.x * dt * 1.6 * sens.look, -sticks.look.y * dt * 1.2 * sens.look);
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
 
-    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks };
+    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
       window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true);
@@ -302,6 +305,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       }).filter(b => b.vis).map(({ id, x, y }) => ({ id, x, y }));
       return { png, w, h, badges };
     },
+    setSensitivity: (move, look) => { const s = st.current.sens; if (s) { s.move = move; s.look = look; } },
     setStick: (kind, x, y) => { const s = st.current.sticks; if (s) s[kind] = { x, y }; },
     setGrid: (visible, opacity) => {
       const g = st.current.grid; if (!g) return;

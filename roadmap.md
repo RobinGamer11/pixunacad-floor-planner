@@ -257,3 +257,10 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Schraffur neigen (Kante wählen, ziehen/Zahl/Regler, ✓/Enter, Zurücksetzen)
 - [x] Begrenzen/Durchbrechen mit geneigten Körpern (echtes Volumen)
 - [x] Automatische Wandanschlüsse in 3D (gemeinsame Höhen bereinigt)
+
+## 3D-Bedienung Feinschliff – 19.10.2026
+- [x] Raster Ein/Aus hervorgehoben, Standard schwächste Stufe; „Gesamte Szene“ nur Symbol
+- [x] Bedienungshilfe im 2D-Stil („Navigation“, Symbole über Text)
+- [x] 3D-Einstellungen in Werkzeugen unter „Ebene“; alte Schraffur-Objekthöhe entfernt
+- [x] Joysticks einzeln verschiebbar (Griff „Laufen“/„Blick“), Positionen gespeichert
+- [x] Zahnrad: Empfindlichkeit Laufen/Blick in %
