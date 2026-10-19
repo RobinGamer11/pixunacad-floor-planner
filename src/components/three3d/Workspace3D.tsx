@@ -6,16 +6,24 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D } from "@/cad/three3d/geometryDerivation";
 import type { Relation3D, RelationIssue } from "@/cad/three3d/relations";
-import { addRelation, deriveFromApp, findObject, objectLabel, removeRelation, selectInCad, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
+import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
 import { sheetParticipatesIn3D, sheetElevationM } from "@/cad/SheetManager";
 import type { Viewer3DHandle } from "./Viewer3D";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, Maximize2, Pencil, Trash2 } from "lucide-react";
+import { projectStore, useProject } from "@/lib/projectStore";
+import { DEFAULT_PRESETS, PRESET_OPTIONS, type RenderPresets } from "@/cad/three3d/dossier";
+import { Camera, FileDown, FileJson, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ChevronsDown, ChevronsUp, Maximize2, Pencil, Trash2 } from "lucide-react";
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
 
 const ID_FIELDS = ["wallId", "hatchId", "stairId", "documentId", "textBoxId", "libraryInstanceId", "segmentId", "dimensionId", "freeStrokeId"];
 
-export function Workspace3D({ app, onEditInCad }: { app: CadApp; onEditInCad: () => void }) {
+export function Workspace3D({ app, projectId, onEditInCad }: { app: CadApp; projectId?: string; onEditInCad: () => void }) {
+  const project = useProject(projectId);
+  const presets: RenderPresets = { ...DEFAULT_PRESETS, ...(project?.settings?.renderPresets ?? {}) };
+  const setPresets = (patch: Partial<RenderPresets>) => { if (projectId) projectStore.setRenderPresets(projectId, { ...presets, ...patch }); };
+  const [busy, setBusy] = useState(false);
+  const [dossierMsg, setDossierMsg] = useState<string | null>(null);
+  const restoredCam = useRef(false);
   const viewer = useRef<Viewer3DHandle>(null);
   const [items, setItems] = useState<Derived3D[]>([]);
   const [issues, setIssues] = useState<RelationIssue[]>([]);
@@ -43,6 +51,36 @@ export function Workspace3D({ app, onEditInCad }: { app: CadApp; onEditInCad: ()
     const iv = window.setInterval(read, 500);
     return () => window.clearInterval(iv);
   }, [app]);
+
+  useEffect(() => {
+    if (restoredCam.current || !items.length || !presets.camera) return;
+    const t = window.setTimeout(() => { viewer.current?.setCamera(presets.camera!); restoredCam.current = true; }, 300);
+    return () => window.clearTimeout(t);
+  }, [items.length]);
+
+  const makeDossier = async (format: "pdf" | "json") => {
+    setBusy(true); setDossierMsg(null);
+    try {
+      const d = await import("@/cad/three3d/dossier");
+      const data = d.buildDossierData(project?.name || "Projekt", items, k => dossierInfo(app, k), presets);
+      if (!data.objects.length) { setDossierMsg("Keine Objekte in der 3D-Zusammenstellung."); return; }
+      const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+      const base = `Render-Dossier_${(project?.name || "Projekt").replace(/[^\w-]+/g, "_")}_${stamp}`;
+      if (format === "json") { d.downloadBytes(JSON.stringify(data, null, 2), `${base}.json`, "application/json"); return; }
+      let img;
+      if (presets.view === "3d") img = viewer.current?.capture(data.objects.map(o => ({ id: o.dossierId, ...o.center })));
+      else img = await render2DView(app, data.objects);
+      if (!img) { setDossierMsg("Ansicht konnte nicht erfasst werden."); return; }
+      const byId = new Map(data.objects.map(o => [o.dossierId, o]));
+      const bytes = await d.buildDossierPdf(data, { target: img, assignment: img }, (did) => {
+        const o = byId.get(did); return o ? (dossierInfo(app, `${o.sheetId}::${o.objectId}`)?.attachments ?? []) : [];
+      });
+      d.downloadBytes(bytes, `${base}.pdf`, "application/pdf");
+      setDossierMsg(`Dossier mit ${data.objects.length} Objekten erstellt.`);
+    } catch (e) {
+      console.error(e); setDossierMsg("Dossier konnte nicht erstellt werden.");
+    } finally { setBusy(false); }
+  };
 
   const sheets = useMemo(() => app.sheetManager.list().map(s => ({ ...s })), [app, tick]);
   const sel = selKey ? { sheetId: selKey.split("::")[0], id: selKey.split("::")[1] } : null;
@@ -144,6 +182,37 @@ export function Workspace3D({ app, onEditInCad }: { app: CadApp; onEditInCad: ()
               </div>
             </div>
           )}
+        </section>
+
+        <section className="pt-2 border-t space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <h3 className="font-semibold">Render-Dossier</h3>
+          <div className="flex gap-1">
+            {(["3d", "2d"] as const).map(v => (
+              <button key={v} className={`${btn} flex-1`} style={presets.view === v ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" } : undefined}
+                onClick={() => setPresets({ view: v })}>{v === "3d" ? "3D-Kamera" : "2D-Draufsicht"}</button>
+            ))}
+          </div>
+          {presets.view === "3d" && (
+            <button className={`${btn} w-full flex items-center justify-center gap-1.5`} onClick={() => { const c = viewer.current?.getCamera(); if (c) { setPresets({ camera: c }); setDossierMsg("Blickrichtung gespeichert."); } }}>
+              <Camera size={13} /> Aktuelle Blickrichtung übernehmen{presets.camera ? " ✓" : ""}
+            </button>
+          )}
+          {([["timeOfDay", "Tageszeit"], ["weather", "Wetter"], ["season", "Jahreszeit"], ["style", "Darstellungsstil"], ["mood", "Bildwirkung"]] as const).map(([k, label]) => (
+            <label key={k} className="flex items-center gap-2 text-xs">
+              <span className="w-24 shrink-0">{label}</span>
+              <select className="flex-1 h-8 rounded border bg-background px-1" value={presets[k]} onChange={e => setPresets({ [k]: e.target.value } as any)}>
+                {PRESET_OPTIONS[k].map(o => <option key={o}>{o}</option>)}
+              </select>
+            </label>
+          ))}
+          <textarea className="w-full min-h-[60px] rounded border bg-background p-1.5 text-xs" placeholder="Freitext (z. B. Bepflanzung, Personen, Lichtstimmung)"
+            defaultValue={presets.freeText} key={presets.freeText}
+            onBlur={e => { if (e.target.value !== presets.freeText) setPresets({ freeText: e.target.value }); }} />
+          <div className="flex gap-1.5">
+            <button className={`${btn} flex-1 flex items-center justify-center gap-1.5`} disabled={busy} onClick={() => makeDossier("pdf")}><FileDown size={13} /> PDF-Dossier</button>
+            <button className={`${btn} flex-1 flex items-center justify-center gap-1.5`} disabled={busy} onClick={() => makeDossier("json")}><FileJson size={13} /> JSON</button>
+          </div>
+          {dossierMsg && <div className="text-xs text-muted-foreground">{dossierMsg}</div>}
         </section>
 
         {issues.length > 0 && (
