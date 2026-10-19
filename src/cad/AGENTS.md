@@ -14,3 +14,7 @@
 - Pipetten-„Weiterzeichnen“ läuft nur über `styleCarry` in `Scene.ts` (flüchtig, beim Werkzeugwechsel gelöscht) – nie Werkzeug-Defaults dauerhaft überschreiben.
 - Fangpunkte des ausgewählten Objekts prüft `SelectTool._selectedObjectPointHit` vor allen anderen Treffern, damit deckungsgleiche Fremdpunkte nie gewinnen.
 - Infobox-Pins folgen `Renderer.afterRender` synchron; Werkzeug-/Auswahlwechsel schließen Infobox-Einstellungen in `CadApp.setTool`/`setSelection`.
+
+## 3D
+- 3D-Körper leitet nur `src/cad/three3d/geometryDerivation.ts` aus bestehenden Szene-Objekten ab – flüchtig, nie gespeichert; 2D bleibt führend.
+- Welthöhe = `sheetElevationM` (Blatt) + `objectElevationM` (Objekt, über `objectMeta.ts` serialisiert); `heightM` bleibt Körper-/Maßhöhe, kein zweites Höhenfeld.

@@ -43,6 +43,19 @@ export interface Sheet {
   scaleKey?: string;
   /** @deprecated Altfeld (siehe scaleKey). */
   scaleValue?: number;
+  /** 3D: Blatthöhe in Metern (Standard 0, negativ erlaubt). */
+  elevationM?: number;
+  /** 3D: Blatt nimmt an der 3D-Ansicht teil (Standard true). */
+  participatesIn3D?: boolean;
+}
+
+export function sheetElevationM(sheet: Sheet | null | undefined): number {
+  const v = sheet?.elevationM;
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+export function sheetParticipatesIn3D(sheet: Sheet | null | undefined): boolean {
+  return sheet?.participatesIn3D !== false;
 }
 
 export const SheetDefaults = {
@@ -123,6 +136,22 @@ export class SheetManager {
     return s;
   }
 
+  /** 3D-Blatthöhe setzen (m, negativ erlaubt). */
+  setElevation(id: string, elevationM: number): Sheet | null {
+    const s = this.getById(id);
+    if (!s || !Number.isFinite(elevationM)) return null;
+    s.elevationM = elevationM;
+    return s;
+  }
+
+  /** 3D-Teilnahme setzen. */
+  setParticipatesIn3D(id: string, on: boolean): Sheet | null {
+    const s = this.getById(id);
+    if (!s) return null;
+    s.participatesIn3D = !!on;
+    return s;
+  }
+
   deleteSheet(id: string): boolean {
     const s = this.getById(id);
     if (!s) return false;
@@ -151,6 +180,8 @@ export class SheetManager {
       // Altfelder nur durchreichen, wenn sie tatsächlich vorhanden sind.
       ...(s.scaleKey ? { scaleKey: s.scaleKey } : {}),
       ...(typeof s.scaleValue === "number" ? { scaleValue: s.scaleValue } : {}),
+      ...(typeof s.elevationM === "number" && s.elevationM !== 0 ? { elevationM: s.elevationM } : {}),
+      ...(s.participatesIn3D === false ? { participatesIn3D: false } : {}),
     }));
   }
 
@@ -173,6 +204,8 @@ export class SheetManager {
       // erzeugen. Sie sind keine Quelle mehr für neue Projektionen.
       ...(typeof s.scaleKey === "string" ? { scaleKey: s.scaleKey } : {}),
       ...(typeof s.scaleValue === "number" && s.scaleValue > 0 ? { scaleValue: s.scaleValue } : {}),
+      ...(typeof s.elevationM === "number" && Number.isFinite(s.elevationM) && s.elevationM !== 0 ? { elevationM: s.elevationM } : {}),
+      ...(s.participatesIn3D === false ? { participatesIn3D: false } : {}),
     }));
     if (cleaned.length === 0) cleaned.push(makeDefault());
     this.sheets = cleaned;

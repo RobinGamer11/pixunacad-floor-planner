@@ -23,8 +23,17 @@ const KIND_OF_KEY: Record<string, string> = {
   freeStrokes: "freeStroke", doors: "door", stairs: "stair", infoBoxes: "infobox",
 };
 
-export interface ObjectAttachment { id: string; name: string; type: string; size: number; dataUrl: string }
-export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[] }
+/** Referenz-Kategorie einer Anlage (optional; alte Anlagen ohne Kategorie bleiben gültig). */
+export type AttachmentCategory = "Material" | "Vorderseite" | "Rückseite" | "Seitenansicht";
+export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = ["Material", "Vorderseite", "Rückseite", "Seitenansicht"];
+export interface ObjectAttachment { id: string; name: string; type: string; size: number; dataUrl: string; category?: AttachmentCategory }
+export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number }
+
+/** 3D: Objekthöhe relativ zum Blatt (m). Fehlend = 0. */
+export function objectElevationM(obj: any): number {
+  const v = obj?.elevationM;
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
 
 /** Maximaler Anlagenspeicher je Objekt (Bytes). */
 export const MAX_ATTACHMENT_BYTES_PER_OBJECT = 5 * 1024 * 1024;
@@ -152,6 +161,7 @@ export function copyObjectMeta(obj: any, opts: { withCode?: boolean } = {}): Obj
   if (typeof obj?.objName === "string" && obj.objName) out.objName = obj.objName;
   if (typeof obj?.objDesc === "string" && obj.objDesc) out.objDesc = obj.objDesc;
   if (Array.isArray(obj?.objAttachments) && obj.objAttachments.length) out.objAttachments = obj.objAttachments.map((a: ObjectAttachment) => ({ ...a }));
+  if (typeof obj?.elevationM === "number" && Number.isFinite(obj.elevationM) && obj.elevationM !== 0) out.elevationM = obj.elevationM;
   if (opts.withCode !== false && typeof obj?.objCode === "string" && obj.objCode) out.objCode = obj.objCode;
   return out;
 }
@@ -163,6 +173,7 @@ export function applyObjectMeta(obj: any, src: any, opts: { withCode?: boolean }
   if (m.objDesc) obj.objDesc = m.objDesc;
   if (m.objCode) obj.objCode = m.objCode;
   if (m.objAttachments) obj.objAttachments = m.objAttachments;
+  if (typeof m.elevationM === "number") obj.elevationM = m.elevationM;
 }
 
 /** Hängt die Objektdaten an eine serialisierte Szene (Zuordnung über id). */
@@ -192,7 +203,7 @@ export function restoreObjectMeta(scene: any, data: any, before: Record<string, 
   if (!data) return;
   for (const key of SCENE_OBJECT_KEYS) {
     const raw = data[key];
-    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments))) continue;
+    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments || typeof r.elevationM === "number"))) continue;
     const created = ((scene?.[key] || []) as any[]).slice(before[key] ?? 0);
     if (created.length !== raw.length) continue;
     raw.forEach((r: any, i: number) => applyObjectMeta(created[i], r));

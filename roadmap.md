@@ -247,3 +247,7 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Stift-Modus entfernt (Stift wie Finger), SPACE-Knopf in der Mitte
 - [x] Umranden mit SPACE bei Polygon & Schraffur wieder entfernt (Absturz)
 - [x] Kleiner ENTF-Knopf mit Mültonnen-Symbol ganz unten unter dem Rad
+
+- [x] Paket 01 / Schritt 1: Blatt-/Objekthöhen, Anlagenkategorie, 3D-Ableitung
+- [ ] Paket 01 / Schritt 2: 3D-Ansicht (Three.js, Navigation, Auswahl), Körperbeziehungen
+- [ ] Paket 01 / Schritt 3: Render-Dossier (PDF/JSON)
