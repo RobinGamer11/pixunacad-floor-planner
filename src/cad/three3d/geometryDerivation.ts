@@ -11,7 +11,8 @@ import { sheetElevationM, sheetParticipatesIn3D } from "../SheetManager";
 import { buildWallSolidRing } from "../wallSolid";
 import { wallBandPolygon, wallReferenceLengths } from "../doorGeom";
 import { computeStairGeometry } from "../stairGeometry";
-import { objectElevationM } from "../objectMeta";
+import { libraryBodyHeightM, objectElevationM } from "../objectMeta";
+export { libraryBodyHeightM };
 import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
 import { buildHealedWallSolidRing } from "../wallSolid";
@@ -104,13 +105,6 @@ function rect(center: Vec2, w: number, h: number, rot: number): Vec2[] {
     x: center.x + x * c - y * s,
     y: center.y + x * s + y * c,
   }));
-}
-
-/** Räumliche Körperhöhe eines Bibliothekselements (nie die 2D-Größe). */
-export function libraryBodyHeightM(li: any, fallback = 1): number {
-  const v = li?.bodyHeightM;
-  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
-  return Number.isFinite(li?.heightM) && li.heightM > 0 ? li.heightM : fallback;
 }
 
 /** Öffnungen einer Wand: Unterkante = Brüstung über Wandunterkante, Oberkante = Brüstung + Öffnungshöhe. */

@@ -7,11 +7,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Check, X, RotateCcw } from "lucide-react";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
-import { objectElevationM } from "@/cad/objectMeta";
+import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
 import { sheetElevationM } from "@/cad/SheetManager";
 import { computeStairGeometry } from "@/cad/stairGeometry";
-import { libraryBodyHeightM } from "@/cad/three3d/geometryDerivation";
-import { frameForEdge, netArea, resolveTilt, straightEdgeIndices, tiltPoint, type TiltFrame } from "@/cad/three3d/solidMesh";
+import { frameForEdge, netArea, resolveTilt, straightEdgeIndices, tiltPoint, type TiltFrame } from "@/cad/three3d/tiltGeometry";
 import type { Vec2 } from "@/cad/geometry";
 
 const HAIRLINE = "hsl(var(--hairline))";

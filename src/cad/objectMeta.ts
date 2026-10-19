@@ -41,6 +41,13 @@ export function objectElevationM(obj: any): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
+/** Räumliche Körperhöhe eines Bibliothekselements (nie die 2D-Größe). */
+export function libraryBodyHeightM(li: any, fallback = 1): number {
+  const v = li?.bodyHeightM;
+  if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  return Number.isFinite(li?.heightM) && li.heightM > 0 ? li.heightM : fallback;
+}
+
 /** Maximaler Anlagenspeicher je Objekt (Bytes). */
 export const MAX_ATTACHMENT_BYTES_PER_OBJECT = 5 * 1024 * 1024;
 export const ATTACHMENT_TYPES = ["image/jpeg", "image/png", "application/pdf"];
