@@ -60,6 +60,8 @@ export interface DeriveOptions {
   libraryBounds?: (definitionId: string) => { minX: number; minY: number; maxX: number; maxY: number } | null;
   /** Ersatzhöhe für Bibliotheksobjekte ohne eigene Höhe. */
   libraryDefaultHeightM?: number;
+  /** Aktives Blatt – erscheint immer, weitere Blätter nur ausdrücklich. */
+  activeSheetId?: string | null;
 }
 
 const EPS = 1e-6;
@@ -187,7 +189,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
 export function deriveProject3D(sheets: Sheet[], sceneOf: (id: string) => any, opts: DeriveOptions = {}): Derived3D[] {
   const out: Derived3D[] = [];
   for (const sh of sheets) {
-    if (!sheetParticipatesIn3D(sh)) continue;
+    if (!sheetParticipatesIn3D(sh, opts.activeSheetId)) continue;
     out.push(...deriveScene3D(sceneOf(sh.id), sh, opts));
   }
   return out;

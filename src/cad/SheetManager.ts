@@ -45,7 +45,8 @@ export interface Sheet {
   scaleValue?: number;
   /** 3D: Blatthöhe in Metern (Standard 0, negativ erlaubt). */
   elevationM?: number;
-  /** 3D: Blatt nimmt an der 3D-Ansicht teil (Standard true). */
+  /** 3D: Blatt wurde ausdrücklich zur 3D-Ansicht hinzugenommen. Ohne Angabe
+   *  zeigt die 3D-Ansicht nur das aktive Blatt (keine ungefragte Überlagerung). */
   participatesIn3D?: boolean;
 }
 
@@ -54,8 +55,9 @@ export function sheetElevationM(sheet: Sheet | null | undefined): number {
   return typeof v === "number" && Number.isFinite(v) ? v : 0;
 }
 
-export function sheetParticipatesIn3D(sheet: Sheet | null | undefined): boolean {
-  return sheet?.participatesIn3D !== false;
+export function sheetParticipatesIn3D(sheet: Sheet | null | undefined, activeSheetId?: string | null): boolean {
+  if (!sheet) return false;
+  return sheet.participatesIn3D === true || (!!activeSheetId && sheet.id === activeSheetId);
 }
 
 export const SheetDefaults = {
@@ -181,7 +183,7 @@ export class SheetManager {
       ...(s.scaleKey ? { scaleKey: s.scaleKey } : {}),
       ...(typeof s.scaleValue === "number" ? { scaleValue: s.scaleValue } : {}),
       ...(typeof s.elevationM === "number" && s.elevationM !== 0 ? { elevationM: s.elevationM } : {}),
-      ...(s.participatesIn3D === false ? { participatesIn3D: false } : {}),
+      ...(typeof s.participatesIn3D === "boolean" ? { participatesIn3D: s.participatesIn3D } : {}),
     }));
   }
 
@@ -205,7 +207,7 @@ export class SheetManager {
       ...(typeof s.scaleKey === "string" ? { scaleKey: s.scaleKey } : {}),
       ...(typeof s.scaleValue === "number" && s.scaleValue > 0 ? { scaleValue: s.scaleValue } : {}),
       ...(typeof s.elevationM === "number" && Number.isFinite(s.elevationM) && s.elevationM !== 0 ? { elevationM: s.elevationM } : {}),
-      ...(s.participatesIn3D === false ? { participatesIn3D: false } : {}),
+      ...(typeof s.participatesIn3D === "boolean" ? { participatesIn3D: s.participatesIn3D } : {}),
     }));
     if (cleaned.length === 0) cleaned.push(makeDefault());
     this.sheets = cleaned;
