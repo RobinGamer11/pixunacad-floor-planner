@@ -43,6 +43,19 @@ export interface Sheet {
   scaleKey?: string;
   /** @deprecated Altfeld (siehe scaleKey). */
   scaleValue?: number;
+  /** 3D: Blatthöhe in Metern (Standard 0, negativ erlaubt). */
+  elevationM?: number;
+  /** 3D: Blatt nimmt an der 3D-Ansicht teil (Standard true). */
+  participatesIn3D?: boolean;
+}
+
+export function sheetElevationM(sheet: Sheet | null | undefined): number {
+  const v = sheet?.elevationM;
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
+
+export function sheetParticipatesIn3D(sheet: Sheet | null | undefined): boolean {
+  return sheet?.participatesIn3D !== false;
 }
 
 export const SheetDefaults = {
