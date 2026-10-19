@@ -2,9 +2,9 @@
  * 3D-Bereich über der gemeinsamen CadApp: Blattzusammenstellung, Auswahl,
  * Körperbeziehungen und Navigation. Alle Änderungen laufen über CadApp.runAction.
  */
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
-import type { Derived3D } from "@/cad/three3d/geometryDerivation";
+import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 import type { Relation3D, RelationIssue } from "@/cad/three3d/relations";
 import { libraryDefinitionsOf, sheetSnapshotOf } from "@/cad/three3d/projectBridge";
 import { renderPlaneTexture } from "@/cad/three3d/planeTextures";
