@@ -71,7 +71,7 @@ export interface StackRef { kind: string; id: string }
  * Bringt die Objekte nach vorne/hinten ihrer jeweiligen Ebene.
  * Relative Reihenfolge der Auswahl bleibt erhalten. Rückgabe: etwas geändert?
  */
-export function moveStack(scene: any, refs: StackRef[], dir: "front" | "back", canEdit: (labelId: string) => boolean = () => true): boolean {
+export function moveStack(scene: any, refs: StackRef[], dir: "front" | "back", canEdit: (labelId: string) => boolean = () => true, dryRun = false): boolean {
   const byLabel = new Map<string, any[]>();
   const seen = new Set<any>();
   for (const r of refs) {
@@ -92,10 +92,11 @@ export function moveStack(scene: any, refs: StackRef[], dir: "front" | "back", c
     const next = dir === "front" ? [...rest, ...sel] : [...sel, ...rest];
     if (next.every((it, i) => it === items[i])) continue;
     void objs;
+    changed = true;
+    if (dryRun) continue;
     const { min, max } = labelExtremes(scene, labelId);
     if (dir === "front") sel.forEach((it, i) => { it.obj.stackOrder = max + 1 + i; });
     else sel.forEach((it, i) => { it.obj.stackOrder = min - sel.length + i; });
-    changed = true;
   }
   return changed;
 }

@@ -1020,6 +1020,12 @@ export class CadApp {
     return this._serializeScene();
   }
 
+  /** Lässt sich die Auswahl nach vorne/hinten bewegen? */
+  canMoveSelectionStack(dir: "front" | "back"): boolean {
+    const refs = this.getStackSelectionRefs();
+    return refs.length > 0 && moveStack(this.scene, refs, dir, (l) => this.labelManager.isEditable(l), true);
+  }
+
   /** Aktuelle Auswahl als Objekt-Referenzen (Einzel- oder Mehrfachauswahl). */
   getStackSelectionRefs(): StackRef[] {
     const multi = ((this.selectTool as any)?.marqueeSelectedIds || []) as StackRef[];
@@ -1048,13 +1054,11 @@ export class CadApp {
   moveSelectionStack(dir: "front" | "back"): boolean {
     const refs = this.getStackSelectionRefs();
     if (!refs.length) return false;
-    let changed = false;
-    this.runAction(() => {
-      changed = moveStack(this.scene, refs, dir, (l) => this.labelManager.isEditable(l));
-      if (!changed) throw new Error("__noop__");
-    });
-    if (changed) this.renderer?.render?.();
-    return changed;
+    const canEdit = (l: string) => this.labelManager.isEditable(l);
+    if (!moveStack(this.scene, refs, dir, canEdit, true)) return false;
+    const ok = this.runAction(() => moveStack(this.scene, refs, dir, canEdit));
+    this.renderer?.render?.();
+    return !!ok;
   }
 
   private _serializeScene(): string {
