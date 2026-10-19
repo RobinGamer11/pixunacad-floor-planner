@@ -192,7 +192,7 @@ export function applyRelations3D(items: Derived3D[], sources: RelationSource[]):
         if (faces.some(f => !f)) { issues.push({ sourceKey: sk, targetKey: tk, message: "Die Zielfläche ist nicht eindeutig bestimmbar – Originalgeometrie bleibt erhalten." }); continue; }
         let cur: Derived3D[] = src;
         for (const f of faces.flat() as Face[]) {
-          cur = cur.flatMap(d => {
+          cur = cur.flatMap((d): Derived3D[] => {
             if (d.type !== "prism" && !(d.type === "mesh" && d.closed)) return [d];
             if (d.type === "prism" && isHorizontal(f)) return limitPrismFlat(d, f, keep);
             return limitMesh(d, f, keep);
