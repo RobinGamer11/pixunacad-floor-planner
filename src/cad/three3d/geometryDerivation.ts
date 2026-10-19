@@ -14,6 +14,9 @@ import { computeStairGeometry } from "../stairGeometry";
 import { objectElevationM } from "../objectMeta";
 import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
+import { buildHealedWallSolidRing } from "../wallSolid";
+import { subtractPrism } from "./relations";
+import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 
 export type Solid3DSource =
   | "wall" | "hatch" | "stair" | "document" | "textbox" | "table" | "library"
@@ -61,7 +64,22 @@ export interface Line3D {
   order?: number;
 }
 
-export type Derived3D = Prism3D | Plane3D | Line3D;
+/** Allgemeiner Körper als Dreiecksnetz (geneigte Schraffuren, Verschneidungsergebnisse). */
+export interface Mesh3D {
+  type: "mesh";
+  source: Solid3DSource;
+  sourceId: string;
+  sheetId: string;
+  mesh: MeshData;
+  /** Geschlossenes Volumen (false = flache Fläche). */
+  closed: boolean;
+  color: string;
+  order?: number;
+  /** Ober-/Unterseite als räumliche Ringe (für „An Oberfläche begrenzen“). */
+  faces?: { top: { outer: Vec3[]; holes: Vec3[][] }; bottom: { outer: Vec3[]; holes: Vec3[][] } };
+}
+
+export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { note?: string };
 
 export interface DeriveOptions {
   /** Grundrissgröße eines Bibliotheksobjekts (lokal, vor Skalierung). */
@@ -131,10 +149,24 @@ export function deriveHatch(hatch: any, sheetId: string, base: number): Derived3
   if (!hatch.points || hatch.points.length < 3) return null;
   const z = base + objectElevationM(hatch);
   const h = Math.max(0, Number(hatch.heightM) || 0);
-  const holes = (hatch.holes || []).filter((r: Vec2[]) => r && r.length >= 3);
+  const holes: Vec2[][] = (hatch.holes || []).filter((r: Vec2[]) => r && r.length >= 3);
   const color = hatch.fillColor || "#cfc6b0";
-  if (h <= EPS) return { type: "plane", source: "hatch", sourceId: hatch.id, sheetId, outline: hatch.points, holes, z, color };
-  return { type: "prism", source: "hatch", sourceId: hatch.id, sheetId, footprint: hatch.points, holes, z0: z, z1: z + h, color };
+  const flatItem = (): Derived3D => h <= EPS
+    ? { type: "plane", source: "hatch", sourceId: hatch.id, sheetId, outline: hatch.points, holes, z, color }
+    : { type: "prism", source: "hatch", sourceId: hatch.id, sheetId, footprint: hatch.points, holes, z0: z, z1: z + h, color };
+  const tilt = resolveTilt(hatch, z);
+  if (!tilt) return flatItem();
+  if (!tilt.frame) return { ...flatItem(), note: tilt.error };
+  // Neigung immer aus der ursprünglichen, ungekippten Geometrie berechnen.
+  const f = tilt.frame;
+  const lift = (ring: Vec2[], zz: number): Vec3[] => ring.map(p => tiltPoint(p.x, p.y, zz, f));
+  const faces = {
+    top: { outer: lift(hatch.points, z + h), holes: holes.map(r => lift(r, z + h)) },
+    bottom: { outer: lift(hatch.points, z), holes: holes.map(r => lift(r, z)) },
+  };
+  const base3 = h <= EPS ? faceMesh(hatch.points, holes, () => z) : slabMesh(hatch.points, holes, () => z, () => z + h);
+  if (!base3) return flatItem();
+  return { type: "mesh", source: "hatch", sourceId: hatch.id, sheetId, mesh: tiltMesh(base3, f), closed: h > EPS, color, faces };
 }
 
 /** Treppe als diskrete Stufen und Podeste (Blockstufen). */
@@ -185,7 +217,8 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
   }
   const push = (o: any, items: Derived3D[]) => { const ord = orderOf.get(o) ?? 0; for (const d of items) { d.order = ord; out.push(d); } };
   const doors = (scene.doors || []).filter(vis);
-  for (const w of scene.walls || []) if (vis(w)) push(w, deriveWall(w, doors, sheetId, base));
+  const walls = deriveWalls(scene, doors, sheetId, base, vis);
+  for (const [w, parts] of walls) push(w, parts);
   for (const h of scene.hatches || []) { if (!vis(h)) continue; const d = deriveHatch(h, sheetId, base); if (d) push(h, [d]); }
   for (const s of scene.stairs || []) if (vis(s)) push(s, deriveStair(s, sheetId, base));
   const flat = (source: Solid3DSource, o: any, corners: Vec2[], color: string, list: "documents" | "textBoxes" | "tables") => {
@@ -218,7 +251,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     if (Math.abs(area) < EPS) continue;
     if (area < 0) fp = [...fp].reverse();
     const z0 = base + objectElevationM(li);
-    const h = Number.isFinite(li.heightM) && li.heightM > 0 ? li.heightM : (opts.libraryDefaultHeightM ?? 1);
+    const h = libraryBodyHeightM(li, opts.libraryDefaultHeightM);
     push(li, [{ type: "prism", source: "library", sourceId: li.id, sheetId, footprint: fp, holes: [], z0, z1: z0 + h, color: "#b9c2b0" }]);
   }
   const line = (source: Solid3DSource, o: any, points: Vec2[], color: string) => {
