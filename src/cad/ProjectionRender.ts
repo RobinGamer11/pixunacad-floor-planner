@@ -12,6 +12,7 @@
 import { Scene } from "./Scene";
 import { restoreOneScene } from "./sceneSerde";
 import { Renderer } from "./Renderer";
+import { hasExplicitStackOrder } from "./stackOrder";
 
 /** Minimale Kamera: worldToScreen/screenToWorld/scale genügen allen Zeichenpfaden. */
 export class ProjectionCamera {
@@ -114,6 +115,10 @@ export function drawSheetSnapshotContent(
 
   for (const labelId of labelIds) {
     // Gleiche Reihenfolge wie im Haupt-Renderer (Hintergrund → Vordergrund).
+    if (hasExplicitStackOrder(scene, labelId)) {
+      try { r._drawLabelByStackOrder(labelId); } catch { /* ein Objekt darf den Ausschnitt nicht killen */ }
+      continue;
+    }
     try { r._drawDocumentsForLabel(labelId); } catch { /* ein Objekt darf den Ausschnitt nicht killen */ }
     try { r._drawHatchesForLabel(labelId); } catch { }
     try { r._drawWallsForLabel(labelId); } catch { }

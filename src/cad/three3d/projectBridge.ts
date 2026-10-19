@@ -5,7 +5,7 @@
  */
 import type { CadApp } from "../CadApp";
 import { SelectionType } from "../constants";
-import { snapshotsBounds } from "../library/libraryGeometry";
+import { snapshotsBounds, instanceCornersWorld } from "../library/libraryGeometry";
 import { deriveProject3D, type Derived3D } from "./geometryDerivation";
 import { objectDisplayName } from "../objectMeta";
 import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "../ProjectionRender";
@@ -41,6 +41,19 @@ function relationSources(app: CadApp): RelationSource[] {
 export function deriveFromApp(app: CadApp): { items: Derived3D[]; issues: RelationIssue[] } {
   const raw = deriveProject3D(app.sheetManager.list(), id => sceneOf(app, id), {
     activeSheetId: app.activeSheetId,
+    isLabelVisible: (l) => app.labelManager.isVisible(l),
+    labelFrontRank: (() => {
+      const list = app.labelManager.list();
+      const rank = new Map(list.map((g: any, i: number) => [g.id, list.length - i]));
+      return (l: string) => rank.get(l) ?? 0;
+    })(),
+    libraryCorners: (li) => {
+      const def: any = app.getLibraryDefinition(li.definitionId);
+      if (!def?.geometry?.length) return null;
+      try {
+        return instanceCornersWorld(def.geometry, { position: { x: li.position.x, y: li.position.y }, rotationRad: li.rotationRad || 0, scaleX: li.scaleX ?? 1, scaleY: li.scaleY ?? 1 } as any);
+      } catch { return null; }
+    },
     libraryBounds: (defId) => {
       const def: any = app.getLibraryDefinition(defId);
       return def?.geometry ? snapshotsBounds(def.geometry) : null;
@@ -53,6 +66,8 @@ export function deriveFromApp(app: CadApp): { items: Derived3D[]; issues: Relati
 export function selectInCad(app: CadApp, sheetId: string, id: string) {
   const hit = findObject(app, sheetId, id);
   if (!hit) return;
+  // Gesperrte Ebenen: sichtbar, aber wie im CAD nicht anwählbar.
+  if (hit.obj?.labelId && !app.labelManager.isEditable(hit.obj.labelId)) return;
   if (app.activeSheetId !== sheetId) app.setActiveSheetId(sheetId);
   const map: Record<string, any> = {
     walls: { type: SelectionType.WALL, wallId: id },
@@ -152,4 +167,14 @@ export async function render2DView(app: CadApp, objects: DossierObject[]): Promi
   }
   const badges = objects.map(o => { const p = cam.worldToScreen(o.center.x, o.center.y); return { id: o.dossierId, x: p.x, y: p.y }; });
   return { png: out.toDataURL("image/png"), w, h, badges };
+}
+
+/** Serialisierter Stand eines Blattes (auch das aktive). */
+export function sheetSnapshotOf(app: CadApp, sheetId: string): any | null {
+  const sc = sceneOf(app, sheetId);
+  return sc ? (app as any)._serializeOneScene(sc) : null;
+}
+
+export function libraryDefinitionsOf(app: CadApp): any[] {
+  return (app as any).libraryDefinitions || [];
 }
