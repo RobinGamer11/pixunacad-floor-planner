@@ -47,12 +47,13 @@ describe("3D-Einstellungen – Neigen", () => {
     expect(app.runAction).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("Neigen"));
     const svg = container.querySelector('svg[viewBox="0 0 240 150"]')!;
+    (svg as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 240, height: 150, right: 240, bottom: 150 });
     const angleText = () => Number((svg.querySelector("text")?.textContent || "").split("°")[0].replace(",", "."));
     // erster Kontakt startet ohne Sprung
     ptr(svg, "pointerDown", 100, 100);
     expect(angleText()).toBe(0);
-    ptr(svg, "pointerMove", 100, 99.995);
-    ptr(svg, "pointerUp", 100, 99.995);
+    ptr(svg, "pointerMove", 100, 95);
+    ptr(svg, "pointerUp", 100, 95);
     const a1 = angleText();
     expect(Math.abs(a1)).toBeGreaterThan(1);
     // Finger angehoben: nichts gespeichert, Vorschau bleibt
@@ -61,8 +62,8 @@ describe("3D-Einstellungen – Neigen", () => {
     // erneuter Kontakt an anderer Stelle: kein Sprung
     ptr(svg, "pointerDown", 20, 20);
     expect(angleText()).toBe(a1);
-    ptr(svg, "pointerMove", 20, 19.995);
-    ptr(svg, "pointerUp", 20, 19.995);
+    ptr(svg, "pointerMove", 20, 15);
+    ptr(svg, "pointerUp", 20, 15);
     const a2 = angleText();
     expect(Math.abs(a2)).toBeGreaterThan(Math.abs(a1));
     // Übernehmen-Knopf: Koordinaten des Knopfs spielen keine Rolle
@@ -83,7 +84,8 @@ describe("3D-Einstellungen – Neigen", () => {
     fireEvent.pointerDown(container.querySelector('line[stroke-width="14"]')!);
     fireEvent.click(screen.getByText("Neigen"));
     const svg = container.querySelector('svg[viewBox="0 0 240 150"]')!;
-    ptr(svg, "pointerDown", 10, 10); ptr(svg, "pointerMove", 10, 9.995); ptr(svg, "pointerUp", 10, 9.995);
+    (svg as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 240, height: 150, right: 240, bottom: 150 });
+    ptr(svg, "pointerDown", 10, 10); ptr(svg, "pointerMove", 10, 5); ptr(svg, "pointerUp", 10, 5);
     fireEvent.keyDown(window, { key: "Escape" });
     expect(app.runAction).not.toHaveBeenCalled();
     expect(h.tilt3D).toBeUndefined();
