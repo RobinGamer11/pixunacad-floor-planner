@@ -2,6 +2,7 @@
  * 3D-Bereich über der gemeinsamen CadApp: Blattzusammenstellung, Auswahl,
  * Körperbeziehungen und Navigation. Alle Änderungen laufen über CadApp.runAction.
  */
+import type React from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
@@ -14,7 +15,7 @@ import { sheetParticipatesIn3D, sheetElevationM } from "@/cad/SheetManager";
 import type { Viewer3DHandle } from "./Viewer3D";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { DEFAULT_PRESETS, PRESET_OPTIONS, type RenderPresets } from "@/cad/three3d/dossier";
-import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Mouse } from "lucide-react";
+import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Settings } from "lucide-react";
 import { Joystick3D } from "./Joystick3D";
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
@@ -26,9 +27,20 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   // Raster: lokaler Bedienzustand pro Gerät (nie Projekt/Cloud).
   const [grid, setGrid] = useState<{ on: boolean; opacity: number }>(() => {
     try { const g = JSON.parse(localStorage.getItem("pixuna.3d.grid") || "null"); if (g && typeof g.on === "boolean") return g; } catch {}
-    return { on: true, opacity: 1 };
+    return { on: true, opacity: 0.1 };
   });
   const [gridPanel, setGridPanel] = useState(false);
+  const [sensPanel, setSensPanel] = useState(false);
+  // Empfindlichkeit: lokaler Bedienzustand pro Gerät (Prozent).
+  const [sens, setSens] = useState<{ move: number; look: number }>(() => {
+    try { const g = JSON.parse(localStorage.getItem("pixuna.3d.sens") || "null"); if (g && Number.isFinite(g.move) && Number.isFinite(g.look)) return g; } catch {}
+    return { move: 100, look: 100 };
+  });
+  useEffect(() => {
+    try { localStorage.setItem("pixuna.3d.sens", JSON.stringify(sens)); } catch {}
+    const apply = () => viewer.current?.setSensitivity(sens.move / 100, sens.look / 100);
+    apply(); const t = window.setTimeout(apply, 400); return () => window.clearTimeout(t);
+  }, [sens, items.length]);
   const project = useProject(projectId);
   const presets: RenderPresets = { ...DEFAULT_PRESETS, ...(project?.settings?.renderPresets ?? {}) };
   const setPresets = (patch: Partial<RenderPresets>) => { if (projectId) projectStore.setRenderPresets(projectId, { ...presets, ...patch }); };
@@ -221,40 +233,66 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         <div className="absolute right-3 bottom-3 z-10 flex flex-col items-end gap-2">
           <div className="flex items-center gap-1.5">
             {gridPanel && (
-              <div className="h-8 rounded-md border bg-card px-2 flex items-center gap-2 text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>
-                <button className="font-medium underline-offset-2 hover:underline" onClick={() => setGrid(g => ({ ...g, on: !g.on }))}>{grid.on ? "Ein" : "Aus"}</button>
+              <div className="h-8 rounded-md border bg-card px-1 flex items-center gap-2 text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <button className="h-6 px-2.5 rounded text-[11px] font-semibold border" aria-pressed={grid.on}
+                  style={grid.on ? { background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))", borderColor: "hsl(var(--accent-gold))" } : { borderColor: "hsl(var(--hairline))" }}
+                  onClick={() => setGrid(g => ({ ...g, on: !g.on }))}>{grid.on ? "Ein" : "Aus"}</button>
                 <input type="range" min={0.1} max={1} step={0.05} value={grid.opacity} disabled={!grid.on} aria-label="Rasterstärke"
-                  onChange={e => setGrid(g => ({ ...g, opacity: parseFloat(e.target.value) }))} className="w-28" />
+                  onChange={e => setGrid(g => ({ ...g, opacity: parseFloat(e.target.value) }))} className="w-28 mr-1" />
               </div>
             )}
             <button className={`${btn} bg-card w-8 px-0 grid place-items-center`} title="Raster ein/aus und Stärke"
-              style={grid.on ? { color: "hsl(var(--accent-gold))" } : { opacity: 0.6 }} onClick={() => setGridPanel(v => !v)}>
+              style={grid.on ? { color: "hsl(var(--accent-gold))" } : { opacity: 0.6 }} onClick={() => { setGridPanel(v => !v); setSensPanel(false); }}>
               <Grid3x3 size={15} />
             </button>
-            <button className={`${btn} bg-card flex items-center gap-1.5`} onClick={() => viewer.current?.fitAll()}>
-              <Maximize2 size={14} /> Gesamte Szene zeigen
+            <div className="relative">
+              {sensPanel && (
+                <div className="absolute bottom-10 right-0 w-56 rounded-lg border bg-card p-2.5 shadow-lg space-y-2 text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>
+                  <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">EMPFINDLICHKEIT</div>
+                  {([["move", "Laufen"], ["look", "Blick"]] as const).map(([k, l]) => (
+                    <label key={k} className="block">
+                      <span className="flex justify-between text-[11px]"><span>{l}</span><span className="tabular-nums">{sens[k]} %</span></span>
+                      <input type="range" min={10} max={300} step={5} value={sens[k]} aria-label={`Empfindlichkeit ${l}`}
+                        onChange={e => setSens(v => ({ ...v, [k]: parseInt(e.target.value, 10) }))} className="w-full" />
+                    </label>
+                  ))}
+                  <div className="text-[9px] text-muted-foreground">Gilt für Joysticks, Tastatur und Maus.</div>
+                </div>
+              )}
+              <button className={`${btn} bg-card w-8 px-0 grid place-items-center`} title="Empfindlichkeit"
+                onClick={() => { setSensPanel(v => !v); setGridPanel(false); }}>
+                <Settings size={15} />
+              </button>
+            </div>
+            <button className={`${btn} bg-card w-8 px-0 grid place-items-center`} title="Gesamte Szene zeigen" aria-label="Gesamte Szene zeigen" onClick={() => viewer.current?.fitAll()}>
+              <Maximize2 size={14} />
             </button>
           </div>
-          {tabletAidOn && (
-            <div className="flex items-end gap-3">
-              <Joystick3D label="Laufen" onChange={(x, y) => viewer.current?.setStick("move", x, y)} />
-              <Joystick3D label="Blick" onChange={(x, y) => viewer.current?.setStick("look", x, y)} />
-            </div>
-          )}
         </div>
+        {tabletAidOn && (
+          <>
+            <Joystick3D label="Laufen" storageKey="pixuna.3d.stick.move"
+              defaultPos={() => ({ x: window.innerWidth - 300 - 260, y: window.innerHeight - 190 })}
+              onChange={(x, y) => viewer.current?.setStick("move", x, y)} />
+            <Joystick3D label="Blick" storageKey="pixuna.3d.stick.look"
+              defaultPos={() => ({ x: window.innerWidth - 300 - 135, y: window.innerHeight - 190 })}
+              onChange={(x, y) => viewer.current?.setStick("look", x, y)} />
+          </>
+        )}
         {/* Bedienungshilfe unten mittig */}
         {helpOn && (
-          <div className="absolute left-1/2 -translate-x-1/2 bottom-3 z-10 rounded-lg border bg-card px-3 py-2 shadow-sm flex items-center gap-4 text-[11px] pointer-events-none"
-            style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
-            <div className="flex items-center gap-2">
-              <div className="grid grid-cols-3 gap-0.5">
-                <span /><Key k="W" a="▲" /><span />
-                <Key k="A" a="◀" /><Key k="S" a="▼" /><Key k="D" a="▶" />
-              </div>
-              <span>Bewegen</span>
+          <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-3 z-10 rounded-xl border shadow-xl backdrop-blur-md px-2 py-1.5"
+            style={{ borderColor: "hsl(var(--overlay-surface) / 0.24)", background: "hsl(var(--overlay-ink) / 0.78)", color: "hsl(var(--overlay-surface))" }}>
+            <div className="mb-0.5 text-[8px] font-semibold uppercase tracking-[0.16em] opacity-70">Navigation</div>
+            <div className="flex items-end justify-center">
+              <HelpItem icon={
+                <div className="grid grid-cols-3 gap-0.5">
+                  <span /><Key k="W" a="▲" /><span />
+                  <Key k="A" a="◀" /><Key k="S" a="▼" /><Key k="D" a="▶" />
+                </div>} shortcut="W A S D" description="Bewegen" />
+              <HelpItem icon={<MouseGlyph3D />} shortcut="Maustaste gedrückt" description="Kamera bewegen" />
+              <HelpItem icon={<div className="flex items-center gap-1"><Key k="Shift" /><span className="text-[10px]">+</span><MouseGlyph3D wheel /></div>} shortcut="Shift + Rad gedrückt" description="Drehen" />
             </div>
-            <div className="flex items-center gap-1.5"><Mouse size={16} /><span>gedrückt: Kamera bewegen</span></div>
-            <div className="flex items-center gap-1.5"><Key k="Shift" /><span>+</span><Mouse size={16} /><span>Mausrad gedrückt: Drehen</span></div>
           </div>
         )}
       </div>
@@ -308,10 +346,32 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   );
 }
 
+function HelpItem({ icon, shortcut, description }: { icon: React.ReactNode; shortcut: string; description: string }) {
+  return (
+    <div className="flex min-w-[62px] flex-col items-center justify-end px-1.5 py-1 text-center">
+      <div className="mb-1 flex min-h-8 items-center justify-center">{icon}</div>
+      <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">{shortcut}</div>
+      <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">{description}</div>
+    </div>
+  );
+}
+
+function MouseGlyph3D({ wheel = false }: { wheel?: boolean }) {
+  const c = "hsl(var(--overlay-surface) / 0.86)", a = "hsl(var(--overlay-surface))";
+  return (
+    <svg viewBox="0 0 32 42" className="h-8 w-7" fill="none" aria-hidden="true">
+      {!wheel && <path d="M6 16V13C6 6.7 9.7 3 15 3v13H6Z" fill={a} opacity="0.92" />}
+      <rect x="5" y="2.5" width="22" height="37" rx="11" stroke={c} strokeWidth="1.6" />
+      <path d="M16 3v13" stroke={c} strokeWidth="1.2" /><path d="M5.8 16.5h20.4" stroke={c} strokeWidth="1.2" />
+      <rect x="13.4" y="6" width="5.2" height="9" rx="2.6" fill={wheel ? a : "transparent"} stroke={c} strokeWidth="1.2" />
+    </svg>
+  );
+}
+
 function Key({ k, a }: { k: string; a?: string }) {
   return (
     <span className="min-w-[20px] h-5 px-1 rounded border grid place-items-center leading-none text-[9px] font-semibold"
-      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))" }}>
+      style={{ borderColor: "hsl(var(--overlay-surface) / 0.55)", background: "hsl(var(--overlay-surface) / 0.12)", color: "hsl(var(--overlay-surface))" }}>
       {a ? <span className="flex flex-col items-center"><span className="text-[6px] opacity-60">{a}</span>{k}</span> : k}
     </span>
   );
