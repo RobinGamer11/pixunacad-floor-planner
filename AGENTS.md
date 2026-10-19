@@ -53,3 +53,4 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Objektname/-ID/-Beschreibung nur über `cad/objectMeta.ts` (Serialisierung/Laden gekoppelt, Kopien ohne ID).
 - Flächen schneiden/vereinigen nur via `cad/cutGeometry.ts` (`restoreArcs` = echte Bögen).
 - Infoboxen sind Szenenobjekte (`Scene.infoBoxes`, Serialisierung wie Treppen); flüchtige Auswahl/Entwurf nur in `lib/infoBoxUi.ts`, Bearbeitung nur im Einstellungspanel – keine DB-Kommentare mehr im CAD.
+- Stapelreihenfolge innerhalb einer Ebene nur über `src/cad/stackOrder.ts` (`stackOrder` via `objectMeta.ts`); fehlender Wert = alte Typordnung, damit Altprojekte unverändert bleiben.

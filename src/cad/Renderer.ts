@@ -34,6 +34,7 @@ import { buildHealedWallSolidRing, buildWallSolidRing, ringToPCPolygon } from ".
 import { drawDoor } from "./doorGeom";
 import { isExportMode } from "@/lib/printExport";
 import { drawStair } from "./stairDraw";
+import { hasExplicitStackOrder, orderedLabelItems } from "./stackOrder";
 import { type MultiPolygon } from "polygon-clipping";
 
 export interface Selection {
@@ -309,6 +310,7 @@ export class Renderer {
     for (let i = order.length - 1; i >= 0; i--) {
       const labelId = order[i].id;
       if (!this.labels.isVisible(labelId)) continue;
+      if (hasExplicitStackOrder(this.scene, labelId)) { this._drawLabelByStackOrder(labelId); continue; }
       this._drawDocumentsForLabel(labelId);
       // Dunkelmodus: Dokumente (JPG/PNG/PDF) werden in einem eigenen,
       // ungefilterten Durchgang gezeichnet — hier endet dieser Durchgang.
@@ -333,6 +335,56 @@ export class Renderer {
     }
   }
 
+
+  /**
+   * Ebene mit expliziter Stapelreihenfolge: alle Objektarten gemischt,
+   * hinten → vorne. Wände werden gemeinsam (Vereinigung) an der Stelle der
+   * hintersten Wand gezeichnet.
+   */
+  private _drawLabelByStackOrder(labelId: string) {
+    const items = orderedLabelItems(this.scene, labelId);
+    const r = this._viewRect();
+    const hideGuides = isExportMode();
+    let wallsDone = false;
+    let segRun: any[] = [];
+    const flushSegs = () => { if (segRun.length) { this._drawSegmentJoints(segRun); segRun = []; } };
+    for (const it of items) {
+      if (this._darkPass === "docs" && it.key !== "documents") continue;
+      if (it.key !== "segments") flushSegs();
+      const o = it.obj;
+      switch (it.key) {
+        case "documents":
+          if (this._darkPass !== "vector") this._drawSingleDocument(o);
+          break;
+        case "hatches":
+          if (this._hatchInView(o, r)) this._drawSingleHatch(o);
+          break;
+        case "walls":
+          if (!wallsDone) { wallsDone = true; this._drawWallsForLabel(labelId); }
+          break;
+        case "doors": {
+          const w = this.scene.getWallById(o.wallId);
+          if (w) drawDoor(this.ctx, this.camera, w, o, 1);
+          break;
+        }
+        case "stairs":
+          if (!this.stairHiddenIds.has(o.id)) drawStair(this.ctx, this.camera as any, o, { selected: !isExportMode() && this.stairHighlightIds.has(o.id), zoomFactor: this.camera.scale / this.referencePxPerM, textPtScale: this.textPtScale });
+          break;
+        case "segments":
+          if (!this._segInView(o, r) || (hideGuides && o.isGuide)) break;
+          this._drawSingleSegment(o);
+          segRun.push(o);
+          break;
+        case "freeStrokes": this._drawSingleFreeStroke(o); break;
+        case "dimensions": this._drawSingleDimension(this.ctx, this.camera, this._dimForRender(o), false); break;
+        case "textBoxes": if (this._textInView(o, r)) this._drawSingleTextBox(o); break;
+        case "tables": this._drawSingleTable(o); break;
+        case "libraryInstances": this._drawSingleLibraryInstance(o, labelId); break;
+      }
+    }
+    flushSegs();
+    if (this._darkPass !== "docs" && this._isLastVisibleLabel(labelId)) this._drawTextBoxHoverOutline();
+  }
 
   /**
    * „Nur Zeichenfläche schwarz“: Der dunkle Hintergrund und die Invertierung
@@ -1395,8 +1447,14 @@ export class Renderer {
     if (!this.labels.isVisible(labelId)) return;
     for (const inst of list) {
       if (inst.labelId !== labelId) continue;
+      this._drawSingleLibraryInstance(inst, labelId);
+    }
+  }
+
+  private _drawSingleLibraryInstance(inst: any, labelId: string) {
+    {
       const res = this._resolveLibraryInstance(inst);
-      if (!res) continue;
+      if (!res) return;
       // Die aufgelöste Geometrie wird mit den NORMALEN Zeichenpfaden gerendert:
       // dazu wird kurzzeitig auf die transiente Szene umgeschaltet.
       const realScene = this.scene;

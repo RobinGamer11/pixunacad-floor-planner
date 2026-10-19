@@ -27,7 +27,7 @@ const KIND_OF_KEY: Record<string, string> = {
 export type AttachmentCategory = "Material" | "Vorderseite" | "Rückseite" | "Seitenansicht";
 export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = ["Material", "Vorderseite", "Rückseite", "Seitenansicht"];
 export interface ObjectAttachment { id: string; name: string; type: string; size: number; dataUrl: string; category?: AttachmentCategory }
-export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number; relations3D?: Relation3D[] }
+export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number; relations3D?: Relation3D[]; stackOrder?: number }
 
 /** 3D-Körperbeziehung, am Quellobjekt gespeichert (Ziel über Blatt + Objekt-ID). */
 export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above" }
@@ -167,6 +167,8 @@ export function copyObjectMeta(obj: any, opts: { withCode?: boolean } = {}): Obj
   if (typeof obj?.elevationM === "number" && Number.isFinite(obj.elevationM) && obj.elevationM !== 0) out.elevationM = obj.elevationM;
   // Beziehungen hängen an der Identität: Kopien (ohne Kennung) übernehmen sie nicht.
   if (opts.withCode !== false && Array.isArray(obj?.relations3D) && obj.relations3D.length) out.relations3D = obj.relations3D.map((r: Relation3D) => ({ ...r }));
+  // Stapelreihenfolge gehört zur Identität; Kopien kommen ohnehin nach vorne.
+  if (opts.withCode !== false && typeof obj?.stackOrder === "number" && Number.isFinite(obj.stackOrder)) out.stackOrder = obj.stackOrder;
   if (opts.withCode !== false && typeof obj?.objCode === "string" && obj.objCode) out.objCode = obj.objCode;
   return out;
 }
@@ -180,6 +182,7 @@ export function applyObjectMeta(obj: any, src: any, opts: { withCode?: boolean }
   if (m.objAttachments) obj.objAttachments = m.objAttachments;
   if (typeof m.elevationM === "number") obj.elevationM = m.elevationM;
   if (m.relations3D) obj.relations3D = m.relations3D;
+  if (typeof m.stackOrder === "number") obj.stackOrder = m.stackOrder;
 }
 
 /** Hängt die Objektdaten an eine serialisierte Szene (Zuordnung über id). */
@@ -209,7 +212,7 @@ export function restoreObjectMeta(scene: any, data: any, before: Record<string, 
   if (!data) return;
   for (const key of SCENE_OBJECT_KEYS) {
     const raw = data[key];
-    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments || typeof r.elevationM === "number" || r.relations3D))) continue;
+    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments || typeof r.elevationM === "number" || r.relations3D || typeof r.stackOrder === "number"))) continue;
     const created = ((scene?.[key] || []) as any[]).slice(before[key] ?? 0);
     if (created.length !== raw.length) continue;
     raw.forEach((r: any, i: number) => applyObjectMeta(created[i], r));
