@@ -6,6 +6,7 @@
  * Kennung mit vollständigem Objektnamen, Objekt-ID (objCode), Blatt und interner ID.
  * Ausgabe als PDF (pdf-lib) und als JSON für die spätere KI-Übergabe.
  */
+import { meshBounds } from "./solidMesh";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { Derived3D } from "./geometryDerivation";
 import type { ObjectAttachment } from "../objectMeta";
@@ -84,6 +85,13 @@ export function buildDossierData(projectName: string, items: Derived3D[], info: 
     if (!meta) continue;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const d of list) {
+      if (d.type === "mesh") {
+        // Tatsächlich geneigte/begrenzte Geometrie.
+        const b = meshBounds(d.mesh);
+        minX = Math.min(minX, b.minX); maxX = Math.max(maxX, b.maxX); minY = Math.min(minY, b.minY); maxY = Math.max(maxY, b.maxY);
+        z0 = Math.min(z0, b.minZ); z1 = Math.max(z1, b.maxZ);
+        continue;
+      }
       const pts = d.type === "prism" ? d.footprint : d.type === "plane" ? d.outline : d.points;
       for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
       const a = d.type === "prism" ? d.z0 : d.z, b = d.type === "prism" ? d.z1 : d.z;
