@@ -5,7 +5,7 @@
  * Brüstung …). Jede bestätigte Änderung = genau ein Undo-Schritt (runAction).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, X, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw } from "lucide-react";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
 import { sheetElevationM } from "@/cad/SheetManager";
@@ -291,7 +291,7 @@ const TiltControl: React.FC<{ app: any; obj: any; z: number; h: number; editable
           </div>
           <div className="flex gap-1.5">
             <button type="button" onClick={commit} className="flex h-7 flex-1 items-center justify-center gap-1 rounded-md border text-[11px] font-medium" style={{ ...fieldStyle, background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}><Check size={13} /> Übernehmen</button>
-            <button type="button" onClick={cancel} className="flex h-7 flex-1 items-center justify-center gap-1 rounded-md border text-[11px]" style={fieldStyle}><X size={13} /> Abbrechen</button>
+            <button type="button" onClick={cancel} className="flex h-7 flex-1 items-center justify-center gap-1 rounded-md border text-[11px]" style={fieldStyle}><XIcon size={13} /> Abbrechen</button>
           </div>
         </div>
       )}
