@@ -4,7 +4,7 @@
  * nur das eine Objekt, im Rahmen seiner vier Ecken. Flüchtig, nie gespeichert.
  */
 import type { Vec2 } from "../geometry";
-import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "../ProjectionRender";
+import { ProjectionCamera, drawSheetSnapshotContent, preloadSnapshotDocImages } from "../ProjectionRender";
 
 const MAX_PX = 1024;
 const MAX_PX_PER_M = 600;
@@ -74,11 +74,6 @@ export async function renderPlaneTexture(
   // … dann in die Achsen des Objekts drehen (inkl. Spiegelung).
   const ax = ux / wM, ay = uy / wM, bx = vx / hM, by = vy / hM;
   ctx.setTransform(ax, bx, ay, by, 0, 0);
-  const inner = renderProjectionCanvas(snap, definitions, cam, 1, 1, imgs);
-  void inner;
-  // renderProjectionCanvas zeichnet in eine eigene Canvas; für die Drehung
-  // zeichnen wir direkt mit derselben Routine in unseren Kontext.
-  const { drawSheetSnapshotContent } = await import("../ProjectionRender");
   drawSheetSnapshotContent(ctx, snap, cam, definitions, imgs);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   const transparent = list === "documents";
