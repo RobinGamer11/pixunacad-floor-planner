@@ -22,3 +22,4 @@
 - 3D-Blattzusammenstellung: aktives Blatt immer, weitere nur mit `participatesIn3D === true` (verhindert ungefragte Überlagerung von Varianten).
 - Körperbeziehungen liegen als `relations3D` (Ziel = Blatt + Objekt-ID, Fläche = top/bottom + keep) am Quellobjekt über `objectMeta.ts`; ausgewertet nur flüchtig in `three3d/relations.ts`, Kopien übernehmen sie nicht.
 - Render-Dossier: Kennungen (D001 …) vergibt nur `three3d/dossier.ts` je Blatt+Objekt; Bildvorgaben liegen in `project.settings.renderPresets`.
+- 3D-Platteninhalte (Dokumente/Texte/Tabellen) zeichnet nur `three3d/planeTextures.ts` über den normalen CAD-Renderer (ein Objekt je Bild, flüchtig); Tiefenversatz statt Höhenverschiebung gegen Flackern.
