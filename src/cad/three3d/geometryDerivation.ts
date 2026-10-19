@@ -12,6 +12,8 @@ import { buildWallSolidRing } from "../wallSolid";
 import { wallBandPolygon, wallReferenceLengths } from "../doorGeom";
 import { computeStairGeometry } from "../stairGeometry";
 import { objectElevationM } from "../objectMeta";
+import { documentVisibleCornersWorld } from "../documentGeometry";
+import { orderedLabelItems } from "../stackOrder";
 
 export type Solid3DSource =
   | "wall" | "hatch" | "stair" | "document" | "textbox" | "table" | "library"
@@ -25,6 +27,8 @@ export interface Prism3D {
   sheetId: string;
   footprint: Vec2[];
   holes: Vec2[][];
+  /** Zeichenreihenfolge (Ebene + Stapel), größer = weiter vorne. */
+  order?: number;
   z0: number;
   z1: number;
   color: string;
@@ -40,6 +44,9 @@ export interface Plane3D {
   holes: Vec2[][];
   z: number;
   color: string;
+  order?: number;
+  /** Inhalt als Bild: Ecken in Reihenfolge oben-links, oben-rechts, unten-rechts, unten-links. */
+  texture?: { list: "documents" | "textBoxes" | "tables" };
 }
 
 /** Flaches Linien-Overlay (Linien, Maße, Freihand) ohne Extrusion. */
@@ -51,6 +58,7 @@ export interface Line3D {
   points: Vec2[];
   z: number;
   color: string;
+  order?: number;
 }
 
 export type Derived3D = Prism3D | Plane3D | Line3D;
@@ -62,6 +70,12 @@ export interface DeriveOptions {
   libraryDefaultHeightM?: number;
   /** Aktives Blatt – erscheint immer, weitere Blätter nur ausdrücklich. */
   activeSheetId?: string | null;
+  /** Exakte Welt-Ecken eines Bibliothekselements (Nullpunkt, Skalierung, Spiegelung, Drehung). */
+  libraryCorners?: (instance: any) => Vec2[] | null;
+  /** Ausgeblendete Ebenen erscheinen nicht in 3D. */
+  isLabelVisible?: (labelId: string) => boolean;
+  /** Vordergrund-Rang einer Ebene (größer = weiter vorne). */
+  labelFrontRank?: (labelId: string) => number;
 }
 
 const EPS = 1e-6;
@@ -149,35 +163,66 @@ export function deriveStair(stair: any, sheetId: string, base: number): Prism3D[
   return out;
 }
 
+/** Rechteck (oben-links, oben-rechts, unten-rechts, unten-links) um einen Mittelpunkt. */
+function boxCorners(center: Vec2, w: number, h: number, rot: number): Vec2[] { return rect(center, w, h, rot); }
+
 /** Leitet alle 3D-Körper eines Blattes ab. */
 export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}): Derived3D[] {
   if (!scene) return [];
   const sheetId = sheet.id;
   const base = sheetElevationM(sheet);
   const out: Derived3D[] = [];
-  const doors = scene.doors || [];
-  for (const w of scene.walls || []) out.push(...deriveWall(w, doors, sheetId, base));
-  for (const h of scene.hatches || []) { const d = deriveHatch(h, sheetId, base); if (d) out.push(d); }
-  for (const s of scene.stairs || []) out.push(...deriveStair(s, sheetId, base));
-  const flat = (source: Solid3DSource, o: any, center: Vec2, w: number, h: number, color: string) => {
+  const vis = (o: any) => !opts.isLabelVisible || !o?.labelId || opts.isLabelVisible(o.labelId);
+  // Reihenfolge wie im 2D: Ebene, dann Stapel innerhalb der Ebene.
+  const orderOf = new Map<any, number>();
+  const labelIds = new Set<string>();
+  for (const k of ["documents", "hatches", "walls", "doors", "stairs", "segments", "freeStrokes", "dimensions", "textBoxes", "tables", "libraryInstances"]) {
+    for (const o of scene[k] || []) if (o?.labelId) labelIds.add(o.labelId);
+  }
+  for (const l of labelIds) {
+    const rank = opts.labelFrontRank ? opts.labelFrontRank(l) : 0;
+    orderedLabelItems(scene, l).forEach((it, i) => orderOf.set(it.obj, rank * 1e6 + i));
+  }
+  const push = (o: any, items: Derived3D[]) => { const ord = orderOf.get(o) ?? 0; for (const d of items) { d.order = ord; out.push(d); } };
+  const doors = (scene.doors || []).filter(vis);
+  for (const w of scene.walls || []) if (vis(w)) push(w, deriveWall(w, doors, sheetId, base));
+  for (const h of scene.hatches || []) { if (!vis(h)) continue; const d = deriveHatch(h, sheetId, base); if (d) push(h, [d]); }
+  for (const s of scene.stairs || []) if (vis(s)) push(s, deriveStair(s, sheetId, base));
+  const flat = (source: Solid3DSource, o: any, corners: Vec2[], color: string, list: "documents" | "textBoxes" | "tables") => {
+    if (corners.length !== 4) return;
+    const w = Math.hypot(corners[1].x - corners[0].x, corners[1].y - corners[0].y);
+    const h = Math.hypot(corners[3].x - corners[0].x, corners[3].y - corners[0].y);
     if (!(w > EPS && h > EPS)) return;
-    out.push({ type: "plane", source, sourceId: o.id, sheetId, outline: rect(center, w, h, o.rotationRad), holes: [], z: base + objectElevationM(o), color });
+    push(o, [{ type: "plane", source, sourceId: o.id, sheetId, outline: corners, holes: [], z: base + objectElevationM(o), color, texture: { list } }]);
   };
-  for (const d of scene.documents || []) flat("document", d, d.position, d.widthM, d.heightM, "#ffffff");
-  for (const t of scene.textBoxes || []) flat("textbox", t, t.center, t.widthM, t.heightM, "#f6f3ea");
-  for (const t of scene.tables || []) flat("table", t, t.center, t.widthM, t.heightM, "#f6f3ea");
+  for (const d of scene.documents || []) {
+    if (!vis(d) || !d.position) continue;
+    let c: Vec2[] = [];
+    try { c = documentVisibleCornersWorld(d); } catch { /* defektes Dokument */ }
+    flat("document", d, c, "#ffffff", "documents");
+  }
+  for (const t of scene.textBoxes || []) if (vis(t)) flat("textbox", t, boxCorners(t.center, t.widthM, t.heightM, t.rotationRad), "#f6f3ea", "textBoxes");
+  for (const t of scene.tables || []) if (vis(t)) flat("table", t, boxCorners(t.center, t.widthM, t.heightM, t.rotationRad), "#f6f3ea", "tables");
   for (const li of scene.libraryInstances || []) {
-    const b = opts.libraryBounds?.(li.definitionId);
-    if (!b) continue;
-    const w = (b.maxX - b.minX) * Math.abs(li.scaleX || 1);
-    const d = (b.maxY - b.minY) * Math.abs(li.scaleY || 1);
-    if (!(w > EPS && d > EPS)) continue;
+    if (!vis(li)) continue;
+    let fp: Vec2[] | null = opts.libraryCorners?.(li) ?? null;
+    if (!fp) {
+      const b = opts.libraryBounds?.(li.definitionId);
+      if (!b) continue;
+      fp = rect(li.position, (b.maxX - b.minX) * Math.abs(li.scaleX || 1), (b.maxY - b.minY) * Math.abs(li.scaleY || 1), li.rotationRad);
+    }
+    if (fp.length < 3) continue;
+    // Spiegelung dreht die Umlaufrichtung – für die Extrusion vereinheitlichen.
+    let area = 0;
+    for (let i = 0; i < fp.length; i++) { const a = fp[i], b = fp[(i + 1) % fp.length]; area += a.x * b.y - b.x * a.y; }
+    if (Math.abs(area) < EPS) continue;
+    if (area < 0) fp = [...fp].reverse();
     const z0 = base + objectElevationM(li);
     const h = Number.isFinite(li.heightM) && li.heightM > 0 ? li.heightM : (opts.libraryDefaultHeightM ?? 1);
-    out.push({ type: "prism", source: "library", sourceId: li.id, sheetId, footprint: rect(li.position, w, d, li.rotationRad), holes: [], z0, z1: z0 + h, color: "#b9c2b0" });
+    push(li, [{ type: "prism", source: "library", sourceId: li.id, sheetId, footprint: fp, holes: [], z0, z1: z0 + h, color: "#b9c2b0" }]);
   }
   const line = (source: Solid3DSource, o: any, points: Vec2[], color: string) => {
-    if (points.length >= 2) out.push({ type: "line", source, sourceId: o.id, sheetId, points, z: base + objectElevationM(o), color });
+    if (vis(o) && points.length >= 2) push(o, [{ type: "line", source, sourceId: o.id, sheetId, points, z: base + objectElevationM(o), color }]);
   };
   for (const s of scene.segments || []) if (!s.isGuide) line("segment", s, [s.a, s.b], s.color || "#111111");
   for (const d of scene.dimensions || []) line("dimension", d, [d.p1, d.p2], d.lineColor || "#111111");
