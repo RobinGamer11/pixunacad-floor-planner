@@ -32,9 +32,9 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [gridPanel, setGridPanel] = useState(false);
   const [sensPanel, setSensPanel] = useState(false);
   // Empfindlichkeit: lokaler Bedienzustand pro Gerät (Prozent).
-  const [sens, setSens] = useState<{ move: number; look: number }>(() => {
-    try { const g = JSON.parse(localStorage.getItem("pixuna.3d.sens") || "null"); if (g && Number.isFinite(g.move) && Number.isFinite(g.look)) return g; } catch {}
-    return { move: 100, look: 100 };
+  const [sens, setSens] = useState<{ move: number; look: number; stick: number }>(() => {
+    try { const g = JSON.parse(localStorage.getItem("pixuna.3d.sens") || "null"); if (g && Number.isFinite(g.move) && Number.isFinite(g.look)) return { stick: 100, ...g }; } catch {}
+    return { move: 100, look: 100, stick: 100 };
   });
   useEffect(() => {
     try { localStorage.setItem("pixuna.3d.sens", JSON.stringify(sens)); } catch {}
@@ -258,6 +258,11 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
                     </label>
                   ))}
                   <div className="text-[9px] text-muted-foreground">Gilt für Joysticks, Tastatur und Maus.</div>
+                  <label className="block pt-1 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+                    <span className="flex justify-between text-[11px]"><span>Joystick-Größe</span><span className="tabular-nums">{sens.stick} %</span></span>
+                    <input type="range" min={60} max={180} step={5} value={sens.stick} aria-label="Joystick-Größe"
+                      onChange={e => setSens(v => ({ ...v, stick: parseInt(e.target.value, 10) }))} className="w-full" />
+                  </label>
                 </div>
               )}
               <button className={`${btn} bg-card w-8 px-0 grid place-items-center`} title="Empfindlichkeit"
@@ -272,10 +277,10 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         </div>
         {tabletAidOn && (
           <>
-            <Joystick3D label="Laufen" storageKey="pixuna.3d.stick.move"
+            <Joystick3D label="Laufen" size={Math.round(112 * sens.stick / 100)} storageKey="pixuna.3d.stick.move"
               defaultPos={() => ({ x: window.innerWidth - 300 - 260, y: window.innerHeight - 190 })}
               onChange={(x, y) => viewer.current?.setStick("move", x, y)} />
-            <Joystick3D label="Blick" storageKey="pixuna.3d.stick.look"
+            <Joystick3D label="Blick" size={Math.round(112 * sens.stick / 100)} onVertical={(d, on) => viewer.current?.move(d, on)} storageKey="pixuna.3d.stick.look"
               defaultPos={() => ({ x: window.innerWidth - 300 - 135, y: window.innerHeight - 190 })}
               onChange={(x, y) => viewer.current?.setStick("look", x, y)} />
           </>
@@ -291,8 +296,14 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
                   <span /><Key k="W" a="▲" /><span />
                   <Key k="A" a="◀" /><Key k="S" a="▼" /><Key k="D" a="▶" />
                 </div>} shortcut="W A S D" description="Bewegen" />
-              <HelpItem icon={<MouseGlyph3D />} shortcut="Maustaste gedrückt" description="Kamera bewegen" />
-              <HelpItem icon={<div className="flex items-center gap-1"><Key k="Shift" /><span className="text-[10px]">+</span><MouseGlyph3D wheel /></div>} shortcut="Shift + Rad gedrückt" description="Drehen" />
+              <HelpItem icon={<div className="flex items-center gap-1"><Key k="Space" a="▲" /><Key k="X" a="▼" /></div>} shortcut="Space / X" description="Steigen / Sinken" />
+              <div className="flex flex-col items-center">
+                <div className="flex items-end">
+                  <HelpItem icon={<MouseGlyph3D />} shortcut="Maustaste gedrückt" description="Blick bewegen" />
+                  <HelpItem icon={<div className="flex items-center gap-1"><Key k="Shift" /><span className="text-[10px]">+</span><MouseGlyph3D wheel /></div>} shortcut="Shift + Rad gedrückt" description="Drehen" />
+                </div>
+                <div className="text-[8px] font-semibold uppercase tracking-[0.16em] opacity-70">Blickarten</div>
+              </div>
             </div>
           </div>
         )}
@@ -341,7 +352,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
             {issues.map((x, i) => <div key={i} className="text-xs text-muted-foreground">{x.message}</div>)}
           </section>
         )}
-        <p className="text-xs text-muted-foreground">Ziehen: Kamera bewegen · Shift + Ziehen: Blick drehen · Rechts-Ziehen oder zwei Finger: schieben · Rad: Zoom · W A S D: laufen</p>
+        <p className="text-xs text-muted-foreground">Ziehen: Blick bewegen · Shift + Ziehen: Blick drehen · Rechts-Ziehen oder zwei Finger: schieben · Rad: Zoom · W A S D: laufen · Space / X: steigen / sinken</p>
       </aside>
     </div>
   );
