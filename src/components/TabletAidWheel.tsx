@@ -423,8 +423,10 @@ function useWheelTouchRouter() {
 }
 
 function WheelButton({
-  angle, size, label, description, tooltip, icon, onTap, onHold, toggleHold, highlight,
+  angle, size, label, description, tooltip, icon, onTap, onHold, toggleHold, highlight, compact,
 }: {
+  /** Kleiner Nur-Symbol-Knopf (z. B. ENTF), damit Nachbarknöpfe Abstand behalten. */
+  compact?: boolean;
   angle: number;
   size: number;
   label: string;
@@ -438,8 +440,8 @@ function WheelButton({
   /** Dezentes Leuchten, z. B. wenn ein Punkt auf das Setzen per LMB wartet. */
   highlight?: boolean;
 }) {
-  const buttonSize = 56;
-  const r = size / 2 - buttonSize / 2 - 2;
+  const buttonSize = compact ? 34 : 56;
+  const r = size / 2 - 56 / 2 - 2 + (compact ? 6 : 0);
   const rad = (angle * Math.PI) / 180;
   const cx = size / 2 + Math.cos(rad) * r - buttonSize / 2;
   const cy = size / 2 + Math.sin(rad) * r - buttonSize / 2;
@@ -527,8 +529,8 @@ function WheelButton({
       }}
     >
       {icon}
-      <span className="text-[8px] font-semibold leading-none">{label}</span>
-      <span className="max-w-[48px] truncate text-[6px] leading-none opacity-70">{description}</span>
+      {!compact && <span className="text-[8px] font-semibold leading-none">{label}</span>}
+      {!compact && <span className="max-w-[48px] truncate text-[6px] leading-none opacity-70">{description}</span>}
     </button>
   );
 }

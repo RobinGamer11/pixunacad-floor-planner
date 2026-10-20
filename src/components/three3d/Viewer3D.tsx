@@ -101,7 +101,11 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const sticks = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
     const sens = { move: 1, look: 1 };
     const el = renderer.domElement;
+    // 3D-Klicks nie an das darunterliegende CAD weiterreichen (sonst geht die Auswahl verloren).
+    const stopAll = (e: Event) => e.stopPropagation();
+    for (const t of ["mousedown", "mouseup", "click", "dblclick", "touchstart", "touchend"]) el.addEventListener(t, stopAll);
     const onDown = (e: PointerEvent) => {
+      e.stopPropagation();
       el.setPointerCapture(e.pointerId);
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
@@ -110,6 +114,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     };
     const onMove = (e: PointerEvent) => {
       const p = pts.get(e.pointerId); if (!p) return;
+      e.stopPropagation();
       const dx = e.clientX - p.x, dy = e.clientY - p.y;
       p.x = e.clientX; p.y = e.clientY;
       if (pts.size >= 2) {
@@ -118,13 +123,20 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         if (lastPinch > 0) orbit.r *= lastPinch / Math.max(1, d);
         pan(mid.x - lastMid.x, mid.y - lastMid.y);
         lastPinch = d; lastMid = mid;
-      } else if (mode === "pan") pan(dx, dy);
-      else if (mode === "look") { look(dx * 0.004 * sens.look, -dy * 0.004 * sens.look); return; }
+      }
+      // Shift + gedrücktes Mausrad = Drehen, egal in welcher Reihenfolge gedrückt.
+      const cur = e.pointerType === "mouse"
+        ? (e.shiftKey && (e.buttons & 5) ? "look" : (e.buttons & 6) ? "pan" : mode)
+        : mode;
+      if (pts.size >= 2) { /* bereits behandelt */ }
+      else if (cur === "pan") pan(dx, dy);
+      else if (cur === "look") { look(dx * 0.004 * sens.look, -dy * 0.004 * sens.look); return; }
       else { orbit.theta += dx * 0.008 * sens.look; orbit.phi -= dy * 0.008 * sens.look; }
       apply();
     };
     const ray = new THREE.Raycaster();
     const onUp = (e: PointerEvent) => {
+      e.stopPropagation();
       pts.delete(e.pointerId);
       if (pts.size < 2) lastPinch = 0;
       const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
@@ -145,11 +157,12 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
 
     // Bewegung durch die Szene (gehend, ohne Physik)
     const held = new Set<string>();
-    const keyMap: Record<string, string> = { w: "f", arrowup: "f", s: "b", arrowdown: "b", a: "l", arrowleft: "l", d: "r", arrowright: "r", e: "u", q: "d" };
+    const keyMap: Record<string, string> = { w: "f", arrowup: "f", s: "b", arrowdown: "b", a: "l", arrowleft: "l", d: "r", arrowright: "r", e: "u", q: "d", " ": "u", x: "d" };
     const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
-    const kd = (e: KeyboardEvent) => { const k = keyMap[e.key.toLowerCase()]; if (k && !typing(e.target)) { held.add(k); e.preventDefault(); e.stopImmediatePropagation(); } };
+    const kd = (e: KeyboardEvent) => { const k = keyMap[e.key.toLowerCase()]; if (k && !typing(e.target) && !e.ctrlKey && !e.metaKey) { held.add(k); e.preventDefault(); e.stopImmediatePropagation(); } };
     const ku = (e: KeyboardEvent) => { const k = keyMap[e.key.toLowerCase()]; if (k) { held.delete(k); if (!typing(e.target)) e.stopImmediatePropagation(); } };
     window.addEventListener("keydown", kd, true); window.addEventListener("keyup", ku, true);
+    const clearHeld = () => held.clear(); window.addEventListener("blur", clearHeld);
     let raf = 0, last = performance.now();
     const loop = (t: number) => {
       const dt = Math.min(0.05, (t - last) / 1000); last = t;
@@ -181,7 +194,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
-      window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true);
+      window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true); window.removeEventListener("blur", clearHeld);
       disposeGroup(group); grid.geometry.dispose(); (grid.material as THREE.Material).dispose?.();
       renderer.dispose(); renderer.forceContextLoss?.(); el.remove();
     };
