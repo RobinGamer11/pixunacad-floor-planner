@@ -258,8 +258,9 @@ export function TabletAidWheel() {
         icon={<Keyboard size={24} strokeWidth={1.45} />} />
 
       <WheelButton angle={90} size={size} label="Entf" description="Löschen" tooltip="Entf: Auswahl löschen"
+        compact
         onTap={() => { if (!(window as any).__pixunaCameraGesture) virtualKeyPress("Delete"); }}
-        icon={<Trash2 size={22} strokeWidth={1.45} />} />
+        icon={<Trash2 size={15} strokeWidth={1.6} />} />
 
     </div>
   );
