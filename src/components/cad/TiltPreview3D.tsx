@@ -16,7 +16,11 @@ import type { Vec2 } from "@/cad/geometry";
 
 type Props = {
   obj: any; base: number; draftTilt: any | undefined; edge: number | null; frame?: TiltFrame;
-  selectable: Set<number>; onPickEdge?: (i: number) => void;
+  /** Welche Kante der gewählten Seite hervorgehoben wird (Ober- oder Unterkante). */
+  edgeLevel?: "top" | "bottom";
+  /** Unterkanten zusätzlich antippbar (nur „Kanten bündig“). */
+  bottomSelectable?: boolean;
+  selectable: Set<number>; onPickEdge?: (i: number, level: "top" | "bottom") => void;
   /** Nur in der Bearbeitung: vertikaler Zug an der Kante in Metern (relativ zum Zugbeginn). */
   onEdgeDrag?: (phase: "start" | "move", dzM: number) => void;
 };
@@ -31,11 +35,11 @@ function meshOfDerived(d: any): MeshData | null {
   return null;
 }
 
-export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, frame, selectable, onPickEdge, onEdgeDrag }) => {
+export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edgeLevel = "top", bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag }) => {
   const host = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
   const props = useRef<Props>({} as Props);
-  props.current = { obj, base, draftTilt, edge, frame, selectable, onPickEdge, onEdgeDrag };
+  props.current = { obj, base, draftTilt, edge, edgeLevel, bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag };
 
   // Einmalige Einrichtung; Ressourcen beim Schließen freigeben.
   useEffect(() => {
@@ -52,29 +56,37 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, fra
     const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 5000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = false; controls.screenSpacePanning = true;
+    // Wie in der 3D-Ansicht: gedrückte Maustaste dreht, rechte/mittlere schiebt, zwei Finger zoomen/schieben.
+    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
     const group = new THREE.Group(); scene.add(group);
     const render = () => renderer.render(scene, camera);
     controls.addEventListener("change", render);
     const ro = new ResizeObserver(() => { const w = el.clientWidth || W; renderer.setSize(w, H); camera.aspect = w / H; camera.updateProjectionMatrix(); render(); });
     ro.observe(el);
-    st.current = { renderer, scene, camera, controls, group, render, fitted: null as string | null, edges: [] as { i: number; a: THREE.Vector3; b: THREE.Vector3 }[] };
+    st.current = { renderer, scene, camera, controls, group, render, fitted: null as string | null, edges: [] as { i: number; level: "top" | "bottom"; a: THREE.Vector3; b: THREE.Vector3 }[], body: null as THREE.Box3 | null };
 
     // Tipp vs. Ziehen unterscheiden; Kantenzug nur an der gewählten Kante.
     const cv = renderer.domElement;
     let down: { id: number; x: number; y: number; moved: boolean; edgeDrag: boolean; ppm: number } | null = null;
     let touches = 0;
     const screen = (v: THREE.Vector3) => { const r = cv.getBoundingClientRect(); const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * r.width, y: (1 - p.y) / 2 * r.height }; };
-    const nearestEdge = (cx: number, cy: number) => {
-      let best = -1, bd = 16;
+    // Großzügige Fangzone (Finger/Tablet): 28 px, bei Maus 18 px.
+    let fingerTol = 18;
+    const nearestEdgeHit = (cx: number, cy: number): { i: number; level: "top" | "bottom" } | null => {
+      let best: { i: number; level: "top" | "bottom" } | null = null, bd = fingerTol;
       for (const e of st.current.edges) {
+        if (e.level === "bottom" && !props.current.bottomSelectable) continue;
         const A = screen(e.a), B = screen(e.b); const dx = B.x - A.x, dy = B.y - A.y; const L = dx * dx + dy * dy || 1;
         const t = Math.max(0, Math.min(1, ((cx - A.x) * dx + (cy - A.y) * dy) / L));
         const d = Math.hypot(cx - (A.x + t * dx), cy - (A.y + t * dy));
-        if (d < bd) { bd = d; best = e.i; }
+        if (d < bd) { bd = d; best = { i: e.i, level: e.level }; }
       }
       return best;
     };
+    const nearestEdge = (cx: number, cy: number) => nearestEdgeHit(cx, cy)?.i ?? -1;
     const onDown = (e: PointerEvent) => {
+      fingerTol = e.pointerType === "mouse" ? 18 : 28;
       touches++;
       if (touches > 1) { down = null; controls.enabled = true; return; } // Pinch = nur Kamera
       const r = cv.getBoundingClientRect(); const cx = e.clientX - r.left, cy = e.clientY - r.top;
@@ -100,8 +112,8 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, fra
       touches = Math.max(0, touches - 1);
       const d = down; down = null; controls.enabled = true;
       if (!d || d.id !== e.pointerId || d.moved || d.edgeDrag) return; // Fingerheben hält die Vorschau
-      const r = cv.getBoundingClientRect(); const i = nearestEdge(e.clientX - r.left, e.clientY - r.top);
-      if (i >= 0 && props.current.selectable.has(i)) props.current.onPickEdge?.(i);
+      const r = cv.getBoundingClientRect(); const hit = nearestEdgeHit(e.clientX - r.left, e.clientY - r.top);
+      if (hit && props.current.selectable.has(hit.i)) props.current.onPickEdge?.(hit.i, hit.level);
     };
     cv.addEventListener("pointerdown", onDown, true); window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); window.addEventListener("pointercancel", onUp);
     return () => {
@@ -114,7 +126,8 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, fra
 
   const fit = () => {
     const s = st.current; if (!s.group) return;
-    const box = new THREE.Box3().setFromObject(s.group); if (box.isEmpty()) return;
+    // Nur der Körper zählt – die gestrichelte Bezugslinie ist reine Hilfslinie.
+    const box = s.body ? s.body.clone() : new THREE.Box3(); if (box.isEmpty()) return;
     const c = box.getCenter(new THREE.Vector3()), r = Math.max(0.5, box.getSize(new THREE.Vector3()).length() / 2);
     s.controls.target.copy(c);
     s.camera.position.copy(c).add(new THREE.Vector3(1, 0.9, 1.3).normalize().multiplyScalar(r * 2.6));
@@ -127,7 +140,7 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, fra
   useEffect(() => {
     const s = st.current; if (!s.group) return;
     s.group.traverse((o: any) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
-    s.group.clear(); s.edges = [];
+    s.group.clear(); s.edges = []; s.body = null;
     const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", base);
     const m = meshOfDerived(d);
     if (m) {
@@ -135,43 +148,52 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, fra
       for (let i = 0; i < pos.length; i += 3) { pos[i] = m.positions[i]; pos[i + 1] = m.positions[i + 2]; pos[i + 2] = m.positions[i + 1]; }
       const idx: number[] = []; for (let i = 0; i < m.indices.length; i += 3) idx.push(m.indices[i], m.indices[i + 2], m.indices[i + 1]);
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+      g.computeBoundingBox(); s.body = g.boundingBox!.clone();
       s.group.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: obj.fillColor || "#cfc6b0", roughness: 0.85, flatShading: true, side: THREE.DoubleSide })));
       s.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({ color: 0x2a2f3a, transparent: true, opacity: 0.55 })));
     }
     // Obere Außenkanten (aus der abgeleiteten Oberseite) für Auswahl und Hervorhebung.
     const top = d?.faces?.top?.outer as { x: number; y: number; z: number }[] | undefined;
     const ztop = d?.type === "prism" ? d.z1 : d?.type === "plane" ? d.z : undefined;
+    const bot = d?.faces?.bottom?.outer as { x: number; y: number; z: number }[] | undefined;
+    const zbot = d?.type === "prism" ? d.z0 : undefined;
+    const gold = (a: THREE.Vector3, b: THREE.Vector3) => {
+      s.group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: 0xc8954a, linewidth: 3 })));
+      s.group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, 0.02 * Math.max(1, a.distanceTo(b) / 3), 6), new THREE.MeshBasicMaterial({ color: 0xc8954a })));
+    };
     for (let i = 0; i < pts.length; i++) {
       const j = (i + 1) % pts.length;
       const a = top ? toScene(top[i].x, top[i].y, top[i].z) : toScene(pts[i].x, pts[i].y, ztop ?? base);
       const b = top ? toScene(top[j].x, top[j].y, top[j].z) : toScene(pts[j].x, pts[j].y, ztop ?? base);
-      s.edges.push({ i, a, b });
-      if (i === edge) {
-        const g = new THREE.BufferGeometry().setFromPoints([a, b]);
-        s.group.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xc8954a, linewidth: 3 })));
-        const tube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, 0.02 * Math.max(1, a.distanceTo(b) / 3), 6), new THREE.MeshBasicMaterial({ color: 0xc8954a }));
-        s.group.add(tube);
-      }
+      s.edges.push({ i, level: "top", a, b });
+      const hasBottom = !!bot || zbot !== undefined;
+      const ba = bot ? toScene(bot[i].x, bot[i].y, bot[i].z) : toScene(pts[i].x, pts[i].y, zbot ?? base);
+      const bb = bot ? toScene(bot[j].x, bot[j].y, bot[j].z) : toScene(pts[j].x, pts[j].y, zbot ?? base);
+      if (hasBottom && ba.distanceTo(a) + bb.distanceTo(b) > 1e-4) s.edges.push({ i, level: "bottom", a: ba, b: bb });
+      if (i === edge) { if (edgeLevel === "bottom" && hasBottom) gold(ba, bb); else gold(a, b); }
     }
     // Feste Bezugslinie (Drehachse bzw. feste Gegenkante) gestrichelt.
     if (frame) {
-      const L = 1e2, zb = base + (Number(obj.elevationM) || 0);
+      // Nur so lang wie der Körper quer zur Achse plus etwas Überstand.
+      let lo = Infinity, hi = -Infinity;
+      for (const p of pts) { const t = (p.x - frame.axis.x) * frame.dir.x + (p.y - frame.axis.y) * frame.dir.y; lo = Math.min(lo, t); hi = Math.max(hi, t); }
+      const m = Math.max(0.15, (hi - lo) * 0.12), zb = base + (Number(obj.elevationM) || 0);
       const g = new THREE.BufferGeometry().setFromPoints([
-        toScene(frame.axis.x - frame.dir.x * L, frame.axis.y - frame.dir.y * L, zb), toScene(frame.axis.x + frame.dir.x * L, frame.axis.y + frame.dir.y * L, zb)]);
+        toScene(frame.axis.x + frame.dir.x * (lo - m), frame.axis.y + frame.dir.y * (lo - m), zb), toScene(frame.axis.x + frame.dir.x * (hi + m), frame.axis.y + frame.dir.y * (hi + m), zb)]);
       const line = new THREE.Line(g, new THREE.LineDashedMaterial({ color: 0x7a8394, dashSize: 0.15, gapSize: 0.1 }));
       line.computeLineDistances(); s.group.add(line);
     }
     const key = String(obj?.id);
     if (s.fitted !== key) { s.fitted = key; fit(); } else s.render();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, frame?.axis, frame?.dir, base])]);
+  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base])]);
 
   return (
     <div ref={host} className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
       <button type="button" onClick={fit} title="Gesamtes Objekt anzeigen" aria-label="Gesamtes Objekt anzeigen"
-        className="absolute right-1.5 top-1.5 flex h-8 items-center gap-1 rounded-md border px-2 text-[10px] font-medium"
+        className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-md border"
         style={{ borderColor: "hsl(var(--overlay-surface) / 0.2)", background: "hsl(var(--overlay-ink) / 0.85)", color: "hsl(var(--overlay-surface))" }}>
-        <Maximize2 size={12} /> Gesamtes Objekt
+        <Maximize2 size={12} />
       </button>
     </div>
   );
