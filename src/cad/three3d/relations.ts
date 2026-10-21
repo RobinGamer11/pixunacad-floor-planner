@@ -177,26 +177,12 @@ export function applyRelations3D(items: Derived3D[], sources: RelationSource[]):
         const solids = src.filter(d => d.type === "prism" || (d.type === "mesh" && d.closed));
         if (!solids.length) { issues.push({ sourceKey: sk, targetKey: tk, message: "Quelle hat keinen Körper zum Durchbrechen." }); continue; }
         const allPrism = solids.every(d => d.type === "prism");
-        // „mit Oberkante/Unterkante“: die Quelle stößt von dieser Kante aus ganz durch das Ziel.
-        const tb = tgt.reduce((acc, t) => { const m = meshOf(t); if (!m) return acc; const b = meshBounds(m); return { lo: Math.min(acc.lo, b.minZ), hi: Math.max(acc.hi, b.maxZ) }; }, { lo: Infinity, hi: -Infinity });
-        const far = { hi: (Number.isFinite(tb.hi) ? tb.hi : 0) + 10, lo: (Number.isFinite(tb.lo) ? tb.lo : 0) - 10 };
+        // Ziel verliert nur das tatsächliche Schnittvolumen mit der Quelle – nie den Raum darüber/darunter.
         const cutters: MeshData[] = [];
         const prismCutters: Prism3D[] = [];
         for (const c of solids) {
-          if (c.type === "prism") {
-            const ext = r.edge === "top" ? { ...c, z1: Math.max(c.z1, far.hi) } : r.edge === "bottom" ? { ...c, z0: Math.min(c.z0, far.lo) } : c;
-            prismCutters.push(ext); cutters.push(meshOf(ext)!);
-            continue;
-          }
+          if (c.type === "prism") prismCutters.push(c);
           cutters.push(meshOf(c)!);
-          if (r.edge && c.type === "mesh" && c.faces) {
-            const f = c.faces[r.edge];
-            const pl = planeOfRing(f.outer);
-            if (!pl) throw new Error("steep");
-            const zf = (p: Vec2) => pl.a * p.x + pl.b * p.y + pl.c;
-            const ext = r.edge === "top" ? slabMesh(xy(f.outer), f.holes.map(xy), zf, () => far.hi) : slabMesh(xy(f.outer), f.holes.map(xy), () => far.lo, zf);
-            if (ext) cutters.push(ext);
-          }
         }
         const out: Derived3D[] = [];
         for (const t of tgt) {

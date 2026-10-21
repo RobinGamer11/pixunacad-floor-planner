@@ -21,9 +21,10 @@ const REL = {
 /** Verbindungswort zwischen den Schritten (mit / bis / und) – deutlich hervorgehoben. */
 const Joiner: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="flex items-center gap-2 py-0.5">
-    <span className="h-px flex-1" style={{ background: "hsl(var(--accent-gold) / 0.45)" }} />
-    <span className="text-[15px] font-bold italic leading-none" style={REL.join}>{children}</span>
-    <span className="h-px flex-1" style={{ background: "hsl(var(--accent-gold) / 0.45)" }} />
+    <span className="h-px flex-1" style={{ background: "hsl(var(--overlay-surface) / 0.14)" }} />
+    <span className="rounded-full border px-2.5 py-0.5 text-[11px] font-medium leading-none tracking-wide"
+      style={{ color: "hsl(var(--accent-gold))", borderColor: "hsl(var(--accent-gold) / 0.35)", background: "hsl(var(--accent-gold) / 0.08)" }}>{children}</span>
+    <span className="h-px flex-1" style={{ background: "hsl(var(--overlay-surface) / 0.14)" }} />
   </div>
 );
 import { libraryDefinitionsOf, sheetSnapshotOf } from "@/cad/three3d/projectBridge";
