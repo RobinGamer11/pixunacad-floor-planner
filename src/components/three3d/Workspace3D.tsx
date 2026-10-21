@@ -17,6 +17,7 @@ import { projectStore, useProject } from "@/lib/projectStore";
 import { DEFAULT_PRESETS, PRESET_OPTIONS, type RenderPresets } from "@/cad/three3d/dossier";
 import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Settings } from "lucide-react";
 import { Joystick3D } from "./Joystick3D";
+import { loadSens, saveSens, speedFactor, stickFactor, type Sens3D } from "./sensitivity";
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
 
@@ -32,16 +33,14 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [gridPanel, setGridPanel] = useState(false);
   const [sensPanel, setSensPanel] = useState(false);
   // Empfindlichkeit: lokaler Bedienzustand pro Gerät (Prozent).
-  const [sens, setSens] = useState<{ move: number; look: number; stick: number }>(() => {
-    try { const g = JSON.parse(localStorage.getItem("pixuna.3d.sens") || "null"); if (g && Number.isFinite(g.move) && Number.isFinite(g.look)) return { stick: 100, ...g }; } catch {}
-    return { move: 100, look: 100, stick: 100 };
-  });
+  const [sens, setSens] = useState<Sens3D>(loadSens);
   useEffect(() => {
-    try { localStorage.setItem("pixuna.3d.sens", JSON.stringify(sens)); } catch {}
-    const apply = () => viewer.current?.setSensitivity(sens.move / 100, sens.look / 100);
+    saveSens(sens);
+    const apply = () => viewer.current?.setSensitivity(speedFactor(sens.move), speedFactor(sens.look), speedFactor(sens.vert));
     apply(); const t = window.setInterval(() => { if (viewer.current) { apply(); window.clearInterval(t); } }, 250);
     return () => window.clearInterval(t);
   }, [sens]);
+  const stickSize = Math.round(112 * stickFactor(sens.stick));
   const project = useProject(projectId);
   const presets: RenderPresets = { ...DEFAULT_PRESETS, ...(project?.settings?.renderPresets ?? {}) };
   const setPresets = (patch: Partial<RenderPresets>) => { if (projectId) projectStore.setRenderPresets(projectId, { ...presets, ...patch }); };
@@ -250,17 +249,17 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
               {sensPanel && (
                 <div className="absolute bottom-10 right-0 w-56 rounded-lg border bg-card p-2.5 shadow-lg space-y-2 text-xs" style={{ borderColor: "hsl(var(--hairline))" }}>
                   <div className="text-[10px] font-semibold tracking-wider text-muted-foreground">EMPFINDLICHKEIT</div>
-                  {([["move", "Laufen"], ["look", "Blick"]] as const).map(([k, l]) => (
+                  {([["move", "Laufen"], ["look", "Blick"], ["vert", "Hoch / Runter"]] as const).map(([k, l]) => (
                     <label key={k} className="block">
                       <span className="flex justify-between text-[11px]"><span>{l}</span><span className="tabular-nums">{sens[k]} %</span></span>
-                      <input type="range" min={10} max={300} step={5} value={sens[k]} aria-label={`Empfindlichkeit ${l}`}
+                      <input type="range" min={1} max={100} step={1} value={sens[k]} aria-label={`Empfindlichkeit ${l}`}
                         onChange={e => setSens(v => ({ ...v, [k]: parseInt(e.target.value, 10) }))} className="w-full" />
                     </label>
                   ))}
                   <div className="text-[9px] text-muted-foreground">Gilt für Joysticks, Tastatur und Maus.</div>
                   <label className="block pt-1 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
                     <span className="flex justify-between text-[11px]"><span>Joystick-Größe</span><span className="tabular-nums">{sens.stick} %</span></span>
-                    <input type="range" min={60} max={180} step={5} value={sens.stick} aria-label="Joystick-Größe"
+                    <input type="range" min={1} max={100} step={1} value={sens.stick} aria-label="Joystick-Größe"
                       onChange={e => setSens(v => ({ ...v, stick: parseInt(e.target.value, 10) }))} className="w-full" />
                   </label>
                 </div>
@@ -277,10 +276,10 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         </div>
         {tabletAidOn && (
           <>
-            <Joystick3D label="Laufen" size={Math.round(112 * sens.stick / 100)} storageKey="pixuna.3d.stick.move"
+            <Joystick3D label="Laufen" size={stickSize} storageKey="pixuna.3d.stick.move"
               defaultPos={() => ({ x: window.innerWidth - 300 - 260, y: window.innerHeight - 190 })}
               onChange={(x, y) => viewer.current?.setStick("move", x, y)} />
-            <Joystick3D label="Blick" size={Math.round(112 * sens.stick / 100)} onVertical={(d, on) => viewer.current?.move(d, on)} storageKey="pixuna.3d.stick.look"
+            <Joystick3D label="Blick" size={stickSize} onVertical={(d, on) => viewer.current?.move(d, on)} storageKey="pixuna.3d.stick.look"
               defaultPos={() => ({ x: window.innerWidth - 300 - 135, y: window.innerHeight - 190 })}
               onChange={(x, y) => viewer.current?.setStick("look", x, y)} />
           </>
@@ -297,12 +296,13 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
                   <Key k="A" a="◀" /><Key k="S" a="▼" /><Key k="D" a="▶" />
                 </div>} shortcut="W A S D" description="Bewegen" />
               <HelpItem icon={<div className="flex items-center gap-1"><Key k="Space" a="▲" /><Key k="X" a="▼" /></div>} shortcut="Space / X" description="Steigen / Sinken" />
+              <div className="mx-1.5 self-stretch w-px" style={{ background: "hsl(var(--overlay-surface) / 0.24)" }} />
               <div className="flex flex-col items-center">
                 <div className="flex items-end">
-                  <HelpItem icon={<MouseGlyph3D />} shortcut="Maustaste gedrückt" description="Blick bewegen" />
-                  <HelpItem icon={<div className="flex items-center gap-1"><Key k="Shift" /><span className="text-[10px]">+</span><MouseGlyph3D wheel /></div>} shortcut="Shift + Rad gedrückt" description="Drehen" />
+                  <HelpItem icon={<MouseGlyph3D />} shortcut="Maustaste gedrückt" />
+                  <HelpItem icon={<div className="flex items-center gap-1"><Key k="Shift" /><span className="text-[10px]">+</span><MouseGlyph3D wheel /></div>} shortcut="Shift + Rad gedrückt" />
                 </div>
-                <div className="text-[8px] font-semibold uppercase tracking-[0.16em] opacity-70">Blickarten</div>
+                <div className="whitespace-nowrap text-[8px] leading-3 opacity-75 pb-1">Blickarten</div>
               </div>
             </div>
           </div>
@@ -358,12 +358,12 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   );
 }
 
-function HelpItem({ icon, shortcut, description }: { icon: React.ReactNode; shortcut: string; description: string }) {
+function HelpItem({ icon, shortcut, description }: { icon: React.ReactNode; shortcut: string; description?: string }) {
   return (
     <div className="flex min-w-[62px] flex-col items-center justify-end px-1.5 py-1 text-center">
       <div className="mb-1 flex min-h-8 items-center justify-center">{icon}</div>
       <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">{shortcut}</div>
-      <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">{description}</div>
+      {description && <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">{description}</div>}
     </div>
   );
 }

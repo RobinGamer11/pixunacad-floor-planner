@@ -17,7 +17,7 @@ export interface Viewer3DHandle {
   /** Analoge Steuerung (Joysticks): Werte −1…1; move = laufen, look = Blick drehen. */
   setStick(kind: "move" | "look", x: number, y: number): void;
   /** Empfindlichkeit (1 = 100 %) für Laufen und Blick. */
-  setSensitivity(move: number, look: number): void;
+  setSensitivity(move: number, look: number, vert?: number): void;
   /** Raster ein/aus und Sichtbarkeit (0…1). */
   setGrid(visible: boolean, opacity: number): void;
   /** Aktuelles Bild ohne Raster/UI; projiziert Weltpunkte (x, Höhe z, y) auf Bildpixel. */
@@ -99,7 +99,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       apply();
     };
     const sticks = { move: { x: 0, y: 0 }, look: { x: 0, y: 0 } };
-    const sens = { move: 1, look: 1 };
+    const sens = { move: 1, look: 1, vert: 1 };
     const el = renderer.domElement;
     // 3D-Klicks nie an das darunterliegende CAD weiterreichen (sonst geht die Auswahl verloren).
     const stopAll = (e: Event) => e.stopPropagation();
@@ -174,8 +174,8 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         if (held.has("b")) orbit.target.addScaledVector(fwd, -speed);
         if (held.has("r")) orbit.target.addScaledVector(right, speed);
         if (held.has("l")) orbit.target.addScaledVector(right, -speed);
-        if (held.has("u")) orbit.target.y += speed;
-        if (held.has("d")) orbit.target.y -= speed;
+        if (held.has("u")) orbit.target.y += speed / sens.move * sens.vert;
+        if (held.has("d")) orbit.target.y -= speed / sens.move * sens.vert;
         apply();
       }
       if (sticks.move.x || sticks.move.y) {
@@ -318,7 +318,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       }).filter(b => b.vis).map(({ id, x, y }) => ({ id, x, y }));
       return { png, w, h, badges };
     },
-    setSensitivity: (move, look) => { const s = st.current.sens; if (s) { s.move = move; s.look = look; } },
+    setSensitivity: (move, look, vert = 1) => { const s = st.current.sens; if (s) { s.move = move; s.look = look; s.vert = vert; } },
     setStick: (kind, x, y) => { const s = st.current.sticks; if (s) s[kind] = { x, y }; },
     setGrid: (visible, opacity) => {
       const g = st.current.grid; if (!g) return;
