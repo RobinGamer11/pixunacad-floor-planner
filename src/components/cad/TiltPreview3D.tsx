@@ -105,7 +105,7 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edg
     };
     const onMove = (e: PointerEvent) => {
       if (!down || down.id !== e.pointerId) return;
-      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) down.moved = true;
+      if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 12) down.moved = true;
       if (down.edgeDrag) props.current.onEdgeDrag?.("move", -(e.clientY - down.y) / down.ppm);
     };
     const onUp = (e: PointerEvent) => {

@@ -162,7 +162,7 @@ export const Object3DSettings: React.FC<{
       {!allEditable && <Note>Ebene gesperrt – nur Anzeige.</Note>}
 
       <Section title="Höhenlage und Körperhöhe">
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(118px,1fr))] gap-2">
+        <div className="grid grid-cols-1 gap-2">
           {elevItems.length > 0 && (
             <NumField label={`Höhenlage ü. Blatt${multi ? ` (${elevItems.length} Objekte)` : ""}`} info={`Bezogen auf das Blatt (Blatthöhe ${fmt(sheetZ)} m). Negative Werte erlaubt.`} value={elevCommon} onCommit={allEditable ? setElev : undefined} />
           )}
@@ -315,8 +315,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
         <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={edge} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
           bottomSelectable={cur.plumb && cur.mode === "rotate"}
           onPickEdge={editable ? (i, level) => {
-            if (session && i !== edge) return; // Kantenwechsel nur ohne offene Bearbeitung
-            if (i !== edge) setEdge(i);
+            if (i !== edge) setEdge(i); // Kantenwechsel jederzeit; offene Bearbeitung gilt für die neue Kante
             if (cur.plumb && cur.mode === "rotate" && level !== cur.anchor) begin({ anchor: level });
           } : undefined} onEdgeDrag={canEdit && !shapeErr ? onEdgeDrag : undefined} />
         <div className="flex gap-2">
