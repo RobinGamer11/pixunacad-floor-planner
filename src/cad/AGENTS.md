@@ -28,4 +28,4 @@
 - 3D-Wände nutzen den geheilten 2D-Wandring (`deriveWalls`); Überlappungen angrenzender Wände nur im gemeinsamen Höhenbereich abziehen, jede Wand bleibt eigener Körper.
 - Tür-/Fensterlage in 3D = Brüstung (`breakHeightM`, auch negativ) über Wandunterkante; „Höhenlage ü. Blatt“ wird daraus berechnet und zurückgeschrieben – kein eigenes Höhenfeld; 3D-Einstellungen nur über `components/cad/Object3DSettings.tsx`.
 
-- Neigungsform (`tilt3D.mode`/`plumb`) nur über `tiltShape` in `three3d/tiltGeometry.ts`; fehlende Felder = starre Drehung (Altprojekte unverändert). Vorschau in den Einstellungen nutzt `deriveHatch`, keine zweite Geometrie.
+- Neigungsform (`tilt3D.mode`/`plumb`/`anchor`) nur über `tiltShape` in `three3d/tiltGeometry.ts`; „Kanten bündig“ hält die gewählte Kante an der Lage der starren Drehung und staucht den Grundriss quer zur Achse (Körper wird nie länger). Fehlende Felder = starre Drehung. Vorschau nutzt `deriveHatch`.
