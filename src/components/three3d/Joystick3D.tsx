@@ -51,7 +51,7 @@ export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112
     <button type="button" aria-label={dir === "u" ? "Hoch" : "Runter"} title={dir === "u" ? "Hoch (Space)" : "Runter (X)"}
       className="grid place-items-center border select-none"
       style={{ ...surface, width: VBW, height: SIZE / 2 - 6 * k,
-        borderRadius: dir === "u" ? "0 22px 6px 0 / 0 40px 6px 0" : "0 6px 22px 0 / 0 6px 40px 0" }}
+        borderRadius: dir === "u" ? `0 ${22 * k}px ${6 * k}px 0 / 0 ${40 * k}px ${6 * k}px 0` : `0 ${6 * k}px ${22 * k}px 0 / 0 ${6 * k}px ${40 * k}px 0` }}
       onPointerDown={(e) => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); onVertical?.(dir, true); }}
       onPointerUp={() => onVertical?.(dir, false)} onPointerCancel={() => onVertical?.(dir, false)}
       onLostPointerCapture={() => onVertical?.(dir, false)}>
