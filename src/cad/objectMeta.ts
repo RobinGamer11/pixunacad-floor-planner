@@ -30,7 +30,7 @@ export interface ObjectAttachment { id: string; name: string; type: string; size
 export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number; relations3D?: Relation3D[]; stackOrder?: number; tilt3D?: Tilt3D; bodyHeightM?: number }
 
 /** Räumliche Neigung einer Schraffur (Bezugskante + Winkel); 2D-Punkte bleiben unverändert. */
-export interface Tilt3D { edgeIndex: number; a: { x: number; y: number }; b: { x: number; y: number }; count: number; angleDeg: number }
+export interface Tilt3D { edgeIndex: number; a: { x: number; y: number }; b: { x: number; y: number }; count: number; angleDeg: number; mode?: "rotate" | "lift"; plumb?: boolean }
 
 /** 3D-Körperbeziehung, am Quellobjekt gespeichert (Ziel über Blatt + Objekt-ID). */
 export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above" }
@@ -177,7 +177,7 @@ export function copyObjectMeta(obj: any, opts: { withCode?: boolean } = {}): Obj
   if (typeof obj?.elevationM === "number" && Number.isFinite(obj.elevationM) && obj.elevationM !== 0) out.elevationM = obj.elevationM;
   // Räumliche Form gehört zum Objekt: Kopien behalten Neigung und Körperhöhe.
   const t = obj?.tilt3D;
-  if (t && Number.isFinite(t.angleDeg) && t.angleDeg !== 0 && t.a && t.b) out.tilt3D = { edgeIndex: t.edgeIndex | 0, a: { x: +t.a.x, y: +t.a.y }, b: { x: +t.b.x, y: +t.b.y }, count: t.count | 0, angleDeg: +t.angleDeg };
+  if (t && Number.isFinite(t.angleDeg) && t.angleDeg !== 0 && t.a && t.b) out.tilt3D = { edgeIndex: t.edgeIndex | 0, a: { x: +t.a.x, y: +t.a.y }, b: { x: +t.b.x, y: +t.b.y }, count: t.count | 0, angleDeg: +t.angleDeg, ...(t.mode === "lift" ? { mode: "lift" as const } : {}), ...(t.plumb === true ? { plumb: true } : {}) };
   if (typeof obj?.bodyHeightM === "number" && Number.isFinite(obj.bodyHeightM) && obj.bodyHeightM > 0) out.bodyHeightM = obj.bodyHeightM;
   // Beziehungen hängen an der Identität: Kopien (ohne Kennung) übernehmen sie nicht.
   if (opts.withCode !== false && Array.isArray(obj?.relations3D) && obj.relations3D.length) out.relations3D = obj.relations3D.map((r: Relation3D) => ({ ...r }));

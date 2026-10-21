@@ -26,6 +26,10 @@ export interface Tilt3D {
   /** Punktanzahl der Außenkontur zum Zeitpunkt der Wahl. */
   count: number;
   angleDeg: number;
+  /** "rotate" (Standard, fehlt bei Altprojekten) = Körper starr neigen; "lift" = ausgewählte Oberkante anheben. */
+  mode?: "rotate" | "lift";
+  /** Seitenkanten bleiben lotrecht (nur bei "rotate" wirksam; "lift" ist immer lotrecht). */
+  plumb?: boolean;
 }
 
 export interface TiltFrame {
@@ -104,3 +108,30 @@ export function tiltPoint(x: number, y: number, z: number, f: TiltFrame): Vec3 {
   return { x: f.axis.x + f.dir.x * t + f.n.x * u2, y: f.axis.y + f.dir.y * t + f.n.y * u2, z: f.z0 + w2 };
 }
 
+
+/** Abstand eines Punkts von der festen Achse in Richtung Bezugskante (0 … D). */
+export const axisDistance = (p: Vec2, f: TiltFrame) => (p.x - f.axis.x) * f.n.x + (p.y - f.axis.y) * f.n.y;
+
+export type TiltMode = "rotate" | "lift";
+/** Wirksame Form einer Neigung: "rigid" = starr drehen, sonst Höhenfunktionen über unverändertem Grundriss. */
+export function tiltShape(mode: TiltMode | undefined, plumb: boolean | undefined, f: TiltFrame, z: number, h: number):
+  { kind: "rigid" } | { kind: "field"; zb: (p: Vec2) => number; zt: (p: Vec2) => number } {
+  const t = Math.tan(f.angleRad);
+  if (mode === "lift") return { kind: "field", zb: () => z, zt: p => z + h + axisDistance(p, f) * t };
+  if (plumb) { const c = Math.cos(f.angleRad); return { kind: "field", zb: p => z + axisDistance(p, f) * t, zt: p => z + h / c + axisDistance(p, f) * t }; }
+  return { kind: "rigid" };
+}
+
+/** Prüft, ob die Verformung gültig ist (Oberseite darf nicht unter die Unterseite sinken). */
+export function tiltShapeError(mode: TiltMode | undefined, f: TiltFrame, h: number): string | undefined {
+  if (mode === "lift" && h > 1e-9 && h + f.D * Math.tan(f.angleRad) <= 1e-6)
+    return "Die Kante würde unter die Unterseite sinken – letzte gültige Form bleibt erhalten.";
+  return undefined;
+}
+
+/** Tatsächliche Fläche der oberen Oberfläche (Aussparungen abgezogen); starre Drehung ändert sie nicht. */
+export function topSurfaceArea(outer: Vec2[], holes: Vec2[][], mode: TiltMode | undefined, plumb: boolean | undefined, angleDeg: number): number {
+  const a = netArea(outer, holes);
+  if (!angleDeg || (mode !== "lift" && !plumb)) return a;
+  return a / Math.cos((angleDeg * Math.PI) / 180);
+}

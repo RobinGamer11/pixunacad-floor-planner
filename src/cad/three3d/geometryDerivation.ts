@@ -17,6 +17,7 @@ import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
 import { buildHealedWallSolidRing } from "../wallSolid";
 import { subtractPrism } from "./relations";
+import { tiltShape, tiltShapeError } from "./tiltGeometry";
 import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 
 export type Solid3DSource =
@@ -206,6 +207,22 @@ export function deriveHatch(hatch: any, sheetId: string, base: number): Derived3
   if (!tilt.frame) return { ...flatItem(), note: tilt.error };
   // Neigung immer aus der ursprünglichen, ungekippten Geometrie berechnen.
   const f = tilt.frame;
+  const mode = hatch.tilt3D?.mode, plumb = hatch.tilt3D?.plumb;
+  const bad = tiltShapeError(mode, f, h);
+  if (bad) return { ...flatItem(), note: bad };
+  const shape = tiltShape(mode, plumb, f, z, h);
+  if (shape.kind === "field") {
+    // Verformung über unverändertem Grundriss: Seitenkanten bleiben lotrecht.
+    const on = (ring: Vec2[], fz: (p: Vec2) => number): Vec3[] => ring.map(p => ({ x: p.x, y: p.y, z: fz(p) }));
+    const top = shape.zt;
+    const faces = {
+      top: { outer: on(hatch.points, top), holes: holes.map(r => on(r, top)) },
+      bottom: { outer: on(hatch.points, h <= EPS ? top : shape.zb), holes: holes.map(r => on(r, h <= EPS ? top : shape.zb)) },
+    };
+    const m = h <= EPS ? faceMesh(hatch.points, holes, top) : slabMesh(hatch.points, holes, shape.zb, shape.zt);
+    if (!m) return flatItem();
+    return { type: "mesh", source: "hatch", sourceId: hatch.id, sheetId, mesh: m, closed: h > EPS, color, faces };
+  }
   const lift = (ring: Vec2[], zz: number): Vec3[] => ring.map(p => tiltPoint(p.x, p.y, zz, f));
   const faces = {
     top: { outer: lift(hatch.points, z + h), holes: holes.map(r => lift(r, z + h)) },
