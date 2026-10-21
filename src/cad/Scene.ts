@@ -869,7 +869,7 @@ export class Door {
     this.posM = opts.posM;
     this.widthM = Math.max(0.1, opts.widthM);
     this.heightM = opts.heightM ?? 2.1;
-    this.breakHeightM = (typeof opts.breakHeightM === "number" && opts.breakHeightM >= 0)
+    this.breakHeightM = (typeof opts.breakHeightM === "number" && Number.isFinite(opts.breakHeightM))
       ? opts.breakHeightM
       : (this.kind === "window" ? 0.9 : 0);
     this.breakHeightVisible = !!opts.breakHeightVisible;

@@ -335,7 +335,8 @@ export class DoorTool {
     d.kind = this.settings.mode;
     d.widthM = Math.max(0.1, Math.min(this.settings.widthM, total));
     d.heightM = this.settings.heightM;
-    d.breakHeightM = Math.max(0, this.settings.breakHeightM);
+    // Negative Unterkante ist erlaubt (Höhenlage unter der Wandunterkante).
+    d.breakHeightM = Number.isFinite(this.settings.breakHeightM) ? this.settings.breakHeightM : 0;
     d.breakHeightVisible = !!this.settings.breakHeightVisible;
     d.side = this.settings.side;
     d.hand = this.settings.hand;
