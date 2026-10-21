@@ -40,7 +40,9 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, fra
   // Einmalige Einrichtung; Ressourcen beim Schließen freigeben.
   useEffect(() => {
     const el = host.current!; const W = el.clientWidth || 260, H = 180;
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    let renderer: THREE.WebGLRenderer;
+    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
+    catch { el.dataset.noWebgl = "1"; return; } // ohne WebGL: Bedienung über Zahl/Regler bleibt
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); renderer.setSize(W, H);
     renderer.domElement.style.touchAction = "none"; renderer.domElement.style.display = "block";
     el.prepend(renderer.domElement);

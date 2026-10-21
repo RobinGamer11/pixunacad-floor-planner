@@ -218,10 +218,11 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const holes = (obj.holes || []).filter((r: any) => r?.length >= 3);
   const stored = obj.tilt3D;
   const resolved = resolveTilt(obj, z);
-  const [edge, setEdge] = useState<number | null>(resolved?.frame?.edgeIndex ?? null);
+  const firstEdge = () => straightEdgeIndices(obj)[0] ?? null;
+  const [edge, setEdge] = useState<number | null>(resolved?.frame?.edgeIndex ?? firstEdge());
   const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean } | null>(null);
   const dragStart = useRef<number>(0);
-  useEffect(() => { setEdge(resolveTilt(obj, z)?.frame?.edgeIndex ?? null); setSession(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [obj]);
+  useEffect(() => { setEdge(resolveTilt(obj, z)?.frame?.edgeIndex ?? firstEdge()); setSession(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [obj]);
 
   const pts = obj.points || [];
   const straight = useMemo(() => new Set(straightEdgeIndices(obj)), [obj, pts.length]);
