@@ -302,7 +302,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
                   <HelpItem icon={<MouseGlyph3D />} shortcut="Maustaste gedrückt" />
                   <HelpItem icon={<div className="flex items-center gap-1"><Key k="Shift" /><span className="text-[10px]">+</span><MouseGlyph3D wheel /></div>} shortcut="Shift + Rad gedrückt" />
                 </div>
-                <div className="text-[10px] leading-tight opacity-75">Blickarten</div>
+                <div className="whitespace-nowrap text-[8px] leading-3 opacity-75 pb-1">Blickarten</div>
               </div>
             </div>
           </div>
@@ -358,12 +358,12 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   );
 }
 
-function HelpItem({ icon, shortcut, description }: { icon: React.ReactNode; shortcut: string; description: string }) {
+function HelpItem({ icon, shortcut, description }: { icon: React.ReactNode; shortcut: string; description?: string }) {
   return (
     <div className="flex min-w-[62px] flex-col items-center justify-end px-1.5 py-1 text-center">
       <div className="mb-1 flex min-h-8 items-center justify-center">{icon}</div>
       <div className="whitespace-nowrap text-[10px] font-semibold leading-3.5">{shortcut}</div>
-      <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">{description}</div>
+      {description && <div className="whitespace-nowrap text-[8px] leading-3 opacity-75">{description}</div>}
     </div>
   );
 }

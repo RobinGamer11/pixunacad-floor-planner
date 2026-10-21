@@ -6,7 +6,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Move } from "lucide-react";
 
-const GRIP_H = 34;
 
 function clampPos(p: { x: number; y: number }, w0: number, h0: number) {
   const w = window.innerWidth, h = window.innerHeight, m = 8;
@@ -19,8 +18,11 @@ export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112
   /** Optional: Hoch/Runter-Knöpfe rechts an der Rundung (Halten = bewegen). */
   onVertical?: (dir: "u" | "d", on: boolean) => void;
 }) {
+  // Alles (Griff, Hoch/Runter, Schrift, Symbole) skaliert mit der Joystick-Größe.
+  const k = size / 112;
   const SIZE = size, KNOB = Math.round(size * 0.4);
-  const SIDE = onVertical ? 34 : 0;
+  const GAP = Math.round(6 * k), VBW = Math.round(30 * k), GRIP_H = Math.round(34 * k), GRIP_W = Math.round(68 * k);
+  const SIDE = onVertical ? GAP + VBW : 0;
   const W = SIZE + SIDE, H = SIZE + GRIP_H - 8;
   const max = (SIZE - KNOB) / 2;
   const [p, setP] = useState({ x: 0, y: 0 });
@@ -48,12 +50,12 @@ export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112
   const vBtn = (dir: "u" | "d") => (
     <button type="button" aria-label={dir === "u" ? "Hoch" : "Runter"} title={dir === "u" ? "Hoch (Space)" : "Runter (X)"}
       className="grid place-items-center border select-none"
-      style={{ ...surface, width: 30, height: SIZE / 2 - 6,
+      style={{ ...surface, width: VBW, height: SIZE / 2 - 6 * k,
         borderRadius: dir === "u" ? "0 22px 6px 0 / 0 40px 6px 0" : "0 6px 22px 0 / 0 6px 40px 0" }}
       onPointerDown={(e) => { e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); onVertical?.(dir, true); }}
       onPointerUp={() => onVertical?.(dir, false)} onPointerCancel={() => onVertical?.(dir, false)}
       onLostPointerCapture={() => onVertical?.(dir, false)}>
-      {dir === "u" ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      {dir === "u" ? <ChevronUp size={Math.round(16 * k)} /> : <ChevronDown size={Math.round(16 * k)} />}
     </button>
   );
 
@@ -77,16 +79,16 @@ export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112
             background: "hsl(var(--accent-gold))", borderColor: "hsl(var(--hairline))", pointerEvents: "none" }} />
       </div>
       {onVertical && (
-        <div className="absolute flex flex-col gap-1" style={{ left: SIZE - 4, top: 6 }}>
+        <div className="absolute flex flex-col" style={{ left: SIZE + GAP, top: 6 * k, gap: 4 * k }}>
           {vBtn("u")}{vBtn("d")}
         </div>
       )}
       {/* Griff: folgt der Rundung unten, verschiebt nur den Joystick */}
       <div
         role="button" aria-label={`${label} verschieben`} title="Ziehen zum Verschieben"
-        className="absolute flex flex-col items-center justify-center gap-0.5 border text-[10px] font-semibold leading-none cursor-grab active:cursor-grabbing"
+        className="absolute flex flex-col items-center justify-center gap-0.5 border font-semibold leading-none cursor-grab active:cursor-grabbing"
         style={{
-          ...surface, left: SIZE / 2 - 34, top: SIZE - 8, width: 68, height: GRIP_H, borderRadius: "0 0 34px 34px / 0 0 24px 24px",
+          ...surface, left: SIZE / 2 - GRIP_W / 2, top: SIZE - 8 * k, width: GRIP_W, height: GRIP_H, fontSize: 10 * k, borderRadius: `0 0 ${GRIP_W / 2}px ${GRIP_W / 2}px / 0 0 ${24 * k}px ${24 * k}px`,
         }}
         onPointerDown={(e) => {
           e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId);
@@ -96,7 +98,7 @@ export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112
         onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}
       >
         <span>{label}</span>
-        <Move size={11} strokeWidth={1.8} aria-hidden="true" />
+        <Move size={Math.round(11 * k)} strokeWidth={1.8} aria-hidden="true" />
       </div>
     </div>
   );
