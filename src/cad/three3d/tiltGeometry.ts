@@ -30,6 +30,8 @@ export interface Tilt3D {
   mode?: "rotate" | "lift";
   /** Seitenkanten bleiben lotrecht (nur bei "rotate" wirksam; "lift" ist immer lotrecht). */
   plumb?: boolean;
+  /** Nur bei "plumb": welche Kante der gewählten Seite fest bleibt ("top" Standard, "bottom" = Unterkante). */
+  anchor?: "top" | "bottom";
 }
 
 export interface TiltFrame {
@@ -114,24 +116,43 @@ export const axisDistance = (p: Vec2, f: TiltFrame) => (p.x - f.axis.x) * f.n.x 
 
 export type TiltMode = "rotate" | "lift";
 /** Wirksame Form einer Neigung: "rigid" = starr drehen, sonst Höhenfunktionen über unverändertem Grundriss. */
-export function tiltShape(mode: TiltMode | undefined, plumb: boolean | undefined, f: TiltFrame, z: number, h: number):
-  { kind: "rigid" } | { kind: "field"; zb: (p: Vec2) => number; zt: (p: Vec2) => number } {
+/**
+ * Wirksame Form einer Neigung: "rigid" = starr drehen, sonst Höhenfunktionen.
+ * "plumb" (Kanten bündig): die gewählte Kante (Ober- oder Unterkante der Bezugsseite)
+ * bleibt exakt dort, wo die starre Drehung sie hinlegt; die Seitenflächen werden lotrecht
+ * (die Gegenkante wird je nach Lage nach oben oder unten geführt). Der Körper wird dabei
+ * nie länger: der Grundriss wird quer zur Achse auf die gedrehte Ausdehnung gestaucht (`map`).
+ */
+export function tiltShape(mode: TiltMode | undefined, plumb: boolean | undefined, f: TiltFrame, z: number, h: number, anchor?: "top" | "bottom"):
+  { kind: "rigid" } | { kind: "field"; zb: (p: Vec2) => number; zt: (p: Vec2) => number; map?: (p: Vec2) => Vec2 } {
   const t = Math.tan(f.angleRad);
   if (mode === "lift") return { kind: "field", zb: () => z, zt: p => z + h + axisDistance(p, f) * t };
-  if (plumb) { const c = Math.cos(f.angleRad); return { kind: "field", zb: p => z + axisDistance(p, f) * t, zt: p => z + h / c + axisDistance(p, f) * t }; }
+  if (plumb) {
+    const c = Math.cos(f.angleRad), k = plumbScale(f, h, anchor);
+    const map = (p: Vec2): Vec2 => { const u = axisDistance(p, f); const d = (k - 1) * u; return { x: p.x + f.n.x * d, y: p.y + f.n.y * d }; };
+    return { kind: "field", zb: p => z + axisDistance(p, f) * t, zt: p => z + h / c + axisDistance(p, f) * t, map };
+  }
   return { kind: "rigid" };
 }
 
+/** Stauchung quer zur Achse bei "Kanten bündig" (1 = unverändert). */
+export function plumbScale(f: TiltFrame, h: number, anchor?: "top" | "bottom"): number {
+  const c = Math.cos(f.angleRad), s = Math.sin(f.angleRad);
+  return anchor === "bottom" || h <= 1e-9 ? c : (f.D * c - h * s) / f.D;
+}
+
 /** Prüft, ob die Verformung gültig ist (Oberseite darf nicht unter die Unterseite sinken). */
-export function tiltShapeError(mode: TiltMode | undefined, f: TiltFrame, h: number): string | undefined {
+export function tiltShapeError(mode: TiltMode | undefined, f: TiltFrame, h: number, plumb?: boolean, anchor?: "top" | "bottom"): string | undefined {
   if (mode === "lift" && h > 1e-9 && h + f.D * Math.tan(f.angleRad) <= 1e-6)
     return "Die Kante würde unter die Unterseite sinken – letzte gültige Form bleibt erhalten.";
+  if (mode !== "lift" && plumb && plumbScale(f, h, anchor) <= 0.02)
+    return "Bei dieser Neigung passt der Körper nicht bündig – letzte gültige Form bleibt erhalten.";
   return undefined;
 }
 
 /** Tatsächliche Fläche der oberen Oberfläche (Aussparungen abgezogen); starre Drehung ändert sie nicht. */
-export function topSurfaceArea(outer: Vec2[], holes: Vec2[][], mode: TiltMode | undefined, plumb: boolean | undefined, angleDeg: number): number {
+export function topSurfaceArea(outer: Vec2[], holes: Vec2[][], mode: TiltMode | undefined, plumb: boolean | undefined, angleDeg: number, scale = 1): number {
   const a = netArea(outer, holes);
   if (!angleDeg || (mode !== "lift" && !plumb)) return a;
-  return a / Math.cos((angleDeg * Math.PI) / 180);
+  return (a * (mode === "lift" ? 1 : scale)) / Math.cos((angleDeg * Math.PI) / 180);
 }

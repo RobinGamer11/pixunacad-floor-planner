@@ -6,7 +6,7 @@ import type React from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
-import { topOfItems, type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
+import { type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
 import { Object3DSettings, BigChoice } from "@/components/cad/Object3DSettings";
 import { Crosshair, X as XIcon } from "lucide-react";
 const REL = {
@@ -16,7 +16,16 @@ const REL = {
   muted: { color: "hsl(var(--overlay-surface) / 0.62)" },
   err: { color: "hsl(0 80% 72%)" },
   errBorder: { borderColor: "hsl(0 70% 60% / 0.6)" },
+  join: { color: "hsl(var(--accent-gold))" },
 };
+/** Verbindungswort zwischen den Schritten (mit / bis / und) – deutlich hervorgehoben. */
+const Joiner: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="flex items-center gap-2 py-0.5">
+    <span className="h-px flex-1" style={{ background: "hsl(var(--accent-gold) / 0.45)" }} />
+    <span className="text-[15px] font-bold italic leading-none" style={REL.join}>{children}</span>
+    <span className="h-px flex-1" style={{ background: "hsl(var(--accent-gold) / 0.45)" }} />
+  </div>
+);
 import { libraryDefinitionsOf, sheetSnapshotOf } from "@/cad/three3d/projectBridge";
 import { renderPlaneTexture } from "@/cad/three3d/planeTextures";
 import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
@@ -63,6 +72,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [selKey, setSelKey] = useState<string | null>(null);
   const [picking, setPicking] = useState<null | Relation3D["type"]>(null);
   const [face, setFace] = useState<"top" | "bottom">("bottom");
+  const [cutEdge, setCutEdge] = useState<"top" | "bottom">("top");
   const [keep, setKeep] = useState<"below" | "above">("below");
   const [msg, setMsg] = useState<string | null>(null);
   const lastSig = useRef("");
@@ -150,7 +160,6 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const sel = selKey ? { sheetId: selKey.split("::")[0], id: selKey.split("::")[1] } : null;
   const selObj = sel ? findObject(app, sel.sheetId, sel.id)?.obj : null;
   const rels: Relation3D[] = selObj?.relations3D || [];
-  const selTop = selKey ? topOfItems(items.filter(d => `${d.sheetId}::${d.sourceId}` === selKey)) : null;
 
   useEffect(() => {
     if (!picking) return;
@@ -160,7 +169,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   }, [picking]);
   const onPick = (sheetId: string, id: string) => {
     if (picking && sel) {
-      const err = addRelation(app, sel, { type: picking, targetSheetId: sheetId, targetId: id, ...(picking === "limitToSurface" ? { face, keep } : {}) });
+      const err = addRelation(app, sel, { type: picking, targetSheetId: sheetId, targetId: id, ...(picking === "limitToSurface" ? { face, keep } : { edge: cutEdge }) });
       setMsg(err || null); // Erfolg zeigt sich an der Beziehung selbst (inkl. Geometriefehlern)
       setPicking(null);
       return;
@@ -326,71 +335,54 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
 
       <aside className="w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
 
-        <section>
-          <h3 className="font-semibold mb-2">Auswahl</h3>
-          {!sel ? <p className="text-xs text-muted-foreground">Körper in der 3D-Ansicht anklicken.</p> : (
-            <div className="space-y-2">
-              <Object3DSettings app={app} defaultOpen onEditInCad={onEditInCad} relations={
-                <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
-                  {selTop !== null && <div className="text-[11px]" style={REL.muted}>Höchste verbleibende Stelle: {selTop.toFixed(2).replace(".", ",")} m</div>}
-                  {/* Durchbrechen */}
-                  <div className="space-y-1.5 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>
-                    <BigChoice active={picking === "cutout"} icon={<Crosshair size={15} />} label="Durchbricht (Ziel wählen)" onClick={() => setPicking(picking === "cutout" ? null : "cutout")} />
-                    <div className="text-[11px]" style={REL.muted}>mit · Kante des ausgewählten Körpers</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <BigChoice disabled label="Oberkante des Körpers" title="Noch nicht verfügbar" />
-                      <BigChoice disabled label="Unterkante des Körpers" title="Noch nicht verfügbar" />
+        {!sel ? <p className="text-xs text-muted-foreground">Körper in der 3D-Ansicht anklicken.</p> : (
+          <Object3DSettings app={app} defaultOpen onEditInCad={onEditInCad} relations={
+            <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
+              <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>
+                <BigChoice active={picking === "cutout"} icon={<Crosshair size={15} />} label="Durchbricht (Ziel wählen)" onClick={() => setPicking(picking === "cutout" ? null : "cutout")} />
+                <Joiner>mit</Joiner>
+                <div className="flex gap-1.5">
+                  <BigChoice active={cutEdge === "top"} label="Oberkörper Kante" onClick={() => setCutEdge("top")} />
+                  <BigChoice active={cutEdge === "bottom"} label="Unterkörper Kante" onClick={() => setCutEdge("bottom")} />
+                </div>
+              </div>
+              <div className="space-y-1 rounded-lg border p-2" style={picking === "limitToSurface" ? REL.active : REL.field}>
+                <BigChoice active={picking === "limitToSurface"} icon={<Crosshair size={15} />} label="An Oberfläche begrenzen (Ziel wählen)" onClick={() => setPicking(picking === "limitToSurface" ? null : "limitToSurface")} />
+                <Joiner>bis</Joiner>
+                <div className="flex gap-1.5">
+                  <BigChoice active={face === "top"} label="Oberkante Körper" onClick={() => setFace("top")} />
+                  <BigChoice active={face === "bottom"} label="Unterkante Körper" onClick={() => setFace("bottom")} />
+                </div>
+                <Joiner>und</Joiner>
+                <div className="flex gap-1.5">
+                  <BigChoice active={keep === "below"} label="Darunter behalten" onClick={() => setKeep("below")} />
+                  <BigChoice active={keep === "above"} label="Darüber behalten" onClick={() => setKeep("above")} />
+                </div>
+              </div>
+              {picking && <BigChoice icon={<XIcon size={15} />} label="Zielwahl abbrechen (Esc)" onClick={() => setPicking(null)} />}
+              {msg && <div className="text-[11px]" style={REL.err}>{msg}</div>}
+              {rels.map((r, i) => {
+                const tk = `${r.targetSheetId}::${r.targetId}`;
+                const errs = issues.filter(x => x.sourceKey === selKey && x.targetKey === tk);
+                return (
+                  <div key={i} className="rounded-lg border p-2" style={errs.length ? { ...REL.field, ...REL.errBorder } : REL.field}>
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 text-[12px] leading-snug">
+                        {r.type === "cutout"
+                          ? <>Durchbricht <b style={REL.join}>mit</b> {r.edge === "bottom" ? "Unterkörper Kante" : r.edge === "top" ? "Oberkörper Kante" : "Volumen"}</>
+                          : <>Begrenzt <b style={REL.join}>bis</b> {r.face === "top" ? "Oberkante" : "Unterkante"} <b style={REL.join}>und</b> {r.keep === "above" ? "darüber" : "darunter"} behalten</>}
+                        <span className="block truncate text-[11px]" style={REL.muted}>{objectLabel(app, r.targetSheetId, r.targetId)}</span>
+                      </span>
+                      <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border" style={REL.field} title="Beziehung entfernen" aria-label="Beziehung entfernen" onClick={() => removeRelation(app, sel, i)}><Trash2 size={14} /></button>
                     </div>
-                    <div className="text-[10px]" style={REL.muted}>Derzeit wird das gesamte überlappende Volumen abgezogen. Die Unterscheidung Ober-/Unterkante folgt, sobald ihre geometrische Bedeutung geklärt ist.</div>
+                    {errs.map((x, j) => <div key={j} className="mt-1 text-[11px]" style={REL.err}>{x.message}</div>)}
                   </div>
-                  {/* An Oberfläche begrenzen */}
-                  <div className="space-y-1.5 rounded-lg border p-2" style={picking === "limitToSurface" ? REL.active : REL.field}>
-                    <BigChoice active={picking === "limitToSurface"} icon={<Crosshair size={15} />} label="An Oberfläche begrenzen (Ziel wählen)" onClick={() => setPicking(picking === "limitToSurface" ? null : "limitToSurface")} />
-                    <div className="text-[11px]" style={REL.muted}>bis · Oberfläche des Zielkörpers</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <BigChoice active={face === "top"} label="Oberkante des Körpers" onClick={() => setFace("top")} />
-                      <BigChoice active={face === "bottom"} label="Unterkante des Körpers" onClick={() => setFace("bottom")} />
-                    </div>
-                    <div className="text-[11px]" style={REL.muted}>und</div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <BigChoice active={keep === "below"} label="Darunter behalten" onClick={() => setKeep("below")} />
-                      <BigChoice active={keep === "above"} label="Darüber behalten" onClick={() => setKeep("above")} />
-                    </div>
-                  </div>
-                  {picking && <BigChoice icon={<XIcon size={15} />} label="Zielwahl abbrechen (Esc)" onClick={() => setPicking(null)} />}
-                  {msg && <div className="text-[11px]" style={REL.err}>{msg}</div>}
-                  {rels.length > 0 && <div className="pt-1 text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Bestehende Beziehungen</div>}
-                  {rels.map((r, i) => {
-                    const tk = `${r.targetSheetId}::${r.targetId}`;
-                    const errs = issues.filter(x => x.sourceKey === selKey && x.targetKey === tk);
-                    return (
-                      <div key={i} className="rounded-lg border p-2" style={errs.length ? { ...REL.field, ...REL.errBorder } : REL.field}>
-                        <div className="flex items-start gap-2">
-                          <span className="min-w-0 flex-1 text-[12px] leading-snug">
-                            {r.type === "cutout" ? "Durchbricht" : `Begrenzt bis ${r.face === "top" ? "Oberkante" : "Unterkante"} · ${r.keep === "above" ? "darüber" : "darunter"} behalten`}
-                            <span className="block text-[11px]" style={REL.muted}>Ziel: {objectLabel(app, r.targetSheetId, r.targetId)}</span>
-                          </span>
-                          <button className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border" style={REL.field} title="Beziehung entfernen" aria-label="Beziehung entfernen" onClick={() => removeRelation(app, sel, i)}><Trash2 size={14} /></button>
-                        </div>
-                        {errs.map((x, j) => <div key={j} className="mt-1 text-[11px]" style={REL.err}>{x.message}</div>)}
-                      </div>
-                    );
-                  })}
-                </section>
-              } />
-            </div>
-          )}
-        </section>
-
-
-        {issues.length > 0 && (
-          <section>
-            <h3 className="font-semibold mb-1 text-xs">Hinweise</h3>
-            {issues.map((x, i) => <div key={i} className="text-xs text-muted-foreground">{x.message}</div>)}
-          </section>
+                );
+              })}
+            </section>
+          } />
         )}
-        <p className="text-xs text-muted-foreground">Ziehen: Blick bewegen · Shift + Ziehen: Blick drehen · Rechts-Ziehen oder zwei Finger: schieben · Rad: Zoom · W A S D: laufen · Space / X: steigen / sinken</p>
       </aside>
     </div>
   );

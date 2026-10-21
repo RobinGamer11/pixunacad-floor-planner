@@ -207,19 +207,21 @@ export function deriveHatch(hatch: any, sheetId: string, base: number): Derived3
   if (!tilt.frame) return { ...flatItem(), note: tilt.error };
   // Neigung immer aus der ursprünglichen, ungekippten Geometrie berechnen.
   const f = tilt.frame;
-  const mode = hatch.tilt3D?.mode, plumb = hatch.tilt3D?.plumb;
-  const bad = tiltShapeError(mode, f, h);
+  const mode = hatch.tilt3D?.mode, plumb = hatch.tilt3D?.plumb, anchor = hatch.tilt3D?.anchor;
+  const bad = tiltShapeError(mode, f, h, plumb, anchor);
   if (bad) return { ...flatItem(), note: bad };
-  const shape = tiltShape(mode, plumb, f, z, h);
+  const shape = tiltShape(mode, plumb, f, z, h, anchor);
   if (shape.kind === "field") {
-    // Verformung über unverändertem Grundriss: Seitenkanten bleiben lotrecht.
+    // Verformung mit lotrechten Seitenkanten (Grundriss ggf. quer zur Achse gestaucht).
+    const mp = shape.map ?? ((p: Vec2) => p);
+    const outerM = hatch.points.map(mp), holesM = holes.map(r => r.map(mp));
     const on = (ring: Vec2[], fz: (p: Vec2) => number): Vec3[] => ring.map(p => ({ x: p.x, y: p.y, z: fz(p) }));
     const top = shape.zt;
     const faces = {
-      top: { outer: on(hatch.points, top), holes: holes.map(r => on(r, top)) },
-      bottom: { outer: on(hatch.points, h <= EPS ? top : shape.zb), holes: holes.map(r => on(r, h <= EPS ? top : shape.zb)) },
+      top: { outer: on(outerM, top), holes: holesM.map(r => on(r, top)) },
+      bottom: { outer: on(outerM, h <= EPS ? top : shape.zb), holes: holesM.map(r => on(r, h <= EPS ? top : shape.zb)) },
     };
-    const m = h <= EPS ? faceMesh(hatch.points, holes, top) : slabMesh(hatch.points, holes, shape.zb, shape.zt);
+    const m = h <= EPS ? faceMesh(outerM, holesM, top) : slabMesh(outerM, holesM, shape.zb, shape.zt);
     if (!m) return flatItem();
     return { type: "mesh", source: "hatch", sourceId: hatch.id, sheetId, mesh: m, closed: h > EPS, color, faces };
   }

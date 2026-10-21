@@ -5,12 +5,13 @@
  * Bibliotheks-Körperhöhe). Jede bestätigte Änderung = genau ein Undo-Schritt (runAction).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Info as InfoIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
 import { sheetElevationM } from "@/cad/SheetManager";
 import { computeStairGeometry } from "@/cad/stairGeometry";
-import { frameForEdge, netArea, resolveTilt, straightEdgeIndices, tiltShapeError, topSurfaceArea, type TiltFrame, type TiltMode } from "@/cad/three3d/tiltGeometry";
+import { frameForEdge, netArea, plumbScale, resolveTilt, straightEdgeIndices, tiltShapeError, topSurfaceArea, type TiltFrame, type TiltMode } from "@/cad/three3d/tiltGeometry";
 import { TiltPreview3D } from "./TiltPreview3D";
 
 const C = {
@@ -41,7 +42,17 @@ function act(app: any, fn: () => void) {
 }
 
 /** Zahlenfeld: Enter oder Verlassen bestätigt genau einmal, Escape verwirft. */
-const NumField: React.FC<{ label: string; value: number | null; unit?: string; onCommit?: (v: number) => void; min?: number; minExclusive?: boolean; hint?: string }> = ({ label, value, unit = "m", onCommit, min, minExclusive, hint }) => {
+/** Kleiner „i“-Knopf: Infotext erst auf Antippen. */
+export const InfoTip: React.FC<{ text: string }> = ({ text }) => (
+  <Popover>
+    <PopoverTrigger asChild>
+      <button type="button" aria-label="Info" className="ml-1 inline-grid h-4 w-4 place-items-center rounded-full border align-middle" style={C.field}><InfoIcon size={10} /></button>
+    </PopoverTrigger>
+    <PopoverContent side="top" className="w-56 border p-2 text-[11px] leading-snug" style={C.card}>{text}</PopoverContent>
+  </Popover>
+);
+
+const NumField: React.FC<{ label: string; value: number | null; unit?: string; onCommit?: (v: number) => void; min?: number; minExclusive?: boolean; hint?: string; info?: string }> = ({ label, value, unit = "m", onCommit, min, minExclusive, hint, info }) => {
   const [draft, setDraft] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const draftRef = useRef<string | null>(null);
@@ -57,7 +68,7 @@ const NumField: React.FC<{ label: string; value: number | null; unit?: string; o
   };
   return (
     <label className="block min-w-0">
-      <span className="mb-1 block text-[10px] leading-tight" style={C.muted}>{label}</span>
+      <span className="mb-1 flex items-center text-[10px] leading-tight" style={C.muted}>{label}{info && <InfoTip text={info} />}</span>
       <div className="flex items-center gap-1.5">
         <input type="text" inputMode="decimal" value={draft ?? (value === null ? "" : fmt(value))} readOnly={!onCommit}
           placeholder={value === null ? "Verschieden" : undefined}
@@ -79,9 +90,9 @@ const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   </div>
 );
 const Note: React.FC<{ children: React.ReactNode }> = ({ children }) => <div className="text-[11px] leading-snug" style={C.muted}>{children}</div>;
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+const Section: React.FC<{ title: string; info?: string; children: React.ReactNode }> = ({ title, info, children }) => (
   <section className="space-y-2 rounded-xl border p-2.5" style={C.card}>
-    <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={C.muted}>{title}</div>
+    <div className="flex items-center text-[10px] font-semibold uppercase tracking-[0.14em]" style={C.muted}>{title}{info && <InfoTip text={info} />}</div>
     {children}
   </section>
 );
@@ -153,24 +164,22 @@ export const Object3DSettings: React.FC<{
       <Section title="Höhenlage und Körperhöhe">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(118px,1fr))] gap-2">
           {elevItems.length > 0 && (
-            <NumField label={`Höhenlage ü. Blatt${multi ? ` (${elevItems.length} Objekte)` : ""}`} value={elevCommon} onCommit={allEditable ? setElev : undefined} />
+            <NumField label={`Höhenlage ü. Blatt${multi ? ` (${elevItems.length} Objekte)` : ""}`} info={`Bezogen auf das Blatt (Blatthöhe ${fmt(sheetZ)} m). Negative Werte erlaubt.`} value={elevCommon} onCommit={allEditable ? setElev : undefined} />
           )}
           {!multi && isDoor && <DoorFields app={app} obj={obj} editable={editable(obj)} />}
           {!multi && kind === "wall" && (
-            <NumField label="Körperhöhe (Wandhöhe)" value={Number(obj.heightM) || 0} min={0} minExclusive
+            <NumField label="Körperhöhe (Wandhöhe)" info={`Anschlüsse an Nachbarwände entstehen automatisch. Wanddicke ${fmt(Number(obj.thicknessM) || 0)} m.`} value={Number(obj.heightM) || 0} min={0} minExclusive
               onCommit={editable(obj) ? (v) => act(app, () => { obj.heightM = v; }) : undefined} />
           )}
           {!multi && kind === "hatch" && !isPolygon && (
-            <NumField label="Körperhöhe (0 = Fläche)" value={Math.max(0, Number(obj.heightM) || 0)} min={0}
+            <NumField label="Körperhöhe" info="Höhe des Körpers über seiner Höhenlage. 0 ergibt eine flache Fläche." value={Math.max(0, Number(obj.heightM) || 0)} min={0}
               onCommit={editable(obj) ? (v) => act(app, () => { obj.heightM = v; }) : undefined} />
           )}
           {!multi && kind === "library" && (
-            <NumField label="Körperhöhe" value={libraryBodyHeightM(obj)} min={0} minExclusive
+            <NumField label="Körperhöhe" info="Höhe des Bibliothekskörpers über seiner Höhenlage." value={libraryBodyHeightM(obj)} min={0} minExclusive
               onCommit={editable(obj) ? (v) => act(app, () => { obj.bodyHeightM = v; }) : undefined} />
           )}
         </div>
-        <Note>Bezogen auf das Blatt (Blatthöhe {fmt(sheetZ)} m) · negative Höhenlage erlaubt.</Note>
-        {!multi && kind === "wall" && <Note>Anschlüsse an Nachbarwände entstehen automatisch. Wanddicke {fmt(Number(obj.thicknessM) || 0)} m.</Note>}
         {!multi && kind === "stair" && (() => {
           let total = 0; try { total = computeStairGeometry(obj).totalHeightM; } catch { /* noop */ }
           return <Info label="Gesamthöhe (aus Treppenberechnung)" value={`${fmt(total)} m`} />;
@@ -205,7 +214,7 @@ const DoorFields: React.FC<{ app: any; obj: any; editable: boolean }> = ({ app, 
   return (
     <>
       <NumField label="Höhenlage ü. Blatt" value={wallElev + sill} onCommit={on(v => { obj.breakHeightM = v - wallElev; })} />
-      <NumField label="Körperhöhe (Öffnungshöhe)" value={h} min={0} minExclusive onCommit={on(v => { obj.heightM = v; })} />
+      <NumField label="Körperhöhe (Öffnungshöhe)" info="Lichte Höhe der Öffnung über ihrer Unterkante." value={h} min={0} minExclusive onCommit={on(v => { obj.heightM = v; })} />
       <NumField label={obj.kind === "window" ? "Brüstung (über Wand)" : "Unterkante (über Wand)"} value={sill} onCommit={on(v => { obj.breakHeightM = v; })} />
     </>
   );
@@ -220,7 +229,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const resolved = resolveTilt(obj, z);
   const firstEdge = () => straightEdgeIndices(obj)[0] ?? null;
   const [edge, setEdge] = useState<number | null>(resolved?.frame?.edgeIndex ?? firstEdge());
-  const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean } | null>(null);
+  const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom" } | null>(null);
   const dragStart = useRef<number>(0);
   useEffect(() => { setEdge(resolveTilt(obj, z)?.frame?.edgeIndex ?? firstEdge()); setSession(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [obj]);
 
@@ -229,24 +238,28 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const sameEdge = !!(stored && resolved?.frame && resolved.frame.edgeIndex === edge);
   const storedAngle = sameEdge ? stored.angleDeg : 0;
   const storedMode: TiltMode = stored?.mode === "lift" ? "lift" : "rotate";
-  const cur = session ?? { angle: storedAngle, mode: storedMode, plumb: !!stored?.plumb };
+  const cur = session ?? { angle: storedAngle, mode: storedMode, plumb: !!stored?.plumb, anchor: (stored?.anchor === "bottom" ? "bottom" : "top") as "top" | "bottom" };
   const fr = edge !== null ? frameForEdge(obj, edge, cur.angle, z) : null;
   const frame: TiltFrame | undefined = fr?.frame;
-  const shapeErr = frame ? tiltShapeError(cur.mode, frame, h) : undefined;
+  const shapeErr = frame ? tiltShapeError(cur.mode, frame, h, cur.plumb, cur.anchor) : undefined;
   const draftTilt = edge !== null && frame && Math.abs(cur.angle) > 1e-9 && !shapeErr
-    ? { edgeIndex: edge, a: pts[edge], b: pts[(edge + 1) % pts.length], count: pts.length, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb }
+    ? { edgeIndex: edge, a: pts[edge], b: pts[(edge + 1) % pts.length], count: pts.length, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb, anchor: cur.anchor }
     : (session ? undefined : stored);
 
-  const begin = (patch: Partial<{ angle: number; mode: TiltMode; plumb: boolean }>) => setSession({ ...cur, ...patch });
+  const begin = (patch: Partial<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom" }>) => setSession({ ...cur, ...patch });
   const commit = () => {
     if (!session || edge === null || !frame || shapeErr) return;
     const a = pts[edge], b = pts[(edge + 1) % pts.length], v = session;
     act(app, () => {
       if (Math.abs(v.angle) < 1e-9) delete obj.tilt3D;
-      else obj.tilt3D = { edgeIndex: edge, a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, count: pts.length, angleDeg: v.angle, ...(v.mode === "lift" ? { mode: "lift" } : {}), ...(v.plumb ? { plumb: true } : {}) };
+      else obj.tilt3D = { edgeIndex: edge, a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, count: pts.length, angleDeg: v.angle, ...(v.mode === "lift" ? { mode: "lift" } : {}), ...(v.plumb ? { plumb: true } : {}), ...(v.plumb && v.anchor === "bottom" ? { anchor: "bottom" } : {}) };
     });
     setSession(null);
   };
+  // Zuverlässig speichern: eine gültige, noch offene Bearbeitung wird beim Verlassen
+  // (Auswahlwechsel, Panel schließt) übernommen statt still verworfen.
+  const commitRef = useRef(commit); commitRef.current = commit;
+  useEffect(() => () => { commitRef.current(); }, [obj]);
   const cancel = () => setSession(null);
   useEffect(() => {
     if (!session) return;
@@ -282,25 +295,30 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   };
 
   const area = netArea(pts, holes);
-  const real = topSurfaceArea(pts, holes, (draftTilt as any)?.mode, (draftTilt as any)?.plumb, (draftTilt as any)?.angleDeg || 0);
+  const dt: any = draftTilt;
+  const dFrame = dt && edge !== null ? frameForEdge(obj, edge, dt.angleDeg, z).frame : undefined;
+  const real = topSurfaceArea(pts, holes, dt?.mode, dt?.plumb, dt?.angleDeg || 0, dFrame && dt?.plumb ? plumbScale(dFrame, h, dt.anchor) : 1);
   const canEdit = editable && edge !== null && !!frame;
   const pct = ((cur.angle + 85) / 170) * 100;
 
   return (
     <>
-      <Section title="Flächen">
+      <Section title="Flächen" info="Oberfläche inkl. Neigung/Verformung. Aussparungen abgezogen.">
         <div className="grid grid-cols-2 gap-2">
           <Info label="Grundfläche im CAD" value={`${fmt(area)} m²`} />
           <Info label="Tatsächliche Fläche" value={`${fmt(real)} m²`} />
         </div>
-        <Note>Aussparungen abgezogen · tatsächliche Fläche = obere Oberfläche inkl. Neigung/Verformung.</Note>
       </Section>
 
       <Section title="Neigung bearbeiten">
         {resolved?.error && <div className="rounded-lg border px-2 py-1.5 text-[11px]" style={C.err}>{resolved.error}</div>}
-        <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={edge} frame={frame} selectable={straight}
-          onPickEdge={editable && !session ? (i) => setEdge(i) : undefined} onEdgeDrag={canEdit && !shapeErr ? onEdgeDrag : undefined} />
-        <Note>{edge === null ? "Gerade Kante in der Vorschau antippen." : session ? "An der goldenen Kante ziehen, Winkel eingeben oder Regler nutzen – ✓/Enter übernimmt, ✕/Esc verwirft." : "Ziehen dreht nur die Vorschau. Gold = gewählte Kante, gestrichelt = feste Bezugslinie."}</Note>
+        <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={edge} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
+          bottomSelectable={cur.plumb && cur.mode === "rotate"}
+          onPickEdge={editable ? (i, level) => {
+            if (session && i !== edge) return; // Kantenwechsel nur ohne offene Bearbeitung
+            if (i !== edge) setEdge(i);
+            if (cur.plumb && cur.mode === "rotate" && level !== cur.anchor) begin({ anchor: level });
+          } : undefined} onEdgeDrag={canEdit && !shapeErr ? onEdgeDrag : undefined} />
         <div className="flex gap-2">
           <BigChoice active={cur.mode === "rotate"} disabled={!canEdit} icon={<Box size={15} />} label="Körper neigen" onClick={() => begin({ mode: "rotate" })} title="Gesamter Körper wird um die gegenüberliegende Seite geneigt" />
           <BigChoice active={cur.mode === "lift"} disabled={!canEdit} icon={<ArrowUpFromLine size={15} />} label="Kante anheben" onClick={() => begin({ mode: "lift" })} title="Gewählte Oberkante wird angehoben, Gegenkante und Unterseite bleiben fest" />
@@ -326,7 +344,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
           {angleErr && <div className="text-[10px]" style={C.err}>{angleErr}</div>}
         </div>
         <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5" style={{ ...C.field, opacity: canEdit && cur.mode === "rotate" ? 1 : 0.5 }}>
-          <span className="text-[12px]">Kanten bündig <span className="block text-[10px]" style={C.muted}>{cur.mode === "lift" ? "Beim Kante anheben bleiben Seitenkanten immer lotrecht." : "Seitenkanten bleiben lotrecht"}</span></span>
+          <span className="flex items-center text-[12px]">Kanten bündig<InfoTip text="Die gewählte Kante bleibt an ihrer Stelle, die Seiten werden lotrecht. Oberkante gewählt: die Kante darunter wird lotrecht nach unten geführt. Unterkante gewählt (in der Vorschau antippen): die Kante darüber wird lotrecht nach oben geführt. Der Körper wird nicht länger." /></span>
           <button type="button" role="switch" aria-checked={cur.plumb} disabled={!canEdit || cur.mode === "lift"} onClick={() => begin({ plumb: !cur.plumb })}
             className="relative h-6 w-11 shrink-0 rounded-full border transition-colors" style={cur.plumb ? C.gold : C.field}>
             <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all" style={{ left: cur.plumb ? 22 : 3, background: cur.plumb ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))" }} />
