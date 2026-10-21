@@ -15,9 +15,10 @@ describe("Neigungsmodi", () => {
     expect(Math.max(...zs(d))).toBeCloseTo(0.2 + 2 * Math.tan(Math.PI / 6));
     for (const v of xs(d)) expect([0, 2, 4].some(k => Math.abs(v - k) < 1e-9)).toBe(true);
   });
-  it("Kanten bündig: Grundriss bleibt lotrecht (keine verschobenen x/y)", () => {
+  it("Kanten bündig: Körper wird nicht länger (Ausdehnung quer zur Achse ≤ Grundriss)", () => {
     const d: any = deriveHatch({ id: "h", points: sq, heightM: 0.2, tilt3D: tilt(undefined, true) }, "s", 0);
-    for (const v of xs(d)) expect([0, 2, 4].some(k => Math.abs(v - k) < 1e-9)).toBe(true);
+    const ys = xs(d).filter((_, i) => i % 2 === 1);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(2);
   });
   it("Kante unter die Unterseite → Meldung, letzte gültige (flache) Form", () => {
     const d: any = deriveHatch({ id: "h", points: sq, heightM: 0.2, tilt3D: { ...tilt("lift"), angleDeg: -30 } }, "s", 0);
