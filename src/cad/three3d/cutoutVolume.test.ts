@@ -11,7 +11,8 @@ describe("Durchbricht", () => {
     for (const edge of [undefined, "top", "bottom"] as const) {
       const { items } = applyRelations3D([target, source], [{ sheetId: "s", id: "q", relations3D: [{ type: "cutout", targetSheetId: "s", targetId: "t", ...(edge ? { edge } : {}) } as any] }]);
       const pieces = items.filter((d: any) => d.sourceId === "t") as any[];
-      const vol = pieces.reduce((s, p) => s + (p.z1 - p.z0) * Math.abs(p.footprint.reduce((a: number, q: any, i: number) => { const r = p.footprint[(i + 1) % p.footprint.length]; return a + q.x * r.y - r.x * q.y; }, 0) / 2), 0);
+      const area = (r: any[]) => Math.abs(r.reduce((a: number, q: any, i: number) => { const n = r[(i + 1) % r.length]; return a + q.x * n.y - n.x * q.y; }, 0) / 2);
+      const vol = pieces.reduce((s, p) => s + (p.z1 - p.z0) * (area(p.footprint) - p.holes.reduce((h: number, r: any[]) => h + area(r), 0)), 0);
       expect(vol).toBeCloseTo(48 - 1, 6);
     }
   });
