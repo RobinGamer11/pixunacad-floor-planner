@@ -100,7 +100,7 @@ export function addRelation(app: CadApp, src: { sheetId: string; id: string }, r
   if (wouldCreateCycle(relationSources(app), objKey(src.sheetId, src.id), objKey(rel.targetSheetId, rel.targetId)))
     return "Diese Beziehung würde einen Kreisbezug erzeugen.";
   app.runAction(() => {
-    const list: Relation3D[] = (s.obj.relations3D || []).filter((r: Relation3D) => !(r.targetSheetId === rel.targetSheetId && r.targetId === rel.targetId));
+    const list: Relation3D[] = (s.obj.relations3D || []).filter((r: Relation3D) => !(r.type === rel.type && r.targetSheetId === rel.targetSheetId && r.targetId === rel.targetId && r.face === rel.face && r.keep === rel.keep && r.edge === rel.edge));
     s.obj.relations3D = [...list, { ...rel }];
   });
   return null;
