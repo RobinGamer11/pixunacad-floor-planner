@@ -26,4 +26,6 @@
 - Schraffurneigung = `tilt3D` (Bezugskante + Winkel) über `objectMeta.ts`; Achse/Kantenauflösung nur in `three3d/tiltGeometry.ts` – 2D-Punkte bleiben unverändert, verlorene Kante wird gemeldet statt ersetzt.
 - Geneigte/verschnittene Körper sind `Mesh3D`; echte Volumen-Verschneidung nur über `three3d/solidMesh.ts` (three-bvh-csg), senkrechte Prismen weiter exakt über polygon-clipping.
 - 3D-Wände nutzen den geheilten 2D-Wandring (`deriveWalls`); Überlappungen angrenzender Wände nur im gemeinsamen Höhenbereich abziehen, jede Wand bleibt eigener Körper.
-- Tür-/Fensterlage in 3D = Brüstung (`breakHeightM`) über Wandunterkante – kein eigenes Höhenfeld; 3D-Einstellungen nur über `components/cad/Object3DSettings.tsx`.
+- Tür-/Fensterlage in 3D = Brüstung (`breakHeightM`, auch negativ) über Wandunterkante; „Höhenlage ü. Blatt“ wird daraus berechnet und zurückgeschrieben – kein eigenes Höhenfeld; 3D-Einstellungen nur über `components/cad/Object3DSettings.tsx`.
+
+- Neigungsform (`tilt3D.mode`/`plumb`) nur über `tiltShape` in `three3d/tiltGeometry.ts`; fehlende Felder = starre Drehung (Altprojekte unverändert). Vorschau in den Einstellungen nutzt `deriveHatch`, keine zweite Geometrie.
