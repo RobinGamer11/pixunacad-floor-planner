@@ -115,8 +115,8 @@ export function wallOpenings(wall: any, doors: any[]) {
     .map(d => ({
       from: Math.max(0, d.posM - d.widthM / 2),
       to: Math.min(total, d.posM + d.widthM / 2),
-      sill: Math.max(0, Number(d.breakHeightM) || 0),
-      top: Math.max(0, Number(d.breakHeightM) || 0) + Math.max(0, Number(d.heightM) || 0),
+      sill: Number(d.breakHeightM) || 0,
+      top: (Number(d.breakHeightM) || 0) + Math.max(0, Number(d.heightM) || 0),
     }))
     .filter(o => o.to - o.from > EPS && o.top - o.sill > EPS)
     .sort((a, b) => a.from - b.from);
