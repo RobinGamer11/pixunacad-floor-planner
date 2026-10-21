@@ -5,7 +5,7 @@
  * Bibliotheks-Körperhöhe). Jede bestätigte Änderung = genau ein Undo-Schritt (runAction).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Layers, Pencil, MoveUp, Box, ArrowUpFromLine } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine } from "lucide-react";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
 import { sheetElevationM } from "@/cad/SheetManager";
@@ -347,5 +347,3 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   );
 };
 
-// Ungenutzte Symbole vermeiden Warnungen nicht; bewusst exportiert für 3D-Bereich.
-export const Icons3D = { Layers, MoveUp };
