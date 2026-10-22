@@ -29,3 +29,5 @@
 - Tür-/Fensterlage in 3D = Brüstung (`breakHeightM`, auch negativ) über Wandunterkante; „Höhenlage ü. Blatt“ wird daraus berechnet und zurückgeschrieben – kein eigenes Höhenfeld; 3D-Einstellungen nur über `components/cad/Object3DSettings.tsx`.
 
 - Neigungsform (`tilt3D.mode`/`plumb`/`anchor`) nur über `tiltShape` in `three3d/tiltGeometry.ts`; „Kanten bündig“ hält die gewählte Kante an der Lage der starren Drehung und staucht den Grundriss quer zur Achse (Körper wird nie länger). Fehlende Felder = starre Drehung. Vorschau nutzt `deriveHatch`.
+- Neigungsentwürfe gelten nur für ihr Objekt (Objektwechsel verwirft) und erscheinen in 3D nur flüchtig über `three3d/tiltDraftPreview.ts`; „Tatsächliche Fläche“ (`tilt3D.basis`) staucht die 2D-Punkte erst bei „Übernehmen“ über `scaleAcrossAxis` (Rücksetzen streckt zurück).
+- „Durchbricht“ mit `trim` kürzt die Quelle flüchtig in `relations.ts` (Hauptteil + Teil im Ziel); `edge` ist veraltet und ohne Wirkung.
