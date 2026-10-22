@@ -3,7 +3,7 @@
  * Körperbeziehungen und Navigation. Alle Änderungen laufen über CadApp.runAction.
  */
 import type React from "react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 import { type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
