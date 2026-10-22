@@ -4,8 +4,8 @@
  * Gespeichert am Quellobjekt (`relations3D` über objectMeta) mit Blatt + Objekt-ID
  * des Ziels. Ausgewertet wird nur flüchtig auf den abgeleiteten 3D-Körpern:
  * - "cutout":         Quelle durchbricht Ziel → Ziel verliert das Volumen der Quelle;
- *                     mit `edge` (top/bottom) zusätzlich den Raum über der Ober- bzw.
- *                     unter der Unterkante der Quelle (die Quelle stößt ganz hindurch).
+ *                     mit `trim` endet die Quelle zusätzlich an der Außenkante des Ziels
+ *                     (alles, was jenseits des Ziels herausragt, entfällt).
  * - "limitToSurface": Quelle wird an Ober- oder Unterseite des Ziels begrenzt;
  *                     `keep` bestimmt eindeutig, welche Seite erhalten bleibt.
  * Fehlt das Ziel oder schlägt die Verschneidung fehl, bleibt die Originalgeometrie.
@@ -14,7 +14,7 @@ import polygonClipping from "polygon-clipping";
 import type { Vec2 } from "../geometry";
 import type { Relation3D } from "../objectMeta";
 import type { Derived3D, Prism3D, Mesh3D } from "./geometryDerivation";
-import { csgMesh, meshBounds, planeOfRing, slabMesh, type MeshData, type Vec3 } from "./solidMesh";
+import { csgMesh, meshBounds, meshVolume, planeOfRing, slabMesh, type MeshData, type Vec3 } from "./solidMesh";
 
 export type { Relation3D };
 export const objKey = (sheetId: string, id: string) => `${sheetId}::${id}`;
@@ -194,6 +194,27 @@ export function applyRelations3D(items: Derived3D[], sources: RelationSource[]):
           if (m) out.push(asMesh(t, m));
         }
         byKey.set(tk, out);
+        if (r.trim) {
+          // Körper abgeschnitten: Hauptteil + Teil im Ziel behalten, Überstände jenseits des Ziels entfernen.
+          const tm = tgt.map(meshOf).filter(Boolean) as MeshData[];
+          const next: Derived3D[] = [];
+          for (const c of src) {
+            let m = meshOf(c);
+            if (!m || !(c.type === "prism" || (c.type === "mesh" && c.closed))) { next.push(c); continue; }
+            let rest: MeshData | null = m;
+            const inside: MeshData[] = [];
+            for (const t of tm) {
+              const i = csgMesh(m, t, "intersect"); if (i) inside.push(i);
+              if (rest) rest = csgMesh(rest, t, "subtract");
+            }
+            if (!inside.length) { next.push(c); continue; }
+            const parts = rest ? splitMesh(rest) : [];
+            parts.sort((a, b) => Math.abs(meshVolume(b)) - Math.abs(meshVolume(a)));
+            if (parts[0]) next.push(asMesh(c, parts[0]));
+            for (const i of inside) next.push(asMesh(c, i));
+          }
+          byKey.set(sk, next);
+        }
       } else {
         const face = r.face === "bottom" ? "bottom" : "top";
         const keep = r.keep === "above" ? "above" : "below";
@@ -234,4 +255,24 @@ export function topOfItems(items: Derived3D[]): number | null {
     else top = Math.max(top, meshBounds(d.mesh).maxZ);
   }
   return Number.isFinite(top) ? top : null;
+}
+
+/** Netz in zusammenhängende Teile zerlegen (Punkte werden über ihre Lage verschweißt). */
+export function splitMesh(m: MeshData): MeshData[] {
+  const key = (i: number) => `${Math.round(m.positions[i * 3] * 1e5)},${Math.round(m.positions[i * 3 + 1] * 1e5)},${Math.round(m.positions[i * 3 + 2] * 1e5)}`;
+  const weld = new Map<string, number>(); const vid: number[] = [];
+  for (let i = 0; i < m.positions.length / 3; i++) { const k = key(i); if (!weld.has(k)) weld.set(k, weld.size); vid.push(weld.get(k)!); }
+  const par = Array.from({ length: weld.size }, (_, i) => i);
+  const find = (x: number): number => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+  for (let t = 0; t + 2 < m.indices.length; t += 3) {
+    const a = find(vid[m.indices[t]]), b = find(vid[m.indices[t + 1]]), c = find(vid[m.indices[t + 2]]);
+    par[b] = a; par[find(c)] = a;
+  }
+  const groups = new Map<number, number[]>();
+  for (let t = 0; t + 2 < m.indices.length; t += 3) { const g = find(vid[m.indices[t]]); (groups.get(g) || groups.set(g, []).get(g)!).push(t); }
+  return [...groups.values()].map(ts => {
+    const positions: number[] = [], indices: number[] = [];
+    for (const t of ts) for (let k = 0; k < 3; k++) { const i = m.indices[t + k]; indices.push(positions.length / 3); positions.push(m.positions[i * 3], m.positions[i * 3 + 1], m.positions[i * 3 + 2]); }
+    return { positions, indices };
+  });
 }

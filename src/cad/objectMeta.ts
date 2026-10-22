@@ -33,7 +33,7 @@ export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: stri
 export interface Tilt3D { edgeIndex: number; a: { x: number; y: number }; b: { x: number; y: number }; count: number; angleDeg: number; mode?: "rotate" | "lift"; plumb?: boolean; anchor?: "top" | "bottom" }
 
 /** 3D-Körperbeziehung, am Quellobjekt gespeichert (Ziel über Blatt + Objekt-ID). */
-export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above"; /** Nur "cutout": mit welcher Kante der Quellkörper durchbricht (fehlt = Volumen). */ edge?: "top" | "bottom" }
+export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above"; /** Veraltet (ohne Wirkung, nur Altdaten). */ edge?: "top" | "bottom"; /** Nur "cutout": Quelle wird an der Außenkante des Ziels abgeschnitten („Körper abgeschnitten“); fehlt = „Körper vollständig“. */ trim?: boolean }
 
 /** 3D: Objekthöhe relativ zum Blatt (m). Fehlend = 0. */
 export function objectElevationM(obj: any): number {

@@ -73,7 +73,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [selKey, setSelKey] = useState<string | null>(null);
   const [picking, setPicking] = useState<null | Relation3D["type"]>(null);
   const [face, setFace] = useState<"top" | "bottom">("bottom");
-  const [cutEdge, setCutEdge] = useState<"top" | "bottom">("top");
+  const [cutTrim, setCutTrim] = useState(false);
   const [keep, setKeep] = useState<"below" | "above">("below");
   const [msg, setMsg] = useState<string | null>(null);
   const lastSig = useRef("");
@@ -170,7 +170,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   }, [picking]);
   const onPick = (sheetId: string, id: string) => {
     if (picking && sel) {
-      const err = addRelation(app, sel, { type: picking, targetSheetId: sheetId, targetId: id, ...(picking === "limitToSurface" ? { face, keep } : { edge: cutEdge }) });
+      const err = addRelation(app, sel, { type: picking, targetSheetId: sheetId, targetId: id, ...(picking === "limitToSurface" ? { face, keep } : (cutTrim ? { trim: true } : {})) });
       setMsg(err || null); // Erfolg zeigt sich an der Beziehung selbst (inkl. Geometriefehlern)
       setPicking(null);
       return;
@@ -342,10 +342,10 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>
                 <BigChoice active={picking === "cutout"} icon={<Crosshair size={15} />} label="Durchbricht (Ziel wählen)" onClick={() => setPicking(picking === "cutout" ? null : "cutout")} />
-                <Joiner>mit</Joiner>
+                <Joiner>und</Joiner>
                 <div className="flex gap-1.5">
-                  <BigChoice active={cutEdge === "top"} label="Oberkörper Kante" onClick={() => setCutEdge("top")} />
-                  <BigChoice active={cutEdge === "bottom"} label="Unterkörper Kante" onClick={() => setCutEdge("bottom")} />
+                  <BigChoice active={!cutTrim} label="Körper vollständig" onClick={() => setCutTrim(false)} />
+                  <BigChoice active={cutTrim} label="Körper abgeschnitten" onClick={() => setCutTrim(true)} />
                 </div>
               </div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "limitToSurface" ? REL.active : REL.field}>
@@ -371,7 +371,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 text-[12px] leading-snug">
                         {r.type === "cutout"
-                          ? <>Durchbricht <b style={REL.join}>mit</b> {r.edge === "bottom" ? "Unterkörper Kante" : r.edge === "top" ? "Oberkörper Kante" : "Volumen"}</>
+                          ? <>Durchbricht <b style={REL.join}>und</b> {r.trim ? "Körper abgeschnitten" : "Körper vollständig"}</>
                           : <>Begrenzt <b style={REL.join}>bis</b> {r.face === "top" ? "Oberkante" : "Unterkante"} <b style={REL.join}>und</b> {r.keep === "above" ? "darüber" : "darunter"} behalten</>}
                         <span className="block truncate text-[11px]" style={REL.muted}>{objectLabel(app, r.targetSheetId, r.targetId)}</span>
                       </span>
