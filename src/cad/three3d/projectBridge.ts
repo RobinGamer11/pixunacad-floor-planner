@@ -84,6 +84,9 @@ export function selectInCad(app: CadApp, sheetId: string, id: string) {
   try { app.setSelection({ ...map[hit.list], handleIndex: null } as any); } catch { /* Auswahl nicht möglich */ }
 }
 
+/** Klick ins Leere der 3D-Ansicht: Auswahl aufheben (schließt die Einstellungen). */
+export function clearCadSelection(app: CadApp) { try { app.clearSelection(); } catch { /* ignorieren */ } }
+
 export function setSheetIn3D(app: CadApp, sheetId: string, on: boolean) {
   app.runAction(() => { app.sheetManager.setParticipatesIn3D(sheetId, on); });
 }
@@ -100,7 +103,7 @@ export function addRelation(app: CadApp, src: { sheetId: string; id: string }, r
   if (wouldCreateCycle(relationSources(app), objKey(src.sheetId, src.id), objKey(rel.targetSheetId, rel.targetId)))
     return "Diese Beziehung würde einen Kreisbezug erzeugen.";
   app.runAction(() => {
-    const list: Relation3D[] = (s.obj.relations3D || []).filter((r: Relation3D) => !(r.type === rel.type && r.targetSheetId === rel.targetSheetId && r.targetId === rel.targetId && r.face === rel.face && r.keep === rel.keep && r.edge === rel.edge));
+    const list: Relation3D[] = (s.obj.relations3D || []).filter((r: Relation3D) => !(r.type === rel.type && r.targetSheetId === rel.targetSheetId && r.targetId === rel.targetId && r.face === rel.face && r.keep === rel.keep && !!r.trim === !!rel.trim));
     s.obj.relations3D = [...list, { ...rel }];
   });
   return null;

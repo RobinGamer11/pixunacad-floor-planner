@@ -264,3 +264,10 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] 3D-Einstellungen in Werkzeugen unter „Ebene“; alte Schraffur-Objekthöhe entfernt
 - [x] Joysticks einzeln verschiebbar (Griff „Laufen“/„Blick“), Positionen gespeichert
 - [x] Zahnrad: Empfindlichkeit Laufen/Blick in %
+
+## 3D-Neigung & Beziehungen – 21.10.2026
+- [x] Neigung je Objekt unabhängig (keine Übernahme beim Auswahlwechsel)
+- [x] Neigungsvorschau transparent grau mit beiger Kante in der 3D-Ansicht
+- [x] Durchbricht „und“ Körper vollständig / Körper abgeschnitten
+- [x] „Kante neigen“; Orientierung Grundfläche / Tatsächliche Fläche (2D folgt)
+- [x] Rechtsklick dreht wie Linksklick; Klick ins Leere hebt Auswahl auf

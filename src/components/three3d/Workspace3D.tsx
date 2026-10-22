@@ -3,7 +3,7 @@
  * Körperbeziehungen und Navigation. Alle Änderungen laufen über CadApp.runAction.
  */
 import type React from "react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 import { type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
@@ -29,7 +29,8 @@ const Joiner: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 import { libraryDefinitionsOf, sheetSnapshotOf } from "@/cad/three3d/projectBridge";
 import { renderPlaneTexture } from "@/cad/three3d/planeTextures";
-import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
+import { getTiltDraftPreview, subscribeTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
+import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, clearCadSelection, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
 import { sheetParticipatesIn3D, sheetElevationM } from "@/cad/SheetManager";
 import type { Viewer3DHandle } from "./Viewer3D";
 import { projectStore, useProject } from "@/lib/projectStore";
@@ -73,7 +74,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [selKey, setSelKey] = useState<string | null>(null);
   const [picking, setPicking] = useState<null | Relation3D["type"]>(null);
   const [face, setFace] = useState<"top" | "bottom">("bottom");
-  const [cutEdge, setCutEdge] = useState<"top" | "bottom">("top");
+  const [cutTrim, setCutTrim] = useState(false);
   const [keep, setKeep] = useState<"below" | "above">("below");
   const [msg, setMsg] = useState<string | null>(null);
   const lastSig = useRef("");
@@ -168,9 +169,10 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     window.addEventListener("keydown", kd, true);
     return () => window.removeEventListener("keydown", kd, true);
   }, [picking]);
+  const ghost = useSyncExternalStore(subscribeTiltDraftPreview, getTiltDraftPreview);
   const onPick = (sheetId: string, id: string) => {
     if (picking && sel) {
-      const err = addRelation(app, sel, { type: picking, targetSheetId: sheetId, targetId: id, ...(picking === "limitToSurface" ? { face, keep } : { edge: cutEdge }) });
+      const err = addRelation(app, sel, { type: picking, targetSheetId: sheetId, targetId: id, ...(picking === "limitToSurface" ? { face, keep } : (cutTrim ? { trim: true } : {})) });
       setMsg(err || null); // Erfolg zeigt sich an der Beziehung selbst (inkl. Geometriefehlern)
       setPicking(null);
       return;
@@ -183,7 +185,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} textureFor={textureFor} />
+          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} onEmpty={() => { if (!picking) clearCadSelection(app); }} ghost={ghost} textureFor={textureFor} />
         </Suspense>
         {picking && (
           <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs font-medium shadow-lg" style={REL.active}>
@@ -342,10 +344,10 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>
                 <BigChoice active={picking === "cutout"} icon={<Crosshair size={15} />} label="Durchbricht (Ziel wählen)" onClick={() => setPicking(picking === "cutout" ? null : "cutout")} />
-                <Joiner>mit</Joiner>
+                <Joiner>und</Joiner>
                 <div className="flex gap-1.5">
-                  <BigChoice active={cutEdge === "top"} label="Oberkörper Kante" onClick={() => setCutEdge("top")} />
-                  <BigChoice active={cutEdge === "bottom"} label="Unterkörper Kante" onClick={() => setCutEdge("bottom")} />
+                  <BigChoice active={!cutTrim} label="Körper vollständig" onClick={() => setCutTrim(false)} />
+                  <BigChoice active={cutTrim} label="Körper abgeschnitten" onClick={() => setCutTrim(true)} />
                 </div>
               </div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "limitToSurface" ? REL.active : REL.field}>
@@ -371,7 +373,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 text-[12px] leading-snug">
                         {r.type === "cutout"
-                          ? <>Durchbricht <b style={REL.join}>mit</b> {r.edge === "bottom" ? "Unterkörper Kante" : r.edge === "top" ? "Oberkörper Kante" : "Volumen"}</>
+                          ? <>Durchbricht <b style={REL.join}>und</b> {r.trim ? "Körper abgeschnitten" : "Körper vollständig"}</>
                           : <>Begrenzt <b style={REL.join}>bis</b> {r.face === "top" ? "Oberkante" : "Unterkante"} <b style={REL.join}>und</b> {r.keep === "above" ? "darüber" : "darunter"} behalten</>}
                         <span className="block truncate text-[11px]" style={REL.muted}>{objectLabel(app, r.targetSheetId, r.targetId)}</span>
                       </span>

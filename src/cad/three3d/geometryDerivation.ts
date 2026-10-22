@@ -17,7 +17,7 @@ import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
 import { buildHealedWallSolidRing } from "../wallSolid";
 import { subtractPrism } from "./relations";
-import { tiltShape, tiltShapeError } from "./tiltGeometry";
+import { scaleAcrossAxis, tiltShape, tiltShapeError } from "./tiltGeometry";
 import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 
 export type Solid3DSource =
@@ -207,10 +207,18 @@ export function deriveHatch(hatch: any, sheetId: string, base: number): Derived3
   if (!tilt.frame) return { ...flatItem(), note: tilt.error };
   // Neigung immer aus der ursprünglichen, ungekippten Geometrie berechnen.
   const f = tilt.frame;
-  const mode = hatch.tilt3D?.mode, plumb = hatch.tilt3D?.plumb, anchor = hatch.tilt3D?.anchor;
+  const mode = hatch.tilt3D?.mode, plumb = hatch.tilt3D?.plumb, anchor = hatch.tilt3D?.anchor, basis = hatch.tilt3D?.basis;
   const bad = tiltShapeError(mode, f, h, plumb, anchor);
   if (bad) return { ...flatItem(), note: bad };
-  const shape = tiltShape(mode, plumb, f, z, h, anchor);
+  const shape = tiltShape(mode, plumb, f, z, h, anchor, basis);
+  if (shape.kind === "rigid" && basis === "actual") {
+    // Tatsächliche Fläche: 2D-Punkte sind die Projektion → wahre Form quer zur Achse zurückstrecken.
+    const pd = Number.isFinite(hatch.tilt3D?.projDeg) ? hatch.tilt3D.projDeg : hatch.tilt3D.angleDeg;
+    const k = 1 / Math.max(0.05, Math.cos((pd * Math.PI) / 180));
+    if (Math.abs(k - 1) > 1e-9) {
+      return deriveHatch({ ...hatch, points: scaleAcrossAxis(hatch.points, f, k), holes: holes.map(r => scaleAcrossAxis(r, f, k)), tilt3D: { ...hatch.tilt3D, basis: undefined, projDeg: undefined } }, sheetId, base);
+    }
+  }
   if (shape.kind === "field") {
     // Verformung mit lotrechten Seitenkanten (Grundriss ggf. quer zur Achse gestaucht).
     const mp = shape.map ?? ((p: Vec2) => p);

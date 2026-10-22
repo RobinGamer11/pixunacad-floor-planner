@@ -33,7 +33,7 @@ export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: stri
 export interface Tilt3D { edgeIndex: number; a: { x: number; y: number }; b: { x: number; y: number }; count: number; angleDeg: number; mode?: "rotate" | "lift"; plumb?: boolean; anchor?: "top" | "bottom" }
 
 /** 3D-Körperbeziehung, am Quellobjekt gespeichert (Ziel über Blatt + Objekt-ID). */
-export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above"; /** Nur "cutout": mit welcher Kante der Quellkörper durchbricht (fehlt = Volumen). */ edge?: "top" | "bottom" }
+export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above"; /** Veraltet (ohne Wirkung, nur Altdaten). */ edge?: "top" | "bottom"; /** Nur "cutout": Quelle wird an der Außenkante des Ziels abgeschnitten („Körper abgeschnitten“); fehlt = „Körper vollständig“. */ trim?: boolean }
 
 /** 3D: Objekthöhe relativ zum Blatt (m). Fehlend = 0. */
 export function objectElevationM(obj: any): number {
@@ -177,7 +177,7 @@ export function copyObjectMeta(obj: any, opts: { withCode?: boolean } = {}): Obj
   if (typeof obj?.elevationM === "number" && Number.isFinite(obj.elevationM) && obj.elevationM !== 0) out.elevationM = obj.elevationM;
   // Räumliche Form gehört zum Objekt: Kopien behalten Neigung und Körperhöhe.
   const t = obj?.tilt3D;
-  if (t && Number.isFinite(t.angleDeg) && t.angleDeg !== 0 && t.a && t.b) out.tilt3D = { edgeIndex: t.edgeIndex | 0, a: { x: +t.a.x, y: +t.a.y }, b: { x: +t.b.x, y: +t.b.y }, count: t.count | 0, angleDeg: +t.angleDeg, ...(t.mode === "lift" ? { mode: "lift" as const } : {}), ...(t.plumb === true ? { plumb: true } : {}), ...(t.plumb === true && t.anchor === "bottom" ? { anchor: "bottom" as const } : {}) };
+  if (t && Number.isFinite(t.angleDeg) && t.angleDeg !== 0 && t.a && t.b) out.tilt3D = { edgeIndex: t.edgeIndex | 0, a: { x: +t.a.x, y: +t.a.y }, b: { x: +t.b.x, y: +t.b.y }, count: t.count | 0, angleDeg: +t.angleDeg, ...(t.mode === "lift" ? { mode: "lift" as const } : {}), ...(t.plumb === true ? { plumb: true } : {}), ...(t.plumb === true && t.anchor === "bottom" ? { anchor: "bottom" as const } : {}), ...(t.basis === "plan" || t.basis === "actual" ? { basis: t.basis } : {}) };
   if (typeof obj?.bodyHeightM === "number" && Number.isFinite(obj.bodyHeightM) && obj.bodyHeightM > 0) out.bodyHeightM = obj.bodyHeightM;
   // Beziehungen hängen an der Identität: Kopien (ohne Kennung) übernehmen sie nicht.
   if (opts.withCode !== false && Array.isArray(obj?.relations3D) && obj.relations3D.length) out.relations3D = obj.relations3D.map((r: Relation3D) => ({ ...r }));

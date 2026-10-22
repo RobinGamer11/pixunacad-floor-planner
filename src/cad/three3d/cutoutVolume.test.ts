@@ -17,3 +17,18 @@ describe("Durchbricht", () => {
     }
   });
 });
+
+describe("Durchbricht – Körper abgeschnitten", () => {
+  const box = (id: string, x0: number, x1: number): any => prism(id, [{ x: x0, y: 0 }, { x: x1, y: 0 }, { x: x1, y: 1 }, { x: x0, y: 1 }], 0, 1);
+  it("Quelle endet an der Außenkante des Ziels, Überstand entfällt", async () => {
+    const { meshVolume } = await import("./solidMesh");
+    const { meshOf } = await import("./relations");
+    const wall = prism("t", [{ x: 0, y: -1 }, { x: 1, y: -1 }, { x: 1, y: 2 }, { x: 0, y: 2 }], -1, 2);
+    const vol = (trim: boolean) => {
+      const { items } = applyRelations3D([wall, box("q", -3, 1.5)], [{ sheetId: "s", id: "q", relations3D: [{ type: "cutout", targetSheetId: "s", targetId: "t", ...(trim ? { trim: true } : {}) }] }]);
+      return items.filter((d: any) => d.sourceId === "q").reduce((s: number, d: any) => s + Math.abs(meshVolume(meshOf(d)!)), 0);
+    };
+    expect(vol(false)).toBeCloseTo(4.5, 4);
+    expect(vol(true)).toBeCloseTo(4, 4);
+  });
+});

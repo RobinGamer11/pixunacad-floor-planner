@@ -27,7 +27,7 @@ type Props = {
 
 const toScene = (x: number, y: number, z: number) => new THREE.Vector3(x, z, y);
 
-function meshOfDerived(d: any): MeshData | null {
+export function meshOfDerived(d: any): MeshData | null {
   if (!d) return null;
   if (d.type === "mesh") return d.mesh;
   if (d.type === "prism") return slabMesh(d.footprint, d.holes, () => d.z0, () => d.z1);
@@ -56,8 +56,8 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edg
     const camera = new THREE.PerspectiveCamera(40, W / H, 0.01, 5000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = false; controls.screenSpacePanning = true;
-    // Wie in der 3D-Ansicht: gedrückte Maustaste dreht, rechte/mittlere schiebt, zwei Finger zoomen/schieben.
-    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+    // Wie in der 3D-Ansicht: linke und rechte Maustaste drehen, mittlere schiebt, zwei Finger zoomen/schieben.
+    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
     controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
     const group = new THREE.Group(); scene.add(group);
     const render = () => renderer.render(scene, camera);

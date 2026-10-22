@@ -27,6 +27,10 @@ interface Props {
   items: Derived3D[];
   selectedKey: string | null;
   onPick: (sheetId: string, id: string) => void;
+  /** Klick ins Leere (kein Körper getroffen). */
+  onEmpty?: () => void;
+  /** Flüchtige Neigungsvorschau (transparent grau, Bezugskante beige). */
+  ghost?: { mesh: { positions: number[]; indices: number[] }; edge?: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }] } | null;
   /** Inhalt einer flachen Platte (Dokument, Text, Tabelle) als Bild. */
   textureFor?: (d: Plane3D) => Promise<{ canvas: HTMLCanvasElement; transparent: boolean; failed: boolean } | null>;
 }
@@ -39,7 +43,7 @@ function shapeOf(outer: { x: number; y: number }[], holes: { x: number; y: numbe
   return s;
 }
 
-const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, textureFor }, ref) {
+const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, onEmpty, textureFor, ghost }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
 
@@ -109,7 +113,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       el.setPointerCapture(e.pointerId);
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
-      mode = e.shiftKey ? "look" : e.button === 2 || e.button === 1 ? "pan" : "rot";
+      mode = e.shiftKey ? "look" : e.button === 1 ? "pan" : "rot";
       if (pts.size === 2) { const [a, b] = [...pts.values()]; lastPinch = Math.hypot(a.x - b.x, a.y - b.y); lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
     };
     const onMove = (e: PointerEvent) => {
@@ -126,7 +130,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       }
       // Shift + gedrücktes Mausrad = Drehen, egal in welcher Reihenfolge gedrückt.
       const cur = e.pointerType === "mouse"
-        ? (e.shiftKey && (e.buttons & 5) ? "look" : (e.buttons & 6) ? "pan" : mode)
+        ? (e.shiftKey && (e.buttons & 5) ? "look" : (e.buttons & 4) ? "pan" : mode)
         : mode;
       if (pts.size >= 2) { /* bereits behandelt */ }
       else if (cur === "pan") pan(dx, dy);
@@ -147,6 +151,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         const hit = ray.intersectObjects(group.children, false)[0];
         const u = hit?.object.userData as any;
         if (u?.sheetId) st.current.onPick?.(u.sheetId, u.sourceId);
+        else st.current.onEmpty?.();
       }
     };
     const onWheel = (e: WheelEvent) => { e.preventDefault(); orbit.r *= Math.exp(e.deltaY * 0.0012); apply(); };
@@ -200,7 +205,30 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     };
   }, []);
 
-  st.current.onPick = onPick;
+  st.current.onPick = onPick; st.current.onEmpty = onEmpty;
+
+  // Neigungsvorschau: eigener, nicht anklickbarer Körper über dem (unveränderten) Original.
+  useEffect(() => {
+    const scene: THREE.Scene | undefined = st.current.scene;
+    if (!scene || !ghost) return;
+    const gg = new THREE.Group();
+    const m = ghost.mesh, pos = new Float32Array(m.positions.length);
+    for (let i = 0; i < pos.length; i += 3) { pos[i] = m.positions[i]; pos[i + 1] = m.positions[i + 2]; pos[i + 2] = m.positions[i + 1]; }
+    const idx: number[] = []; for (let i = 0; i + 2 < m.indices.length; i += 3) idx.push(m.indices[i], m.indices[i + 2], m.indices[i + 1]);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    gg.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x9aa1ab, transparent: true, opacity: 0.38, roughness: 0.6, depthWrite: false, side: THREE.DoubleSide })));
+    gg.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: 0xd9dde3, transparent: true, opacity: 0.7 })));
+    if (ghost.edge) {
+      const [a, b] = ghost.edge.map(p => new THREE.Vector3(p.x, p.z, p.y));
+      const r = Math.max(0.025, a.distanceTo(b) * 0.008);
+      gg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 8), new THREE.MeshBasicMaterial({ color: 0xe8cf9a })));
+      gg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r * 2.6, 8), new THREE.MeshBasicMaterial({ color: 0xe8cf9a, transparent: true, opacity: 0.25, depthWrite: false })));
+    }
+    gg.traverse(o => { (o as any).raycast = () => {}; });
+    gg.renderOrder = 10;
+    scene.add(gg);
+    return () => { scene.remove(gg); gg.traverse((o: any) => { o.geometry?.dispose?.(); o.material?.dispose?.(); }); };
+  }, [ghost]);
 
   // Körper bei jeder Datenänderung neu aufbauen (flüchtig).
   useEffect(() => {

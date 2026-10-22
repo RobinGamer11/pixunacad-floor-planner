@@ -32,6 +32,19 @@ export interface Tilt3D {
   plumb?: boolean;
   /** Nur bei "plumb": welche Kante der gewählten Seite fest bleibt ("top" Standard, "bottom" = Unterkante). */
   anchor?: "top" | "bottom";
+  /**
+   * Nur starres Neigen ohne „Kanten bündig“: "plan" = Grundriss bleibt wie in 2D, der Körper
+   * wird schräg größer; "actual" = tatsächliche Fläche bleibt, 2D-Punkte sind die Projektion
+   * bei `angleDeg`. Fehlt = alte starre Drehung ohne 2D-Änderung.
+   */
+  basis?: "plan" | "actual";
+  /** Nur Entwurf (nie gespeichert): Winkel, bei dem die aktuellen 2D-Punkte projiziert sind. */
+  projDeg?: number;
+}
+
+/** Punkte quer zur Achse um Faktor k skalieren (Achse bleibt fest). */
+export function scaleAcrossAxis(ring: Vec2[], f: TiltFrame, k: number): Vec2[] {
+  return ring.map(p => { const d = (k - 1) * axisDistance(p, f); return { x: p.x + f.n.x * d, y: p.y + f.n.y * d }; });
 }
 
 export interface TiltFrame {
@@ -123,9 +136,14 @@ export type TiltMode = "rotate" | "lift";
  * (die Gegenkante wird je nach Lage nach oben oder unten geführt). Der Körper wird dabei
  * nie länger: der Grundriss wird quer zur Achse auf die gedrehte Ausdehnung gestaucht (`map`).
  */
-export function tiltShape(mode: TiltMode | undefined, plumb: boolean | undefined, f: TiltFrame, z: number, h: number, anchor?: "top" | "bottom"):
+export function tiltShape(mode: TiltMode | undefined, plumb: boolean | undefined, f: TiltFrame, z: number, h: number, anchor?: "top" | "bottom", basis?: "plan" | "actual"):
   { kind: "rigid" } | { kind: "field"; zb: (p: Vec2) => number; zt: (p: Vec2) => number; map?: (p: Vec2) => Vec2 } {
   const t = Math.tan(f.angleRad);
+  if (mode !== "lift" && !plumb && basis === "plan") {
+    // Grundfläche fest: Unter- und Oberseite parallel geneigt, Dicke senkrecht zur Fläche = h.
+    const c = Math.cos(f.angleRad);
+    return { kind: "field", zb: p => z + axisDistance(p, f) * t, zt: p => z + h / c + axisDistance(p, f) * t };
+  }
   if (mode === "lift") return { kind: "field", zb: () => z, zt: p => z + h + axisDistance(p, f) * t };
   if (plumb) {
     const c = Math.cos(f.angleRad), k = plumbScale(f, h, anchor);
