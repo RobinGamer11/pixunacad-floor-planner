@@ -5,14 +5,16 @@
  * Bibliotheks-Körperhöhe). Jede bestätigte Änderung = genau ein Undo-Schritt (runAction).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Info as InfoIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
 import { sheetElevationM } from "@/cad/SheetManager";
 import { computeStairGeometry } from "@/cad/stairGeometry";
-import { frameForEdge, netArea, plumbScale, resolveTilt, straightEdgeIndices, tiltShapeError, topSurfaceArea, type TiltFrame, type TiltMode } from "@/cad/three3d/tiltGeometry";
-import { TiltPreview3D } from "./TiltPreview3D";
+import { frameForEdge, netArea, scaleAcrossAxis, plumbScale, resolveTilt, straightEdgeIndices, tiltShapeError, topSurfaceArea, type TiltFrame, type TiltMode } from "@/cad/three3d/tiltGeometry";
+import { TiltPreview3D, meshOfDerived } from "./TiltPreview3D";
+import { deriveHatch } from "@/cad/three3d/geometryDerivation";
+import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 
 const C = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
@@ -57,6 +59,16 @@ const NumField: React.FC<{ label: string; value: number | null; unit?: string; o
   const [err, setErr] = useState<string | null>(null);
   const draftRef = useRef<string | null>(null);
   const set = (v: string | null) => { draftRef.current = v; setDraft(v); };
+  const projectAcross = (f: TiltFrame, k: number) => {
+    obj.points = scaleAcrossAxis(obj.points, f, k);
+    if (Array.isArray(obj.holes)) obj.holes = obj.holes.map((r: any) => Array.isArray(r) ? scaleAcrossAxis(r, f, k) : r);
+  };
+  /** Bei gespeicherter „Tatsächlicher Fläche“ die 2D-Projektion zurück in die wahre Form strecken. */
+  const unproject = () => {
+    if (obj.tilt3D?.basis !== "actual") return;
+    const r = resolveTilt(obj, z);
+    if (r?.frame) projectAcross(r.frame, 1 / Math.max(0.05, Math.cos(obj.tilt3D.angleDeg * Math.PI / 180)));
+  };
   const commit = () => {
     const d = draftRef.current; if (d === null) return;
     const v = parseNum(d);
@@ -229,7 +241,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const resolved = resolveTilt(obj, z);
   const firstEdge = () => straightEdgeIndices(obj)[0] ?? null;
   const [edge, setEdge] = useState<number | null>(resolved?.frame?.edgeIndex ?? firstEdge());
-  const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom" } | null>(null);
+  const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual" } | null>(null);
   const dragStart = useRef<number>(0);
   useEffect(() => { setEdge(resolveTilt(obj, z)?.frame?.edgeIndex ?? firstEdge()); setSession(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [obj]);
 
@@ -238,28 +250,58 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const sameEdge = !!(stored && resolved?.frame && resolved.frame.edgeIndex === edge);
   const storedAngle = sameEdge ? stored.angleDeg : 0;
   const storedMode: TiltMode = stored?.mode === "lift" ? "lift" : "rotate";
-  const cur = session ?? { angle: storedAngle, mode: storedMode, plumb: !!stored?.plumb, anchor: (stored?.anchor === "bottom" ? "bottom" : "top") as "top" | "bottom" };
+  const cur = session ?? { angle: storedAngle, mode: storedMode, plumb: !!stored?.plumb, anchor: (stored?.anchor === "bottom" ? "bottom" : "top") as "top" | "bottom", basis: stored ? stored.basis : "plan" as "plan" | "actual" | undefined };
+  // Winkel, bei dem die 2D-Punkte bei „Tatsächliche Fläche“ derzeit projiziert sind.
+  const projDeg = stored?.basis === "actual" && resolved?.frame ? stored.angleDeg : 0;
   const fr = edge !== null ? frameForEdge(obj, edge, cur.angle, z) : null;
   const frame: TiltFrame | undefined = fr?.frame;
   const shapeErr = frame ? tiltShapeError(cur.mode, frame, h, cur.plumb, cur.anchor) : undefined;
   const draftTilt = edge !== null && frame && Math.abs(cur.angle) > 1e-9 && !shapeErr
-    ? { edgeIndex: edge, a: pts[edge], b: pts[(edge + 1) % pts.length], count: pts.length, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb, anchor: cur.anchor }
+    ? { edgeIndex: edge, a: pts[edge], b: pts[(edge + 1) % pts.length], count: pts.length, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb, anchor: cur.anchor, ...(cur.basis ? { basis: cur.basis } : {}), projDeg }
     : (session ? undefined : stored);
 
-  const begin = (patch: Partial<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom" }>) => setSession({ ...cur, ...patch });
+  const begin = (patch: Partial<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual" }>) => setSession({ ...cur, ...patch });
+  const projectAcross = (f: TiltFrame, k: number) => {
+    obj.points = scaleAcrossAxis(obj.points, f, k);
+    if (Array.isArray(obj.holes)) obj.holes = obj.holes.map((r: any) => Array.isArray(r) ? scaleAcrossAxis(r, f, k) : r);
+  };
+  /** Bei gespeicherter „Tatsächlicher Fläche“ die 2D-Projektion zurück in die wahre Form strecken. */
+  const unproject = () => {
+    if (obj.tilt3D?.basis !== "actual") return;
+    const r = resolveTilt(obj, z);
+    if (r?.frame) projectAcross(r.frame, 1 / Math.max(0.05, Math.cos(obj.tilt3D.angleDeg * Math.PI / 180)));
+  };
   const commit = () => {
     if (!session || edge === null || !frame || shapeErr) return;
-    const a = pts[edge], b = pts[(edge + 1) % pts.length], v = session;
+    const v = session;
+    const useBasis = v.mode === "rotate" && !v.plumb ? v.basis : undefined;
     act(app, () => {
+      unproject();
+      // Tatsächliche Fläche: 2D zeigt die Projektion des geneigten Körpers (quer zur Achse gestaucht).
+      if (useBasis === "actual" && Math.abs(v.angle) > 1e-9) {
+        const nf = frameForEdge(obj, edge, v.angle, z).frame;
+        if (nf) projectAcross(nf, Math.cos(v.angle * Math.PI / 180));
+      }
+      const P = obj.points, a = P[edge], b = P[(edge + 1) % P.length];
       if (Math.abs(v.angle) < 1e-9) delete obj.tilt3D;
-      else obj.tilt3D = { edgeIndex: edge, a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, count: pts.length, angleDeg: v.angle, ...(v.mode === "lift" ? { mode: "lift" } : {}), ...(v.plumb ? { plumb: true } : {}), ...(v.plumb && v.anchor === "bottom" ? { anchor: "bottom" } : {}) };
+      else obj.tilt3D = { edgeIndex: edge, a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, count: P.length, angleDeg: v.angle, ...(v.mode === "lift" ? { mode: "lift" } : {}), ...(v.plumb ? { plumb: true } : {}), ...(v.plumb && v.anchor === "bottom" ? { anchor: "bottom" } : {}), ...(useBasis ? { basis: useBasis } : {}) };
     });
     setSession(null);
   };
-  // Zuverlässig speichern: eine gültige, noch offene Bearbeitung wird beim Verlassen
-  // (Auswahlwechsel, Panel schließt) übernommen statt still verworfen.
-  const commitRef = useRef(commit); commitRef.current = commit;
-  useEffect(() => () => { commitRef.current(); }, [obj]);
+  // Jedes Objekt unabhängig: offene Entwürfe werden beim Objektwechsel verworfen, nie übertragen.
+  // 3D-Vorschau (flüchtig) des Entwurfs auf dem ausgewählten Körper.
+  useEffect(() => {
+    if (!session || !draftTilt) { setTiltDraftPreview(null); return; }
+    const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", sheetZ);
+    const m = meshOfDerived(d);
+    if (!m) { setTiltDraftPreview(null); return; }
+    const lvl = cur.plumb && cur.mode === "rotate" && cur.anchor === "bottom" ? "bottom" : "top";
+    const ring = d?.faces?.[lvl]?.outer;
+    const e = edge !== null && ring && ring.length === pts.length ? [ring[edge], ring[(edge + 1) % ring.length]] as any : undefined;
+    setTiltDraftPreview({ mesh: m, edge: e });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify([session, draftTilt, edge, obj?.id, pts, sheetZ])]);
+  useEffect(() => () => setTiltDraftPreview(null), [obj]);
   const cancel = () => setSession(null);
   useEffect(() => {
     if (!session) return;
@@ -297,7 +339,10 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const area = netArea(pts, holes);
   const dt: any = draftTilt;
   const dFrame = dt && edge !== null ? frameForEdge(obj, edge, dt.angleDeg, z).frame : undefined;
-  const real = topSurfaceArea(pts, holes, dt?.mode, dt?.plumb, dt?.angleDeg || 0, dFrame && dt?.plumb ? plumbScale(dFrame, h, dt.anchor) : 1);
+  const rigidBasis = dt && dt.mode !== "lift" && !dt.plumb ? dt.basis : undefined;
+  const real = rigidBasis === "plan" ? area / Math.cos((dt.angleDeg || 0) * Math.PI / 180)
+    : rigidBasis === "actual" ? area / Math.cos(((dt.projDeg ?? dt.angleDeg) || 0) * Math.PI / 180)
+    : topSurfaceArea(pts, holes, dt?.mode, dt?.plumb, dt?.angleDeg || 0, dFrame && dt?.plumb ? plumbScale(dFrame, h, dt.anchor) : 1);
   const canEdit = editable && edge !== null && !!frame;
   const pct = ((cur.angle + 85) / 170) * 100;
 
@@ -320,7 +365,14 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
           } : undefined} onEdgeDrag={canEdit && !shapeErr ? onEdgeDrag : undefined} />
         <div className="flex gap-2">
           <BigChoice active={cur.mode === "rotate"} disabled={!canEdit} icon={<Box size={15} />} label="Körper neigen" onClick={() => begin({ mode: "rotate" })} title="Gesamter Körper wird um die gegenüberliegende Seite geneigt" />
-          <BigChoice active={cur.mode === "lift"} disabled={!canEdit} icon={<ArrowUpFromLine size={15} />} label="Kante anheben" onClick={() => begin({ mode: "lift" })} title="Gewählte Oberkante wird angehoben, Gegenkante und Unterseite bleiben fest" />
+          <BigChoice active={cur.mode === "lift"} disabled={!canEdit} icon={<ArrowUpFromLine size={15} />} label="Kante neigen" onClick={() => begin({ mode: "lift" })} title="Gewählte Oberkante wird geneigt, Gegenkante und Unterseite bleiben fest" />
+        </div>
+        <div className="space-y-1" style={{ opacity: canEdit && cur.mode === "rotate" && !cur.plumb ? 1 : 0.45 }}>
+          <div className="flex items-center text-[11px]" style={C.muted}>Orientierung an<InfoTip text="Grundfläche: der Körper bleibt im Grundriss wie in 2D gezeichnet und wird durch die Neigung größer. Tatsächliche Fläche: die Fläche bleibt gleich, der Grundriss wird kleiner – so auch in 2D angezeigt." /></div>
+          <div className="flex gap-2">
+            <BigChoice active={cur.basis === "plan"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Grid2x2 size={15} />} label="Grundfläche" onClick={() => begin({ basis: "plan" })} />
+            <BigChoice active={cur.basis === "actual"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Ruler size={15} />} label="Tatsächliche Fläche" onClick={() => begin({ basis: "actual" })} />
+          </div>
         </div>
         <div className="space-y-1">
           <div className="flex items-center justify-between text-[11px]"><span style={C.muted}>Neigungswinkel</span>
@@ -357,7 +409,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
           </div>
         ) : (
           <div className="flex gap-2">
-            <BigChoice disabled={!editable || !stored} icon={<RotateCcw size={15} />} label="Auf 0° zurücksetzen" onClick={() => act(app, () => { delete obj.tilt3D; })} />
+            <BigChoice disabled={!editable || !stored} icon={<RotateCcw size={15} />} label="Auf 0° zurücksetzen" onClick={() => act(app, () => { unproject(); delete obj.tilt3D; })} />
           </div>
         )}
       </Section>

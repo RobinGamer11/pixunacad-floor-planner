@@ -62,10 +62,10 @@ describe("3D-Einstellungen – Neigen", () => {
     expect(h.points).toEqual(sq(0, 0, 4, 2));
   });
 
-  it("Kante anheben + Kanten bündig werden gespeichert", async () => {
+  it("Kante neigen + Kanten bündig werden gespeichert", async () => {
     const h: any = { id: "R", points: sq(0, 0, 4, 2), holes: [], heightM: 0.2 };
     const app = await setup(h);
-    fireEvent.click(screen.getByText("Kante anheben"));
+    fireEvent.click(screen.getByText("Kante neigen"));
     typeAngle("10");
     fireEvent.click(screen.getByText("Übernehmen"));
     expect(app.runAction).toHaveBeenCalledTimes(1);
