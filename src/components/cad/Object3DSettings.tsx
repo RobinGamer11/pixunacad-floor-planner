@@ -261,16 +261,6 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     const r = resolveTilt(obj, z);
     if (r?.frame) projectAcross(r.frame, 1 / Math.max(0.05, Math.cos(obj.tilt3D.angleDeg * Math.PI / 180)));
   };
-  const projectAcross = (f: TiltFrame, k: number) => {
-    obj.points = scaleAcrossAxis(obj.points, f, k);
-    if (Array.isArray(obj.holes)) obj.holes = obj.holes.map((r: any) => Array.isArray(r) ? scaleAcrossAxis(r, f, k) : r);
-  };
-  /** Bei gespeicherter „Tatsächlicher Fläche“ die 2D-Projektion zurück in die wahre Form strecken. */
-  const unproject = () => {
-    if (obj.tilt3D?.basis !== "actual") return;
-    const r = resolveTilt(obj, z);
-    if (r?.frame) projectAcross(r.frame, 1 / Math.max(0.05, Math.cos(obj.tilt3D.angleDeg * Math.PI / 180)));
-  };
   const commit = () => {
     if (!session || edge === null || !frame || shapeErr) return;
     const v = session;
