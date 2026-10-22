@@ -84,6 +84,9 @@ export function selectInCad(app: CadApp, sheetId: string, id: string) {
   try { app.setSelection({ ...map[hit.list], handleIndex: null } as any); } catch { /* Auswahl nicht möglich */ }
 }
 
+/** Klick ins Leere der 3D-Ansicht: Auswahl aufheben (schließt die Einstellungen). */
+export function clearCadSelection(app: CadApp) { try { app.clearSelection(); } catch { /* ignorieren */ } }
+
 export function setSheetIn3D(app: CadApp, sheetId: string, on: boolean) {
   app.runAction(() => { app.sheetManager.setParticipatesIn3D(sheetId, on); });
 }

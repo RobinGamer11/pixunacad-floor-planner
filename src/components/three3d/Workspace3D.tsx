@@ -29,7 +29,7 @@ const Joiner: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 );
 import { libraryDefinitionsOf, sheetSnapshotOf } from "@/cad/three3d/projectBridge";
 import { renderPlaneTexture } from "@/cad/three3d/planeTextures";
-import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
+import { addRelation, deriveFromApp, dossierInfo, render2DView, findObject, objectLabel, removeRelation, selectInCad, clearCadSelection, setSheetElevation, setSheetIn3D } from "@/cad/three3d/projectBridge";
 import { sheetParticipatesIn3D, sheetElevationM } from "@/cad/SheetManager";
 import type { Viewer3DHandle } from "./Viewer3D";
 import { projectStore, useProject } from "@/lib/projectStore";
@@ -183,7 +183,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} textureFor={textureFor} />
+          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} onEmpty={() => { if (!picking) clearCadSelection(app); }} textureFor={textureFor} />
         </Suspense>
         {picking && (
           <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs font-medium shadow-lg" style={REL.active}>

@@ -27,6 +27,8 @@ interface Props {
   items: Derived3D[];
   selectedKey: string | null;
   onPick: (sheetId: string, id: string) => void;
+  /** Klick ins Leere (kein Körper getroffen). */
+  onEmpty?: () => void;
   /** Inhalt einer flachen Platte (Dokument, Text, Tabelle) als Bild. */
   textureFor?: (d: Plane3D) => Promise<{ canvas: HTMLCanvasElement; transparent: boolean; failed: boolean } | null>;
 }
@@ -39,7 +41,7 @@ function shapeOf(outer: { x: number; y: number }[], holes: { x: number; y: numbe
   return s;
 }
 
-const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, textureFor }, ref) {
+const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, onEmpty, textureFor }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
 
@@ -109,7 +111,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       el.setPointerCapture(e.pointerId);
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
       downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
-      mode = e.shiftKey ? "look" : e.button === 2 || e.button === 1 ? "pan" : "rot";
+      mode = e.shiftKey ? "look" : e.button === 1 ? "pan" : "rot";
       if (pts.size === 2) { const [a, b] = [...pts.values()]; lastPinch = Math.hypot(a.x - b.x, a.y - b.y); lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
     };
     const onMove = (e: PointerEvent) => {
@@ -126,7 +128,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       }
       // Shift + gedrücktes Mausrad = Drehen, egal in welcher Reihenfolge gedrückt.
       const cur = e.pointerType === "mouse"
-        ? (e.shiftKey && (e.buttons & 5) ? "look" : (e.buttons & 6) ? "pan" : mode)
+        ? (e.shiftKey && (e.buttons & 5) ? "look" : (e.buttons & 4) ? "pan" : mode)
         : mode;
       if (pts.size >= 2) { /* bereits behandelt */ }
       else if (cur === "pan") pan(dx, dy);
@@ -147,6 +149,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         const hit = ray.intersectObjects(group.children, false)[0];
         const u = hit?.object.userData as any;
         if (u?.sheetId) st.current.onPick?.(u.sheetId, u.sourceId);
+        else st.current.onEmpty?.();
       }
     };
     const onWheel = (e: WheelEvent) => { e.preventDefault(); orbit.r *= Math.exp(e.deltaY * 0.0012); apply(); };
@@ -200,7 +203,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     };
   }, []);
 
-  st.current.onPick = onPick;
+  st.current.onPick = onPick; st.current.onEmpty = onEmpty;
 
   // Körper bei jeder Datenänderung neu aufbauen (flüchtig).
   useEffect(() => {
