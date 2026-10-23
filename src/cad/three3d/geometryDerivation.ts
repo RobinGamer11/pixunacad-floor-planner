@@ -17,7 +17,7 @@ import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
 import { buildHealedWallSolidRing } from "../wallSolid";
 import { subtractPrism } from "./relations";
-import { scaleAcrossAxis, tiltShape, tiltShapeError } from "./tiltGeometry";
+import { resolveCardinalTilt, scaleAcrossAxis, tiltShape, tiltShapeError, tiltVertex } from "./tiltGeometry";
 import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 
 export type Solid3DSource =
@@ -243,6 +243,57 @@ export function deriveHatch(hatch: any, sheetId: string, base: number): Derived3
   return { type: "mesh", source: "hatch", sourceId: hatch.id, sheetId, mesh: tiltMesh(base3, f), closed: h > EPS, color, faces };
 }
 
+/** Beliebigen abgeleiteten Teil als Dreiecksnetz (Linien als schmales Band). */
+export function pieceMesh(d: any): MeshData | null {
+  if (!d) return null;
+  if (d.type === "mesh") return d.mesh;
+  if (d.type === "prism") return slabMesh(d.footprint, d.holes, () => d.z0, () => d.z1);
+  if (d.type === "plane") return faceMesh(d.outline, d.holes, () => d.z);
+  if (d.type === "line") {
+    const positions: number[] = [], indices: number[] = [], w = 0.015;
+    for (let i = 0; i + 1 < d.points.length; i++) {
+      const a = d.points[i], b = d.points[i + 1], L = Math.hypot(b.x - a.x, b.y - a.y);
+      if (L < EPS) continue;
+      const nx = -(b.y - a.y) / L * w, ny = (b.x - a.x) / L * w, k = positions.length / 3;
+      positions.push(a.x + nx, a.y + ny, d.z, b.x + nx, b.y + ny, d.z, b.x - nx, b.y - ny, d.z, a.x - nx, a.y - ny, d.z);
+      indices.push(k, k + 1, k + 2, k, k + 2, k + 3);
+    }
+    return positions.length ? { positions, indices } : null;
+  }
+  return null;
+}
+
+/** 2D-Umrisspunkte abgeleiteter Teile (für gedachte Bezugskanten). */
+export function piecePoints(items: any[]): Vec2[] {
+  const out: Vec2[] = [];
+  for (const d of items) out.push(...(d.footprint || d.outline || d.points || []));
+  return out;
+}
+
+/** Neigung beliebiger Objekte (nicht Schraffur) über gedachte Kanten: punktweise auf alle Teile. */
+export function applyGenericTilt(o: any, items: Derived3D[], z0: number): Derived3D[] {
+  const t = o?.tilt3D;
+  if (!t?.cardinal || !items.length) return items;
+  const r = resolveCardinalTilt(t, piecePoints(items), z0);
+  if (!r) return items;
+  if (!r.frame) return items.map(d => ({ ...d, note: r.error } as any));
+  let zTop = z0;
+  for (const d of items as any[]) zTop = Math.max(zTop, d.z1 ?? d.z ?? z0);
+  const h = zTop - z0;
+  const bad = tiltShapeError(t.mode, r.frame, h, t.plumb, t.anchor);
+  if (bad) return items.map(d => ({ ...d, note: bad } as any));
+  const f = r.frame;
+  const out: Derived3D[] = [];
+  for (const d of items as any[]) {
+    const m = pieceMesh(d);
+    if (!m) continue;
+    const p = m.positions, q = new Array(p.length);
+    for (let i = 0; i < p.length; i += 3) { const v = tiltVertex(p[i], p[i + 1], p[i + 2], f, t, h); q[i] = v.x; q[i + 1] = v.y; q[i + 2] = v.z; }
+    out.push({ type: "mesh", source: d.source, sourceId: d.sourceId, sheetId: d.sheetId, mesh: { positions: q, indices: m.indices }, closed: d.type === "prism" || (d.type === "mesh" && d.closed), color: d.color } as any);
+  }
+  return out;
+}
+
 /** Treppe als diskrete Stufen und Podeste (Blockstufen). */
 export function deriveStair(stair: any, sheetId: string, base: number): Prism3D[] {
   let g;
@@ -289,7 +340,11 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     const rank = opts.labelFrontRank ? opts.labelFrontRank(l) : 0;
     orderedLabelItems(scene, l).forEach((it, i) => orderOf.set(it.obj, rank * 1e6 + i));
   }
-  const push = (o: any, items: Derived3D[]) => { const ord = orderOf.get(o) ?? 0; for (const d of items) { d.order = ord; out.push(d); } };
+  const push = (o: any, items: Derived3D[]) => {
+    const ord = orderOf.get(o) ?? 0;
+    const list = o?.tilt3D?.cardinal && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
+    for (const d of list) { d.order = ord; out.push(d); }
+  };
   const doors = (scene.doors || []).filter(vis);
   const walls = deriveWalls(scene, doors, sheetId, base, vis);
   for (const [w, parts] of walls) push(w, parts);

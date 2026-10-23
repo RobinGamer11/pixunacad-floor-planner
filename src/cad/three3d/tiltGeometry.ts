@@ -40,6 +40,67 @@ export interface Tilt3D {
   basis?: "plan" | "actual";
   /** Nur Entwurf (nie gespeichert): Winkel, bei dem die aktuellen 2D-Punkte projiziert sind. */
   projDeg?: number;
+  /**
+   * Gedachte waagerechte/lotrechte Bezugskante am äußersten Punkt des Objekts (2D-Ansicht,
+   * y nach unten): "bottom" = unterster Punkt usw. Ersetzt `edgeIndex`; fehlt = echte Kante.
+   */
+  cardinal?: Cardinal;
+}
+
+export type Cardinal = "top" | "bottom" | "left" | "right";
+export const CARDINALS: Cardinal[] = ["top", "bottom", "left", "right"];
+
+function bounds(pts: Vec2[]) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+  return { x0, y0, x1, y1 };
+}
+
+/** Endpunkte der gedachten Bezugskante (über die ganze Objektbreite). */
+export function cardinalEdge(pts: Vec2[], c: Cardinal): [Vec2, Vec2] | null {
+  if (pts.length < 2) return null;
+  const { x0, y0, x1, y1 } = bounds(pts);
+  if (c === "bottom") return [{ x: x0, y: y1 }, { x: x1, y: y1 }];
+  if (c === "top") return [{ x: x0, y: y0 }, { x: x1, y: y0 }];
+  if (c === "left") return [{ x: x0, y: y0 }, { x: x0, y: y1 }];
+  return [{ x: x1, y: y0 }, { x: x1, y: y1 }];
+}
+
+/** Drehachse für eine gedachte Kante: Achse an der gegenüberliegenden äußersten Stelle. */
+export function frameForCardinal(pts: Vec2[], c: Cardinal, angleDeg: number, z0: number): { frame?: TiltFrame; error?: string } {
+  if (pts.length < 2) return { error: "Objekt hat keine Ausdehnung." };
+  const { x0, y0, x1, y1 } = bounds(pts);
+  const vert = c === "top" || c === "bottom";
+  const D = vert ? y1 - y0 : x1 - x0;
+  if (D < 1e-4) return { error: "Das Objekt hat keine Ausdehnung quer zu dieser Seite." };
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const fr = (axis: Vec2, dir: Vec2, n: Vec2): TiltFrame => ({ axis, dir, n, D, angleRad, z0, edgeIndex: -1 });
+  if (c === "bottom") return { frame: fr({ x: x0, y: y0 }, { x: 1, y: 0 }, { x: 0, y: 1 }) };
+  if (c === "top") return { frame: fr({ x: x0, y: y1 }, { x: 1, y: 0 }, { x: 0, y: -1 }) };
+  if (c === "left") return { frame: fr({ x: x1, y: y0 }, { x: 0, y: 1 }, { x: -1, y: 0 }) };
+  return { frame: fr({ x: x0, y: y0 }, { x: 0, y: 1 }, { x: 1, y: 0 }) };
+}
+
+/** Neigung beliebiger Objekte (nur gedachte Kanten) aus ihren 2D-Umrisspunkten. */
+export function resolveCardinalTilt(t: Tilt3D | undefined, pts: Vec2[], z0: number): { frame?: TiltFrame; error?: string } | null {
+  if (!t || !t.cardinal || !Number.isFinite(t.angleDeg) || Math.abs(t.angleDeg) < 1e-9) return null;
+  return frameForCardinal(pts, t.cardinal, t.angleDeg, z0);
+}
+
+/**
+ * Punktweise Neigung (gleiche Formen wie bei Schraffuren) für beliebige Netze:
+ * rigid / Grundfläche / Kante neigen / Kanten bündig. `h` = Körperhöhe über z0.
+ */
+export function tiltVertex(x: number, y: number, z: number, f: TiltFrame, t: Pick<Tilt3D, "mode" | "plumb" | "anchor" | "basis">, h: number): Vec3 {
+  const tn = Math.tan(f.angleRad), c = Math.cos(f.angleRad), w = z - f.z0;
+  if (t.mode === "lift") return { x, y, z: z + axisDistance({ x, y }, f) * tn * (h > 1e-9 ? w / h : 1) };
+  if (t.plumb) {
+    const k = plumbScale(f, h, t.anchor), u = axisDistance({ x, y }, f), d = (k - 1) * u;
+    const q = { x: x + f.n.x * d, y: y + f.n.y * d };
+    return { ...q, z: f.z0 + w / c + axisDistance(q, f) * tn };
+  }
+  if (t.basis === "plan") return { x, y, z: f.z0 + w / c + axisDistance({ x, y }, f) * tn };
+  return tiltPoint(x, y, z, f);
 }
 
 /** Punkte quer zur Achse um Faktor k skalieren (Achse bleibt fest). */
@@ -105,6 +166,7 @@ export function resolveTilt(hatch: any, z0: number): { frame?: TiltFrame; error?
   const t: Tilt3D | undefined = hatch?.tilt3D;
   if (!t || !Number.isFinite(t.angleDeg) || Math.abs(t.angleDeg) < 1e-9) return null;
   const pts: Vec2[] = hatch.points || [];
+  if (t.cardinal) return frameForCardinal(pts, t.cardinal, t.angleDeg, z0);
   let idx = -1;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i], q = pts[(i + 1) % pts.length];

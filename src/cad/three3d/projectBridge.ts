@@ -6,7 +6,7 @@
 import type { CadApp } from "../CadApp";
 import { SelectionType } from "../constants";
 import { snapshotsBounds, instanceCornersWorld } from "../library/libraryGeometry";
-import { deriveProject3D, type Derived3D } from "./geometryDerivation";
+import { deriveProject3D, deriveScene3D, type Derived3D } from "./geometryDerivation";
 import { objectDisplayName } from "../objectMeta";
 import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "../ProjectionRender";
 import type { DossierInput, DossierObject } from "./dossier";
@@ -38,8 +38,27 @@ function relationSources(app: CadApp): RelationSource[] {
   return out;
 }
 
+/**
+ * Nur Vorschau: Teile eines einzelnen Objekts mit einer Entwurfsneigung (ohne Beziehungen).
+ * Setzt `tilt3D` nur synchron für die Ableitung und stellt es sofort wieder her.
+ */
+export function deriveObjectFromApp(app: CadApp, obj: any, tilt: any): Derived3D[] {
+  const had = Object.prototype.hasOwnProperty.call(obj, "tilt3D"), prev = obj.tilt3D;
+  try {
+    if (tilt) obj.tilt3D = tilt; else delete obj.tilt3D;
+    const sh = (app.sheetManager as any).getById?.(app.activeSheetId);
+    if (!sh) return [];
+    return deriveScene3D(sceneOf(app, sh.id), sh, { ...deriveOpts(app), isLabelVisible: () => true }).filter(d => d.sourceId === obj.id);
+  } finally { if (had) obj.tilt3D = prev; else delete obj.tilt3D; }
+}
+
 export function deriveFromApp(app: CadApp): { items: Derived3D[]; issues: RelationIssue[] } {
-  const raw = deriveProject3D(app.sheetManager.list(), id => sceneOf(app, id), {
+  const raw = deriveProject3D(app.sheetManager.list(), id => sceneOf(app, id), deriveOpts(app));
+  return applyRelations3D(raw, relationSources(app));
+}
+
+function deriveOpts(app: CadApp) {
+  return {
     activeSheetId: app.activeSheetId,
     isLabelVisible: (l) => app.labelManager.isVisible(l),
     labelFrontRank: (() => {
@@ -58,8 +77,7 @@ export function deriveFromApp(app: CadApp): { items: Derived3D[]; issues: Relati
       const def: any = app.getLibraryDefinition(defId);
       return def?.geometry ? snapshotsBounds(def.geometry) : null;
     },
-  });
-  return applyRelations3D(raw, relationSources(app));
+  } as any;
 }
 
 /** 3D-Auswahl → gemeinsame CAD-Auswahl (wechselt bei Bedarf eindeutig das Blatt). */
