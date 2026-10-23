@@ -26,6 +26,6 @@ describe("gedachte Bezugskanten", () => {
     const out: any[] = applyGenericTilt({ tilt3D: { cardinal: "right", angleDeg: 20, edgeIndex: -1, a: { x: 4, y: 0 }, b: { x: 4, y: 0.2 }, count: 4 } }, [prism], 0);
     expect(out[0].type).toBe("mesh");
     const zs = out[0].mesh.positions.filter((_: number, i: number) => i % 3 === 2);
-    expect(Math.min(...zs)).toBeLessThan(-0.1);
+    expect(Math.max(...zs)).toBeGreaterThan(4);
   });
 });
