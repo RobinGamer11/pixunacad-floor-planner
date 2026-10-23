@@ -201,7 +201,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
   }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base, pieces?.map((x: any) => x.mesh?.positions?.length ?? x.type), framePts, highlight])]);
 
   return (
-    <div ref={host} data-children className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
+    <div ref={host} className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
       <button type="button" onClick={fit} title="Gesamtes Objekt anzeigen" aria-label="Gesamtes Objekt anzeigen"
         className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-md border"
         style={{ borderColor: "hsl(var(--overlay-surface) / 0.2)", background: "hsl(var(--overlay-ink) / 0.85)", color: "hsl(var(--overlay-surface))" }}>

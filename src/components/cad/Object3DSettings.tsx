@@ -11,8 +11,13 @@ import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
 import { sheetElevationM } from "@/cad/SheetManager";
 import { computeStairGeometry } from "@/cad/stairGeometry";
+import { cardinalEdge, frameForCardinal, tiltVertex, type Cardinal } from "@/cad/three3d/tiltGeometry";
+import { deriveObjectFromApp } from "@/cad/three3d/projectBridge";
+import { piecePoints } from "@/cad/three3d/geometryDerivation";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from "lucide-react";
 import { frameForEdge, netArea, scaleAcrossAxis, plumbScale, resolveTilt, straightEdgeIndices, tiltShapeError, topSurfaceArea, type TiltFrame, type TiltMode } from "@/cad/three3d/tiltGeometry";
-import { TiltPreview3D, meshOfDerived } from "./TiltPreview3D";
+import { TiltPreview3D, meshOfDerived, mergeMeshes } from "./TiltPreview3D";
+import type { Vec2 } from "@/cad/geometry";
 import { deriveHatch } from "@/cad/three3d/geometryDerivation";
 import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 
@@ -192,6 +197,7 @@ export const Object3DSettings: React.FC<{
       </Section>
 
       {!multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
+      {!multi && !(kind === "hatch" && !isPolygon) && kind !== "door" && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} generic />}
       {relations}
     </div>
   );
@@ -223,32 +229,55 @@ const DoorFields: React.FC<{ app: any; obj: any; editable: boolean }> = ({ app, 
 };
 
 /** Flächen + Neigung bearbeiten für Schraffurkörper. */
-const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: boolean }> = ({ app, obj, sheetZ, editable }) => {
+const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: boolean; generic?: boolean }> = ({ app, obj, sheetZ, editable, generic }) => {
   const z = sheetZ + objectElevationM(obj);
-  const h = Math.max(0, Number(obj.heightM) || 0);
-  const holes = (obj.holes || []).filter((r: any) => r?.length >= 3);
+  // Allgemeine Objekte: Teile ohne Neigung (für Umriss und Körperhöhe).
+  const flatPieces = generic ? deriveObjectFromApp(app, obj, undefined) : [];
+  const h = generic ? Math.max(0, ...flatPieces.map((d: any) => (d.z1 ?? d.z ?? z) - z)) : Math.max(0, Number(obj.heightM) || 0);
+  const holes = generic ? [] : (obj.holes || []).filter((r: any) => r?.length >= 3);
   const stored = obj.tilt3D;
-  const resolved = resolveTilt(obj, z);
-  const firstEdge = () => straightEdgeIndices(obj)[0] ?? null;
-  const [edge, setEdge] = useState<number | null>(resolved?.frame?.edgeIndex ?? firstEdge());
+  const outline: Vec2[] = generic ? piecePoints(flatPieces) : (obj.points || []);
+  const resolved = generic ? (stored?.cardinal ? frameForCardinal(outline, stored.cardinal, stored.angleDeg, z) : null) : resolveTilt(obj, z);
+  const firstEdge = () => generic ? null : (straightEdgeIndices(obj)[0] ?? null);
+  const [edge, setEdge] = useState<number | null>(resolved?.frame && !stored?.cardinal ? resolved.frame.edgeIndex : firstEdge());
+  const [card, setCard] = useState<Cardinal | null>(stored?.cardinal ?? (generic ? "bottom" : null));
   const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual" } | null>(null);
   const dragStart = useRef<number>(0);
-  useEffect(() => { setEdge(resolveTilt(obj, z)?.frame?.edgeIndex ?? firstEdge()); setSession(null); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [obj]);
+  useEffect(() => {
+    const r = resolveTilt(obj, z);
+    setCard(obj.tilt3D?.cardinal ?? (generic ? "bottom" : null));
+    setEdge(r?.frame && !obj.tilt3D?.cardinal ? r.frame.edgeIndex : firstEdge()); setSession(null);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [obj]);
 
-  const pts = obj.points || [];
-  const straight = useMemo(() => new Set(straightEdgeIndices(obj)), [obj, pts.length]);
-  const sameEdge = !!(stored && resolved?.frame && resolved.frame.edgeIndex === edge);
+  const pts = generic ? [] : (obj.points || []);
+  const straight = useMemo(() => new Set(generic ? [] : straightEdgeIndices(obj)), [obj, pts.length, generic]);
+  const sameEdge = !!(stored && resolved?.frame && (card ? stored.cardinal === card : !stored.cardinal && resolved.frame.edgeIndex === edge));
   const storedAngle = sameEdge ? stored.angleDeg : 0;
   const storedMode: TiltMode = stored?.mode === "lift" ? "lift" : "rotate";
   const cur = session ?? { angle: storedAngle, mode: storedMode, plumb: !!stored?.plumb, anchor: (stored?.anchor === "bottom" ? "bottom" : "top") as "top" | "bottom", basis: stored ? stored.basis : "plan" as "plan" | "actual" | undefined };
   // Winkel, bei dem die 2D-Punkte bei „Tatsächliche Fläche“ derzeit projiziert sind.
   const projDeg = stored?.basis === "actual" && resolved?.frame ? stored.angleDeg : 0;
-  const fr = edge !== null ? frameForEdge(obj, edge, cur.angle, z) : null;
+  const frameAt = (deg: number) => card ? frameForCardinal(outline, card, deg, z) : edge !== null ? frameForEdge(obj, edge, deg, z) : null;
+  const fr = frameAt(cur.angle);
   const frame: TiltFrame | undefined = fr?.frame;
   const shapeErr = frame ? tiltShapeError(cur.mode, frame, h, cur.plumb, cur.anchor) : undefined;
-  const draftTilt = edge !== null && frame && Math.abs(cur.angle) > 1e-9 && !shapeErr
-    ? { edgeIndex: edge, a: pts[edge], b: pts[(edge + 1) % pts.length], count: pts.length, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb, anchor: cur.anchor, ...(cur.basis ? { basis: cur.basis } : {}), projDeg }
+  const cEdge = card ? cardinalEdge(outline, card) : null;
+  const tiltFields = () => card && cEdge
+    ? { edgeIndex: -1, a: { x: cEdge[0].x, y: cEdge[0].y }, b: { x: cEdge[1].x, y: cEdge[1].y }, count: outline.length, cardinal: card }
+    : edge !== null ? { edgeIndex: edge, a: { x: pts[edge].x, y: pts[edge].y }, b: { x: pts[(edge + 1) % pts.length].x, y: pts[(edge + 1) % pts.length].y }, count: pts.length } : null;
+  const tf = tiltFields();
+  const draftTilt = tf && frame && Math.abs(cur.angle) > 1e-9 && !shapeErr
+    ? { ...tf, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb, anchor: cur.anchor, ...(cur.basis ? { basis: cur.basis } : {}), projDeg }
     : (session ? undefined : stored);
+  const draftPieces = generic ? (draftTilt ? deriveObjectFromApp(app, obj, draftTilt) : flatPieces) : undefined;
+  // Gedachte Kante räumlich (Oberkante bzw. Unterkante bei „Kanten bündig“ unten).
+  const highlight = cEdge && frame ? (() => {
+    const zz = cur.plumb && cur.mode === "rotate" && cur.anchor === "bottom" ? z : z + h;
+    const dt: any = draftTilt;
+    const tv = (p: Vec2) => dt ? tiltVertex(p.x, p.y, zz, frameAt(dt.angleDeg)?.frame ?? frame, dt, h) : { x: p.x, y: p.y, z: zz };
+    return [tv(cEdge[0]), tv(cEdge[1])] as [any, any];
+  })() : undefined;
 
   const begin = (patch: Partial<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual" }>) => setSession({ ...cur, ...patch });
   const projectAcross = (f: TiltFrame, k: number) => {
@@ -262,19 +291,18 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     if (r?.frame) projectAcross(r.frame, 1 / Math.max(0.05, Math.cos(obj.tilt3D.angleDeg * Math.PI / 180)));
   };
   const commit = () => {
-    if (!session || edge === null || !frame || shapeErr) return;
+    if (!session || !tf || !frame || shapeErr) return;
     const v = session;
-    const useBasis = v.mode === "rotate" && !v.plumb ? v.basis : undefined;
+    const useBasis = v.mode === "rotate" && !v.plumb ? (generic && v.basis === "actual" ? "plan" : v.basis) : undefined;
     act(app, () => {
       unproject();
       // Tatsächliche Fläche: 2D zeigt die Projektion des geneigten Körpers (quer zur Achse gestaucht).
       if (useBasis === "actual" && Math.abs(v.angle) > 1e-9) {
-        const nf = frameForEdge(obj, edge, v.angle, z).frame;
+        const nf = frameAt(v.angle)?.frame;
         if (nf) projectAcross(nf, Math.cos(v.angle * Math.PI / 180));
       }
-      const P = obj.points, a = P[edge], b = P[(edge + 1) % P.length];
       if (Math.abs(v.angle) < 1e-9) delete obj.tilt3D;
-      else obj.tilt3D = { edgeIndex: edge, a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y }, count: P.length, angleDeg: v.angle, ...(v.mode === "lift" ? { mode: "lift" } : {}), ...(v.plumb ? { plumb: true } : {}), ...(v.plumb && v.anchor === "bottom" ? { anchor: "bottom" } : {}), ...(useBasis ? { basis: useBasis } : {}) };
+      else obj.tilt3D = { ...tf, angleDeg: v.angle, ...(v.mode === "lift" ? { mode: "lift" } : {}), ...(v.plumb ? { plumb: true } : {}), ...(v.plumb && v.anchor === "bottom" ? { anchor: "bottom" } : {}), ...(useBasis ? { basis: useBasis } : {}) };
     });
     setSession(null);
   };
@@ -282,15 +310,20 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   // 3D-Vorschau (flüchtig) des Entwurfs auf dem ausgewählten Körper.
   useEffect(() => {
     if (!session || !draftTilt) { setTiltDraftPreview(null); return; }
+    if (generic) {
+      const m = mergeMeshes((draftPieces || []).map(meshOfDerived));
+      setTiltDraftPreview(m ? { mesh: m, edge: highlight as any } : null); return;
+    }
     const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", sheetZ);
     const m = meshOfDerived(d);
     if (!m) { setTiltDraftPreview(null); return; }
+    if (highlight) { setTiltDraftPreview({ mesh: m, edge: highlight as any }); return; }
     const lvl = cur.plumb && cur.mode === "rotate" && cur.anchor === "bottom" ? "bottom" : "top";
     const ring = d?.faces?.[lvl]?.outer;
     const e = edge !== null && ring && ring.length === pts.length ? [ring[edge], ring[(edge + 1) % ring.length]] as any : undefined;
     setTiltDraftPreview({ mesh: m, edge: e });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify([session, draftTilt, edge, obj?.id, pts, sheetZ])]);
+  }, [JSON.stringify([session, draftTilt, edge, card, obj?.id, pts, sheetZ])]);
   useEffect(() => () => setTiltDraftPreview(null), [obj]);
   const cancel = () => setSession(null);
   useEffect(() => {
@@ -328,31 +361,43 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
 
   const area = netArea(pts, holes);
   const dt: any = draftTilt;
-  const dFrame = dt && edge !== null ? frameForEdge(obj, edge, dt.angleDeg, z).frame : undefined;
+  const dFrame = dt ? frameAt(dt.angleDeg)?.frame : undefined;
   const rigidBasis = dt && dt.mode !== "lift" && !dt.plumb ? dt.basis : undefined;
   const real = rigidBasis === "plan" ? area / Math.cos((dt.angleDeg || 0) * Math.PI / 180)
     : rigidBasis === "actual" ? area / Math.cos(((dt.projDeg ?? dt.angleDeg) || 0) * Math.PI / 180)
     : topSurfaceArea(pts, holes, dt?.mode, dt?.plumb, dt?.angleDeg || 0, dFrame && dt?.plumb ? plumbScale(dFrame, h, dt.anchor) : 1);
-  const canEdit = editable && edge !== null && !!frame;
+  const canEdit = editable && !!tf && !!frame;
+  const cardBtn = (c: Cardinal, icon: React.ReactNode, label: string, pos: string) => (
+    <button key={c} type="button" disabled={!editable} title={`Waagerechte/lotrechte Bezugskante am äußersten Punkt: ${label}`} aria-label={`Bezugskante ${label}`} aria-pressed={card === c}
+      onClick={() => { setCard(card === c && !generic ? null : c); if (card === c && !generic) setEdge(firstEdge()); }}
+      className={`absolute z-10 flex h-7 items-center gap-1 rounded-md border px-1.5 text-[10px] font-medium disabled:opacity-40 ${pos}`}
+      style={card === c ? C.gold : { ...C.field, background: "hsl(var(--overlay-ink) / 0.85)" }}>{icon}{label}</button>
+  );
   const pct = ((cur.angle + 85) / 170) * 100;
 
   return (
     <>
-      <Section title="Flächen" info="Oberfläche inkl. Neigung/Verformung. Aussparungen abgezogen.">
+      {!generic && <Section title="Flächen" info="Oberfläche inkl. Neigung/Verformung. Aussparungen abgezogen.">
         <div className="grid grid-cols-2 gap-2">
           <Info label="Grundfläche im CAD" value={`${fmt(area)} m²`} />
           <Info label="Tatsächliche Fläche" value={`${fmt(real)} m²`} />
         </div>
-      </Section>
+      </Section>}
 
       <Section title="Neigung bearbeiten">
         {resolved?.error && <div className="rounded-lg border px-2 py-1.5 text-[11px]" style={C.err}>{resolved.error}</div>}
-        <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={edge} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
+        <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={card ? null : edge} pieces={draftPieces} highlight={highlight} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
           bottomSelectable={cur.plumb && cur.mode === "rotate"}
           onPickEdge={editable ? (i, level) => {
+            setCard(null);
             if (i !== edge) setEdge(i); // Kantenwechsel jederzeit; offene Bearbeitung gilt für die neue Kante
             if (cur.plumb && cur.mode === "rotate" && level !== cur.anchor) begin({ anchor: level });
-          } : undefined} onEdgeDrag={canEdit && !shapeErr ? onEdgeDrag : undefined} />
+          } : undefined} onEdgeDrag={canEdit && !shapeErr ? onEdgeDrag : undefined}>
+          {cardBtn("top", <ArrowUp size={11} />, "Oben", "left-1/2 top-1.5 -translate-x-1/2")}
+          {cardBtn("bottom", <ArrowDown size={11} />, "Unten", "bottom-1.5 left-1/2 -translate-x-1/2")}
+          {cardBtn("left", <ArrowLeft size={11} />, "Links", "left-1.5 top-1/2 -translate-y-1/2")}
+          {cardBtn("right", <ArrowRight size={11} />, "Rechts", "right-1.5 top-1/2 -translate-y-1/2")}
+        </TiltPreview3D>
         <div className="flex gap-2">
           <BigChoice active={cur.mode === "rotate"} disabled={!canEdit} icon={<Box size={15} />} label="Körper neigen" onClick={() => begin({ mode: "rotate" })} title="Gesamter Körper wird um die gegenüberliegende Seite geneigt" />
           <BigChoice active={cur.mode === "lift"} disabled={!canEdit} icon={<ArrowUpFromLine size={15} />} label="Kante neigen" onClick={() => begin({ mode: "lift" })} title="Gewählte Oberkante wird geneigt, Gegenkante und Unterseite bleiben fest" />
