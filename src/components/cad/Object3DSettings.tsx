@@ -406,7 +406,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
           <div className="flex items-center text-[11px]" style={C.muted}>Orientierung an<InfoTip text="Grundfläche: der Körper bleibt im Grundriss wie in 2D gezeichnet und wird durch die Neigung größer. Tatsächliche Fläche: die Fläche bleibt gleich, der Grundriss wird kleiner – so auch in 2D angezeigt." /></div>
           <div className="flex gap-2">
             <BigChoice active={cur.basis === "plan"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Grid2x2 size={15} />} label="Grundfläche" onClick={() => begin({ basis: "plan" })} />
-            <BigChoice active={cur.basis === "actual"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Ruler size={15} />} label="Tatsächliche Fläche" onClick={() => begin({ basis: "actual" })} />
+            <BigChoice active={cur.basis === "actual"} disabled={!canEdit || generic || cur.mode !== "rotate" || cur.plumb} icon={<Ruler size={15} />} label="Tatsächliche Fläche" onClick={() => begin({ basis: "actual" })} />
           </div>
         </div>
         <div className="space-y-1">
