@@ -166,6 +166,7 @@ export function resolveTilt(hatch: any, z0: number): { frame?: TiltFrame; error?
   const t: Tilt3D | undefined = hatch?.tilt3D;
   if (!t || !Number.isFinite(t.angleDeg) || Math.abs(t.angleDeg) < 1e-9) return null;
   const pts: Vec2[] = hatch.points || [];
+  if (t.cardinal) return frameForCardinal(pts, t.cardinal, t.angleDeg, z0);
   let idx = -1;
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i], q = pts[(i + 1) % pts.length];
