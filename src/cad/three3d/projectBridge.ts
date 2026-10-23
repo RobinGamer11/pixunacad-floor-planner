@@ -6,7 +6,7 @@
 import type { CadApp } from "../CadApp";
 import { SelectionType } from "../constants";
 import { snapshotsBounds, instanceCornersWorld } from "../library/libraryGeometry";
-import { deriveProject3D, type Derived3D } from "./geometryDerivation";
+import { deriveProject3D, deriveScene3D, type Derived3D } from "./geometryDerivation";
 import { objectDisplayName } from "../objectMeta";
 import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "../ProjectionRender";
 import type { DossierInput, DossierObject } from "./dossier";
