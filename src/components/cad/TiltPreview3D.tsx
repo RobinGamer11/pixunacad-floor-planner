@@ -10,7 +10,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { Maximize2 } from "lucide-react";
 import { deriveHatch } from "@/cad/three3d/geometryDerivation";
-import { faceMesh, slabMesh, type MeshData } from "@/cad/three3d/solidMesh";
+import { pieceMesh, piecePoints } from "@/cad/three3d/geometryDerivation";
+import type { MeshData } from "@/cad/three3d/solidMesh";
 import type { TiltFrame } from "@/cad/three3d/tiltGeometry";
 import type { Vec2 } from "@/cad/geometry";
 
@@ -23,23 +24,28 @@ type Props = {
   selectable: Set<number>; onPickEdge?: (i: number, level: "top" | "bottom") => void;
   /** Nur in der Bearbeitung: vertikaler Zug an der Kante in Metern (relativ zum Zugbeginn). */
   onEdgeDrag?: (phase: "start" | "move", dzM: number) => void;
+  /** Allgemeine Objekte: bereits abgeleitete Teile (mit Entwurfsneigung) statt Schraffurableitung. */
+  pieces?: any[];
+  /** Gedachte Bezugskante (räumlich), gold hervorgehoben und ziehbar. */
+  highlight?: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }];
 };
 
 const toScene = (x: number, y: number, z: number) => new THREE.Vector3(x, z, y);
 
-export function meshOfDerived(d: any): MeshData | null {
-  if (!d) return null;
-  if (d.type === "mesh") return d.mesh;
-  if (d.type === "prism") return slabMesh(d.footprint, d.holes, () => d.z0, () => d.z1);
-  if (d.type === "plane") return faceMesh(d.outline, d.holes, () => d.z);
-  return null;
+export function meshOfDerived(d: any): MeshData | null { return pieceMesh(d); }
+
+/** Mehrere Teile zu einem Netz zusammenfassen. */
+export function mergeMeshes(list: (MeshData | null)[]): MeshData | null {
+  const positions: number[] = [], indices: number[] = [];
+  for (const m of list) { if (!m) continue; const k = positions.length / 3; positions.push(...m.positions); for (const i of m.indices) indices.push(i + k); }
+  return positions.length ? { positions, indices } : null;
 }
 
-export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edgeLevel = "top", bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag }) => {
+export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = ({ obj, base, draftTilt, edge, edgeLevel = "top", bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag, pieces, highlight, children }) => {
   const host = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
   const props = useRef<Props>({} as Props);
-  props.current = { obj, base, draftTilt, edge, edgeLevel, bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag };
+  props.current = { obj, base, draftTilt, edge, edgeLevel, bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag, pieces, highlight };
 
   // Einmalige Einrichtung; Ressourcen beim Schließen freigeben.
   useEffect(() => {
@@ -92,8 +98,9 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edg
       const r = cv.getBoundingClientRect(); const cx = e.clientX - r.left, cy = e.clientY - r.top;
       const P = props.current;
       let edgeDrag = false, ppm = 1;
-      if (P.onEdgeDrag && P.edge !== null && nearestEdge(cx, cy) === P.edge) {
-        const e0 = st.current.edges.find((x: any) => x.i === P.edge);
+      const dragIdx = P.highlight ? -2 : P.edge;
+      if (P.onEdgeDrag && dragIdx !== null && nearestEdge(cx, cy) === dragIdx) {
+        const e0 = st.current.edges.find((x: any) => x.i === dragIdx);
         if (e0) {
           const mid = e0.a.clone().add(e0.b).multiplyScalar(0.5);
           const s0 = screen(mid), s1 = screen(mid.clone().add(new THREE.Vector3(0, 1, 0)));
@@ -113,7 +120,7 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edg
       const d = down; down = null; controls.enabled = true;
       if (!d || d.id !== e.pointerId || d.moved || d.edgeDrag) return; // Fingerheben hält die Vorschau
       const r = cv.getBoundingClientRect(); const hit = nearestEdgeHit(e.clientX - r.left, e.clientY - r.top);
-      if (hit && props.current.selectable.has(hit.i)) props.current.onPickEdge?.(hit.i, hit.level);
+      if (hit && hit.i >= 0 && props.current.selectable.has(hit.i)) props.current.onPickEdge?.(hit.i, hit.level);
     };
     cv.addEventListener("pointerdown", onDown, true); window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); window.addEventListener("pointercancel", onUp);
     return () => {
@@ -136,13 +143,14 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edg
   };
 
   // Geometrie neu aufbauen (Kamera bleibt, außer bei Objektwechsel).
-  const pts: Vec2[] = obj?.points || [];
+  const pts: Vec2[] = pieces ? [] : (obj?.points || []);
+  const framePts: Vec2[] = pieces ? piecePoints(pieces) : pts;
   useEffect(() => {
     const s = st.current; if (!s.group) return;
     s.group.traverse((o: any) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
     s.group.clear(); s.edges = []; s.body = null;
-    const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", base);
-    const m = meshOfDerived(d);
+    const d: any = pieces ? null : deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", base);
+    const m = pieces ? mergeMeshes(pieces.map(meshOfDerived)) : meshOfDerived(d);
     if (m) {
       const pos = new Float32Array(m.positions.length);
       for (let i = 0; i < pos.length; i += 3) { pos[i] = m.positions[i]; pos[i + 1] = m.positions[i + 2]; pos[i + 2] = m.positions[i + 1]; }
@@ -170,13 +178,17 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edg
       const ba = bot ? toScene(bot[i].x, bot[i].y, bot[i].z) : toScene(pts[i].x, pts[i].y, zbot ?? base);
       const bb = bot ? toScene(bot[j].x, bot[j].y, bot[j].z) : toScene(pts[j].x, pts[j].y, zbot ?? base);
       if (hasBottom && ba.distanceTo(a) + bb.distanceTo(b) > 1e-4) s.edges.push({ i, level: "bottom", a: ba, b: bb });
-      if (i === edge) { if (edgeLevel === "bottom" && hasBottom) gold(ba, bb); else gold(a, b); }
+      if (i === edge && !highlight) { if (edgeLevel === "bottom" && hasBottom) gold(ba, bb); else gold(a, b); }
+    }
+    if (highlight) {
+      const a = toScene(highlight[0].x, highlight[0].y, highlight[0].z), b = toScene(highlight[1].x, highlight[1].y, highlight[1].z);
+      s.edges.push({ i: -2, level: "top", a, b }); gold(a, b);
     }
     // Feste Bezugslinie (Drehachse bzw. feste Gegenkante) gestrichelt.
     if (frame) {
       // Nur so lang wie der Körper quer zur Achse plus etwas Überstand.
       let lo = Infinity, hi = -Infinity;
-      for (const p of pts) { const t = (p.x - frame.axis.x) * frame.dir.x + (p.y - frame.axis.y) * frame.dir.y; lo = Math.min(lo, t); hi = Math.max(hi, t); }
+      for (const p of framePts) { const t = (p.x - frame.axis.x) * frame.dir.x + (p.y - frame.axis.y) * frame.dir.y; lo = Math.min(lo, t); hi = Math.max(hi, t); }
       const m = Math.max(0.15, (hi - lo) * 0.12), zb = base + (Number(obj.elevationM) || 0);
       const g = new THREE.BufferGeometry().setFromPoints([
         toScene(frame.axis.x + frame.dir.x * (lo - m), frame.axis.y + frame.dir.y * (lo - m), zb), toScene(frame.axis.x + frame.dir.x * (hi + m), frame.axis.y + frame.dir.y * (hi + m), zb)]);
@@ -186,15 +198,16 @@ export const TiltPreview3D: React.FC<Props> = ({ obj, base, draftTilt, edge, edg
     const key = String(obj?.id);
     if (s.fitted !== key) { s.fitted = key; fit(); } else s.render();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base])]);
+  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base, pieces?.map((x: any) => x.mesh?.positions?.length ?? x.type), framePts, highlight])]);
 
   return (
-    <div ref={host} className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
+    <div ref={host} data-children className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
       <button type="button" onClick={fit} title="Gesamtes Objekt anzeigen" aria-label="Gesamtes Objekt anzeigen"
         className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-md border"
         style={{ borderColor: "hsl(var(--overlay-surface) / 0.2)", background: "hsl(var(--overlay-ink) / 0.85)", color: "hsl(var(--overlay-surface))" }}>
         <Maximize2 size={12} />
       </button>
+      {children}
     </div>
   );
 };
