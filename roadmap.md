@@ -271,3 +271,10 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Durchbricht „und“ Körper vollständig / Körper abgeschnitten
 - [x] „Kante neigen“; Orientierung Grundfläche / Tatsächliche Fläche (2D folgt)
 - [x] Rechtsklick dreht wie Linksklick; Klick ins Leere hebt Auswahl auf
+
+## 3D Neigung Paket 1 (Okt 2026)
+- [x] Kanten wählen/neigen bei allen Objekten
+- [x] Kein Kantenziehen im Neigungsfenster (nur Zahl/Regler)
+- [x] Tatsächliche Fläche für alle Objekte inkl. Bilder
+- [x] Schalter „Gegenüberliegende Kante neigen“
+- [ ] Paket 2: Bibliothek/Bilder wie 2D, Infoboxen 3D, Materialien, Bilder wählbar, Türen/Fenster 3D

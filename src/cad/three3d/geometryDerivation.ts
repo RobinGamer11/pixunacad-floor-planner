@@ -17,7 +17,7 @@ import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
 import { buildHealedWallSolidRing } from "../wallSolid";
 import { subtractPrism } from "./relations";
-import { resolveCardinalTilt, scaleAcrossAxis, tiltShape, tiltShapeError, tiltVertex } from "./tiltGeometry";
+import { genericVertex, resolveGenericTilt, scaleAcrossAxis, tiltShape, tiltShapeError } from "./tiltGeometry";
 import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 
 export type Solid3DSource =
@@ -273,8 +273,8 @@ export function piecePoints(items: any[]): Vec2[] {
 /** Neigung beliebiger Objekte (nicht Schraffur) über gedachte Kanten: punktweise auf alle Teile. */
 export function applyGenericTilt(o: any, items: Derived3D[], z0: number): Derived3D[] {
   const t = o?.tilt3D;
-  if (!t?.cardinal || !items.length) return items;
-  const r = resolveCardinalTilt(t, piecePoints(items), z0);
+  if (!t || !items.length) return items;
+  const r = resolveGenericTilt(t, piecePoints(items), z0);
   if (!r) return items;
   if (!r.frame) return items.map(d => ({ ...d, note: r.error } as any));
   let zTop = z0;
@@ -288,7 +288,7 @@ export function applyGenericTilt(o: any, items: Derived3D[], z0: number): Derive
     const m = pieceMesh(d);
     if (!m) continue;
     const p = m.positions, q = new Array(p.length);
-    for (let i = 0; i < p.length; i += 3) { const v = tiltVertex(p[i], p[i + 1], p[i + 2], f, t, h); q[i] = v.x; q[i + 1] = v.y; q[i + 2] = v.z; }
+    for (let i = 0; i < p.length; i += 3) { const v = genericVertex(p[i], p[i + 1], p[i + 2], f, t, h); q[i] = v.x; q[i + 1] = v.y; q[i + 2] = v.z; }
     out.push({ type: "mesh", source: d.source, sourceId: d.sourceId, sheetId: d.sheetId, mesh: { positions: q, indices: m.indices }, closed: d.type === "prism" || (d.type === "mesh" && d.closed), color: d.color } as any);
   }
   return out;
@@ -342,7 +342,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
   }
   const push = (o: any, items: Derived3D[]) => {
     const ord = orderOf.get(o) ?? 0;
-    const list = o?.tilt3D?.cardinal && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
+    const list = o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
     for (const d of list) { d.order = ord; out.push(d); }
   };
   const doors = (scene.doors || []).filter(vis);

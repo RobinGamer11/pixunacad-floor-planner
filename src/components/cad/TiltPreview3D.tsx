@@ -24,6 +24,8 @@ type Props = {
   selectable: Set<number>; onPickEdge?: (i: number, level: "top" | "bottom") => void;
   /** Nur in der Bearbeitung: vertikaler Zug an der Kante in Metern (relativ zum Zugbeginn). */
   onEdgeDrag?: (phase: "start" | "move", dzM: number) => void;
+  /** Alle Objektarten: wählbare Umrisskanten (2D) und ihre räumliche Lage. */
+  ring?: Vec2[]; ringFaces?: { top: { x: number; y: number; z: number }[]; bottom: { x: number; y: number; z: number }[] };
   /** Allgemeine Objekte: bereits abgeleitete Teile (mit Entwurfsneigung) statt Schraffurableitung. */
   pieces?: any[];
   /** Gedachte Bezugskante (räumlich), gold hervorgehoben und ziehbar. */
@@ -41,7 +43,7 @@ export function mergeMeshes(list: (MeshData | null)[]): MeshData | null {
   return positions.length ? { positions, indices } : null;
 }
 
-export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = ({ obj, base, draftTilt, edge, edgeLevel = "top", bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag, pieces, highlight, children }) => {
+export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = ({ obj, base, draftTilt, edge, edgeLevel = "top", bottomSelectable, frame, selectable, onPickEdge, onEdgeDrag, pieces, highlight, ring, ringFaces, children }) => {
   const host = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
   const props = useRef<Props>({} as Props);
@@ -143,7 +145,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
   };
 
   // Geometrie neu aufbauen (Kamera bleibt, außer bei Objektwechsel).
-  const pts: Vec2[] = pieces ? [] : (obj?.points || []);
+  const pts: Vec2[] = pieces ? (ring || []) : (obj?.points || []);
   const framePts: Vec2[] = pieces ? piecePoints(pieces) : pts;
   useEffect(() => {
     const s = st.current; if (!s.group) return;
@@ -161,9 +163,9 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
       s.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({ color: 0x2a2f3a, transparent: true, opacity: 0.55 })));
     }
     // Obere Außenkanten (aus der abgeleiteten Oberseite) für Auswahl und Hervorhebung.
-    const top = d?.faces?.top?.outer as { x: number; y: number; z: number }[] | undefined;
+    const top = (ringFaces?.top ?? d?.faces?.top?.outer) as { x: number; y: number; z: number }[] | undefined;
     const ztop = d?.type === "prism" ? d.z1 : d?.type === "plane" ? d.z : undefined;
-    const bot = d?.faces?.bottom?.outer as { x: number; y: number; z: number }[] | undefined;
+    const bot = (ringFaces?.bottom ?? d?.faces?.bottom?.outer) as { x: number; y: number; z: number }[] | undefined;
     const zbot = d?.type === "prism" ? d.z0 : undefined;
     const gold = (a: THREE.Vector3, b: THREE.Vector3) => {
       s.group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: 0xc8954a, linewidth: 3 })));
@@ -198,7 +200,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     const key = String(obj?.id);
     if (s.fitted !== key) { s.fitted = key; fit(); } else s.render();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base, pieces?.map((x: any) => x.mesh?.positions?.length ?? x.type), framePts, highlight])]);
+  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base, pieces?.map((x: any) => x.mesh?.positions?.length ?? x.type), framePts, highlight, ringFaces])]);
 
   return (
     <div ref={host} className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>

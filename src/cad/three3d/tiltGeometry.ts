@@ -45,6 +45,8 @@ export interface Tilt3D {
    * y nach unten): "bottom" = unterster Punkt usw. Ersetzt `edgeIndex`; fehlt = echte Kante.
    */
   cardinal?: Cardinal;
+  /** Gewählte Kante bleibt fest (Drehachse), die gegenüberliegende Seite wird geneigt. */
+  opposite?: boolean;
 }
 
 export type Cardinal = "top" | "bottom" | "left" | "right";
@@ -166,6 +168,7 @@ export function resolveTilt(hatch: any, z0: number): { frame?: TiltFrame; error?
   const t: Tilt3D | undefined = hatch?.tilt3D;
   if (!t || !Number.isFinite(t.angleDeg) || Math.abs(t.angleDeg) < 1e-9) return null;
   const pts: Vec2[] = hatch.points || [];
+  if (t.opposite) return withOpposite(resolveTilt({ ...hatch, tilt3D: { ...t, opposite: false } }, z0), true);
   if (t.cardinal) return frameForCardinal(pts, t.cardinal, t.angleDeg, z0);
   let idx = -1;
   for (let i = 0; i < pts.length; i++) {
@@ -235,4 +238,50 @@ export function topSurfaceArea(outer: Vec2[], holes: Vec2[][], mode: TiltMode | 
   const a = netArea(outer, holes);
   if (!angleDeg || (mode !== "lift" && !plumb)) return a;
   return (a * (mode === "lift" ? 1 : scale)) / Math.cos((angleDeg * Math.PI) / 180);
+}
+
+// ---------------------------------------------------------------- Alle Objektarten
+
+/** Konvexe Hülle (Umlauf gegen den Uhrzeigersinn im mathematischen Sinn), doppelte Punkte entfernt. */
+export function convexHull(pts: Vec2[]): Vec2[] {
+  const p = [...pts].filter(q => Number.isFinite(q?.x) && Number.isFinite(q?.y)).sort((a, b) => a.x - b.x || a.y - b.y);
+  if (p.length < 3) return p;
+  const cross = (o: Vec2, a: Vec2, b: Vec2) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lo: Vec2[] = [], up: Vec2[] = [];
+  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 1e-12) lo.pop(); lo.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], q) <= 1e-12) up.pop(); up.push(q); }
+  return lo.slice(0, -1).concat(up.slice(0, -1)).map(q => ({ x: q.x, y: q.y }));
+}
+
+/** „Gegenüberliegende Kante neigen“: gewählte Kante wird Drehachse, die Gegenseite neigt sich. */
+export function oppositeFrame(f: TiltFrame): TiltFrame {
+  return { ...f, axis: { x: f.axis.x + f.n.x * f.D, y: f.axis.y + f.n.y * f.D }, n: { x: -f.n.x, y: -f.n.y } };
+}
+export function withOpposite<T extends { frame?: TiltFrame; error?: string } | null>(r: T, opposite?: boolean): T {
+  return r && r.frame && opposite ? { ...r, frame: oppositeFrame(r.frame) } : r;
+}
+
+/**
+ * Neigung beliebiger Objekte: gedachte Kante oder echte Kante der Umrisshülle (gleiche
+ * Zuordnungsregeln wie bei Schraffuren – nie stillschweigend eine andere Kante).
+ */
+export function resolveGenericTilt(t: Tilt3D | undefined, pts: Vec2[], z0: number): { frame?: TiltFrame; error?: string } | null {
+  if (!t || !Number.isFinite(t.angleDeg) || Math.abs(t.angleDeg) < 1e-9) return null;
+  if (t.cardinal) return withOpposite(frameForCardinal(pts, t.cardinal, t.angleDeg, z0), t.opposite);
+  const hull = convexHull(pts);
+  return withOpposite(resolveTilt({ points: hull, tilt3D: t }, z0), t.opposite);
+}
+
+/** Stauchfaktor-Umkehr bei „Tatsächliche Fläche“ (starres Neigen): 2D ist die Projektion. */
+export function actualStretch(t: Pick<Tilt3D, "mode" | "plumb" | "basis" | "projDeg" | "angleDeg">): number {
+  if (t.mode === "lift" || t.plumb || t.basis !== "actual") return 1;
+  const pd = Number.isFinite(t.projDeg as number) ? (t.projDeg as number) : t.angleDeg;
+  return 1 / Math.max(0.05, Math.cos((pd * Math.PI) / 180));
+}
+
+/** Punktweise Neigung inkl. „Tatsächliche Fläche“ (wahre Form quer zur Achse zurückgestreckt). */
+export function genericVertex(x: number, y: number, z: number, f: TiltFrame, t: Pick<Tilt3D, "mode" | "plumb" | "anchor" | "basis" | "projDeg" | "angleDeg">, h: number): Vec3 {
+  const k = actualStretch(t);
+  if (Math.abs(k - 1) > 1e-12) { const d = (k - 1) * axisDistance({ x, y }, f); x += f.n.x * d; y += f.n.y * d; }
+  return tiltVertex(x, y, z, f, t, h);
 }
