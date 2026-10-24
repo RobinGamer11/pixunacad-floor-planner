@@ -32,3 +32,4 @@
 - Neigungsentwürfe gelten nur für ihr Objekt (Objektwechsel verwirft) und erscheinen in 3D nur flüchtig über `three3d/tiltDraftPreview.ts`; „Tatsächliche Fläche“ (`tilt3D.basis`) staucht die 2D-Punkte erst bei „Übernehmen“ über `scaleAcrossAxis` (Rücksetzen streckt zurück).
 - „Durchbricht“ mit `trim` kürzt die Quelle flüchtig in `relations.ts` (Hauptteil + Teil im Ziel); `edge` ist veraltet und ohne Wirkung.
 - Neigung für Nicht-Schraffuren nur über gedachte Kanten (`tilt3D.cardinal`, Seiten des Umrisses) und punktweise `applyGenericTilt` in `geometryDerivation.ts`; Vorschau über `deriveObjectFromApp` – 2D bleibt unverändert („Tatsächliche Fläche“ nur bei Schraffuren).
+- Neigung aller Nicht-Schraffur-Objekte: Kanten = konvexe Umrisshülle (`resolveGenericTilt`), „Tatsächliche Fläche“ in 2D nur via `three3d/tiltProject2D.ts`; `opposite` macht die gewählte Kante zur Achse.
