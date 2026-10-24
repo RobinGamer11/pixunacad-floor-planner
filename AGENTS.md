@@ -31,6 +31,8 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 Änderungen, Dateien, Tests, Build, Push-Status, Commit; Ende mit PowerShell-Befehl.
 
 ## Architekturregeln
+- 3D materials are object metadata with project-file image references; export the derived scene as standard glTF/GLB so other renderers receive PBR values and textures without a separate CAD model.
+- Keep the existing Three.js viewer engine for incremental 3D work; replacing it would risk the shared CAD selection and navigation behavior.
 - Unterordner haben eigene `AGENTS.md` – vor Änderungen dort lesen (z. B. `src/cad/AGENTS.md`).
 - Öffnen/Laden folgt nur `decideOpen` in `src/lib/cloudProjectState.ts` – Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
 - CAD-Blätter/Ebenen laufen als Strukturobjekte (`__structure__`) – sonst fehlen sie auf dem zweiten Gerät.

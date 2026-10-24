@@ -6,10 +6,12 @@
  */
 import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
 import * as THREE from "three";
-import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
+import type { Derived3D } from "@/cad/three3d/geometryDerivation";
+import { MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
 
 export interface CameraState { tx: number; ty: number; tz: number; r: number; theta: number; phi: number }
 export interface Viewer3DHandle {
+  exportGLB(): Promise<ArrayBuffer>;
   fitAll(): void;
   move(dir: "f" | "b" | "l" | "r" | "u" | "d", on: boolean): void;
   getCamera(): CameraState | null;
@@ -32,7 +34,10 @@ interface Props {
   /** Flüchtige Neigungsvorschau (transparent grau, Bezugskante beige). */
   ghost?: { mesh: { positions: number[]; indices: number[] }; edge?: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }] } | null;
   /** Inhalt einer flachen Platte (Dokument, Text, Tabelle) als Bild. */
-  textureFor?: (d: Plane3D) => Promise<{ canvas: HTMLCanvasElement; transparent: boolean; failed: boolean } | null>;
+  textureFor?: (d: Derived3D) => Promise<{ canvas: HTMLCanvasElement; transparent: boolean; failed: boolean } | null>;
+  materialImage?: (m: Material3D) => string | undefined;
+  onMaterialDrop?: (sheetId: string, id: string, materialId: string) => void;
+  onToggleOpening?: (sheetId: string, id: string) => void;
 }
 
 const keyOf = (d: Derived3D) => `${d.sheetId}::${d.sourceId}`;
@@ -43,13 +48,14 @@ function shapeOf(outer: { x: number; y: number }[], holes: { x: number; y: numbe
   return s;
 }
 
-const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, onEmpty, textureFor, ghost }, ref) {
+const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, onEmpty, textureFor, ghost, materialImage, onMaterialDrop, onToggleOpening }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
 
   // Einmalige Einrichtung von Renderer, Kamera, Licht und Navigation.
   useEffect(() => {
-    const host = hostRef.current!;
+    const host = hostRef.current;
+    if (!host) return;
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     const css = getComputedStyle(document.documentElement);
@@ -79,6 +85,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       const w = host.clientWidth || 1, h = host.clientHeight || 1;
       renderer.setSize(w, h, false); renderer.domElement.style.width = "100%"; renderer.domElement.style.height = "100%";
       camera.aspect = w / h; camera.updateProjectionMatrix();
+      if (st.current.fitted) st.current.fit?.();
     };
     const ro = new ResizeObserver(resize); ro.observe(host); resize();
 
@@ -148,7 +155,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         const r = el.getBoundingClientRect();
         ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
         ray.params.Line = { threshold: Math.max(0.05, orbit.r * 0.004) };
-        const hit = ray.intersectObjects(group.children, false)[0];
+        const hit = ray.intersectObjects(group.children, true)[0];
         const u = hit?.object.userData as any;
         if (u?.sheetId) st.current.onPick?.(u.sheetId, u.sourceId);
         else st.current.onEmpty?.();
@@ -159,6 +166,14 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     el.addEventListener("pointerup", onUp); el.addEventListener("pointercancel", onUp);
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("contextmenu", e => e.preventDefault());
+    const pickAt = (x: number, y: number) => {
+      const r=el.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1),camera);
+      return ray.intersectObjects(group.children,true).find(h=>h.object.userData.sheetId)?.object.userData;
+    };
+    const dragOver = (e: DragEvent) => { if (e.dataTransfer?.types.includes(MATERIAL_DRAG_TYPE)) e.preventDefault(); };
+    const drop = (e: DragEvent) => { const id=e.dataTransfer?.getData(MATERIAL_DRAG_TYPE); if(!id)return; e.preventDefault();e.stopPropagation();const u=pickAt(e.clientX,e.clientY);if(u)st.current.onMaterialDrop?.(u.sheetId,u.sourceId,id); };
+    const doubleClick = (e: MouseEvent) => { const u=pickAt(e.clientX,e.clientY);if(u?.opening)st.current.onToggleOpening?.(u.sheetId,u.sourceId); };
+    el.addEventListener("dragover",dragOver);el.addEventListener("drop",drop);el.addEventListener("dblclick",doubleClick);
 
     // Bewegung durch die Szene (gehend, ohne Physik)
     const held = new Set<string>();
@@ -205,7 +220,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     };
   }, []);
 
-  st.current.onPick = onPick; st.current.onEmpty = onEmpty;
+  st.current.onPick = onPick; st.current.onEmpty = onEmpty; st.current.onMaterialDrop = onMaterialDrop; st.current.onToggleOpening = onToggleOpening;
 
   // Neigungsvorschau: eigener, nicht anklickbarer Körper über dem (unveränderten) Original.
   useEffect(() => {
@@ -240,10 +255,10 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     // (reale Höhe bleibt unverändert). Vorderste Fläche = kein Versatz.
     const planeRank = new Map<Derived3D, number>();
     {
-      const byZ = new Map<number, Plane3D[]>();
+      const byZ = new Map<number, Derived3D[]>();
       for (const d of items) if (d.type === "plane") {
         const k = Math.round(d.z * 1000);
-        (byZ.get(k) || byZ.set(k, []).get(k)!).push(d);
+        const list = byZ.get(k) ?? []; list.push(d); byZ.set(k,list);
       }
       for (const list of byZ.values()) {
         list.sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
@@ -284,19 +299,6 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
           }
           const m = new THREE.Mesh(geo, mat);
           m.position.y = d.z; m.renderOrder = -rank; obj = m;
-          if (d.texture && textureFor) {
-            textureFor(d).then((res) => {
-              if (!res || st.current.gen !== gen || !m.parent) return;
-              const tex = new THREE.CanvasTexture(res.canvas);
-              tex.colorSpace = THREE.SRGBColorSpace;
-              tex.anisotropy = 4;
-              mat.map = tex;
-              if (!sel) mat.color.set("#ffffff");
-              if (res.transparent) { mat.transparent = true; mat.depthWrite = false; mat.alphaTest = 0.01; }
-              mat.needsUpdate = true;
-              (m.userData as any).tex = tex;
-            }).catch(() => { /* Platte bleibt einfarbig */ });
-          }
         } else if (d.type === "mesh") {
           // CAD (x, y, Höhe z) → Szene (x, z, y); Spiegelung → Umlaufsinn tauschen.
           const p = d.mesh.positions, pos = new Float32Array(p.length);
@@ -306,6 +308,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
           const geo = new THREE.BufferGeometry();
           geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
           geo.setIndex(idx);
+          if (d.uvs) geo.setAttribute("uv",new THREE.Float32BufferAttribute(d.uvs,2));
           geo.computeVertexNormals();
           const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: d.closed ? THREE.FrontSide : THREE.DoubleSide, flatShading: true }));
           obj = m;
@@ -317,20 +320,79 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
           obj.renderOrder = 1;
         }
       } catch { continue; }
-      if (obj) { obj.userData = { ...obj.userData, sheetId: d.sheetId, sourceId: d.sourceId }; g.add(obj); }
+      if (obj) {
+        obj.name = `${d.source}_${d.sourceId}${d.part ? `_${d.part}` : ""}`;
+        obj.userData = { ...obj.userData, sheetId: d.sheetId, sourceId: d.sourceId, opening: d.source === "door" || d.source === "window", part:d.part };
+        g.add(obj);
+        if (obj instanceof THREE.Mesh) {
+          const mesh = obj, mat=mesh.material as THREE.MeshStandardMaterial;
+          if (d.surfaceOpacity !== undefined) { mat.opacity=d.surfaceOpacity;mat.transparent=true;mat.depthWrite=false;mat.side=THREE.DoubleSide; }
+          if (d.texture && textureFor && !d.material) textureFor(d).then(res=>{
+            if(!res||st.current.gen!==gen||!mesh.parent)return;
+            const tex=new THREE.CanvasTexture(res.canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
+            mat.map=tex;if(!sel)mat.color.set("#ffffff");
+            if(res.transparent){mat.transparent=true;mat.alphaTest=0.01;mat.depthWrite=false;}
+            mat.needsUpdate=true;
+          }).catch(()=>{});
+          if (d.material) {
+            const material=d.material;
+            mat.name=material.name;mat.roughness=material.roughness;mat.metalness=material.metalness;
+            mat.opacity=material.opacity*(d.surfaceOpacity??1);mat.transparent=mat.opacity<1;mat.depthWrite=mat.opacity>=0.99;
+            mat.emissive.copy(mat.color);mat.emissiveIntensity=material.emissiveIntensity;
+            const src=materialImage?.(material);
+            if(src) {
+              if(d.type !== "plane" && !d.texture) {
+                const p=mesh.geometry.getAttribute("position"), n=mesh.geometry.getAttribute("normal"),uv:number[]=[];
+                for(let i=0;i<p.count;i++) {
+                  const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i)),nz=Math.abs(n.getZ(i));
+                  uv.push((nx>=ny&&nx>=nz?p.getZ(i):p.getX(i))/material.scaleM,(ny>=nx&&ny>=nz?p.getZ(i):p.getY(i))/material.scaleM);
+                }
+                mesh.geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));
+              }
+              const tex=new THREE.TextureLoader().load(src,loaded=>{
+                if(st.current.gen!==gen||!mesh.parent){loaded.dispose();return;}
+                loaded.colorSpace=THREE.SRGBColorSpace;loaded.wrapS=loaded.wrapT=THREE.RepeatWrapping;
+                if(d.type==='plane'){const a=d.outline[0],b=d.outline[1],e=d.outline[3];if(a&&b&&e)loaded.repeat.set(Math.hypot(b.x-a.x,b.y-a.y)/material.scaleM,Math.hypot(e.x-a.x,e.y-a.y)/material.scaleM);}
+                else if(d.texture?.corners?.length===4){const [a,b,,e]=d.texture.corners;loaded.repeat.set(Math.hypot(b.x-a.x,b.y-a.y)/material.scaleM,Math.hypot(e.x-a.x,e.y-a.y)/material.scaleM);}
+                mat.map?.dispose();mat.map=loaded;if(!sel)mat.color.set("#ffffff");mat.emissiveMap=loaded;mat.needsUpdate=true;
+              });
+              mesh.userData.tex=tex;
+            }
+          }
+        }
+      }
     }
     if (!st.current.fitted && items.length) { st.current.fitted = true; fit(); }
-  }, [items, selectedKey, textureFor]);
+  }, [items, selectedKey, textureFor, materialImage]);
 
   const fit = () => {
-    const { group, orbit, apply } = st.current; if (!group) return;
+    const { group, orbit, apply, camera } = st.current; if (!group) return;
     const box = new THREE.Box3().setFromObject(group);
     if (box.isEmpty()) return;
     const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
-    orbit.target.copy(c); orbit.r = Math.max(3, Math.max(s.x, s.y, s.z) * 1.4); apply();
+    orbit.target.copy(c);
+    const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+    const radius = s.length()/2;
+    orbit.r = Math.max(3,radius / Math.sin(Math.min(halfFov,Math.atan(Math.tan(halfFov)*camera.aspect))) * 1.12); apply();
   };
+  st.current.fit = fit;
 
   useImperativeHandle(ref, () => ({
+    exportGLB: async () => {
+      const g: THREE.Group | undefined=st.current.group;if(!g)throw new Error("3D-Ansicht nicht bereit.");
+      const {GLTFExporter}=await import("three/examples/jsm/exporters/GLTFExporter.js");
+      const copy=g.clone(true);
+      for(const child of [...copy.children]) {
+        if(!(child instanceof THREE.Mesh)){copy.remove(child);continue;}
+        child.material=(child.material as THREE.MeshStandardMaterial).clone();
+        const material=child.material as THREE.MeshStandardMaterial;
+        const data=items.find(d=>d.sheetId===child.userData.sheetId&&d.sourceId===child.userData.sourceId&&d.part===child.userData.part);
+        material.color.set(data?.material&&material.map ? "#ffffff" : data?.color??"#ffffff");
+      }
+      const result=await new GLTFExporter().parseAsync(copy,{binary:true,onlyVisible:true});
+      if(!(result instanceof ArrayBuffer))throw new Error("GLB konnte nicht erstellt werden.");
+      return result;
+    },
     fitAll: fit,
     getCamera: () => { const o = st.current.orbit; return o ? { tx: o.target.x, ty: o.target.y, tz: o.target.z, r: o.r, theta: o.theta, phi: o.phi } : null; },
     setCamera: (c) => { const o = st.current.orbit; if (!o) return; o.target.set(c.tx, c.ty, c.tz); o.r = c.r; o.theta = c.theta; o.phi = c.phi; st.current.apply(); st.current.fitted = true; },
@@ -365,9 +427,8 @@ function disposeGroup(g: THREE.Group) {
   for (const c of [...g.children]) {
     g.remove(c);
     const any = c as any;
-    any.userData?.tex?.dispose?.();
     any.geometry?.dispose?.();
-    (Array.isArray(any.material) ? any.material : [any.material]).forEach((m: any) => m?.dispose?.());
+    (Array.isArray(any.material) ? any.material : [any.material]).forEach((m: any) => { m?.map?.dispose?.();m?.dispose?.(); });
   }
 }
 

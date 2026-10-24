@@ -277,4 +277,15 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Kein Kantenziehen im Neigungsfenster (nur Zahl/Regler)
 - [x] Tatsächliche Fläche für alle Objekte inkl. Bilder
 - [x] Schalter „Gegenüberliegende Kante neigen“
-- [ ] Paket 2: Bibliothek/Bilder wie 2D, Infoboxen 3D, Materialien, Bilder wählbar, Türen/Fenster 3D
+- [x] Paket 2: Bibliothek/Bilder wie 2D, Infoboxen 3D, Materialien, Bilder wählbar, Türen/Fenster 3D (angemeldete Abnahme offen)
+
+## Paket 02 – 24.10.2026
+- [x] Neigungswinkel bis einschließlich 90° sicher ableiten und testen (90° = starres Aufrichten; minimale rücksetzbare 2D-Projektion)
+- [x] Bibliotheks-/Bildinhalte auch geneigt anzeigen; Bilder auswählen
+- [x] Vertikale auswählbare Infoboxen mit Inhalt und Größen-/Dickenfeldern
+- [x] Persistente PBR-Materialien: Bild, Skalierung, Transparenz, Leuchtkraft, Palette, Drag & Drop, GLB
+- [x] Parametrische Türen/Fenster mit zwei Materialien und Öffnen/Schließen
+- [x] 83 Regressionstests; getrennte 3D-Browserprüfung mit Auswahl, Material-Drop, Türbedienung und gültigem GLB auf Desktop/Handy
+- [ ] Angemeldete End-to-End-Abnahme inkl. Materialupload und Zwei-Geräte-Synchronisation – keine verfügbare Sitzung; Projektseite führt zu /login
+- [ ] Twinmotion-Import abnehmen – Twinmotion im Prüfumfeld nicht verfügbar
+- [ ] GitHub-main-Übertragung – Lovable verwaltet Commit/Push; GitHub main zeigt noch 3a62d5a6

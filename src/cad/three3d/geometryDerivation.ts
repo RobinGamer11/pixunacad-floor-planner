@@ -19,10 +19,14 @@ import { buildHealedWallSolidRing } from "../wallSolid";
 import { subtractPrism } from "./relations";
 import { genericVertex, resolveGenericTilt, scaleAcrossAxis, tiltShape, tiltShapeError } from "./tiltGeometry";
 import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
+import type { Material3D } from "./materials";
+import { deriveOpening } from "./openingGeometry";
+import { deriveInfoBox } from "./infoBoxGeometry";
+import { projectionCos } from "./tiltGeometry";
 
 export type Solid3DSource =
   | "wall" | "hatch" | "stair" | "document" | "textbox" | "table" | "library"
-  | "segment" | "dimension" | "freeStroke";
+  | "segment" | "dimension" | "freeStroke" | "infobox" | "door" | "window";
 
 /** Senkrecht extrudierter Körper: Grundriss (+Löcher) von z0 bis z1. */
 export interface Prism3D {
@@ -51,7 +55,7 @@ export interface Plane3D {
   color: string;
   order?: number;
   /** Inhalt als Bild: Ecken in Reihenfolge oben-links, oben-rechts, unten-rechts, unten-links. */
-  texture?: { list: "documents" | "textBoxes" | "tables" };
+  texture?: Texture3D;
 }
 
 /** Flaches Linien-Overlay (Linien, Maße, Freihand) ohne Extrusion. */
@@ -81,7 +85,8 @@ export interface Mesh3D {
   faces?: { top: { outer: Vec3[]; holes: Vec3[][] }; bottom: { outer: Vec3[]; holes: Vec3[][] } };
 }
 
-export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { note?: string };
+export interface Texture3D { list: "documents" | "textBoxes" | "tables" | "libraryInstances" | "infoBoxes"; corners?: Vec2[]; snapshot?: unknown; objectId?: string }
+export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[] };
 
 export interface DeriveOptions {
   /** Grundrissgröße eines Bibliotheksobjekts (lokal, vor Skalierung). */
@@ -96,6 +101,7 @@ export interface DeriveOptions {
   isLabelVisible?: (labelId: string) => boolean;
   /** Vordergrund-Rang einer Ebene (größer = weiter vorne). */
   labelFrontRank?: (labelId: string) => number;
+  libraryGeometry?: (instance: any, sheet: Sheet) => Derived3D[];
 }
 
 const EPS = 1e-6;
@@ -214,7 +220,7 @@ export function deriveHatch(hatch: any, sheetId: string, base: number): Derived3
   if (shape.kind === "rigid" && basis === "actual") {
     // Tatsächliche Fläche: 2D-Punkte sind die Projektion → wahre Form quer zur Achse zurückstrecken.
     const pd = Number.isFinite(hatch.tilt3D?.projDeg) ? hatch.tilt3D.projDeg : hatch.tilt3D.angleDeg;
-    const k = 1 / Math.max(0.05, Math.cos((pd * Math.PI) / 180));
+    const k = 1 / projectionCos(pd);
     if (Math.abs(k - 1) > 1e-9) {
       return deriveHatch({ ...hatch, points: scaleAcrossAxis(hatch.points, f, k), holes: holes.map(r => scaleAcrossAxis(r, f, k)), tilt3D: { ...hatch.tilt3D, basis: undefined, projDeg: undefined } }, sheetId, base);
     }
@@ -289,7 +295,16 @@ export function applyGenericTilt(o: any, items: Derived3D[], z0: number): Derive
     if (!m) continue;
     const p = m.positions, q = new Array(p.length);
     for (let i = 0; i < p.length; i += 3) { const v = genericVertex(p[i], p[i + 1], p[i + 2], f, t, h); q[i] = v.x; q[i + 1] = v.y; q[i + 2] = v.z; }
-    out.push({ type: "mesh", source: d.source, sourceId: d.sourceId, sheetId: d.sheetId, mesh: { positions: q, indices: m.indices }, closed: d.type === "prism" || (d.type === "mesh" && d.closed), color: d.color } as any);
+    const texture = d.texture ? { ...d.texture, corners: d.texture.corners ?? d.outline } : undefined;
+    const uvs = d.uvs ?? (texture && d.type === "plane" ? m.positions.flatMap((_: number, i: number) => {
+      if (i % 3 !== 0) return [];
+      const corners = texture.corners;
+      if (!corners || corners.length !== 4) return [0,0];
+      const [a,b,,e] = corners, ux=b.x-a.x, uy=b.y-a.y, vx=e.x-a.x, vy=e.y-a.y, det=ux*vy-uy*vx;
+      const x=m.positions[i]-a.x, y=m.positions[i+1]-a.y;
+      return Math.abs(det)>1e-12 ? [(x*vy-y*vx)/det, 1-(ux*y-uy*x)/det] : [0,0];
+    }) : undefined);
+    out.push({ ...d, type: "mesh", mesh: { positions: q, indices: m.indices }, closed: d.type === "prism" || (d.type === "mesh" && d.closed), texture, uvs } as any);
   }
   return out;
 }
@@ -333,7 +348,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
   // Reihenfolge wie im 2D: Ebene, dann Stapel innerhalb der Ebene.
   const orderOf = new Map<any, number>();
   const labelIds = new Set<string>();
-  for (const k of ["documents", "hatches", "walls", "doors", "stairs", "segments", "freeStrokes", "dimensions", "textBoxes", "tables", "libraryInstances"]) {
+  for (const k of ["documents", "hatches", "walls", "doors", "stairs", "segments", "freeStrokes", "dimensions", "textBoxes", "tables", "libraryInstances", "infoBoxes"]) {
     for (const o of scene[k] || []) if (o?.labelId) labelIds.add(o.labelId);
   }
   for (const l of labelIds) {
@@ -343,11 +358,19 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
   const push = (o: any, items: Derived3D[]) => {
     const ord = orderOf.get(o) ?? 0;
     const list = o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
-    for (const d of list) { d.order = ord; out.push(d); }
+    for (const d of list) { d.order = ord; d.material = d.part === "frame" ? o.frameMaterial3D ?? o.material3D : d.part === "glass" || d.part === "leaf" ? o.panelMaterial3D ?? o.material3D : o.material3D; out.push(d); }
   };
   const doors = (scene.doors || []).filter(vis);
   const walls = deriveWalls(scene, doors, sheetId, base, vis);
   for (const [w, parts] of walls) push(w, parts);
+  for (const d of doors) {
+    const wall = (scene.walls || []).find((w: any) => w.id === d.wallId);
+    if (wall && vis(wall)) {
+      const parts = deriveOpening(d, wall, sheetId, base);
+      push(d, wall.tilt3D ? applyGenericTilt(wall, parts, base + objectElevationM(wall)) : parts);
+    }
+  }
+  for (const b of scene.infoBoxes || []) if (vis(b)) push(b, deriveInfoBox(b, sheetId, base));
   for (const h of scene.hatches || []) { if (!vis(h)) continue; const d = deriveHatch(h, sheetId, base); if (d) push(h, [d]); }
   for (const s of scene.stairs || []) if (vis(s)) push(s, deriveStair(s, sheetId, base));
   const flat = (source: Solid3DSource, o: any, corners: Vec2[], color: string, list: "documents" | "textBoxes" | "tables") => {
@@ -367,6 +390,8 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
   for (const t of scene.tables || []) if (vis(t)) flat("table", t, boxCorners(t.center, t.widthM, t.heightM, t.rotationRad), "#f6f3ea", "tables");
   for (const li of scene.libraryInstances || []) {
     if (!vis(li)) continue;
+    const actual = opts.libraryGeometry?.(li, sheet);
+    if (actual?.length) { push(li, actual); continue; }
     let fp: Vec2[] | null = opts.libraryCorners?.(li) ?? null;
     if (!fp) {
       const b = opts.libraryBounds?.(li.definitionId);
