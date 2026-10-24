@@ -327,7 +327,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         if (obj instanceof THREE.Mesh) {
           const mesh = obj, mat=mesh.material as THREE.MeshStandardMaterial;
           if (d.surfaceOpacity !== undefined) { mat.opacity=d.surfaceOpacity;mat.transparent=true;mat.depthWrite=false;mat.side=THREE.DoubleSide; }
-          if (d.texture && textureFor) textureFor(d).then(res=>{
+          if (d.texture && textureFor && !d.material) textureFor(d).then(res=>{
             if(!res||st.current.gen!==gen||!mesh.parent)return;
             const tex=new THREE.CanvasTexture(res.canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
             mat.map=tex;if(!sel)mat.color.set("#ffffff");
@@ -341,7 +341,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
             mat.emissive.copy(mat.color);mat.emissiveIntensity=material.emissiveIntensity;
             const src=materialImage?.(material);
             if(src) {
-              if(!mesh.geometry.getAttribute("uv")) {
+              if(d.type !== "plane" && !d.texture) {
                 const p=mesh.geometry.getAttribute("position"), n=mesh.geometry.getAttribute("normal"),uv:number[]=[];
                 for(let i=0;i<p.count;i++) {
                   const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i)),nz=Math.abs(n.getZ(i));
@@ -353,6 +353,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
                 if(st.current.gen!==gen||!mesh.parent){loaded.dispose();return;}
                 loaded.colorSpace=THREE.SRGBColorSpace;loaded.wrapS=loaded.wrapT=THREE.RepeatWrapping;
                 if(d.type==='plane'){const a=d.outline[0],b=d.outline[1],e=d.outline[3];if(a&&b&&e)loaded.repeat.set(Math.hypot(b.x-a.x,b.y-a.y)/material.scaleM,Math.hypot(e.x-a.x,e.y-a.y)/material.scaleM);}
+                else if(d.texture?.corners?.length===4){const [a,b,,e]=d.texture.corners;loaded.repeat.set(Math.hypot(b.x-a.x,b.y-a.y)/material.scaleM,Math.hypot(e.x-a.x,e.y-a.y)/material.scaleM);}
                 mat.map?.dispose();mat.map=loaded;if(!sel)mat.color.set("#ffffff");mat.emissiveMap=loaded;mat.needsUpdate=true;
               });
               mesh.userData.tex=tex;
