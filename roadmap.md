@@ -278,3 +278,11 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Tatsächliche Fläche für alle Objekte inkl. Bilder
 - [x] Schalter „Gegenüberliegende Kante neigen“
 - [ ] Paket 2: Bibliothek/Bilder wie 2D, Infoboxen 3D, Materialien, Bilder wählbar, Türen/Fenster 3D
+
+## Paket 02 – 24.10.2026
+- [ ] Neigungswinkel bis einschließlich 90° sicher ableiten und testen
+- [ ] Bibliotheks-/Bildinhalte auch geneigt anzeigen; Bilder auswählen
+- [ ] Vertikale auswählbare Infoboxen mit Inhalt und Größen-/Dickenfeldern
+- [ ] Persistente PBR-Materialien: Bild, Skalierung, Transparenz, Leuchtkraft, Palette, Drag & Drop, GLB
+- [ ] Parametrische Türen/Fenster mit zwei Materialien und Öffnen/Schließen
+- [ ] Regressionstests und Browserprüfung; GitHub-Übertragung prüfen
