@@ -5,14 +5,18 @@
  */
 import type { CadApp } from "../CadApp";
 import { SelectionType } from "../constants";
-import { snapshotsBounds, instanceCornersWorld } from "../library/libraryGeometry";
+import { snapshotsBounds, instanceCornersWorld, transformSnapshots, snapshotsToSerializedScene } from "../library/libraryGeometry";
+import { appendSceneFromSerialized } from "../sceneSerde";
+import { Scene } from "../Scene";
+import { infoBoxUi } from "@/lib/infoBoxUi";
+import type { Material3D } from "./materials";
 import { deriveProject3D, deriveScene3D, type Derived3D } from "./geometryDerivation";
 import { objectDisplayName } from "../objectMeta";
 import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "../ProjectionRender";
 import type { DossierInput, DossierObject } from "./dossier";
 import { applyRelations3D, objKey, wouldCreateCycle, type Relation3D, type RelationIssue, type RelationSource } from "./relations";
 
-export const OBJECT_LISTS = ["walls", "hatches", "stairs", "documents", "textBoxes", "tables", "libraryInstances", "segments", "dimensions", "freeStrokes"] as const;
+export const OBJECT_LISTS = ["walls", "hatches", "stairs", "documents", "textBoxes", "tables", "libraryInstances", "segments", "dimensions", "freeStrokes", "doors", "infoBoxes"] as const;
 
 const sceneOf = (app: CadApp, id: string) => (app as any).scenesById?.get(id) || (id === app.activeSheetId ? (app as any).scene : null);
 
@@ -77,8 +81,28 @@ function deriveOpts(app: CadApp) {
       const def: any = app.getLibraryDefinition(defId);
       return def?.geometry ? snapshotsBounds(def.geometry) : null;
     },
+    libraryGeometry: (li: any) => {
+      const def: any = app.getLibraryDefinition(li.definitionId);
+      const sheet = app.sheetManager.getById(app.activeSheetId);
+      if (!def?.geometry?.length || !sheet) return [];
+      const snap = snapshotsToSerializedScene(transformSnapshots(def.geometry, li));
+      const scene = new Scene();
+      appendSceneFromSerialized(scene, snap);
+      // Definition geometry remains vector geometry, never a bounding-box block.
+      const height = Number(li.bodyHeightM) || 0;
+      for (const hatch of scene.hatches as any[]) if (!hatch.isPolygon && height > 0) hatch.heightM = height;
+      const derived = deriveScene3D(scene, { ...sheet, elevationM: 0 }, {});
+      const z = objectElevationMForLibrary(li);
+      return derived.map(d => {
+        if (d.type === "prism") return { ...d, source: "library", sourceId: li.id, sheetId: app.activeSheetId, z0: d.z0+z, z1:d.z1+z };
+        if (d.type === "mesh") return { ...d, source:"library", sourceId:li.id, sheetId:app.activeSheetId, mesh:{...d.mesh, positions:d.mesh.positions.map((v,i)=>i%3===2?v+z:v)} };
+        return { ...d, source: "library", sourceId: li.id, sheetId: app.activeSheetId, z: d.z+z, ...(d.type === "plane" ? {texture:{list:"libraryInstances",corners:instanceCornersWorld(def.geometry,li)}} : {}) };
+      });
+    },
   } as any;
 }
+
+function objectElevationMForLibrary(li: any) { return typeof li.elevationM === "number" && Number.isFinite(li.elevationM) ? li.elevationM : 0; }
 
 /** 3D-Auswahl → gemeinsame CAD-Auswahl (wechselt bei Bedarf eindeutig das Blatt). */
 export function selectInCad(app: CadApp, sheetId: string, id: string) {
@@ -87,6 +111,7 @@ export function selectInCad(app: CadApp, sheetId: string, id: string) {
   // Gesperrte Ebenen: sichtbar, aber wie im CAD nicht anwählbar.
   if (hit.obj?.labelId && !app.labelManager.isEditable(hit.obj.labelId)) return;
   if (app.activeSheetId !== sheetId) app.setActiveSheetId(sheetId);
+  if (hit.list === "infoBoxes") { app.clearSelection(); infoBoxUi.select(id); return; }
   const map: Record<string, any> = {
     walls: { type: SelectionType.WALL, wallId: id },
     hatches: { type: SelectionType.HATCH, hatchId: id },
@@ -98,12 +123,27 @@ export function selectInCad(app: CadApp, sheetId: string, id: string) {
     segments: { type: SelectionType.SEGMENT, segmentId: id },
     dimensions: { type: SelectionType.DIMENSION, dimensionId: id },
     freeStrokes: { type: SelectionType.FREE_STROKE, freeStrokeId: id },
+    doors: { type: SelectionType.DOOR, doorId: id },
   };
   try { app.setSelection({ ...map[hit.list], handleIndex: null } as any); } catch { /* Auswahl nicht möglich */ }
 }
 
 /** Klick ins Leere der 3D-Ansicht: Auswahl aufheben (schließt die Einstellungen). */
-export function clearCadSelection(app: CadApp) { try { app.clearSelection(); } catch { /* ignorieren */ } }
+export function clearCadSelection(app: CadApp) { try { app.clearSelection(); infoBoxUi.clear(); } catch { /* ignorieren */ } }
+
+export function setObjectMaterial(app: CadApp, sheetId: string, id: string, material?: Material3D, slot: "material3D" | "frameMaterial3D" | "panelMaterial3D" = "material3D") {
+  const hit = findObject(app, sheetId, id);
+  if (!hit || (hit.obj.labelId && !app.labelManager.isEditable(hit.obj.labelId))) return false;
+  app.runAction(() => { if (material) hit.obj[slot] = { ...material }; else delete hit.obj[slot]; });
+  return true;
+}
+
+export function setOpeningState(app: CadApp, sheetId: string, id: string, open: boolean) {
+  const hit = findObject(app, sheetId, id);
+  if (hit?.list !== "doors" || (hit.obj.labelId && !app.labelManager.isEditable(hit.obj.labelId))) return false;
+  app.runAction(() => { hit.obj.open3D = open; });
+  return true;
+}
 
 export function setSheetIn3D(app: CadApp, sheetId: string, on: boolean) {
   app.runAction(() => { app.sheetManager.setParticipatesIn3D(sheetId, on); });
