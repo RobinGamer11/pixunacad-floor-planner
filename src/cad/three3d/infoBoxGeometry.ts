@@ -1,5 +1,4 @@
 import type { Derived3D } from "./geometryDerivation";
-import { slabMesh } from "./solidMesh";
 import { objectElevationM } from "../objectMeta";
 
 export function infoBoxDimensions(box: any) {

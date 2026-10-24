@@ -51,6 +51,9 @@ export interface Tilt3D {
 
 export type Cardinal = "top" | "bottom" | "left" | "right";
 export const CARDINALS: Cardinal[] = ["top", "bottom", "left", "right"];
+/** Reversible nonzero 2D carrier at a vertical pose; never divide by cos(90°). */
+export const projectionCos = (deg: number) => Math.max(0.0001, Math.abs(Math.cos(deg * Math.PI / 180)));
+export const isVerticalTilt = (rad: number) => Math.abs(Math.cos(rad)) < 1e-9;
 
 function bounds(pts: Vec2[]) {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -94,6 +97,7 @@ export function resolveCardinalTilt(t: Tilt3D | undefined, pts: Vec2[], z0: numb
  * rigid / Grundfläche / Kante neigen / Kanten bündig. `h` = Körperhöhe über z0.
  */
 export function tiltVertex(x: number, y: number, z: number, f: TiltFrame, t: Pick<Tilt3D, "mode" | "plumb" | "anchor" | "basis">, h: number): Vec3 {
+  if (isVerticalTilt(f.angleRad)) return tiltPoint(x, y, z, f);
   const tn = Math.tan(f.angleRad), c = Math.cos(f.angleRad), w = z - f.z0;
   if (t.mode === "lift") return { x, y, z: z + axisDistance({ x, y }, f) * tn * (h > 1e-9 ? w / h : 1) };
   if (t.plumb) {
@@ -203,6 +207,7 @@ export type TiltMode = "rotate" | "lift";
  */
 export function tiltShape(mode: TiltMode | undefined, plumb: boolean | undefined, f: TiltFrame, z: number, h: number, anchor?: "top" | "bottom", basis?: "plan" | "actual"):
   { kind: "rigid" } | { kind: "field"; zb: (p: Vec2) => number; zt: (p: Vec2) => number; map?: (p: Vec2) => Vec2 } {
+  if (isVerticalTilt(f.angleRad)) return { kind: "rigid" };
   const t = Math.tan(f.angleRad);
   if (mode !== "lift" && !plumb && basis === "plan") {
     // Grundfläche fest: Unter- und Oberseite parallel geneigt, Dicke senkrecht zur Fläche = h.
@@ -226,6 +231,7 @@ export function plumbScale(f: TiltFrame, h: number, anchor?: "top" | "bottom"): 
 
 /** Prüft, ob die Verformung gültig ist (Oberseite darf nicht unter die Unterseite sinken). */
 export function tiltShapeError(mode: TiltMode | undefined, f: TiltFrame, h: number, plumb?: boolean, anchor?: "top" | "bottom"): string | undefined {
+  if (isVerticalTilt(f.angleRad)) return undefined;
   if (mode === "lift" && h > 1e-9 && h + f.D * Math.tan(f.angleRad) <= 1e-6)
     return "Die Kante würde unter die Unterseite sinken – letzte gültige Form bleibt erhalten.";
   if (mode !== "lift" && plumb && plumbScale(f, h, anchor) <= 0.02)
@@ -237,7 +243,8 @@ export function tiltShapeError(mode: TiltMode | undefined, f: TiltFrame, h: numb
 export function topSurfaceArea(outer: Vec2[], holes: Vec2[][], mode: TiltMode | undefined, plumb: boolean | undefined, angleDeg: number, scale = 1): number {
   const a = netArea(outer, holes);
   if (!angleDeg || (mode !== "lift" && !plumb)) return a;
-  return (a * (mode === "lift" ? 1 : scale)) / Math.cos((angleDeg * Math.PI) / 180);
+  if (Math.abs(angleDeg) === 90) return a;
+  return (a * (mode === "lift" ? 1 : scale)) / projectionCos(angleDeg);
 }
 
 // ---------------------------------------------------------------- Alle Objektarten
@@ -269,14 +276,14 @@ export function resolveGenericTilt(t: Tilt3D | undefined, pts: Vec2[], z0: numbe
   if (!t || !Number.isFinite(t.angleDeg) || Math.abs(t.angleDeg) < 1e-9) return null;
   if (t.cardinal) return withOpposite(frameForCardinal(pts, t.cardinal, t.angleDeg, z0), t.opposite);
   const hull = convexHull(pts);
-  return withOpposite(resolveTilt({ points: hull, tilt3D: t }, z0), t.opposite);
+  return resolveTilt({ points: hull, tilt3D: t }, z0);
 }
 
 /** Stauchfaktor-Umkehr bei „Tatsächliche Fläche“ (starres Neigen): 2D ist die Projektion. */
 export function actualStretch(t: Pick<Tilt3D, "mode" | "plumb" | "basis" | "projDeg" | "angleDeg">): number {
   if (t.mode === "lift" || t.plumb || t.basis !== "actual") return 1;
   const pd = Number.isFinite(t.projDeg as number) ? (t.projDeg as number) : t.angleDeg;
-  return 1 / Math.max(0.05, Math.cos((pd * Math.PI) / 180));
+  return 1 / projectionCos(pd);
 }
 
 /** Punktweise Neigung inkl. „Tatsächliche Fläche“ (wahre Form quer zur Achse zurückgestreckt). */

@@ -31,7 +31,8 @@ describe("3D-Einstellungen – Neigen", () => {
   it("fängt übliche Winkel, freie Winkel bleiben", () => {
     expect(snapTiltAngle(29.4)).toBe(30);
     expect(snapTiltAngle(27.3)).toBe(27.3);
-    expect(snapTiltAngle(120)).toBe(85);
+    expect(snapTiltAngle(120)).toBe(90);
+    expect(snapTiltAngle(-120)).toBe(-90);
   });
 
   const setup = async (h: any) => {

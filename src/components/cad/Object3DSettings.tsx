@@ -21,6 +21,8 @@ import { TiltPreview3D, meshOfDerived, mergeMeshes } from "./TiltPreview3D";
 import type { Vec2 } from "@/cad/geometry";
 import { deriveHatch } from "@/cad/three3d/geometryDerivation";
 import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
+import { projectionCos } from "@/cad/three3d/tiltGeometry";
+import { setOpeningState } from "@/cad/three3d/projectBridge";
 
 const C = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
@@ -39,7 +41,7 @@ export const parseNum = (s: string): number | null => {
 
 /** Neigungswinkel: übliche Winkel fangen (±1°), freie Winkel bleiben möglich. */
 export function snapTiltAngle(deg: number): number {
-  const c = Math.max(-85, Math.min(85, deg));
+  const c = Math.max(-90, Math.min(90, deg));
   const r = Math.round(c / 5) * 5;
   return Math.abs(r - c) <= 1 ? r : Math.round(c * 10) / 10;
 }
@@ -225,6 +227,7 @@ const DoorFields: React.FC<{ app: any; obj: any; editable: boolean }> = ({ app, 
       <NumField label="Höhenlage ü. Blatt" value={wallElev + sill} onCommit={on(v => { obj.breakHeightM = v - wallElev; })} />
       <NumField label="Körperhöhe (Öffnungshöhe)" info="Lichte Höhe der Öffnung über ihrer Unterkante." value={h} min={0} minExclusive onCommit={on(v => { obj.heightM = v; })} />
       <NumField label={obj.kind === "window" ? "Brüstung (über Wand)" : "Unterkante (über Wand)"} value={sill} onCommit={on(v => { obj.breakHeightM = v; })} />
+      <BigChoice active={!!obj.open3D} disabled={!editable} label={obj.open3D ? "Schließen" : "Öffnen"} onClick={() => setOpeningState(app, app.activeSheetId, obj.id, !obj.open3D)} />
     </>
   );
 };
@@ -300,7 +303,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const unproject = () => {
     if (obj.tilt3D?.basis !== "actual") return;
     const r = resolveNow();
-    if (r?.frame) projectAcross(r.frame, 1 / Math.max(0.05, Math.cos(obj.tilt3D.angleDeg * Math.PI / 180)));
+    if (r?.frame) projectAcross(r.frame, 1 / projectionCos(obj.tilt3D.angleDeg));
   };
   const commit = () => {
     if (!session || !tf || !frame || shapeErr) return;
@@ -311,7 +314,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
       // Tatsächliche Fläche: 2D zeigt die Projektion des geneigten Körpers (quer zur Achse gestaucht).
       if (useBasis === "actual" && Math.abs(v.angle) > 1e-9) {
         const nf = frameAt(v.angle)?.frame;
-        if (nf) projectAcross(nf, Math.cos(v.angle * Math.PI / 180));
+        if (nf) projectAcross(nf, projectionCos(v.angle));
       }
       if (Math.abs(v.angle) < 1e-9) delete obj.tilt3D;
       else obj.tilt3D = { ...tf, angleDeg: v.angle, ...(v.mode === "lift" ? { mode: "lift" } : {}), ...(v.plumb ? { plumb: true } : {}), ...(v.plumb && v.anchor === "bottom" ? { anchor: "bottom" } : {}), ...(useBasis ? { basis: useBasis } : {}), ...(v.opposite ? { opposite: true } : {}) };
@@ -359,15 +362,15 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     if (d === null) return;
     const v = parseNum(d);
     if (v === null) { setAngleErr("Ungültiger Winkel – nicht übernommen."); return; }
-    setAngleErr(null); begin({ angle: Math.max(-85, Math.min(85, v)) }); // freie Eingabe ohne Fangrundung
+    setAngleErr(null); begin({ angle: Math.max(-90, Math.min(90, v)) }); // freie Eingabe ohne Fangrundung
   };
 
   const area = netArea(pts, holes);
   const dt: any = draftTilt;
   const dFrame = dt ? frameAt(dt.angleDeg)?.frame : undefined;
   const rigidBasis = dt && dt.mode !== "lift" && !dt.plumb ? dt.basis : undefined;
-  const real = rigidBasis === "plan" ? area / Math.cos((dt.angleDeg || 0) * Math.PI / 180)
-    : rigidBasis === "actual" ? area / Math.cos(((dt.projDeg ?? dt.angleDeg) || 0) * Math.PI / 180)
+  const real = rigidBasis === "plan" ? (Math.abs(dt.angleDeg) === 90 ? area : area / projectionCos(dt.angleDeg || 0))
+     : rigidBasis === "actual" ? area / projectionCos((dt.projDeg ?? dt.angleDeg) || 0)
     : topSurfaceArea(pts, holes, dt?.mode, dt?.plumb, dt?.angleDeg || 0, dFrame && dt?.plumb ? plumbScale(dFrame, h, dt.anchor) : 1);
   const canEdit = editable && !!tf && !!frame;
   const cardBtn = (c: Cardinal, icon: React.ReactNode, label: string, pos: string) => (
@@ -376,7 +379,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
       className={`absolute z-10 flex h-7 items-center gap-1 rounded-md border px-1.5 text-[10px] font-medium disabled:opacity-40 ${pos}`}
       style={card === c ? C.gold : { ...C.field, background: "hsl(var(--overlay-ink) / 0.85)" }}>{icon}{label}</button>
   );
-  const pct = ((cur.angle + 85) / 170) * 100;
+  const pct = ((cur.angle + 90) / 180) * 100;
 
   return (
     <>
@@ -413,7 +416,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
           </div>
         </div>
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-[11px]"><span style={C.muted}>Neigungswinkel</span>
+          <div className="flex items-center justify-between text-[11px]"><span style={C.muted}>Neigungswinkel<InfoTip text="Bei genau ±90° wird der Körper starr aufgerichtet. Grundfläche fest, Kante neigen und lotrechte Seiten sind dort mathematisch nicht als endliche Höhenfunktion möglich. Tatsächliche Fläche bleibt erhalten; die 2D-Projektion behält eine minimale, rücksetzbare Breite." /></span>
             <div className="flex items-center gap-1">
               <input type="text" inputMode="decimal" disabled={!canEdit} value={angleDraft ?? fmt(cur.angle, 1)}
                 onChange={(e) => { angleDraftRef.current = e.target.value; setAngleDraft(e.target.value); setAngleErr(null); }} onBlur={commitAngleText}
@@ -426,9 +429,9 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
             <div className="absolute left-0 right-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full" style={{ background: "linear-gradient(90deg, hsl(var(--overlay-surface) / 0.28), hsl(var(--overlay-surface) / 0.08) 50%, hsl(var(--accent-gold) / 0.55))" }} />
             <div className="absolute top-1/2 h-4 w-0.5 -translate-y-1/2" style={{ left: "50%", background: "hsl(var(--overlay-surface))" }} />
             <div className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full" style={{ left: `${Math.min(50, pct)}%`, width: `${Math.abs(pct - 50)}%`, background: "hsl(var(--accent-gold))" }} />
-            <input type="range" min={-85} max={85} step={0.5} value={cur.angle} disabled={!canEdit} aria-label="Neigungswinkel"
+            <input type="range" min={-90} max={90} step={0.5} value={cur.angle} disabled={!canEdit} aria-label="Neigungswinkel"
               onChange={(e) => begin({ angle: snapTiltAngle(+e.target.value) })} className="relative w-full opacity-90 disabled:opacity-40" style={{ accentColor: "hsl(var(--accent-gold))", touchAction: "pan-y" }} />
-            <div className="flex justify-between text-[10px]" style={C.muted}><span>−85°</span><span>0°</span><span>+85°</span></div>
+            <div className="flex justify-between text-[10px]" style={C.muted}><span>−90°</span><span>0°</span><span>+90°</span></div>
           </div>
           {angleErr && <div className="text-[10px]" style={C.err}>{angleErr}</div>}
         </div>
