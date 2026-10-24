@@ -85,6 +85,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       const w = host.clientWidth || 1, h = host.clientHeight || 1;
       renderer.setSize(w, h, false); renderer.domElement.style.width = "100%"; renderer.domElement.style.height = "100%";
       camera.aspect = w / h; camera.updateProjectionMatrix();
+      if (st.current.fitted) st.current.fit?.();
     };
     const ro = new ResizeObserver(resize); ro.observe(host); resize();
 
@@ -364,19 +365,31 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
   }, [items, selectedKey, textureFor, materialImage]);
 
   const fit = () => {
-    const { group, orbit, apply } = st.current; if (!group) return;
+    const { group, orbit, apply, camera } = st.current; if (!group) return;
     const box = new THREE.Box3().setFromObject(group);
     if (box.isEmpty()) return;
     const c = box.getCenter(new THREE.Vector3()), s = box.getSize(new THREE.Vector3());
-    orbit.target.copy(c); orbit.r = Math.max(3, Math.max(s.x, s.y, s.z) * 1.4); apply();
+    orbit.target.copy(c);
+    const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
+    const radius = s.length()/2;
+    orbit.r = Math.max(3,radius / Math.sin(Math.min(halfFov,Math.atan(Math.tan(halfFov)*camera.aspect))) * 1.12); apply();
   };
+  st.current.fit = fit;
 
   useImperativeHandle(ref, () => ({
     exportGLB: async () => {
       const g: THREE.Group | undefined=st.current.group;if(!g)throw new Error("3D-Ansicht nicht bereit.");
       const {GLTFExporter}=await import("three/examples/jsm/exporters/GLTFExporter.js");
       const copy=g.clone(true);
-      for(const child of [...copy.children]) if(!(child instanceof THREE.Mesh))copy.remove(child);
+      for(const child of [...copy.children]) {
+        if(!(child instanceof THREE.Mesh)){copy.remove(child);continue;}
+        child.material=(child.material as THREE.MeshStandardMaterial).clone();
+        const original=g.children.find(o=>o.uuid===child.uuid);
+        void original;
+        const material=child.material as THREE.MeshStandardMaterial;
+        const data=items.find(d=>d.sheetId===child.userData.sheetId&&d.sourceId===child.userData.sourceId&&d.part===child.userData.part);
+        material.color.set(data?.material&&material.map ? "#ffffff" : data?.color??"#ffffff");
+      }
       const result=await new GLTFExporter().parseAsync(copy,{binary:true,onlyVisible:true});
       if(!(result instanceof ArrayBuffer))throw new Error("GLB konnte nicht erstellt werden.");
       return result;

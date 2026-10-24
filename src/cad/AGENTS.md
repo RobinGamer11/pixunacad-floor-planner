@@ -31,5 +31,8 @@
 - Neigungsform (`tilt3D.mode`/`plumb`/`anchor`) nur über `tiltShape` in `three3d/tiltGeometry.ts`; „Kanten bündig“ hält die gewählte Kante an der Lage der starren Drehung und staucht den Grundriss quer zur Achse (Körper wird nie länger). Fehlende Felder = starre Drehung. Vorschau nutzt `deriveHatch`.
 - Neigungsentwürfe gelten nur für ihr Objekt (Objektwechsel verwirft) und erscheinen in 3D nur flüchtig über `three3d/tiltDraftPreview.ts`; „Tatsächliche Fläche“ (`tilt3D.basis`) staucht die 2D-Punkte erst bei „Übernehmen“ über `scaleAcrossAxis` (Rücksetzen streckt zurück).
 - „Durchbricht“ mit `trim` kürzt die Quelle flüchtig in `relations.ts` (Hauptteil + Teil im Ziel); `edge` ist veraltet und ohne Wirkung.
-- Neigung für Nicht-Schraffuren nur über gedachte Kanten (`tilt3D.cardinal`, Seiten des Umrisses) und punktweise `applyGenericTilt` in `geometryDerivation.ts`; Vorschau über `deriveObjectFromApp` – 2D bleibt unverändert („Tatsächliche Fläche“ nur bei Schraffuren).
+- Exact vertical poses use rigid rotation at the singular endpoint; `projectionCos` keeps a reversible nonzero 2D carrier for actual-area projection, avoiding infinite heights and destroyed source geometry.
 - Neigung aller Nicht-Schraffur-Objekte: Kanten = konvexe Umrisshülle (`resolveGenericTilt`), „Tatsächliche Fläche“ in 2D nur via `three3d/tiltProject2D.ts`; `opposite` macht die gewählte Kante zur Achse.
+- Opening frames and panels are derived by `openingGeometry` from CAD opening placement; only open state and material slots persist via `objectMeta`, so toggling never alters wall openings.
+- Infobox plaques are derived by `infoBoxGeometry`; selection stays in `infoBoxUi` and their contents remain editable in the existing panel, preserving the 2D appearance.
+- Library 3D geometry is reconstructed from transformed vector snapshots through the existing scene deserializer, never from a decorative bounding block.

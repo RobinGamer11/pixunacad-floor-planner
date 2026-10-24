@@ -77,7 +77,7 @@ export function frameForCardinal(pts: Vec2[], c: Cardinal, angleDeg: number, z0:
   const { x0, y0, x1, y1 } = bounds(pts);
   const vert = c === "top" || c === "bottom";
   const D = vert ? y1 - y0 : x1 - x0;
-  if (D < 1e-4) return { error: "Das Objekt hat keine Ausdehnung quer zu dieser Seite." };
+  if (D < 1e-9) return { error: "Das Objekt hat keine Ausdehnung quer zu dieser Seite." };
   const angleRad = (angleDeg * Math.PI) / 180;
   const fr = (axis: Vec2, dir: Vec2, n: Vec2): TiltFrame => ({ axis, dir, n, D, angleRad, z0, edgeIndex: -1 });
   if (c === "bottom") return { frame: fr({ x: x0, y: y0 }, { x: 1, y: 0 }, { x: 0, y: 1 }) };
@@ -158,7 +158,7 @@ export function frameForEdge(hatch: any, edgeIndex: number, angleDeg: number, z0
   if (pos > 1e-4 && neg > 1e-4) return { error: "Die Kante liegt nicht am Rand der Fläche – die Drehachse ist nicht eindeutig." };
   const m = pos >= neg ? nl : { x: -nl.x, y: -nl.y };
   const D = Math.max(pos, neg);
-  if (D < 1e-4) return { error: "Die Fläche hat keine Ausdehnung quer zur Kante." };
+  if (D < 1e-9) return { error: "Die Fläche hat keine Ausdehnung quer zur Kante." };
   return { frame: { axis: { x: a.x + m.x * D, y: a.y + m.y * D }, dir, n: { x: -m.x, y: -m.y }, D, angleRad: (angleDeg * Math.PI) / 180, z0, edgeIndex } };
 }
 

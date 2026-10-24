@@ -2,8 +2,9 @@
 import { doorGeometry } from "../doorGeom";
 import { objectElevationM } from "../objectMeta";
 import type { Derived3D, Prism3D } from "./geometryDerivation";
+import type { Door, Wall } from "../Scene";
 
-export function deriveOpening(door: any, wall: any, sheetId: string, base: number): Derived3D[] {
+export function deriveOpening(door: Door & {open3D?:boolean}, wall: Wall, sheetId: string, base: number): Derived3D[] {
   if (!wall) return [];
   const g = doorGeometry(wall, door);
   if (!g) return [];
