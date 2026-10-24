@@ -8,6 +8,8 @@ import { AttachmentsSection } from "@/components/cad/ObjectInfoTabs";
 import { infoBoxUi, initialsOf, useInfoBoxUi } from "@/lib/infoBoxUi";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ensureObjectCode, formatObjectId, setObjectName } from "@/cad/objectMeta";
+import { infoBoxDimensions } from "@/cad/three3d/infoBoxGeometry";
+import { Button } from "@/components/ui/button";
 
 const inputCls = "cad-settings-input w-full h-9 text-[12px] px-3";
 
@@ -18,7 +20,7 @@ function scenesOf(app: any): any[] {
   return out;
 }
 
-export default function InfoBoxSettingsPanel({ app }: { app: any }) {
+export default function InfoBoxSettingsPanel({ app, in3D = false }: { app: any; in3D?: boolean }) {
   const ui = useInfoBoxUi();
   const auth = useAuth() as any;
   const [tab, setTab] = React.useState<"look" | "info">("look");
@@ -143,6 +145,7 @@ export default function InfoBoxSettingsPanel({ app }: { app: any }) {
               <Trash2 className="h-4 w-4" /> Löschen
             </button>
           </div>
+          {in3D && box && <details className="border-t border-border pt-2"><summary className="cursor-pointer text-xs font-semibold">3D-Eigenschaften</summary><div className="mt-2 space-y-2">{([['size3DM','Breite (m)','width'],['bodyHeightM','Höhe (m)','height'],['thickness3DM','Dicke (m)','thickness'],['elevationM','Höhenlage ü. Blatt (m)','elevation']] as const).map(([key,label,dimension])=><label key={key} className="block text-xs">{label}<input type="number" aria-label={label} step="0.01" defaultValue={infoBoxDimensions(box)[dimension]} key={`${box.id}-${box[key]}`} className={inputCls} onBlur={e=>{const n=e.target.valueAsNumber;if(Number.isFinite(n)&&(key==='elevationM'||n>0)&&n!==box[key]){app.runAction(()=>{box[key]=n;});force();}}}/></label>)}</div></details>}
         </div>
       ) : (
         <div className="space-y-3">

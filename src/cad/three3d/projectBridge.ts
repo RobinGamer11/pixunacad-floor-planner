@@ -6,7 +6,7 @@
 import type { CadApp } from "../CadApp";
 import { SelectionType } from "../constants";
 import { snapshotsBounds, instanceCornersWorld, transformSnapshots, snapshotsToSerializedScene } from "../library/libraryGeometry";
-import { appendSceneFromSerialized } from "../sceneSerde";
+import { appendSceneObjects } from "../sceneSerde";
 import { Scene } from "../Scene";
 import { infoBoxUi } from "@/lib/infoBoxUi";
 import type { Material3D } from "./materials";
@@ -87,7 +87,7 @@ function deriveOpts(app: CadApp) {
       if (!def?.geometry?.length || !sheet) return [];
       const snap = snapshotsToSerializedScene(transformSnapshots(def.geometry, li));
       const scene = new Scene();
-      appendSceneFromSerialized(scene, snap);
+      appendSceneObjects(scene, snap);
       // Definition geometry remains vector geometry, never a bounding-box block.
       const height = Number(li.bodyHeightM) || 0;
       for (const hatch of scene.hatches as any[]) if (!hatch.isPolygon && height > 0) hatch.heightM = height;
@@ -123,7 +123,7 @@ export function selectInCad(app: CadApp, sheetId: string, id: string) {
     segments: { type: SelectionType.SEGMENT, segmentId: id },
     dimensions: { type: SelectionType.DIMENSION, dimensionId: id },
     freeStrokes: { type: SelectionType.FREE_STROKE, freeStrokeId: id },
-    doors: { type: SelectionType.DOOR, doorId: id },
+    doors: { type: (SelectionType as any).DOOR ?? "door", doorId: id },
   };
   try { app.setSelection({ ...map[hit.list], handleIndex: null } as any); } catch { /* Auswahl nicht möglich */ }
 }
