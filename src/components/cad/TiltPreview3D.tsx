@@ -200,7 +200,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     const key = String(obj?.id);
     if (s.fitted !== key) { s.fitted = key; fit(); } else s.render();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base, pieces?.map((x: any) => x.mesh?.positions?.length ?? x.type), framePts, highlight])]);
+  }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base, pieces?.map((x: any) => x.mesh?.positions?.length ?? x.type), framePts, highlight, ringFaces])]);
 
   return (
     <div ref={host} className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>

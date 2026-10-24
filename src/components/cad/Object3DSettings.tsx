@@ -324,7 +324,8 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     if (!session || !draftTilt) { setTiltDraftPreview(null); return; }
     if (generic) {
       const m = mergeMeshes((draftPieces || []).map(meshOfDerived));
-      setTiltDraftPreview(m ? { mesh: m, edge: highlight as any } : null); return;
+      const re = ringFaces && edge !== null && pts.length ? [ringFaces.top[edge], ringFaces.top[(edge + 1) % pts.length]] as any : undefined;
+      setTiltDraftPreview(m ? { mesh: m, edge: (highlight as any) ?? re } : null); return;
     }
     const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", sheetZ);
     const m = meshOfDerived(d);
