@@ -103,7 +103,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     if (!p) {
       let snap = snapCache.current.get(d.sheetId);
       if (snap === undefined) { snap = sheetSnapshotOf(app, d.sheetId); snapCache.current.set(d.sheetId, snap); }
-      p = renderPlaneTexture(snap, d.texture.list, d.sourceId, corners, libraryDefinitionsOf(app));
+      p = renderPlaneTexture(d.texture.snapshot ?? snap, d.texture.list, d.texture.objectId ?? d.sourceId, corners, libraryDefinitionsOf(app));
       if (texCache.current.size > 300) texCache.current.clear();
       texCache.current.set(key, p);
     }

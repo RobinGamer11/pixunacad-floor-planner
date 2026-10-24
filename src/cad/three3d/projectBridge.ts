@@ -95,7 +95,7 @@ function deriveOpts(app: CadApp) {
       return derived.map(d => {
         if (d.type === "prism") return { ...d, source: "library", sourceId: li.id, sheetId: sheet.id, z0: d.z0+z, z1:d.z1+z };
         if (d.type === "mesh") return { ...d, source:"library", sourceId:li.id, sheetId:sheet.id, mesh:{...d.mesh, positions:d.mesh.positions.map((v,i)=>i%3===2?v+z:v)} };
-        return { ...d, source: "library", sourceId: li.id, sheetId: sheet.id, z: d.z+z };
+        return { ...d, source: "library", sourceId: li.id, sheetId: sheet.id, z: d.z+z, ...(d.type === "plane" && d.texture ? {texture:{...d.texture,corners:d.outline,snapshot:snap,objectId:d.sourceId}} : {}) };
       });
     },
   } as any;

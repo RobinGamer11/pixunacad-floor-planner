@@ -51,13 +51,15 @@ export default function InfoBoxSettingsPanel({ app, in3D = false }: { app: any; 
   /** Ändert die Box; ein Entwurf wird dabei als Objekt gesetzt. */
   const update = (patch: Record<string, any>, commit = true) => {
     if (box) {
-      Object.assign(box, patch);
-      if (commit) app.commitHistorySnapshot?.();
+      if (box.labelId && !labelOk(box.labelId)) return;
+      if (commit) app.runAction(() => Object.assign(box, patch));
+      else Object.assign(box, patch);
       app.renderer?.render?.();
       force();
       return;
     }
-    const d = ui.draft!;
+    const d = ui.draft;
+    if (!d) return;
     const made = app.runAction(() => {
       const b = app.scene.createInfoBox({ x: d.x, y: d.y, labelId: drawLabel(), authorInitials: initials, kind: base.kind, ...patch });
       ensureObjectCode(scenesOf(app), "infobox", b);

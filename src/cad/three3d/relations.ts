@@ -105,7 +105,7 @@ export function meshOf(d: Derived3D): MeshData | null {
 }
 
 const asMesh = (d: Derived3D, mesh: MeshData): Mesh3D => ({
-  type: "mesh", source: d.source, sourceId: d.sourceId, sheetId: d.sheetId, color: d.color, order: d.order, mesh, closed: true,
+  ...d, type: "mesh", mesh, closed: true,
 });
 
 /** Senkrechte Prismen exakt im Grundriss an einer waagerechten Fläche begrenzen (nur im Wirkbereich). */

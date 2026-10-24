@@ -85,7 +85,7 @@ export interface Mesh3D {
   faces?: { top: { outer: Vec3[]; holes: Vec3[][] }; bottom: { outer: Vec3[]; holes: Vec3[][] } };
 }
 
-export interface Texture3D { list: "documents" | "textBoxes" | "tables" | "libraryInstances" | "infoBoxes"; corners?: Vec2[] }
+export interface Texture3D { list: "documents" | "textBoxes" | "tables" | "libraryInstances" | "infoBoxes"; corners?: Vec2[]; snapshot?: unknown; objectId?: string }
 export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[] };
 
 export interface DeriveOptions {

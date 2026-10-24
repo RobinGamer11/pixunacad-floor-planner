@@ -1,23 +1,25 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ImagePlus, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DEFAULT_MATERIAL, MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
 import { setObjectMaterial } from "@/cad/three3d/projectBridge";
 import type { CadApp } from "@/cad/CadApp";
 import { projectStore, type Project } from "@/lib/projectStore";
+interface MaterialObject { material3D?: Material3D; frameMaterial3D?: Material3D; panelMaterial3D?: Material3D; kind?: string }
 
-export function MaterialPanel({ app, project, selected }: { app: CadApp; project?: Project; selected: {sheetId:string;id:string;obj:any;list:string} | null }) {
+export function MaterialPanel({ app, project, selected }: { app: CadApp; project?: Project; selected: {sheetId:string;id:string;obj:MaterialObject;list:string} | null }) {
   const [error,setError] = useState<string|null>(null);
-  const [slot,setSlot] = useState<"material3D"|"frameMaterial3D"|"panelMaterial3D">("material3D");
+  const [slot,setSlot] = useState<"material3D"|"frameMaterial3D"|"panelMaterial3D">(selected?.list === "doors" ? "frameMaterial3D" : "material3D");
   const [draft,setDraft] = useState<Material3D|null>(null);
   const palette = project?.settings?.materials3D ?? [];
-  const material: Material3D | null = selected?.obj[slot] ?? draft;
+  const material: Material3D | null = selected ? selected.obj[slot] ?? null : draft;
   const image = (m: Material3D) => project?.files?.find(f=>f.id===m.imageFileId)?.dataUrl;
   const savePalette = (m: Material3D) => project && projectStore.setMaterials3D(project.id, [...palette.filter(x=>x.id!==m.id),m]);
   const change = (patch: Partial<Material3D>) => {
     if (!material) return;
     const next = {...material,...patch};
-    if (selected) setObjectMaterial(app,selected.sheetId,selected.id,next,slot); else { setDraft(next); savePalette(next); }
+    if (selected) { if(!setObjectMaterial(app,selected.sheetId,selected.id,next,slot))setError("Ebene gesperrt – Material nicht geändert."); }
+    else if(savePalette(next))setDraft(next);else setError("Material konnte nicht gespeichert werden.");
   };
   const upload = async (file: File | undefined) => {
     if (!file || !project) return;
@@ -28,7 +30,7 @@ export function MaterialPanel({ app, project, selected }: { app: CadApp; project
       const imageFileId = projectStore.addFile(project.id,"files",null,{name:file.name,dataUrl,mimeType:file.type,sizeBytes:file.size});
       if (!imageFileId) throw new Error("Bild konnte nicht gespeichert werden. Speicherplatz und Verbindung prüfen.");
       const m: Material3D = {...DEFAULT_MATERIAL,id:crypto.randomUUID(),name:file.name.replace(/\.[^.]+$/,""),imageFileId};
-      savePalette(m); setDraft(m);
+      if (!savePalette(m)) throw new Error("Material konnte nicht gespeichert werden."); setDraft(m);
       if (selected) setObjectMaterial(app,selected.sheetId,selected.id,m,slot);
     } catch(e) { setError(e instanceof Error?e.message:"Material konnte nicht angelegt werden."); }
   };
@@ -49,6 +51,7 @@ export function MaterialPanel({ app, project, selected }: { app: CadApp; project
 
 function Numeric({label,value,min,max,sliderMax=max,onCommit}:{label:string;value:number;min:number;max:number;sliderMax?:number;onCommit:(v:number)=>void}) {
   const [v,setV]=useState<number|null>(null);
-  const commit=(raw:number)=>{if(Number.isFinite(raw))onCommit(Math.max(min,Math.min(max,raw)));setV(null);};
+  const pending=useRef<number|null>(null);
+  const commit=(raw:number)=>{pending.current=null;if(Number.isFinite(raw)&&raw!==value)onCommit(Math.max(min,Math.min(max,raw)));setV(null);};
   return <label className="block text-xs"><span className="flex items-center justify-between gap-2">{label}<input aria-label={label} type="number" step="any" min={min} max={max} value={v??value} className="cad-settings-input h-8 w-20 px-2" onChange={e=>setV(e.target.valueAsNumber)} onBlur={()=>{if(v!==null)commit(v);}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();}}/></span><input aria-label={`${label} Regler`} className="mt-1 w-full" type="range" min={min} max={sliderMax} step="any" value={v??Math.min(value,sliderMax)} onChange={e=>setV(e.target.valueAsNumber)} onPointerUp={e=>commit(e.currentTarget.valueAsNumber)} onKeyUp={e=>commit(e.currentTarget.valueAsNumber)}/></label>;
 }

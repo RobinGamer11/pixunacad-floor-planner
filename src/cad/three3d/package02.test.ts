@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { deriveScene3D, applyGenericTilt } from "./geometryDerivation";
+import { applyGenericTilt } from "./geometryDerivation";
 import { frameForCardinal, genericVertex, projectionCos, scaleAcrossAxis } from "./tiltGeometry";
 import { deriveInfoBox, infoBoxDimensions } from "./infoBoxGeometry";
 import { deriveOpening } from "./openingGeometry";
 import { DEFAULT_MATERIAL } from "./materials";
-import { copyObjectMeta, attachObjectMeta, restoreObjectMeta, sceneObjectCounts } from "../objectMeta";
-import { findObject, selectInCad, setObjectMaterial, setOpeningState, deriveFromApp, clearCadSelection } from "./projectBridge";
+import { copyObjectMeta, attachObjectMeta } from "../objectMeta";
+import { selectInCad, setObjectMaterial, setOpeningState, deriveFromApp, clearCadSelection } from "./projectBridge";
 import { infoBoxUi } from "@/lib/infoBoxUi";
 import { Scene } from "../Scene";
 import { restoreOneScene } from "../sceneSerde";
@@ -68,7 +68,7 @@ describe("Paket 02",()=>{
     expect(copy.material3D).toEqual(box.material3D);expect(copy.frameMaterial3D?.name).toBe('Rahmen');expect(copy.open3D).toBe(true);expect(copy.size3DM).toBe(1.2);expect(copy.thickness3DM).toBe(0.08);expect(copy.elevationM).toBe(0);expect(copy.bodyHeightM).toBe(1.4);
   });
   it("Materialzuordnung und Öffnen ergeben genau eine Handlung; gesperrte Ebene bleibt unverändert",()=>{
-    const sc={doors:[{...door,labelId:'L'}]};const app=appFor(sc);
+    const sc={doors:[{...door,labelId:'L',open3D:false}]};const app=appFor(sc);
     expect(setObjectMaterial(app,'s','d',{...DEFAULT_MATERIAL,id:'m',name:'Holz'})).toBe(true);expect(app.runAction).toHaveBeenCalledTimes(1);
     expect(setOpeningState(app,'s','d',true)).toBe(true);expect(app.runAction).toHaveBeenCalledTimes(2);expect(sc.doors[0].open3D).toBe(true);
     app.labelManager.isEditable=()=>false;expect(setOpeningState(app,'s','d',false)).toBe(false);expect(app.runAction).toHaveBeenCalledTimes(2);
