@@ -101,7 +101,7 @@ export interface DeriveOptions {
   isLabelVisible?: (labelId: string) => boolean;
   /** Vordergrund-Rang einer Ebene (größer = weiter vorne). */
   labelFrontRank?: (labelId: string) => number;
-  libraryGeometry?: (instance: any) => Derived3D[];
+  libraryGeometry?: (instance: any, sheet: Sheet) => Derived3D[];
 }
 
 const EPS = 1e-6;
@@ -390,7 +390,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
   for (const t of scene.tables || []) if (vis(t)) flat("table", t, boxCorners(t.center, t.widthM, t.heightM, t.rotationRad), "#f6f3ea", "tables");
   for (const li of scene.libraryInstances || []) {
     if (!vis(li)) continue;
-    const actual = opts.libraryGeometry?.(li);
+    const actual = opts.libraryGeometry?.(li, sheet);
     if (actual?.length) { push(li, actual); continue; }
     let fp: Vec2[] | null = opts.libraryCorners?.(li) ?? null;
     if (!fp) {

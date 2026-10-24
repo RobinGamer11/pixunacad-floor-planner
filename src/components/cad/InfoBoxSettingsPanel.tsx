@@ -9,7 +9,6 @@ import { infoBoxUi, initialsOf, useInfoBoxUi } from "@/lib/infoBoxUi";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ensureObjectCode, formatObjectId, setObjectName } from "@/cad/objectMeta";
 import { infoBoxDimensions } from "@/cad/three3d/infoBoxGeometry";
-import { Button } from "@/components/ui/button";
 
 const inputCls = "cad-settings-input w-full h-9 text-[12px] px-3";
 

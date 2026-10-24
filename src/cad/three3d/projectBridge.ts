@@ -81,9 +81,8 @@ function deriveOpts(app: CadApp) {
       const def: any = app.getLibraryDefinition(defId);
       return def?.geometry ? snapshotsBounds(def.geometry) : null;
     },
-    libraryGeometry: (li: any) => {
+    libraryGeometry: (li: any, sheet: any) => {
       const def: any = app.getLibraryDefinition(li.definitionId);
-      const sheet = app.sheetManager.getById(app.activeSheetId);
       if (!def?.geometry?.length || !sheet) return [];
       const snap = snapshotsToSerializedScene(transformSnapshots(def.geometry, li));
       const scene = new Scene();
@@ -92,11 +91,11 @@ function deriveOpts(app: CadApp) {
       const height = Number(li.bodyHeightM) || 0;
       for (const hatch of scene.hatches as any[]) if (!hatch.isPolygon && height > 0) hatch.heightM = height;
       const derived = deriveScene3D(scene, { ...sheet, elevationM: 0 }, {});
-      const z = objectElevationMForLibrary(li);
+      const z = objectElevationMForLibrary(li) + (Number(sheet.elevationM) || 0);
       return derived.map(d => {
-        if (d.type === "prism") return { ...d, source: "library", sourceId: li.id, sheetId: app.activeSheetId, z0: d.z0+z, z1:d.z1+z };
-        if (d.type === "mesh") return { ...d, source:"library", sourceId:li.id, sheetId:app.activeSheetId, mesh:{...d.mesh, positions:d.mesh.positions.map((v,i)=>i%3===2?v+z:v)} };
-        return { ...d, source: "library", sourceId: li.id, sheetId: app.activeSheetId, z: d.z+z, ...(d.type === "plane" ? {texture:{list:"libraryInstances",corners:instanceCornersWorld(def.geometry,li)}} : {}) };
+        if (d.type === "prism") return { ...d, source: "library", sourceId: li.id, sheetId: sheet.id, z0: d.z0+z, z1:d.z1+z };
+        if (d.type === "mesh") return { ...d, source:"library", sourceId:li.id, sheetId:sheet.id, mesh:{...d.mesh, positions:d.mesh.positions.map((v,i)=>i%3===2?v+z:v)} };
+        return { ...d, source: "library", sourceId: li.id, sheetId: sheet.id, z: d.z+z };
       });
     },
   } as any;
@@ -183,7 +182,7 @@ export function objectLabel(app: CadApp, sheetId: string, id: string): string {
   return `${name}${hit?.obj?.objCode && hit.obj.objName ? ` (${hit.obj.objCode})` : ""} · ${sheet?.name ?? "Blatt"}`;
 }
 
-const KIND: Record<string, string> = { walls: "wall", hatches: "hatch", stairs: "stair", documents: "document", textBoxes: "textbox", tables: "table", libraryInstances: "library", segments: "segment", dimensions: "dimension", freeStrokes: "freeStroke" };
+const KIND: Record<string, string> = { walls: "wall", hatches: "hatch", stairs: "stair", documents: "document", textBoxes: "textbox", tables: "table", libraryInstances: "library", segments: "segment", dimensions: "dimension", freeStrokes: "freeStroke", doors:"door",infoBoxes:"infobox" };
 
 /** Objektangaben für das Render-Dossier. */
 export function dossierInfo(app: CadApp, key: string): DossierInput | null {

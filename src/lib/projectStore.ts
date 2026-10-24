@@ -922,7 +922,7 @@ export const projectStore = {
     return commitProjectUiProjects(projects);
   },
   setMaterials3D: (projectId: string, materials3D: import("@/cad/three3d/materials").Material3D[]) => {
-    return commitProjectUiProjects(state.projects.map(p => p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), materials3D } } : p));
+    return commitDocumentProjects(state.projects.map(p => p.id === projectId ? { ...p, settings: { ...(p.settings ?? {}), materials3D } } : p));
   },
 
   // ---------- Dokumentenablage ----------
