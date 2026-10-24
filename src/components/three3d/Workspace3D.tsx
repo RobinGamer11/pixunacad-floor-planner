@@ -38,6 +38,12 @@ import { DEFAULT_PRESETS, PRESET_OPTIONS, type RenderPresets } from "@/cad/three
 import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Settings } from "lucide-react";
 import { Joystick3D } from "./Joystick3D";
 import { loadSens, saveSens, speedFactor, stickFactor, type Sens3D } from "./sensitivity";
+import { MaterialPanel } from "./MaterialPanel";
+import InfoBoxSettingsPanel from "@/components/cad/InfoBoxSettingsPanel";
+import { infoBoxUi } from "@/lib/infoBoxUi";
+import { setObjectMaterial, setOpeningState } from "@/cad/three3d/projectBridge";
+import { Button } from "@/components/ui/button";
+import type { Material3D } from "@/cad/three3d/materials";
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
 
@@ -84,19 +90,20 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   /** Inhalt eines Objekts kurz zusammengefasst (lange Bilddaten nur angedeutet). */
   const contentKey = (o: any) => JSON.stringify(o, (_k, v) => (typeof v === "string" && v.length > 400 ? `${v.length}:${v.slice(-48)}` : v));
   const texturedKey = (d: Derived3D) => {
-    if (d.type !== "plane" || !d.texture) return "";
+    if (!d.texture) return "";
     const o = (app as any).scenesById?.get(d.sheetId)?.[d.texture.list]?.find((x: any) => x?.id === d.sourceId)
       ?? (d.sheetId === app.activeSheetId ? (app as any).scene?.[d.texture.list]?.find((x: any) => x?.id === d.sourceId) : null);
     return o ? contentKey(o) : "";
   };
-  const textureFor = useCallback((d: Plane3D) => {
+  const textureFor = useCallback((d: Derived3D) => {
     if (!d.texture) return Promise.resolve(null);
-    const key = `${d.sheetId}::${d.sourceId}::${JSON.stringify(d.outline)}::${texturedKey(d)}`;
+    const corners = d.texture.corners ?? (d.type === "plane" ? d.outline : []);
+    const key = `${d.sheetId}::${d.sourceId}::${JSON.stringify(corners)}::${texturedKey(d)}`;
     let p = texCache.current.get(key);
     if (!p) {
       let snap = snapCache.current.get(d.sheetId);
       if (snap === undefined) { snap = sheetSnapshotOf(app, d.sheetId); snapCache.current.set(d.sheetId, snap); }
-      p = renderPlaneTexture(snap, d.texture.list, d.sourceId, d.outline, libraryDefinitionsOf(app));
+      p = renderPlaneTexture(snap, d.texture.list, d.sourceId, corners, libraryDefinitionsOf(app));
       if (texCache.current.size > 300) texCache.current.clear();
       texCache.current.set(key, p);
     }
@@ -109,7 +116,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     const read = () => {
       const r = deriveFromApp(app);
       const sel: any = app.selection;
-      const id = sel ? ID_FIELDS.map(f => sel[f]).find(Boolean) : null;
+      const id = infoBoxUi.get().selectedId ?? (sel ? ID_FIELDS.map(f => sel[f]).find(Boolean) : null);
       const sk = id ? `${app.activeSheetId}::${id}` : null;
       const sig = JSON.stringify([r.items, app.sheetManager.toJSON(), app.activeSheetId, sk, r.issues, r.items.map(texturedKey)]);
       if (sig === lastSig.current) return;
@@ -162,6 +169,13 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const sel = selKey ? { sheetId: selKey.split("::")[0], id: selKey.split("::")[1] } : null;
   const selObj = sel ? findObject(app, sel.sheetId, sel.id)?.obj : null;
   const rels: Relation3D[] = selObj?.relations3D || [];
+  const selectedHit = sel ? findObject(app, sel.sheetId,sel.id) : null;
+  const materialImage = useCallback((m: Material3D) => project?.files?.find(f=>f.id===m.imageFileId)?.dataUrl,[project?.files]);
+  const exportGLB = async () => {
+    setBusy(true);setDossierMsg(null);
+    try { const bytes=await viewer.current?.exportGLB();if(!bytes)throw new Error();const d=await import("@/cad/three3d/dossier");d.downloadBytes(new Uint8Array(bytes),`${project?.name||'Projekt'}.glb`,'model/gltf-binary'); }
+    catch {setDossierMsg('GLB konnte nicht erstellt werden.');}finally{setBusy(false);}
+  };
 
   useEffect(() => {
     if (!picking) return;
@@ -185,7 +199,9 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} onEmpty={() => { if (!picking) clearCadSelection(app); }} ghost={ghost} textureFor={textureFor} />
+          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} onEmpty={() => { if (!picking) clearCadSelection(app); }} ghost={ghost} textureFor={textureFor} materialImage={materialImage}
+            onMaterialDrop={(sheetId,id,materialId)=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);}}
+            onToggleOpening={(sheetId,id)=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);}} />
         </Suspense>
         {picking && (
           <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs font-medium shadow-lg" style={REL.active}>
@@ -226,6 +242,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
             <button className={`${btn} flex-1 flex items-center justify-center gap-1.5`} disabled={busy} onClick={() => makeDossier("json")}><FileJson size={13} /> JSON</button>
           </div>
           {dossierMsg && <div className="text-xs text-muted-foreground">{dossierMsg}</div>}
+          <Button variant="outline" size="sm" className="w-full" disabled={busy} onClick={()=>void exportGLB()}><FileDown size={13}/> 3D-Modell (.glb)</Button>
         </section>
 </div>}
         </div>
@@ -338,7 +355,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
 
       <aside className="w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
 
-        {!sel ? <p className="text-xs text-muted-foreground">Körper in der 3D-Ansicht anklicken.</p> : (
+        {!sel ? null : selectedHit?.list === "infoBoxes" ? <InfoBoxSettingsPanel app={app} in3D /> : (
           <Object3DSettings app={app} defaultOpen onEditInCad={onEditInCad} relations={
             <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
@@ -386,6 +403,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
             </section>
           } />
         )}
+        <MaterialPanel key={selKey} app={app} project={project} selected={sel && selectedHit ? {...sel,...selectedHit}:null}/>
       </aside>
     </div>
   );
