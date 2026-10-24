@@ -9,11 +9,12 @@ import { selectInCad, setObjectMaterial, setOpeningState, deriveFromApp, clearCa
 import { infoBoxUi } from "@/lib/infoBoxUi";
 import { Scene } from "../Scene";
 import { restoreOneScene } from "../sceneSerde";
+import type { Door, Wall } from "../Scene";
 
 const square=[{x:0,y:0},{x:4,y:0},{x:4,y:2},{x:0,y:2}];
 const sheet={id:"s",name:"EG",elevationM:3} as any;
-const wall={id:"w",corners:[{x:0,y:0},{x:5,y:0}],thicknessM:0.3,heightM:3,referenceSide:"center",elevationM:0.2};
-const door={id:"d",kind:"door",wallId:"w",posM:2,widthM:1,heightM:2.1,breakHeightM:0,side:"inner",hand:"left",edge:"center",jambEnabled:true,jambLenM:0.06,jambColor:"#eeeeee",color:"#123456",sashEnabled:true};
+const wall={id:"w",corners:[{x:0,y:0},{x:5,y:0}],thicknessM:0.3,heightM:3,referenceSide:"center",elevationM:0.2} as unknown as Wall;
+const door={id:"d",kind:"door",wallId:"w",posM:2,widthM:1,heightM:2.1,breakHeightM:0,side:"inner",hand:"left",edge:"center",jambEnabled:true,jambLenM:0.06,jambColor:"#eeeeee",color:"#123456",sashEnabled:true} as Door;
 function appFor(scene:any){return {scene,activeSheetId:"s",scenesById:new Map([["s",scene]]),sheetManager:{list:()=>[sheet],getById:()=>sheet},labelManager:{isEditable:()=>true,isVisible:()=>true,list:()=>[]},getLibraryDefinition:()=>null,runAction:vi.fn((fn:()=>unknown)=>fn()),setSelection:vi.fn(),clearSelection:vi.fn(),setActiveSheetId:vi.fn()} as any;}
 
 describe("Paket 02",()=>{

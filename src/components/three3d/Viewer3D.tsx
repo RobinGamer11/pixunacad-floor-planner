@@ -384,8 +384,6 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       for(const child of [...copy.children]) {
         if(!(child instanceof THREE.Mesh)){copy.remove(child);continue;}
         child.material=(child.material as THREE.MeshStandardMaterial).clone();
-        const original=g.children.find(o=>o.uuid===child.uuid);
-        void original;
         const material=child.material as THREE.MeshStandardMaterial;
         const data=items.find(d=>d.sheetId===child.userData.sheetId&&d.sourceId===child.userData.sourceId&&d.part===child.userData.part);
         material.color.set(data?.material&&material.map ? "#ffffff" : data?.color??"#ffffff");
