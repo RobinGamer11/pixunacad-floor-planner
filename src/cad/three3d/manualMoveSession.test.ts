@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { CadApp } from "../CadApp";
-import { Scene } from "../Scene";
+import { Scene, InfoBox } from "../Scene";
 import { attachObjectMeta, copyObjectMeta, restoreObjectMeta, sceneObjectCounts } from "../objectMeta";
 import { beginManualMove, commitManualMove, previewManualMove } from "./manualMoveSession";
 import { deriveFromApp } from "./projectBridge";
 import { enter3DEditor } from "./manualMoveState";
-import { ZERO_MOVE, moveMatrix, posePiece } from "./spatialTransform";
+import { ZERO_MOVE, moveMatrix, posePiece, normalizedPose } from "./spatialTransform";
+import { pieceMesh } from "./geometryDerivation";
 import { Vector3 } from "three";
 
 function makeApp() {
@@ -26,6 +27,27 @@ function makeApp() {
 }
 function hatch(id:string,x=0){return {id,labelId:"l",points:[{x,y:0},{x:x+2,y:0},{x:x+2,y:1},{x,y:1}],holes:[],heightM:1,elevationM:0};}
 describe("Manuell bewegen: echte CAD-Objekte und gemeinsame Historie",()=>{
+  it("Infobox erhält ihre schwebende Höhe und exakt dieselbe räumliche Rotation wie andere Körper",()=>{
+    const {app,scenes,init}=makeApp();scenes.get("a")?.infoBoxes.push(new InfoBox({id:"box",x:1,y:2}));init();
+    const original=deriveFromApp(app).items,s=beginManualMove(app,[{sheetId:"a",id:"box"}]);s.delta={...ZERO_MOVE,x:2,rz:90};
+    const expected=original.map(d=>pieceMesh(posePiece(d,moveMatrix(s.delta,s.pivot))));
+    commitManualMove(app,s);const actual=deriveFromApp(app).items.map(pieceMesh);
+    for(let i=0;i<expected.length;i++){expect(actual[i]?.positions.length).toBe(expected[i]?.positions.length);expected[i]?.positions.forEach((v,j)=>expect(actual[i]?.positions[j]).toBeCloseTo(v,7));}
+    expect((scenes.get("a")?.infoBoxes[0] as any).elevationM).toBe(.15);
+  });
+  it("Wandvorschau verändert den bestehenden Topologiegraphen nicht",()=>{
+    const {app,scenes,init}=makeApp();const sc=scenes.get("a");if(!sc)throw new Error();
+    sc.walls.push({id:"w",corners:[{x:0,y:0},{x:4,y:0}],heightM:3,thicknessM:.2} as any);init();
+    const graph=sc.getWallTopology(),before=JSON.stringify(graph);const s=beginManualMove(app,[{sheetId:"a",id:"w"}]);s.delta={...ZERO_MOVE,x:8};previewManualMove(app,s);
+    expect(sc.getWallTopology()).toBe(graph);expect(JSON.stringify(graph)).toBe(before);
+  });
+  it("gesperrte abhängige Öffnungen verhindern eine Wandbewegung",()=>{
+    const {app,scenes,init}=makeApp();const sc=scenes.get("a");if(!sc)throw new Error();sc.walls.push({id:"w",labelId:"wall",corners:[{x:0,y:0},{x:4,y:0}],heightM:3,thicknessM:.2} as any);sc.doors.push({id:"d",wallId:"w",labelId:"locked",posM:2,widthM:1,heightM:2} as any);app.labelManager.isEditable=(id:string)=>id!=="locked";init();
+    expect(()=>beginManualMove(app,[{sheetId:"a",id:"w"}])).toThrow("gesperrt");expect(app._history).toHaveLength(1);
+  });
+  it("räumliche Orientierung akzeptiert keine Scherung",()=>{
+    const matrix=moveMatrix(ZERO_MOVE,{x:0,y:0,z:0}).toArray();matrix[4]=.000001;expect(normalizedPose(matrix)).toBeUndefined();
+  });
   it("Vorschau mutiert weder Punkte noch Verlauf; Loslassen benötigt keinen Commit",()=>{
     const {app,scenes,init}=makeApp();scenes.get("a")?.hatches.push(hatch("h") as any);init();const before=app._serializeScene();
     const s=beginManualMove(app,[{sheetId:"a",id:"h"}]);s.delta={...ZERO_MOVE,x:3,z:2};

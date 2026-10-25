@@ -31,6 +31,8 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 Änderungen, Dateien, Tests, Build, Push-Status, Commit; Ende mit PowerShell-Befehl.
 
 ## Architekturregeln
+- Manual 3D edits share transient sheet-qualified selection and draft routing through `manualMoveState`; source commits use one `runAction`, while previews use isolated scene copies to protect persistence and wall topology.
+- Rigid spatial orientation is `pose3D` in CAD coordinates, relative to sheet elevation; derive it after existing tilt and before relationships, and serialize it through object metadata so repeated rotations, copies and exports share one model.
 - 3D materials are object metadata with project-file image references; export the derived scene as standard glTF/GLB so other renderers receive PBR values and textures without a separate CAD model.
 - Keep the existing Three.js viewer engine for incremental 3D work; replacing it would risk the shared CAD selection and navigation behavior.
 - Unterordner haben eigene `AGENTS.md` – vor Änderungen dort lesen (z. B. `src/cad/AGENTS.md`).
