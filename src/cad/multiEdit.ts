@@ -15,7 +15,7 @@ export const GEOMETRY_KEYS = new Set([
   "rotationRad", "p1", "p2", "placementPoint", "bulge", "bulges", "holeBulges",
   "labelId", "text", "html", "content", "runs", "cells", "rows", "cols",
   "colWidths", "rowHeights", "formulas", "path", "corners", "src", "dataUrl",
-  "mask", "pixels", "stepDistancesM", "offset", "offsetM",
+  "mask", "pixels", "stepDistancesM", "offset", "offsetM", "pose3D", "tilt3D",
 ]);
 
 export function mirrorProxy<T extends object>(primary: T, siblings: T[]): T {

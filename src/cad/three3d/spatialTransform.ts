@@ -7,6 +7,11 @@ export type MatrixData = number[];
 export type MoveDelta = { x: number; y: number; z: number; rx: number; ry: number; rz: number };
 export const ZERO_MOVE: MoveDelta = { x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0 };
 export const CAD_TO_THREE = new Matrix4().set(1,0,0,0, 0,0,1,0, 0,1,0,0, 0,0,0,1);
+/** Moving a copied source also moves its orientation frame; no shared mutable matrix. */
+export function translatedPose(pose: unknown, dx:number, dy:number): MatrixData|undefined {
+  const data=normalizedPose(pose);if(!data)return;
+  return new Matrix4().makeTranslation(dx,dy,0).multiply(new Matrix4().fromArray(data)).multiply(new Matrix4().makeTranslation(-dx,-dy,0)).toArray();
+}
 export function normalizedPose(raw: unknown): MatrixData | undefined {
   if (!Array.isArray(raw) || raw.length !== 16 || !raw.every(v => typeof v === "number" && Number.isFinite(v))) return;
   const m = new Matrix4().fromArray(raw), p = new Vector3(), q = new Quaternion(), s = new Vector3();
