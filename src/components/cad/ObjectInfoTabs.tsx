@@ -7,6 +7,7 @@ import {
 import { iterSceneObjects } from "@/cad/objectMeta";
 import { OBJECT_TYPE_LABELS, objectTypeKey } from "@/cad/selectionFilter";
 import { Button } from "@/components/ui/button";
+import { state3D } from "@/cad/three3d/manualMoveState";
 
 const HAIRLINE = "hsl(var(--hairline))";
 
@@ -48,6 +49,13 @@ const KIND_TO_KEY: Record<string, string[]> = {
 
 /** Alle ausgewählten Objekte (Mehrfachauswahl + Einzelauswahl), ohne Duplikate. */
 export function resolveSelectedObjects(app: any): { kind: string; obj: any }[] {
+  const three=app&&state3D(app);
+  if(three?.cancelDraft&&three.refs.length){
+    const out:{kind:string;obj:any}[]=[];
+    const kinds:Record<string,string>={segments:"segment",walls:"wall",hatches:"hatch",freeStrokes:"freeStroke",dimensions:"dimension",textBoxes:"textbox",tables:"table",documents:"document",libraryInstances:"library",stairs:"stair",doors:"door",infoBoxes:"infobox"};
+    for(const ref of three.refs){const scene=app.resolveCollabScene(ref.sheetId);for(const [key,kind]of Object.entries(kinds)){const obj=scene?.[key]?.find((o:any)=>o.id===ref.id);if(obj){out.push({kind,obj});break;}}}
+    return out;
+  }
   const sc = app?.scene;
   if (!sc) return [];
   const out: { kind: string; obj: any }[] = [];
