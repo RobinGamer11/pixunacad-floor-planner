@@ -1,5 +1,13 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Option B – Manuell bewegen und Vercel, 25.10.2026
+- [ ] Gemeinsame flüchtige 3D-Auswahl und Transformationssitzung mit Weltachsen, Zahlenfeldern, Übernehmen/Verwerfen
+- [ ] Originalobjekte, räumliche Orientierung, Wandöffnungen, Serialisierung und gemeinsames Undo/Redo anbinden
+- [ ] Gizmo und Mehrfachauswahl für Maus/Touch prüfen; automatische Regressionstests
+- [x] npm-Lockdatei regulär mit unveränderten Versionsvorgaben synchronisieren
+- [ ] Sauberes npm ci prüfen; Produktionsbuild übernimmt die automatische Lovable-Prüfung (manueller Build nicht zulässig)
+- [ ] GitHub-main-Übertragung verifizieren (Commit/Push wird von Lovable verwaltet)
+
 ## Infobox, Pipette, Fangpunkte – 14.10.2026
 - [x] Infobox-Einstellungen schließen bei Werkzeug-/Auswahlwechsel automatisch, ohne X
 - [x] Ausgewählte Infoboxen leuchten blau; Augen im Kopf entfernt
