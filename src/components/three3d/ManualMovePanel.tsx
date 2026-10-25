@@ -25,7 +25,7 @@ export function ManualMovePanel({enabled,count,session,mode,error,onToggle,onMod
     {enabled&&<>
       <div className="text-muted-foreground">{count?`${count} ${count===1?"Objekt":"Objekte"} ausgewählt`:"Bitte ein Objekt auswählen."}</div>
       {session&&<>
-        <div className="flex gap-3 text-[10px] text-muted-foreground"><span className="text-destructive">X</span><span className="text-primary">Z · Höhe</span><span className="text-ring">Y</span></div>
+        <div className="flex gap-3 text-[10px] text-muted-foreground"><span>X · Grundriss</span><span>Y · Grundriss</span><span>Z · Höhe</span></div>
         <div className="flex gap-1"><Button size="sm" variant={mode==="translate"?"default":"outline"} onClick={()=>onMode("translate")}><Move3D size={14}/>Verschieben</Button><Button size="sm" variant={mode==="rotate"?"default":"outline"} onClick={()=>onMode("rotate")}><Rotate3D size={14}/>Drehen</Button></div>
         <div className="grid grid-cols-3 gap-2">
           {(["x","y","z","rx","ry","rz"] as const).map(k=><label key={k} className="min-w-0 space-y-1"><span className="text-muted-foreground">Δ{k.toUpperCase()} ({k.startsWith("r")?"°":"m"})</span><input className="h-9 w-full rounded-md border border-input bg-background px-2 tabular-nums" aria-label={`Bewegung ${k}`} inputMode="decimal" value={draft[k]??String(Number(session.delta[k].toFixed(3))).replace(".",",")} onChange={e=>{

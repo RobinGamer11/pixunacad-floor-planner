@@ -5,7 +5,8 @@ import { attachObjectMeta, copyObjectMeta, restoreObjectMeta, sceneObjectCounts 
 import { beginManualMove, commitManualMove, previewManualMove } from "./manualMoveSession";
 import { deriveFromApp } from "./projectBridge";
 import { enter3DEditor } from "./manualMoveState";
-import { ZERO_MOVE, moveMatrix, posePiece, normalizedPose } from "./spatialTransform";
+import { ZERO_MOVE, moveMatrix, posePiece, normalizedPose, translatedPose } from "./spatialTransform";
+import { commitClipboardAt } from "../ClipboardManager";
 import { pieceMesh } from "./geometryDerivation";
 import { Vector3 } from "three";
 
@@ -47,6 +48,14 @@ describe("Manuell bewegen: echte CAD-Objekte und gemeinsame Historie",()=>{
   });
   it("räumliche Orientierung akzeptiert keine Scherung",()=>{
     const matrix=moveMatrix(ZERO_MOVE,{x:0,y:0,z:0}).toArray();matrix[4]=.000001;expect(normalizedPose(matrix)).toBeUndefined();
+  });
+  it("Kopieren/Einfügen verschiebt räumlichen Bezug und Neigungsachse mit den CAD-Punkten",()=>{
+    const {app,scenes}=makeApp();const sc=scenes.get("a");if(!sc)throw new Error();
+    const pose=moveMatrix({...ZERO_MOVE,rx:30},{x:1,y:0,z:1}).toArray();
+    const item:any={...hatch("old"),kind:"hatch",pose3D:pose,tilt3D:{edgeIndex:0,a:{x:0,y:0},b:{x:2,y:0},count:4,angleDeg:20}};
+    const created=commitClipboardAt(app,{anchor:{x:0,y:0},items:[item]},{x:5,y:3});
+    expect(created).toHaveLength(1);const copy:any=sc.hatches.find(h=>h.id===created[0].id);
+    expect(copy.points[0]).toEqual({x:5,y:3});expect(copy.tilt3D.a).toEqual({x:5,y:3});expect(copy.pose3D).toEqual(translatedPose(pose,5,3));expect(item.tilt3D.a).toEqual({x:0,y:0});
   });
   it("Vorschau mutiert weder Punkte noch Verlauf; Loslassen benötigt keinen Commit",()=>{
     const {app,scenes,init}=makeApp();scenes.get("a")?.hatches.push(hatch("h") as any);init();const before=app._serializeScene();
