@@ -23,7 +23,6 @@ import { deriveHatch } from "@/cad/three3d/geometryDerivation";
 import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 import { projectionCos } from "@/cad/three3d/tiltGeometry";
 import { setOpeningState } from "@/cad/three3d/projectBridge";
-import { state3D } from "@/cad/three3d/manualMoveState";
 
 const C = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
@@ -173,7 +172,7 @@ export const Object3DSettings: React.FC<{
       )}
       {!allEditable && <Note>Ebene gesperrt – nur Anzeige.</Note>}
 
-      <div className={manualActive?"pointer-events-none opacity-50":undefined} inert={manualActive?"":undefined}>
+      <fieldset disabled={manualActive} className={manualActive?"pointer-events-none opacity-50":undefined}>
       <Section title="Höhenlage und Körperhöhe">
         <div className="grid grid-cols-1 gap-2">
           {elevItems.length > 0 && (
@@ -201,7 +200,7 @@ export const Object3DSettings: React.FC<{
         {!multi && ["document", "textbox", "table"].includes(kind) && <Note>Waagerechte Platte auf der Höhenlage; Breite und Höhe bleiben 2D-Maße.</Note>}
         {!multi && ["segment", "dimension", "freeStroke"].includes(kind) && <Note>Flache Darstellung auf der Höhenlage, keine Extrusion.</Note>}
       </Section>
-      </div>
+      </fieldset>
 
       {manualMove}
       {!manualActive && !multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
