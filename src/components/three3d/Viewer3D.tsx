@@ -8,6 +8,7 @@ import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
 import * as THREE from "three";
 import type { Derived3D } from "@/cad/three3d/geometryDerivation";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
+import { disposeTransformControls } from "./disposeTransformControls";
 import { CAD_TO_THREE, moveMatrix, type MoveDelta } from "@/cad/three3d/spatialTransform";
 import type { ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
@@ -240,7 +241,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens, controls, pivot };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
-      window.removeEventListener("blur",cancelPointer);controls.dispose();scene.remove(helper);scene.remove(pivot);
+      window.removeEventListener("blur",cancelPointer);disposeTransformControls(controls);scene.remove(pivot);
       window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true); window.removeEventListener("blur", clearHeld);
       disposeGroup(group); grid.geometry.dispose(); (grid.material as THREE.Material).dispose?.();
       renderer.dispose(); renderer.forceContextLoss?.(); el.remove();
