@@ -1,6 +1,6 @@
 /** Transient editor state, shared by header, keyboard and tablet history commands. */
 export type ObjectRef3D = { sheetId: string; id: string };
-type Editor3DState = { refs: ObjectRef3D[]; cancelDraft?: () => boolean; onHistory?: () => void };
+type Editor3DState = { refs: ObjectRef3D[]; cancelDraft?: () => boolean; onHistory?: () => void; draftActive?: boolean };
 const states = new WeakMap<object, Editor3DState>();
 export function state3D(app: object): Editor3DState { let s=states.get(app);if(!s){s={refs:[]};states.set(app,s);}return s; }
 export function enter3DEditor(app: object, cancelDraft: () => boolean, onHistory: () => void) { const s=state3D(app);s.cancelDraft=cancelDraft;s.onHistory=onHistory;return()=>{states.delete(app);}; }

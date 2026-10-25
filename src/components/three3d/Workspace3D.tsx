@@ -93,12 +93,25 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [moveMode,setMoveMode]=useState<"translate"|"rotate">("translate");
   const [previewItems,setPreviewItems]=useState<Derived3D[]|null>(null);
   const [pendingChange,setPendingChange]=useState<(()=>void)|null>(null);
-  const replaceSession=(s:ManualMoveSession|null)=>{sessionRef.current=s;setManualSession(s);if(!s){setPreviewItems(null);setMoveError(null);}};
-  const cancelMove=()=>{replaceSession(null);setPendingChange(null);};
-  const applyMove=()=>{const s=sessionRef.current;if(!s)return;try{commitManualMove(app,s);replaceSession(null);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);next?.();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
+  const replaceSession=(s:ManualMoveSession|null)=>{sessionRef.current=s;state3D(app).draftActive=!!s;setManualSession(s);if(!s){setPreviewItems(null);setMoveError(null);}};
+  const cancelMove=()=>{replaceSession(null);setManualOn(false);setPendingChange(null);};
+  const applyMove=()=>{const s=sessionRef.current;if(!s)return;try{commitManualMove(app,s);replaceSession(null);setManualOn(false);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);next?.();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
   const guardChange=(next:()=>void)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){setPendingChange(()=>next);return;}replaceSession(null);next();};
   const updateDelta=(delta:MoveDelta)=>{const s=sessionRef.current;if(!s)return;const next={...s,delta};replaceSession(next);try{setPreviewItems(previewManualMove(app,next));setMoveError(null);}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung nicht möglich.");}};
   useEffect(()=>enter3DEditor(app,()=>{if(!sessionRef.current)return false;replaceSession(null);setPendingChange(null);return true;},()=>setTick(t=>t+1)),[app]);
+  useEffect(()=>{
+    const beforeLeave=(e:BeforeUnloadEvent)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){e.preventDefault();e.returnValue="";}};
+    const navigation=(e:MouseEvent)=>{
+      if(!sessionRef.current||!changedMove(sessionRef.current.delta))return;
+      const target=e.target instanceof Element?e.target.closest("button,a"):null;
+      if(!target||!target.closest(".workspace-header"))return;
+      const label=target.getAttribute("title")??target.textContent??"";
+      if(/Rückgängig|Wiederholen|Undo|Redo/i.test(label))return;
+      e.preventDefault();e.stopImmediatePropagation();guardChange(()=>{(target as HTMLElement).click();});
+    };
+    window.addEventListener("beforeunload",beforeLeave);document.addEventListener("click",navigation,true);
+    return()=>{window.removeEventListener("beforeunload",beforeLeave);document.removeEventListener("click",navigation,true);};
+  });
   useEffect(()=>{
     const key=(e:KeyboardEvent)=>{
       const typing=e.target instanceof HTMLElement&&(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
@@ -149,7 +162,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
       const id = infoBoxUi.get().selectedId ?? (sel ? ID_FIELDS.map(f => sel[f]).find(Boolean) : null);
       const state=state3D(app);
       state.refs=state.refs.filter(x=>r.items.some(d=>d.sheetId===x.sheetId&&d.sourceId===x.id)&&editableRef3D(app,x));
-      if(!state.refs.length&&id)state.refs=[{sheetId:app.activeSheetId,id}];
+      if(!state.refs.length&&id&&editableRef3D(app,{sheetId:app.activeSheetId,id}))state.refs=[{sheetId:app.activeSheetId,id}];
+      if(sessionRef.current&&app.contentRevision!==sessionRef.current.revision){replaceSession(null);setManualOn(false);}
       const sk=state.refs[0]?refKey3D(state.refs[0]):null;
       const sig = JSON.stringify([r.items, app.sheetManager.toJSON(), app.activeSheetId, sk, state.refs, r.issues, r.items.map(texturedKey)]);
       if (sig === lastSig.current) return;
@@ -245,8 +259,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
           <Viewer3D ref={viewer} items={previewItems??items} selectedKey={selKey} selectedKeys={refs3D.map(refKey3D)} manual={manualSession} transformMode={moveMode} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
-            onMaterialDrop={(sheetId,id,materialId)=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);}}
-            onToggleOpening={(sheetId,id)=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);}} />
+            onMaterialDrop={(sheetId,id,materialId)=>guardChange(()=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);})}
+            onToggleOpening={(sheetId,id)=>guardChange(()=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);})} />
         </Suspense>
         <div className="absolute left-3 top-14 z-10"><Button size="sm" variant={multiSelect?"default":"outline"} aria-pressed={multiSelect} onClick={()=>setMultiSelect(v=>!v)}><CopyCheck size={14}/>Mehrfachauswahl</Button></div>
         {pendingChange&&<div role="dialog" aria-label="Unbestätigte Bewegung" className="absolute left-1/2 top-1/2 z-30 w-64 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-4 shadow-lg space-y-3 text-sm"><p>Bewegung übernehmen oder verwerfen?</p><div className="flex gap-2"><Button size="sm" disabled={!!moveError} onClick={applyMove}>Übernehmen</Button><Button size="sm" variant="outline" onClick={()=>{const next=pendingChange;cancelMove();next();}}>Verwerfen</Button></div></div>}
