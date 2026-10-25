@@ -123,7 +123,8 @@ export const Object3DSettings: React.FC<{
   onEditInCad?: () => void;
   /** Nur im 3D-Bereich: Körperbeziehungen als vierte Karte. */
   relations?: React.ReactNode;
-}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, relations }) => {
+  manualMove?: React.ReactNode; manualActive?: boolean;
+}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, relations, manualMove, manualActive }) => {
   const [open, setOpen] = useState(defaultOpen);
   const [, force] = useState(0);
   const [items, setItems] = useState<{ kind: string; obj: any }[]>([]);
@@ -199,8 +200,9 @@ export const Object3DSettings: React.FC<{
         {!multi && ["segment", "dimension", "freeStroke"].includes(kind) && <Note>Flache Darstellung auf der Höhenlage, keine Extrusion.</Note>}
       </Section>
 
-      {!multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
-      {!multi && !(kind === "hatch" && !isPolygon) && kind !== "door" && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} generic />}
+      {manualMove}
+      {!manualActive && !multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
+      {!manualActive && !multi && !(kind === "hatch" && !isPolygon) && kind !== "door" && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} generic />}
       {relations}
     </div>
   );
