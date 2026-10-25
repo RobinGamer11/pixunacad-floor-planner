@@ -85,6 +85,7 @@ export function buildDossierData(projectName: string, items: Derived3D[], info: 
     if (!meta) continue;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, z0 = Infinity, z1 = -Infinity;
     for (const d of list) {
+      if(d.spatialPoints){for(const p of d.spatialPoints){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);z0=Math.min(z0,p.z);z1=Math.max(z1,p.z);}continue;}
       if (d.type === "mesh") {
         // Tatsächlich geneigte/begrenzte Geometrie.
         const b = meshBounds(d.mesh);

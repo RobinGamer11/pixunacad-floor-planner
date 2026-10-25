@@ -13,7 +13,7 @@ export interface ManualMovePanelProps {
 }
 export function ManualMovePanel({enabled,count,session,mode,error,onToggle,onMode,onDelta,onApply,onCancel}:ManualMovePanelProps) {
   const [draft,setDraft]=useState<Partial<Record<keyof MoveDelta,string>>>({});
-  useEffect(()=>setDraft({}),[session?.delta]);
+  useEffect(()=>setDraft({}),[session?.baseline]);
   const invalid=Object.values(draft).some(v=>v!==undefined&&parseNum(v)===null);
   return <section className="space-y-2 border-t border-border pt-3 text-xs">
     <div className="flex items-center justify-between gap-2"><span className="font-medium">Manuell bewegen</span><Switch aria-label="Manuell bewegen" checked={enabled} onCheckedChange={onToggle}/></div>
