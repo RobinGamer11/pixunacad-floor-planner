@@ -7,6 +7,9 @@
 import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
 import * as THREE from "three";
 import type { Derived3D } from "@/cad/three3d/geometryDerivation";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
+import { CAD_TO_THREE, moveMatrix, type MoveDelta } from "@/cad/three3d/spatialTransform";
+import type { ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
 
 export interface CameraState { tx: number; ty: number; tz: number; r: number; theta: number; phi: number }
@@ -28,7 +31,11 @@ export interface Viewer3DHandle {
 interface Props {
   items: Derived3D[];
   selectedKey: string | null;
-  onPick: (sheetId: string, id: string) => void;
+  selectedKeys?: string[];
+  manual?: ManualMoveSession | null;
+  transformMode?: "translate"|"rotate";
+  onTransform?: (delta: MoveDelta) => void;
+  onPick: (sheetId: string, id: string, additive?: boolean) => void;
   /** Klick ins Leere (kein Körper getroffen). */
   onEmpty?: () => void;
   /** Flüchtige Neigungsvorschau (transparent grau, Bezugskante beige). */
@@ -48,7 +55,7 @@ function shapeOf(outer: { x: number; y: number }[], holes: { x: number; y: numbe
   return s;
 }
 
-const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, onPick, onEmpty, textureFor, ghost, materialImage, onMaterialDrop, onToggleOpening }, ref) {
+const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, selectedKeys, manual, transformMode = "translate", onTransform, onPick, onEmpty, textureFor, ghost, materialImage, onMaterialDrop, onToggleOpening }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
 
@@ -69,6 +76,18 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(30, 60, 20); scene.add(sun);
     const grid = new THREE.GridHelper(200, 200, 0xc9b98f, 0xe2dccd); scene.add(grid);
     const group = new THREE.Group(); scene.add(group);
+    const pivot = new THREE.Object3D(); scene.add(pivot);
+    const controls = new TransformControls(camera,renderer.domElement);
+    controls.setSpace("world");controls.setSize(1.15);controls.enabled=false;
+    const helper=controls.getHelper();scene.add(helper);
+    const transformed=()=>{
+      const session: ManualMoveSession | undefined=st.current.manual;if(!session||!controls.dragging)return;
+      const cad=CAD_TO_THREE.clone().multiply(new THREE.Matrix4().compose(new THREE.Vector3(),pivot.quaternion,new THREE.Vector3(1,1,1))).multiply(CAD_TO_THREE);
+      const euler=new THREE.Euler().setFromRotationMatrix(cad,"XYZ"), k=180/Math.PI;
+      st.current.onTransform?.({x:pivot.position.x-session.pivot.x,y:pivot.position.z-session.pivot.y,z:pivot.position.y-session.pivot.z,rx:euler.x*k,ry:euler.y*k,rz:euler.z*k});
+    };
+    controls.addEventListener("objectChange",transformed);
+    controls.addEventListener("dragging-changed",e=>{st.current.gizmoDragging=e.value;});
     // Orbit-Zustand (Kugelkoordinaten um Zielpunkt)
     const orbit = { target: new THREE.Vector3(), r: 25, theta: Math.PI / 4, phi: Math.PI / 3.2 };
     const apply = () => {
@@ -91,7 +110,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
 
     // Pointer-Navigation (Maus und Touch)
     const pts = new Map<number, { x: number; y: number }>();
-    let mode: "rot" | "pan" | "look" | null = null, downAt = { x: 0, y: 0, t: 0 }, lastPinch = 0, lastMid = { x: 0, y: 0 };
+    let mode: "rot" | "pan" | "look" | null = null, downAt = { x: 0, y: 0, t: 0, shift:false }, lastPinch = 0, lastMid = { x: 0, y: 0 }, travelled=0;
     const pan = (dx: number, dy: number) => {
       const s = orbit.r * 0.0015;
       const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
@@ -117,16 +136,20 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     for (const t of ["mousedown", "mouseup", "click", "dblclick", "touchstart", "touchend"]) el.addEventListener(t, stopAll);
     const onDown = (e: PointerEvent) => {
       e.stopPropagation();
+      if(controls.dragging || (controls.enabled&&controls.axis)) { st.current.gizmoGesture=true;return; }
+      st.current.gizmoGesture=false;travelled=0;
       el.setPointerCapture(e.pointerId);
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+      downAt = { x: e.clientX, y: e.clientY, t: performance.now(), shift:e.shiftKey };
       mode = e.shiftKey ? "look" : e.button === 1 ? "pan" : "rot";
       if (pts.size === 2) { const [a, b] = [...pts.values()]; lastPinch = Math.hypot(a.x - b.x, a.y - b.y); lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
     };
     const onMove = (e: PointerEvent) => {
+      if(st.current.gizmoGesture||controls.dragging)return;
       const p = pts.get(e.pointerId); if (!p) return;
       e.stopPropagation();
       const dx = e.clientX - p.x, dy = e.clientY - p.y;
+      travelled+=Math.hypot(dx,dy);
       p.x = e.clientX; p.y = e.clientY;
       if (pts.size >= 2) {
         const [a, b] = [...pts.values()];
@@ -148,16 +171,17 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const ray = new THREE.Raycaster();
     const onUp = (e: PointerEvent) => {
       e.stopPropagation();
+      if(st.current.gizmoGesture){st.current.gizmoGesture=false;return;}
       pts.delete(e.pointerId);
       if (pts.size < 2) lastPinch = 0;
       const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
-      if (moved < 5 && performance.now() - downAt.t < 500 && e.button === 0) {
+      if (moved < 5 && travelled < 7 && performance.now() - downAt.t < 500 && e.button === 0 && e.type === "pointerup") {
         const r = el.getBoundingClientRect();
         ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
         ray.params.Line = { threshold: Math.max(0.05, orbit.r * 0.004) };
         const hit = ray.intersectObjects(group.children, true)[0];
         const u = hit?.object.userData as any;
-        if (u?.sheetId) st.current.onPick?.(u.sheetId, u.sourceId);
+        if (u?.sheetId) st.current.onPick?.(u.sheetId, u.sourceId, downAt.shift);
         else st.current.onEmpty?.();
       }
     };
@@ -166,6 +190,8 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     el.addEventListener("pointerup", onUp); el.addEventListener("pointercancel", onUp);
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("contextmenu", e => e.preventDefault());
+    const cancelPointer=()=>{pts.clear();mode=null;lastPinch=0;st.current.gizmoGesture=false;if(controls.dragging){controls.pointerUp(null);}};
+    el.addEventListener("lostpointercapture",cancelPointer);window.addEventListener("blur",cancelPointer);
     const pickAt = (x: number, y: number) => {
       const r=el.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1),camera);
       return ray.intersectObjects(group.children,true).find(h=>h.object.userData.sheetId)?.object.userData;
@@ -211,9 +237,10 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     };
     raf = requestAnimationFrame(loop);
 
-    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens };
+    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens, controls, pivot };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
+      window.removeEventListener("blur",cancelPointer);controls.dispose();scene.remove(helper);scene.remove(pivot);
       window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true); window.removeEventListener("blur", clearHeld);
       disposeGroup(group); grid.geometry.dispose(); (grid.material as THREE.Material).dispose?.();
       renderer.dispose(); renderer.forceContextLoss?.(); el.remove();
@@ -221,6 +248,18 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
   }, []);
 
   st.current.onPick = onPick; st.current.onEmpty = onEmpty; st.current.onMaterialDrop = onMaterialDrop; st.current.onToggleOpening = onToggleOpening;
+  st.current.manual=manual;st.current.onTransform=onTransform;
+  useEffect(()=>{
+    const controls:TransformControls|undefined=st.current.controls,pivot:THREE.Object3D|undefined=st.current.pivot;
+    if(!controls||!pivot)return;
+    if(!manual){controls.detach();controls.enabled=false;return;}
+    controls.enabled=true;controls.setMode(transformMode);controls.attach(pivot);
+    if(!controls.dragging){
+      pivot.position.set(manual.pivot.x+manual.delta.x,manual.pivot.z+manual.delta.z,manual.pivot.y+manual.delta.y);
+      const rotation=moveMatrix({...manual.delta,x:0,y:0,z:0},{x:0,y:0,z:0});
+      pivot.quaternion.setFromRotationMatrix(CAD_TO_THREE.clone().multiply(rotation).multiply(CAD_TO_THREE));
+    }
+  },[manual,transformMode]);
 
   // Neigungsvorschau: eigener, nicht anklickbarer Körper über dem (unveränderten) Original.
   useEffect(() => {
@@ -266,7 +305,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       }
     }
     for (const d of items) {
-      const sel = keyOf(d) === selectedKey;
+      const sel = selectedKeys?.includes(keyOf(d)) ?? keyOf(d) === selectedKey;
       const color = new THREE.Color(sel ? "#3b82f6" : d.color);
       let obj: THREE.Object3D | null = null;
       try {
@@ -315,7 +354,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
           const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3a352c, transparent: true, opacity: 0.35 }));
           edges.raycast = () => {}; g.add(edges);
         } else {
-          const geo = new THREE.BufferGeometry().setFromPoints(d.points.map(p => new THREE.Vector3(p.x, d.z, p.y)));
+          const geo = new THREE.BufferGeometry().setFromPoints(d.spatialPoints ? d.spatialPoints.map(p=>new THREE.Vector3(p.x,p.z,p.y)) : d.points.map(p => new THREE.Vector3(p.x, d.z, p.y)));
           obj = new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));
           obj.renderOrder = 1;
         }
@@ -363,7 +402,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       }
     }
     if (!st.current.fitted && items.length) { st.current.fitted = true; fit(); }
-  }, [items, selectedKey, textureFor, materialImage]);
+  }, [items, selectedKey, selectedKeys, textureFor, materialImage]);
 
   const fit = () => {
     const { group, orbit, apply, camera } = st.current; if (!group) return;
@@ -398,8 +437,11 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     setCamera: (c) => { const o = st.current.orbit; if (!o) return; o.target.set(c.tx, c.ty, c.tz); o.r = c.r; o.theta = c.theta; o.phi = c.phi; st.current.apply(); st.current.fitted = true; },
     capture: (points) => {
       const { renderer, scene, camera, grid } = st.current; if (!renderer) return null;
+      const helper=st.current.controls?.getHelper(),wasVisible=helper?.visible;
+      if(helper)helper.visible=false;
       grid.visible = false; renderer.render(scene, camera);
       const png = renderer.domElement.toDataURL("image/png");
+      if(helper)helper.visible=wasVisible;
       grid.visible = st.current.gridOn !== false;
       const w = renderer.domElement.width, h = renderer.domElement.height;
       const badges = points.map(p => {

@@ -123,7 +123,8 @@ export const Object3DSettings: React.FC<{
   onEditInCad?: () => void;
   /** Nur im 3D-Bereich: Körperbeziehungen als vierte Karte. */
   relations?: React.ReactNode;
-}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, relations }) => {
+  manualMove?: React.ReactNode; manualActive?: boolean;
+}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, relations, manualMove, manualActive }) => {
   const [open, setOpen] = useState(defaultOpen);
   const [, force] = useState(0);
   const [items, setItems] = useState<{ kind: string; obj: any }[]>([]);
@@ -171,6 +172,7 @@ export const Object3DSettings: React.FC<{
       )}
       {!allEditable && <Note>Ebene gesperrt – nur Anzeige.</Note>}
 
+      <fieldset disabled={manualActive} className={manualActive?"pointer-events-none opacity-50":undefined}>
       <Section title="Höhenlage und Körperhöhe">
         <div className="grid grid-cols-1 gap-2">
           {elevItems.length > 0 && (
@@ -198,9 +200,11 @@ export const Object3DSettings: React.FC<{
         {!multi && ["document", "textbox", "table"].includes(kind) && <Note>Waagerechte Platte auf der Höhenlage; Breite und Höhe bleiben 2D-Maße.</Note>}
         {!multi && ["segment", "dimension", "freeStroke"].includes(kind) && <Note>Flache Darstellung auf der Höhenlage, keine Extrusion.</Note>}
       </Section>
+      </fieldset>
 
-      {!multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
-      {!multi && !(kind === "hatch" && !isPolygon) && kind !== "door" && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} generic />}
+      {manualMove}
+      {!manualActive && !multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
+      {!manualActive && !multi && !(kind === "hatch" && !isPolygon) && kind !== "door" && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} generic />}
       {relations}
     </div>
   );

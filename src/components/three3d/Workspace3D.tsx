@@ -44,6 +44,12 @@ import { infoBoxUi } from "@/lib/infoBoxUi";
 import { setObjectMaterial, setOpeningState } from "@/cad/three3d/projectBridge";
 import { Button } from "@/components/ui/button";
 import type { Material3D } from "@/cad/three3d/materials";
+import { ManualMovePanel } from "./ManualMovePanel";
+import { beginManualMove, changedMove, commitManualMove, editableRef3D, previewManualMove, refKey3D, type ManualMoveSession } from "@/cad/three3d/manualMoveSession";
+import { enter3DEditor, state3D, type ObjectRef3D } from "@/cad/three3d/manualMoveState";
+import type { MoveDelta } from "@/cad/three3d/spatialTransform";
+import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
+import { CopyCheck } from "lucide-react";
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
 
@@ -78,6 +84,45 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [issues, setIssues] = useState<RelationIssue[]>([]);
   const [tick, setTick] = useState(0);
   const [selKey, setSelKey] = useState<string | null>(null);
+  const [refs3D,setRefs3D]=useState<ObjectRef3D[]>([]);
+  const [multiSelect,setMultiSelect]=useState(false);
+  const [manualOn,setManualOn]=useState(false);
+  const [manualSession,setManualSession]=useState<ManualMoveSession|null>(null);
+  const sessionRef=useRef<ManualMoveSession|null>(null);
+  const [moveError,setMoveError]=useState<string|null>(null);
+  const numericValid=useRef(true);
+  const onNumericValidity=useCallback((valid:boolean)=>{numericValid.current=valid;},[]);
+  const [moveMode,setMoveMode]=useState<"translate"|"rotate">("translate");
+  const [previewItems,setPreviewItems]=useState<Derived3D[]|null>(null);
+  const [pendingChange,setPendingChange]=useState<(()=>void)|null>(null);
+  const replaceSession=(s:ManualMoveSession|null)=>{sessionRef.current=s;state3D(app).draftActive=!!s;setManualSession(s);if(!s){setPreviewItems(null);setMoveError(null);}};
+  const cancelMove=()=>{replaceSession(null);setManualOn(false);setPendingChange(null);};
+  const applyMove=()=>{const s=sessionRef.current;if(!s)return;if(!numericValid.current){setMoveError("Bitte alle ungültigen Zahlen korrigieren.");return;}try{commitManualMove(app,s);replaceSession(null);setManualOn(false);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);next?.();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
+  const guardChange=(next:()=>void)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){setPendingChange(()=>next);return;}replaceSession(null);next();};
+  const updateDelta=(delta:MoveDelta)=>{const s=sessionRef.current;if(!s)return;const next={...s,delta};replaceSession(next);try{setPreviewItems(previewManualMove(app,next));setMoveError(null);}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung nicht möglich.");}};
+  useEffect(()=>enter3DEditor(app,()=>{if(!sessionRef.current)return false;replaceSession(null);setManualOn(false);setPendingChange(null);return true;},()=>setTick(t=>t+1)),[app]);
+  useEffect(()=>{
+    const beforeLeave=(e:BeforeUnloadEvent)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){e.preventDefault();e.returnValue="";}};
+    const navigation=(e:MouseEvent)=>{
+      if(!sessionRef.current||!changedMove(sessionRef.current.delta))return;
+      const target=e.target instanceof Element?e.target.closest("button,a"):null;
+      if(!target||!target.closest(".workspace-header"))return;
+      const label=target.getAttribute("title")??target.textContent??"";
+      if(/Rückgängig|Wiederholen|Undo|Redo/i.test(label))return;
+      e.preventDefault();e.stopImmediatePropagation();guardChange(()=>{(target as HTMLElement).click();});
+    };
+    window.addEventListener("beforeunload",beforeLeave);document.addEventListener("click",navigation,true);
+    return()=>{window.removeEventListener("beforeunload",beforeLeave);document.removeEventListener("click",navigation,true);};
+  });
+  useEffect(()=>{
+    const key=(e:KeyboardEvent)=>{
+      const typing=e.target instanceof HTMLElement&&(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+      if(typing)return;
+      if((e.ctrlKey||e.metaKey)&&["z","y"].includes(e.key.toLowerCase())){e.preventDefault();e.stopImmediatePropagation();if(e.key.toLowerCase()==="y"||e.shiftKey)app.redo();else app.undo();}
+      else if(sessionRef.current&&(e.key==="Escape"||e.key==="Enter")){e.preventDefault();e.stopImmediatePropagation();if(e.key==="Escape")cancelMove();else applyMove();}
+    };
+    window.addEventListener("keydown",key,true);return()=>window.removeEventListener("keydown",key,true);
+  });
   const [picking, setPicking] = useState<null | Relation3D["type"]>(null);
   const [face, setFace] = useState<"top" | "bottom">("bottom");
   const [cutTrim, setCutTrim] = useState(false);
@@ -117,12 +162,16 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
       const r = deriveFromApp(app);
       const sel: any = app.selection;
       const id = infoBoxUi.get().selectedId ?? (sel ? ID_FIELDS.map(f => sel[f]).find(Boolean) : null);
-      const sk = id ? `${app.activeSheetId}::${id}` : null;
-      const sig = JSON.stringify([r.items, app.sheetManager.toJSON(), app.activeSheetId, sk, r.issues, r.items.map(texturedKey)]);
+      const state=state3D(app);
+      state.refs=state.refs.filter(x=>r.items.some(d=>d.sheetId===x.sheetId&&d.sourceId===x.id)&&editableRef3D(app,x));
+      if(!state.refs.length&&id&&editableRef3D(app,{sheetId:app.activeSheetId,id}))state.refs=[{sheetId:app.activeSheetId,id}];
+      if(sessionRef.current&&app.contentRevision!==sessionRef.current.revision){replaceSession(null);setManualOn(false);}
+      const sk=state.refs[0]?refKey3D(state.refs[0]):null;
+      const sig = JSON.stringify([r.items, app.sheetManager.toJSON(), app.activeSheetId, sk, state.refs, r.issues, r.items.map(texturedKey)]);
       if (sig === lastSig.current) return;
       lastSig.current = sig;
       snapCache.current.clear();
-      setItems(r.items); setIssues(r.issues); setSelKey(sk); setTick(t => t + 1);
+      setItems(r.items); setIssues(r.issues); setSelKey(sk);setRefs3D([...state.refs]); setTick(t => t + 1);
     };
     read();
     const iv = window.setInterval(read, 500);
@@ -142,6 +191,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   }, [grid, items.length]);
 
   const makeDossier = async (format: "pdf" | "json") => {
+    if(sessionRef.current){guardChange(()=>void makeDossier(format));return;}
     setBusy(true); setDossierMsg(null);
     try {
       const d = await import("@/cad/three3d/dossier");
@@ -172,6 +222,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const selectedHit = sel ? findObject(app, sel.sheetId,sel.id) : null;
   const materialImage = useCallback((m: Material3D) => project?.files?.find(f=>f.id===m.imageFileId)?.dataUrl,[project?.files]);
   const exportGLB = async () => {
+    if(sessionRef.current){guardChange(()=>void exportGLB());return;}
     setBusy(true);setDossierMsg(null);
     try { const bytes=await viewer.current?.exportGLB();if(!bytes)throw new Error();const d=await import("@/cad/three3d/dossier");d.downloadBytes(new Uint8Array(bytes),`${project?.name||'Projekt'}.glb`,'model/gltf-binary'); }
     catch {setDossierMsg('GLB konnte nicht erstellt werden.');}finally{setBusy(false);}
@@ -184,25 +235,39 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     return () => window.removeEventListener("keydown", kd, true);
   }, [picking]);
   const ghost = useSyncExternalStore(subscribeTiltDraftPreview, getTiltDraftPreview);
-  const onPick = (sheetId: string, id: string) => {
+  const onPick = (sheetId: string, id: string, additive=false) => {
     if (picking && sel) {
       const err = addRelation(app, sel, { type: picking, targetSheetId: sheetId, targetId: id, ...(picking === "limitToSurface" ? { face, keep } : (cutTrim ? { trim: true } : {})) });
       setMsg(err || null); // Erfolg zeigt sich an der Beziehung selbst (inkl. Geometriefehlern)
       setPicking(null);
       return;
     }
-    selectInCad(app, sheetId, id);
+    if(!editableRef3D(app,{sheetId,id}))return;
+    guardChange(()=>{
+      const s=state3D(app),ref={sheetId,id},key=refKey3D(ref);
+      s.refs=additive||multiSelect ? s.refs.some(r=>refKey3D(r)===key)?s.refs.filter(r=>refKey3D(r)!==key):[...s.refs,ref] : [ref];
+      const first=s.refs[0];if(first)selectInCad(app,first.sheetId,first.id);else clearCadSelection(app);
+      setRefs3D([...s.refs]);setSelKey(first?refKey3D(first):null);
+      if(manualOn&&s.refs.length){try{setTiltDraftPreview(null);replaceSession(beginManualMove(app,s.refs));}catch(e){setMoveError(e instanceof Error?e.message:"Auswahl nicht möglich.");}}
+    });
   };
+  const toggleManual=()=>guardChange(()=>{
+    const next=!manualOn;setManualOn(next);setPicking(null);setTiltDraftPreview(null);
+    if(next&&refs3D.length)try{replaceSession(beginManualMove(app,refs3D,items));}catch(e){setMoveError(e instanceof Error?e.message:"Auswahl nicht möglich.");}
+  });
+  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove}/>;
 
   const btn = "h-8 px-2.5 rounded-md text-xs font-medium border hover:bg-muted disabled:opacity-40";
   return (
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={items} selectedKey={selKey} onPick={onPick} onEmpty={() => { if (!picking) clearCadSelection(app); }} ghost={ghost} textureFor={textureFor} materialImage={materialImage}
-            onMaterialDrop={(sheetId,id,materialId)=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);}}
-            onToggleOpening={(sheetId,id)=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);}} />
+          <Viewer3D ref={viewer} items={previewItems??items} selectedKey={selKey} selectedKeys={refs3D.map(refKey3D)} manual={manualSession} transformMode={moveMode} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
+            onMaterialDrop={(sheetId,id,materialId)=>guardChange(()=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);})}
+            onToggleOpening={(sheetId,id)=>guardChange(()=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);})} />
         </Suspense>
+        <div className="absolute left-3 top-14 z-10"><Button size="sm" variant={multiSelect?"default":"outline"} aria-pressed={multiSelect} onClick={()=>setMultiSelect(v=>!v)}><CopyCheck size={14}/>Mehrfachauswahl</Button></div>
+        {pendingChange&&<div role="dialog" aria-label="Unbestätigte Bewegung" className="absolute left-1/2 top-1/2 z-30 w-64 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-4 shadow-lg space-y-3 text-sm"><p>Bewegung übernehmen oder verwerfen?</p><div className="flex gap-2"><Button size="sm" disabled={!!moveError} onClick={applyMove}>Übernehmen</Button><Button size="sm" variant="outline" onClick={()=>{const next=pendingChange;cancelMove();next();}}>Verwerfen</Button></div></div>}
         {picking && (
           <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs font-medium shadow-lg" style={REL.active}>
             {picking === "cutout" ? "Durchbricht" : "An Oberfläche begrenzen"}: Zielkörper anklicken … <button className="ml-2 underline" onClick={() => setPicking(null)}>Abbrechen (Esc)</button>
@@ -355,8 +420,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
 
       <aside className="w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
 
-        {!sel ? null : selectedHit?.list === "infoBoxes" ? <InfoBoxSettingsPanel app={app} in3D /> : (
-          <Object3DSettings app={app} defaultOpen onEditInCad={onEditInCad} relations={
+        {!sel ? movePanel : selectedHit?.list === "infoBoxes" ? <><InfoBoxSettingsPanel app={app} in3D />{movePanel}</> : (
+          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} manualMove={movePanel} manualActive={manualOn} relations={manualOn?null:
             <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>

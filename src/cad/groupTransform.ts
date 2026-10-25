@@ -22,6 +22,7 @@ export function getGroupObject(app: any, kind: string, id: string): any {
     case "document":   return s.getDocumentById?.(id);
     case "library":    return s.getLibraryInstanceById?.(id);
     case "stair":      return s.getStairById?.(id);
+    case "infobox":    return s.getInfoBoxById?.(id);
     default: return null;
   }
 }
@@ -31,6 +32,7 @@ function movablePoints(kind: string, o: any): Vec2[] {
   const out: Vec2[] = [];
   switch (kind) {
     case "segment": out.push(o.a, o.b); break;
+    case "infobox": out.push(o); break;
     case "wall": for (const p of o.corners || []) out.push(p); break;
     case "hatch":
       for (const p of o.points || []) out.push(p);

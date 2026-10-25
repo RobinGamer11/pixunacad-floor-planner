@@ -1,4 +1,5 @@
 import { attachObjectMeta } from "./objectMeta";
+import { route3DHistory } from "./three3d/manualMoveState";
 import { normalizeStackOrder, resetStackTracking, moveStack, type StackRef } from "./stackOrder";
 import { infoBoxUi } from "@/lib/infoBoxUi";
 import { mergeHatchGeometry } from "./hatchMerge";
@@ -1422,6 +1423,7 @@ export class CadApp {
   }
 
   undo() {
+    if (route3DHistory(this, "undo")) return;
     if (this._actionDepth > 0) { this.cancelAction(); this._emitHistoryChange(); return; }
     // Treppe: laufendes Zeichnen/Bewegen nimmt zuerst den lokalen Schritt zurück.
     if ((this.activeTool as any) === this.stairTool && this.stairTool.undoStep()) { this.renderer?.render?.(); return; }
@@ -1433,6 +1435,7 @@ export class CadApp {
   }
 
   redo() {
+    if (route3DHistory(this, "redo")) return;
     const t = this.activeTool as any;
     if (t?.pointRedo?.()) { this._emitHistoryChange(); this.renderer?.render?.(); return; }
     t?.endPointSession?.();

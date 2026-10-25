@@ -61,7 +61,7 @@ export function deriveFromApp(app: CadApp): { items: Derived3D[]; issues: Relati
   return applyRelations3D(raw, relationSources(app));
 }
 
-function deriveOpts(app: CadApp) {
+export function deriveOpts(app: CadApp) {
   return {
     activeSheetId: app.activeSheetId,
     isLabelVisible: (l) => app.labelManager.isVisible(l),

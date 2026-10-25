@@ -1,4 +1,5 @@
 import { applyObjectMeta, copyObjectMeta } from "./objectMeta";
+import { translatedPose } from "./three3d/spatialTransform";
 import { copyDisplayGradient } from "./displayGradient";
 import { serializeStair } from "./Scene";
 import { Defaults, SelectionType } from "./constants";
@@ -489,6 +490,14 @@ export function commitClipboardAt(app: CadApp, clip: Clipboard, mouseW: Vec2): {
       if (o) applyObjectMeta(o, it, { withCode: false }); if (o) created.push({ kind: "textbox", id: o.id });
     }
 
+  }
+  // Every created source has moved in CAD space: move its spatial frame and saved tilt axis too.
+  const lists=["segments","hatches","walls","dimensions","textBoxes","tables","documents","freeStrokes","libraryInstances","stairs","doors"];
+  for(const ref of created){
+    const o=lists.flatMap(key=>(app.scene as any)[key]||[]).find((item:any)=>item.id===ref.id);
+    if(!o)continue;
+    const pose=translatedPose(o.pose3D,dx,dy);if(pose)o.pose3D=pose;
+    if(o.tilt3D)o.tilt3D={...o.tilt3D,a:{x:o.tilt3D.a.x+dx,y:o.tilt3D.a.y+dy},b:{x:o.tilt3D.b.x+dx,y:o.tilt3D.b.y+dy}};
   }
   return created;
 }

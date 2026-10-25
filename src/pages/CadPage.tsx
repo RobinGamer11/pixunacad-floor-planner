@@ -8,6 +8,7 @@ const Workspace3D = lazy(() => import("@/components/three3d/Workspace3D").then(m
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import type { CadApp } from "@/cad/CadApp";
 import { getLocalActivePage, setLocalActivePage } from "@/lib/exportLocalState";
+import { state3D } from "@/cad/three3d/manualMoveState";
 
 const CadPage = () => {
   const { projectId } = useParams();
@@ -26,6 +27,8 @@ const CadPage = () => {
   // Export ist derselbe CAD-Bereich (dieselbe Engine/Verlauf) mit Exportseite aktiv.
   const view3d = location.pathname.endsWith("/3d");
   const exportView = location.pathname.endsWith("/export") || new URLSearchParams(location.search).get("view") === "export";
+  const [draftHistory,setDraftHistory]=useState(false);
+  useEffect(()=>{if(!view3d||!cadApp){setDraftHistory(false);return;}const iv=window.setInterval(()=>setDraftHistory(!!state3D(cadApp).draftActive),100);return()=>window.clearInterval(iv);},[view3d,cadApp]);
   useEffect(() => {
     if (!cadApp) return;
     // Geöffnete Exportseite ist lokaler Bedienzustand pro Gerät (nie Verlauf/Cloud).
@@ -110,8 +113,8 @@ const CadPage = () => {
         projectId={projectId}
         projectName={project?.name}
         mode={view3d ? "3d" : exportView ? "export" : "cad"}
-        canUndo={canUndo}
-        canRedo={canRedo}
+        canUndo={canUndo || draftHistory}
+        canRedo={canRedo || draftHistory}
         onUndo={() => editorRef.current?.undo()}
         onRedo={() => editorRef.current?.redo()}
         canDelete={canDelete}
