@@ -191,6 +191,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   }, [grid, items.length]);
 
   const makeDossier = async (format: "pdf" | "json") => {
+    if(sessionRef.current){guardChange(()=>void makeDossier(format));return;}
     setBusy(true); setDossierMsg(null);
     try {
       const d = await import("@/cad/three3d/dossier");
@@ -221,6 +222,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const selectedHit = sel ? findObject(app, sel.sheetId,sel.id) : null;
   const materialImage = useCallback((m: Material3D) => project?.files?.find(f=>f.id===m.imageFileId)?.dataUrl,[project?.files]);
   const exportGLB = async () => {
+    if(sessionRef.current){guardChange(()=>void exportGLB());return;}
     setBusy(true);setDossierMsg(null);
     try { const bytes=await viewer.current?.exportGLB();if(!bytes)throw new Error();const d=await import("@/cad/three3d/dossier");d.downloadBytes(new Uint8Array(bytes),`${project?.name||'Projekt'}.glb`,'model/gltf-binary'); }
     catch {setDossierMsg('GLB konnte nicht erstellt werden.');}finally{setBusy(false);}

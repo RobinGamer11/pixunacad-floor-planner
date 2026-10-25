@@ -437,8 +437,11 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     setCamera: (c) => { const o = st.current.orbit; if (!o) return; o.target.set(c.tx, c.ty, c.tz); o.r = c.r; o.theta = c.theta; o.phi = c.phi; st.current.apply(); st.current.fitted = true; },
     capture: (points) => {
       const { renderer, scene, camera, grid } = st.current; if (!renderer) return null;
+      const helper=st.current.controls?.getHelper(),wasVisible=helper?.visible;
+      if(helper)helper.visible=false;
       grid.visible = false; renderer.render(scene, camera);
       const png = renderer.domElement.toDataURL("image/png");
+      if(helper)helper.visible=wasVisible;
       grid.visible = st.current.gridOn !== false;
       const w = renderer.domElement.width, h = renderer.domElement.height;
       const badges = points.map(p => {
