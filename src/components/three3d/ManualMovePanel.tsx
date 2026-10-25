@@ -9,12 +9,17 @@ import type { MoveDelta } from "@/cad/three3d/spatialTransform";
 export interface ManualMovePanelProps {
   enabled: boolean; count: number; session: ManualMoveSession | null; mode: "translate"|"rotate"; error: string | null;
   onToggle: () => void; onMode: (mode:"translate"|"rotate")=>void;
-  onDelta: (delta:MoveDelta)=>void; onApply:()=>void; onCancel:()=>void;
+  onDelta: (delta:MoveDelta)=>void; onApply:()=>void; onCancel:()=>void; onValidity:(valid:boolean)=>void;
 }
-export function ManualMovePanel({enabled,count,session,mode,error,onToggle,onMode,onDelta,onApply,onCancel}:ManualMovePanelProps) {
+export function ManualMovePanel({enabled,count,session,mode,error,onToggle,onMode,onDelta,onApply,onCancel,onValidity}:ManualMovePanelProps) {
   const [draft,setDraft]=useState<Partial<Record<keyof MoveDelta,string>>>({});
   useEffect(()=>setDraft({}),[session?.baseline]);
   const invalid=Object.values(draft).some(v=>v!==undefined&&parseNum(v)===null);
+  useEffect(()=>onValidity(!invalid),[invalid,onValidity]);
+  useEffect(()=>{
+    if(document.activeElement?.getAttribute("aria-label")?.startsWith("Bewegung "))return;
+    setDraft({});
+  },[session?.delta]);
   return <section className="space-y-2 border-t border-border pt-3 text-xs">
     <div className="flex items-center justify-between gap-2"><span className="font-medium">Manuell bewegen</span><Switch aria-label="Manuell bewegen" checked={enabled} onCheckedChange={onToggle}/></div>
     {enabled&&<>

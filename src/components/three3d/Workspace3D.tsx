@@ -90,12 +90,14 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [manualSession,setManualSession]=useState<ManualMoveSession|null>(null);
   const sessionRef=useRef<ManualMoveSession|null>(null);
   const [moveError,setMoveError]=useState<string|null>(null);
+  const numericValid=useRef(true);
+  const onNumericValidity=useCallback((valid:boolean)=>{numericValid.current=valid;},[]);
   const [moveMode,setMoveMode]=useState<"translate"|"rotate">("translate");
   const [previewItems,setPreviewItems]=useState<Derived3D[]|null>(null);
   const [pendingChange,setPendingChange]=useState<(()=>void)|null>(null);
   const replaceSession=(s:ManualMoveSession|null)=>{sessionRef.current=s;state3D(app).draftActive=!!s;setManualSession(s);if(!s){setPreviewItems(null);setMoveError(null);}};
   const cancelMove=()=>{replaceSession(null);setManualOn(false);setPendingChange(null);};
-  const applyMove=()=>{const s=sessionRef.current;if(!s)return;try{commitManualMove(app,s);replaceSession(null);setManualOn(false);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);next?.();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
+  const applyMove=()=>{const s=sessionRef.current;if(!s)return;if(!numericValid.current){setMoveError("Bitte alle ungültigen Zahlen korrigieren.");return;}try{commitManualMove(app,s);replaceSession(null);setManualOn(false);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);next?.();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
   const guardChange=(next:()=>void)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){setPendingChange(()=>next);return;}replaceSession(null);next();};
   const updateDelta=(delta:MoveDelta)=>{const s=sessionRef.current;if(!s)return;const next={...s,delta};replaceSession(next);try{setPreviewItems(previewManualMove(app,next));setMoveError(null);}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung nicht möglich.");}};
   useEffect(()=>enter3DEditor(app,()=>{if(!sessionRef.current)return false;replaceSession(null);setPendingChange(null);return true;},()=>setTick(t=>t+1)),[app]);
@@ -251,7 +253,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     const next=!manualOn;setManualOn(next);setPicking(null);setTiltDraftPreview(null);
     if(next&&refs3D.length)try{replaceSession(beginManualMove(app,refs3D,items));}catch(e){setMoveError(e instanceof Error?e.message:"Auswahl nicht möglich.");}
   });
-  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove}/>;
+  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove}/>;
 
   const btn = "h-8 px-2.5 rounded-md text-xs font-medium border hover:bg-muted disabled:opacity-40";
   return (

@@ -11,6 +11,8 @@ export function normalizedPose(raw: unknown): MatrixData | undefined {
   if (!Array.isArray(raw) || raw.length !== 16 || !raw.every(v => typeof v === "number" && Number.isFinite(v))) return;
   const m = new Matrix4().fromArray(raw), p = new Vector3(), q = new Quaternion(), s = new Vector3();
   m.decompose(p,q,s);
+  const rebuilt=new Matrix4().compose(p,q.normalize(),new Vector3(1,1,1));
+  if(rebuilt.elements.some((v,i)=>Math.abs(v-raw[i])>1e-8))return;
   if (Math.abs(m.determinant()-1)>1e-5 || s.distanceTo(new Vector3(1,1,1))>1e-5 || Math.abs(raw[3])+Math.abs(raw[7])+Math.abs(raw[11])+Math.abs(raw[15]-1)>1e-8) return;
   return m.toArray();
 }
@@ -22,7 +24,7 @@ export function moveMatrix(delta: MoveDelta, pivot: {x:number;y:number;z:number}
 }
 export function posePiece(d: Derived3D, matrix: Matrix4): Derived3D {
   const point = (p: {x:number;y:number;z:number}) => { const v = new Vector3(p.x,p.y,p.z).applyMatrix4(matrix); return {x:v.x,y:v.y,z:v.z}; };
-  if (d.type === "line") return { ...d, spatialPoints: d.points.map(p=>point({...p,z:d.z})) };
+  if (d.type === "line") return { ...d, spatialPoints: (d.spatialPoints??d.points.map(p=>({...p,z:d.z}))).map(point) };
   const mesh = d.type === "mesh" ? d.mesh : d.type === "prism" ? slabMesh(d.footprint,d.holes,()=>d.z0,()=>d.z1) : faceMesh(d.outline,d.holes,()=>d.z);
   if (!mesh) return d;
   const positions: number[] = [];
