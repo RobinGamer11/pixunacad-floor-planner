@@ -12,6 +12,7 @@
 import { OBJECT_TYPE_LABELS, objectTypeKey } from "./selectionFilter";
 import { normalizeMaterial, type Material3D } from "./three3d/materials";
 import type { Tilt3D } from "./three3d/tiltGeometry";
+import { normalizedPose, type MatrixData } from "./three3d/spatialTransform";
 export type { Tilt3D } from "./three3d/tiltGeometry";
 
 export const SCENE_OBJECT_KEYS = [
@@ -30,7 +31,7 @@ const KIND_OF_KEY: Record<string, string> = {
 export type AttachmentCategory = "Material" | "Vorderseite" | "Rückseite" | "Seitenansicht";
 export const ATTACHMENT_CATEGORIES: AttachmentCategory[] = ["Material", "Vorderseite", "Rückseite", "Seitenansicht"];
 export interface ObjectAttachment { id: string; name: string; type: string; size: number; dataUrl: string; category?: AttachmentCategory }
-export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number; relations3D?: Relation3D[]; stackOrder?: number; tilt3D?: Tilt3D; bodyHeightM?: number; material3D?: Material3D; frameMaterial3D?: Material3D; panelMaterial3D?: Material3D; open3D?: boolean; size3DM?: number; thickness3DM?: number }
+export interface ObjectMeta { objName?: string; objCode?: string; objDesc?: string; objAttachments?: ObjectAttachment[]; elevationM?: number; pose3D?: MatrixData; relations3D?: Relation3D[]; stackOrder?: number; tilt3D?: Tilt3D; bodyHeightM?: number; material3D?: Material3D; frameMaterial3D?: Material3D; panelMaterial3D?: Material3D; open3D?: boolean; size3DM?: number; thickness3DM?: number }
 
 /** 3D-Körperbeziehung, am Quellobjekt gespeichert (Ziel über Blatt + Objekt-ID). */
 export interface Relation3D { type: "cutout" | "limitToSurface"; targetSheetId: string; targetId: string; face?: "top" | "bottom"; keep?: "below" | "above"; /** Veraltet (ohne Wirkung, nur Altdaten). */ edge?: "top" | "bottom"; /** Nur "cutout": Quelle wird an der Außenkante des Ziels abgeschnitten („Körper abgeschnitten“); fehlt = „Körper vollständig“. */ trim?: boolean }
@@ -171,6 +172,7 @@ export function setObjectName(scenes: any[], kind: string, obj: any, name: strin
 
 export function copyObjectMeta(obj: any, opts: { withCode?: boolean } = {}): ObjectMeta {
   const out: ObjectMeta = {};
+  const pose = normalizedPose(obj?.pose3D); if (pose) out.pose3D = pose;
   if (typeof obj?.objName === "string" && obj.objName) out.objName = obj.objName;
   if (typeof obj?.objDesc === "string" && obj.objDesc) out.objDesc = obj.objDesc;
   if (Array.isArray(obj?.objAttachments) && obj.objAttachments.length) out.objAttachments = obj.objAttachments.map((a: ObjectAttachment) => ({ ...a }));
@@ -201,6 +203,7 @@ export function applyObjectMeta(obj: any, src: any, opts: { withCode?: boolean }
   if (m.relations3D) obj.relations3D = m.relations3D;
   if (typeof m.stackOrder === "number") obj.stackOrder = m.stackOrder;
   if (m.tilt3D) obj.tilt3D = m.tilt3D;
+  if (m.pose3D) obj.pose3D = m.pose3D;
   if (typeof m.bodyHeightM === "number") obj.bodyHeightM = m.bodyHeightM;
   for (const key of ["material3D", "frameMaterial3D", "panelMaterial3D", "open3D", "size3DM", "thickness3DM"] as const) if (m[key] !== undefined) obj[key] = m[key];
 }
@@ -232,7 +235,7 @@ export function restoreObjectMeta(scene: any, data: any, before: Record<string, 
   if (!data) return;
   for (const key of SCENE_OBJECT_KEYS) {
     const raw = data[key];
-    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.objName || r.objCode || r.objDesc || r.objAttachments || typeof r.elevationM === "number" || r.relations3D || typeof r.stackOrder === "number" || r.tilt3D || typeof r.bodyHeightM === "number" || r.material3D || r.frameMaterial3D || r.panelMaterial3D || typeof r.open3D === "boolean" || r.size3DM || r.thickness3DM))) continue;
+    if (!Array.isArray(raw) || !raw.some((r: any) => r && (r.pose3D || r.objName || r.objCode || r.objDesc || r.objAttachments || typeof r.elevationM === "number" || r.relations3D || typeof r.stackOrder === "number" || r.tilt3D || typeof r.bodyHeightM === "number" || r.material3D || r.frameMaterial3D || r.panelMaterial3D || typeof r.open3D === "boolean" || r.size3DM || r.thickness3DM))) continue;
     const created = ((scene?.[key] || []) as any[]).slice(before[key] ?? 0);
     if (created.length !== raw.length) continue;
     raw.forEach((r: any, i: number) => applyObjectMeta(created[i], r));

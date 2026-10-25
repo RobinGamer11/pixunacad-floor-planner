@@ -23,6 +23,7 @@ import type { Material3D } from "./materials";
 import { deriveOpening } from "./openingGeometry";
 import { deriveInfoBox } from "./infoBoxGeometry";
 import { projectionCos } from "./tiltGeometry";
+import { applySpatialPose } from "./spatialTransform";
 
 export type Solid3DSource =
   | "wall" | "hatch" | "stair" | "document" | "textbox" | "table" | "library"
@@ -86,7 +87,7 @@ export interface Mesh3D {
 }
 
 export interface Texture3D { list: "documents" | "textBoxes" | "tables" | "libraryInstances" | "infoBoxes"; corners?: Vec2[]; snapshot?: unknown; objectId?: string }
-export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[] };
+export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { spatialPoints?: Vec3[]; note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[] };
 
 export interface DeriveOptions {
   /** Grundrissgröße eines Bibliotheksobjekts (lokal, vor Skalierung). */
@@ -357,7 +358,8 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
   }
   const push = (o: any, items: Derived3D[]) => {
     const ord = orderOf.get(o) ?? 0;
-    const list = o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
+    const tilted = o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
+    const list = applySpatialPose(tilted, o.pose3D, base);
     for (const d of list) { d.order = ord; d.material = d.part === "frame" ? o.frameMaterial3D ?? o.material3D : d.part === "glass" || d.part === "leaf" ? o.panelMaterial3D ?? o.material3D : o.material3D; out.push(d); }
   };
   const doors = (scene.doors || []).filter(vis);
@@ -367,7 +369,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     const wall = (scene.walls || []).find((w: any) => w.id === d.wallId);
     if (wall && vis(wall)) {
       const parts = deriveOpening(d, wall, sheetId, base);
-      push(d, wall.tilt3D ? applyGenericTilt(wall, parts, base + objectElevationM(wall)) : parts);
+      push(d, applySpatialPose(wall.tilt3D ? applyGenericTilt(wall, parts, base + objectElevationM(wall)) : parts, wall.pose3D, base));
     }
   }
   for (const b of scene.infoBoxes || []) if (vis(b)) push(b, deriveInfoBox(b, sheetId, base));
