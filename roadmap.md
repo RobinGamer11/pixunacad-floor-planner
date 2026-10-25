@@ -1,11 +1,13 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
 ## Option B – Manuell bewegen und Vercel, 25.10.2026
-- [ ] Gemeinsame flüchtige 3D-Auswahl und Transformationssitzung mit Weltachsen, Zahlenfeldern, Übernehmen/Verwerfen
-- [ ] Originalobjekte, räumliche Orientierung, Wandöffnungen, Serialisierung und gemeinsames Undo/Redo anbinden
-- [ ] Gizmo und Mehrfachauswahl für Maus/Touch prüfen; automatische Regressionstests
+- [x] Gemeinsame flüchtige 3D-Auswahl und Transformationssitzung mit Weltachsen, Zahlenfeldern, Übernehmen/Verwerfen
+- [x] Originalobjekte, räumliche Orientierung, Wandöffnungen, Serialisierung und gemeinsames Undo/Redo anbinden
+- [x] 91 Tests; getrennte Browserprüfung: Zahlen, ungültige Eingabe, Höhenpfeil ziehen, Auswahl/Gruppe, Verwerfen, Undo/Redo
+- [ ] Angemeldete Abnahme, echtes Tablet und neue GLB-Exportabnahme – keine verfügbare Sitzung bzw. kein Tablet
 - [x] npm-Lockdatei regulär mit unveränderten Versionsvorgaben synchronisieren
-- [ ] Sauberes npm ci prüfen; Produktionsbuild übernimmt die automatische Lovable-Prüfung (manueller Build nicht zulässig)
+- [x] Sauberes npm ci: 535 Pakete erfolgreich installiert; automatische Typ-/Buildprüfung fehlerfrei
+- [ ] Produktionsbuild nach sauberem npm ci – manuelle Projektbuilds sind hier nicht zulässig; automatische Lovable-Prüfung ersetzt diese spezifische Prüfung nicht
 - [ ] GitHub-main-Übertragung verifizieren (Commit/Push wird von Lovable verwaltet)
 
 ## Infobox, Pipette, Fangpunkte – 14.10.2026
