@@ -56,7 +56,8 @@ function transformSources(app: CadApp, session: ManualMoveSession, sceneOf: (id:
       o.posM=next;o.breakHeightM=(Number(o.breakHeightM)||0)+d.z;continue;
     }
     const oldPose=new Matrix4().makeTranslation(0,0,base).multiply(o.pose3D?new Matrix4().fromArray(o.pose3D):new Matrix4()).multiply(new Matrix4().makeTranslation(0,0,-base));
-    const facade={scene:sc}, refs=[{kind:kinds[hit.list],id:ref.id}];
+    // Resolve against this scene's lists, not its cached lookup maps (drafts must never reach live objects).
+    const facade={scene:new Proxy(sc,{get(target,key){if(typeof key==="string"&&key.startsWith("get")&&key.endsWith("ById")){const list=Object.entries(kinds).find(([,kind])=>`get${kind==="textbox"?"TextBox":kind==="freeStroke"?"FreeStroke":kind==="library"?"LibraryInstance":kind==="infobox"?"InfoBox":kind[0].toUpperCase()+kind.slice(1)}ById`===key)?.[0];if(list)return(id:string)=>target[list]?.find((obj:any)=>obj.id===id);}return Reflect.get(target,key);}})}, refs=[{kind:kinds[hit.list],id:ref.id}];
     rotateGroup(facade,refs,d.rz*Math.PI/180,session.pivot);
     translateGroup(facade,refs,d.x,d.y);
     o.elevationM=objectElevationM(o)+d.z;
@@ -84,6 +85,7 @@ export function previewManualMove(app: CadApp, session: ManualMoveSession): Deri
 }
 export function commitManualMove(app: CadApp, session: ManualMoveSession): boolean {
   if(!changedMove(session.delta))return false;
+  if(app.contentRevision!==session.revision)throw new Error("Das Projekt wurde zwischenzeitlich geändert. Bitte die Bewegung neu beginnen.");
   if(session.refs.some(r=>!editableRef3D(app,r)||JSON.stringify(findObject(app,r.sheetId,r.id)?.obj)!==session.baseline.get(refKey3D(r))))throw new Error("Die Auswahl wurde zwischenzeitlich geändert. Bitte neu beginnen.");
   previewManualMove(app,session); // validate all members before mutating any source
   const ok=app.runAction(()=>{transformSources(app,session,id=>sceneFor(app,id));return true;});
