@@ -1,7 +1,7 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
 ## Option B – Manuell bewegen und Vercel, 25.10.2026
-- [ ] 3D-Ansichtswechsel: TransformControls-Freigabe korrigieren und Absturz reproduzieren/gegenprüfen
+- [x] 3D-Ansichtswechsel: r169-Absturz reproduziert; Helper-Freigabe korrigiert; 15 Tests und Browser-Unmount ohne Fehler geprüft
 - [x] Gemeinsame flüchtige 3D-Auswahl und Transformationssitzung mit Weltachsen, Zahlenfeldern, Übernehmen/Verwerfen
 - [x] Originalobjekte, räumliche Orientierung, Wandöffnungen, Serialisierung und gemeinsames Undo/Redo anbinden
 - [x] 91 Tests; getrennte Browserprüfung: Zahlen, ungültige Eingabe, Höhenpfeil ziehen, Auswahl/Gruppe, Verwerfen, Undo/Redo
