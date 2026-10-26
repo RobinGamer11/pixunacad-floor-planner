@@ -5,7 +5,7 @@
  * Bibliotheks-Körperhöhe). Jede bestätigte Änderung = genau ein Undo-Schritt (runAction).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon, BrickWall, Hexagon, DoorOpen, AppWindow, Stairs, Package, FileText, Type, Table, Minus, PenLine, Boxes } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
@@ -27,7 +27,7 @@ import { projectionCos } from "@/cad/three3d/tiltGeometry";
 import { setOpeningState } from "@/cad/three3d/projectBridge";
 import { boundaryRings } from "@/cad/three3d/tiltBoundary";
 import { normalizedPose } from "@/cad/three3d/spatialTransform";
-import { Matrix4, Euler, Vector3 } from "three";
+import { Matrix4, Vector3 } from "three";
 
 const C = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
