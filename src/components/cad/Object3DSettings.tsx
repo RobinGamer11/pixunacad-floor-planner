@@ -189,12 +189,25 @@ export const Object3DSettings: React.FC<{
   const body = (
     <div className="space-y-2.5 text-xs">
       {onEditInCad && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border p-2.5" style={C.card}>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold leading-tight">{multi ? `${items.length} Objekte` : KIND_LABEL(kind, obj)}</div>
-            {!multi && <div className="truncate text-[11px]" style={C.muted}>{name ? `${obj.objName || ""}${obj.objCode ? ` · #${obj.objCode}` : ""}` : "ohne Namen"}</div>}
+        <div className="rounded-xl border p-3" style={C.card}>
+          <div className="flex items-center gap-3">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border" style={C.field}>
+              {multi ? <Boxes size={26} style={{ color: "hsl(var(--accent-gold))" }} /> : KIND_ICON(kind, obj)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-base font-bold leading-tight">{multi ? `${items.length} Objekte` : (obj.objName || KIND_LABEL(kind, obj))}</div>
+              {!multi && <div className="truncate text-[12px]" style={C.muted}>{obj.objCode ? `#${obj.objCode}` : (obj.objName ? KIND_LABEL(kind, obj) : "ohne Namen")}</div>}
+            </div>
+            {onCollapse && (
+              <button type="button" onClick={onCollapse} title="Einklappen" aria-label="Einklappen"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border" style={C.field}>
+                <ChevronRight size={16} />
+              </button>
+            )}
           </div>
-          <button type="button" onClick={onEditInCad} className="flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium" style={C.field}><Pencil size={14} /> Im CAD bearbeiten</button>
+          <button type="button" onClick={onEditInCad} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border text-[13px] font-medium" style={C.field}>
+            <Pencil size={14} style={{ color: "hsl(var(--accent-gold))" }} /> Im CAD bearbeiten
+          </button>
         </div>
       )}
       {!allEditable && <Note>Ebene gesperrt – nur Anzeige.</Note>}
