@@ -300,3 +300,10 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [ ] Angemeldete End-to-End-Abnahme inkl. Materialupload und Zwei-Geräte-Synchronisation – keine verfügbare Sitzung; Projektseite führt zu /login
 - [ ] Twinmotion-Import abnehmen – Twinmotion im Prüfumfeld nicht verfügbar
 - [ ] GitHub-main-Übertragung – Lovable verwaltet Commit/Push; GitHub main zeigt noch 3a62d5a6
+
+## Paket 1 (26.10.2026) – 3D-Eigenschaften, Öffnungen, Infobox, Neigung
+- [x] Mehrfachauswahl: gemeinsame Höhen bearbeiten
+- [x] Fenster/Türen starr in geneigten/höheren Wänden
+- [x] Infobox in 3D als 2D-Pin, gedämpfte Farben, leichtes Leuchten
+- [x] „Kanten bündig“ bei Grundfläche ausgegraut; beige Kante sofort in 3D; alle Wandkanten anklickbar
+- [ ] Paket 2: Gizmo und Fangraster

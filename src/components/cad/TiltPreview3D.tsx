@@ -81,10 +81,12 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     const screen = (v: THREE.Vector3) => { const r = cv.getBoundingClientRect(); const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * r.width, y: (1 - p.y) / 2 * r.height }; };
     // Großzügige Fangzone (Finger/Tablet): 28 px, bei Maus 18 px.
     let fingerTol = 18;
-    const nearestEdgeHit = (cx: number, cy: number): { i: number; level: "top" | "bottom" } | null => {
+    const nearestEdgeHit = (cx: number, cy: number, pickOnly = false): { i: number; level: "top" | "bottom" } | null => {
       let best: { i: number; level: "top" | "bottom" } | null = null, bd = fingerTol;
       for (const e of st.current.edges) {
         if (e.level === "bottom" && !props.current.bottomSelectable) continue;
+        // Gedachte Seitenkante (Oben/Unten/…) überdeckt beim Antippen nie echte Körperkanten.
+        if (pickOnly && e.i < 0) continue;
         const A = screen(e.a), B = screen(e.b); const dx = B.x - A.x, dy = B.y - A.y; const L = dx * dx + dy * dy || 1;
         const t = Math.max(0, Math.min(1, ((cx - A.x) * dx + (cy - A.y) * dy) / L));
         const d = Math.hypot(cx - (A.x + t * dx), cy - (A.y + t * dy));
@@ -121,7 +123,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
       touches = Math.max(0, touches - 1);
       const d = down; down = null; controls.enabled = true;
       if (!d || d.id !== e.pointerId || d.moved || d.edgeDrag) return; // Fingerheben hält die Vorschau
-      const r = cv.getBoundingClientRect(); const hit = nearestEdgeHit(e.clientX - r.left, e.clientY - r.top);
+      const r = cv.getBoundingClientRect(); const hit = nearestEdgeHit(e.clientX - r.left, e.clientY - r.top, true);
       if (hit && hit.i >= 0 && props.current.selectable.has(hit.i)) props.current.onPickEdge?.(hit.i, hit.level);
     };
     cv.addEventListener("pointerdown", onDown, true); window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); window.addEventListener("pointercancel", onUp);

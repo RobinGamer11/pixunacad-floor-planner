@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, A
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
+import { sharedFields3D } from "@/cad/three3d/multiEdit3D";
 import { sheetElevationM } from "@/cad/SheetManager";
 import { computeStairGeometry } from "@/cad/stairGeometry";
 import { cardinalEdge, convexHull, frameForCardinal, genericVertex, resolveGenericTilt, withOpposite, type Cardinal } from "@/cad/three3d/tiltGeometry";
@@ -156,7 +157,9 @@ export const Object3DSettings: React.FC<{
   const elevItems = items.filter(x => x.kind !== "door");
   const elevVals = elevItems.map(x => objectElevationM(x.obj));
   const elevCommon = elevVals.length && elevVals.every(v => Math.abs(v - elevVals[0]) < 1e-9) ? elevVals[0] : null;
-  const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0) delete x.obj.elevationM; else x.obj.elevationM = v; } });
+  const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0 && x.kind !== "infobox") delete x.obj.elevationM; else x.obj.elevationM = v; } });
+  // Mehrfachauswahl: gleiche Eigenschaften gemeinsam bearbeiten (ein Undo-Schritt).
+  const shared = multi ? sharedFields3D(items) : [];
   const name = obj.objName || obj.objCode || "";
 
   const body = (
@@ -178,6 +181,10 @@ export const Object3DSettings: React.FC<{
           {elevItems.length > 0 && (
             <NumField label={`Höhenlage ü. Blatt${multi ? ` (${elevItems.length} Objekte)` : ""}`} info={`Bezogen auf das Blatt (Blatthöhe ${fmt(sheetZ)} m). Negative Werte erlaubt.`} value={elevCommon} onCommit={allEditable ? setElev : undefined} />
           )}
+          {shared.map(f => (
+            <NumField key={f.key} label={`${f.label} (${items.length} Objekte)`} value={f.value} min={Number.isFinite(f.min) ? f.min : undefined} minExclusive={f.minExclusive}
+              onCommit={allEditable ? (v) => act(app, () => f.write(v)) : undefined} />
+          ))}
           {!multi && isDoor && <DoorFields app={app} obj={obj} editable={editable(obj)} />}
           {!multi && kind === "wall" && (
             <NumField label="Körperhöhe (Wandhöhe)" info={`Anschlüsse an Nachbarwände entstehen automatisch. Wanddicke ${fmt(Number(obj.thicknessM) || 0)} m.`} value={Number(obj.heightM) || 0} min={0} minExclusive
@@ -327,23 +334,27 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   };
   // Jedes Objekt unabhängig: offene Entwürfe werden beim Objektwechsel verworfen, nie übertragen.
   // 3D-Vorschau (flüchtig) des Entwurfs auf dem ausgewählten Körper.
+  // Beige Bezugskante von Anfang an; grauer Vorschaukörper nur bei offenem Entwurf.
   useEffect(() => {
-    if (!session || !draftTilt) { setTiltDraftPreview(null); return; }
+    const live = !!(session && draftTilt);
     if (generic) {
-      const m = mergeMeshes((draftPieces || []).map(meshOfDerived));
+      const m = live ? mergeMeshes((draftPieces || []).map(meshOfDerived)) : null;
       const re = ringFaces && edge !== null && pts.length ? [ringFaces.top[edge], ringFaces.top[(edge + 1) % pts.length]] as any : undefined;
-      setTiltDraftPreview(m ? { mesh: m, edge: (highlight as any) ?? re } : null); return;
+      const e = (highlight as any) ?? re;
+      setTiltDraftPreview(m || e ? { mesh: m ?? undefined, edge: e } : null); return;
     }
     const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", sheetZ);
-    const m = meshOfDerived(d);
-    if (!m) { setTiltDraftPreview(null); return; }
-    if (highlight) { setTiltDraftPreview({ mesh: m, edge: highlight as any }); return; }
-    const lvl = cur.plumb && cur.mode === "rotate" && cur.anchor === "bottom" ? "bottom" : "top";
-    const ring = d?.faces?.[lvl]?.outer;
-    const e = edge !== null && ring && ring.length === pts.length ? [ring[edge], ring[(edge + 1) % ring.length]] as any : undefined;
-    setTiltDraftPreview({ mesh: m, edge: e });
+    const m = live ? meshOfDerived(d) : null;
+    let e: any = highlight;
+    if (!e) {
+      const lvl = cur.plumb && cur.mode === "rotate" && cur.anchor === "bottom" ? "bottom" : "top";
+      const ring = d?.faces?.[lvl]?.outer;
+      e = edge !== null && ring && ring.length === pts.length ? [ring[edge], ring[(edge + 1) % ring.length]] : undefined;
+      if (!e && edge !== null && pts.length > edge && !d?.faces) { const zz = z + h; e = [{ ...pts[edge], z: zz }, { ...pts[(edge + 1) % pts.length], z: zz }]; }
+    }
+    setTiltDraftPreview(m || e ? { mesh: m ?? undefined, edge: e } : null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify([session, draftTilt, edge, card, obj?.id, pts, sheetZ])]);
+  }, [JSON.stringify([session, draftTilt, edge, card, obj?.id, pts, sheetZ, highlight])]);
   useEffect(() => () => setTiltDraftPreview(null), [obj]);
   const cancel = () => setSession(null);
   useEffect(() => {
@@ -446,9 +457,9 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
             <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all" style={{ left: cur.opposite ? 22 : 3, background: cur.opposite ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))" }} />
           </button>
         </label>}
-        <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5" style={{ ...C.field, opacity: canEdit && cur.mode === "rotate" ? 1 : 0.5 }}>
+        <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5" title={cur.basis === "plan" ? "Nur bei „Tatsächliche Fläche“ verfügbar" : undefined} style={{ ...C.field, opacity: canEdit && cur.mode === "rotate" && cur.basis !== "plan" ? 1 : 0.4, cursor: cur.basis === "plan" ? "not-allowed" : undefined }}>
           <span className="flex items-center text-[12px]">Kanten bündig<InfoTip text="Die gewählte Kante bleibt an ihrer Stelle, die Seiten werden lotrecht. Oberkante gewählt: die Kante darunter wird lotrecht nach unten geführt. Unterkante gewählt (in der Vorschau antippen): die Kante darüber wird lotrecht nach oben geführt. Der Körper wird nicht länger." /></span>
-          <button type="button" role="switch" aria-checked={cur.plumb} disabled={!canEdit || cur.mode === "lift"} onClick={() => begin({ plumb: !cur.plumb })}
+          <button type="button" role="switch" aria-checked={cur.plumb} disabled={!canEdit || cur.mode === "lift" || cur.basis === "plan"} onClick={() => begin({ plumb: !cur.plumb })}
             className="relative h-6 w-11 shrink-0 rounded-full border transition-colors" style={cur.plumb ? C.gold : C.field}>
             <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all" style={{ left: cur.plumb ? 22 : 3, background: cur.plumb ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))" }} />
           </button>

@@ -6,6 +6,7 @@
 import type { Vec2 } from "../geometry";
 import { ProjectionCamera, drawSheetSnapshotContent, preloadSnapshotDocImages } from "../ProjectionRender";
 import type { Texture3D } from "./geometryDerivation";
+import { infoBoxTone } from "./infoBoxGeometry";
 
 const MAX_PX = 1024;
 const MAX_PX_PER_M = 600;
@@ -85,29 +86,48 @@ export async function renderPlaneTexture(
   return { canvas, transparent, failed: false };
 }
 
+/** Infobox in 3D wie in 2D: Pin mit Info-Symbol bzw. Kürzel, ruhige Farben. */
 function renderInfoBoxTexture(box: any): PlaneTextureResult | null {
   if (!box) return null;
-  const canvas = document.createElement("canvas"); canvas.width = 768; canvas.height = 768;
+  const N = 768;
+  const canvas = document.createElement("canvas"); canvas.width = N; canvas.height = N;
   const ctx = canvas.getContext("2d"); if (!ctx) return null;
-  ctx.fillStyle = "#f8f9fa"; ctx.fillRect(0,0,768,768);
-  ctx.fillStyle = box.kind === "task" ? (box.status === "done" ? "#23875b" : "#b18b49") : "#343b44";
-  ctx.fillRect(0,0,768,100); ctx.fillStyle = "#ffffff"; ctx.font = "600 32px sans-serif";
-  ctx.fillText(box.kind === "task" ? (box.status === "done" ? "Erledigt" : "Aufgabe · Offen") : "Information",32,64);
-  ctx.fillStyle = "#202830";
-  let y=156;
-  const write = (text: string, bold: boolean) => {
-    ctx.font = `${bold ? "600" : "400"} ${bold ? 36 : 28}px sans-serif`;
-    for (const paragraph of text.split("\n")) {
-      let line = "";
-      for (const word of paragraph.split(/\s+/)) {
-        if (ctx.measureText(line+word).width > 690 && line) { ctx.fillText(line,32,y,704); y+=42; line=""; }
-        line+=word+" ";
-        if (y>708) break;
-      }
-      if (y<=708) ctx.fillText(line,32,y,704);
-      y+=48;
-    }
+  const tone = infoBoxTone(box);
+  const task = box.kind === "task";
+  // Hintergrund: sanfter Verlauf in der Grundfarbe.
+  const bg = ctx.createLinearGradient(0, 0, 0, N);
+  bg.addColorStop(0, "#fbfaf7"); bg.addColorStop(1, tone.body);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, N, N);
+  // Pin wie in 2D: rund, Ecke unten links spitz (50% 50% 50% 19%).
+  const cx = N / 2, cy = task || !box.title ? N / 2 : N * 0.42, R = N * 0.27, rs = R * 0.38;
+  const x0 = cx - R, y0 = cy - R, x1 = cx + R, y1 = cy + R;
+  const pin = () => {
+    ctx.beginPath();
+    ctx.moveTo(cx, y0);
+    ctx.arcTo(x1, y0, x1, cy, R); ctx.arcTo(x1, y1, cx, y1, R);
+    ctx.arcTo(x0, y1, x0, cy, rs); ctx.arcTo(x0, y0, cx, y0, R);
+    ctx.closePath();
   };
-  write(String(box.title || "Infobox"),true); y+=16; write(String(box.desc || ""),false);
-  return {canvas,transparent:false,failed:false};
+  ctx.save(); ctx.shadowColor = "rgba(40,36,30,0.18)"; ctx.shadowBlur = 36; ctx.shadowOffsetY = 12;
+  pin(); ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.restore();
+  pin(); ctx.lineWidth = R * 0.12; ctx.strokeStyle = tone.accent; ctx.stroke();
+  if (task) {
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.72, 0, Math.PI * 2); ctx.fillStyle = tone.accent; ctx.fill();
+    ctx.lineWidth = R * 0.08; ctx.strokeStyle = "#ffffff"; ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.font = `700 ${Math.round(R * 0.6)}px sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(box.authorInitials || "?").slice(0, 3), cx, cy + R * 0.03, R * 1.3);
+  } else {
+    // Info-Symbol (Kreis mit „i“) wie im 2D-Pin.
+    ctx.strokeStyle = "#4a443b"; ctx.fillStyle = "#4a443b"; ctx.lineWidth = R * 0.09; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.56, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy - R * 0.02); ctx.lineTo(cx, cy + R * 0.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy - R * 0.27, R * 0.06, 0, Math.PI * 2); ctx.fill();
+    if (box.title) {
+      ctx.fillStyle = "#3b362f"; ctx.font = `600 ${Math.round(N * 0.07)}px sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(String(box.title), cx, N * 0.82, N * 0.86);
+    }
+  }
+  return { canvas, transparent: false, failed: false };
 }

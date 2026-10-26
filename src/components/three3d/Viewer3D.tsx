@@ -40,7 +40,7 @@ interface Props {
   /** Klick ins Leere (kein Körper getroffen). */
   onEmpty?: () => void;
   /** Flüchtige Neigungsvorschau (transparent grau, Bezugskante beige). */
-  ghost?: { mesh: { positions: number[]; indices: number[] }; edge?: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }] } | null;
+  ghost?: { mesh?: { positions: number[]; indices: number[] }; edge?: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }] } | null;
   /** Inhalt einer flachen Platte (Dokument, Text, Tabelle) als Bild. */
   textureFor?: (d: Derived3D) => Promise<{ canvas: HTMLCanvasElement; transparent: boolean; failed: boolean } | null>;
   materialImage?: (m: Material3D) => string | undefined;
@@ -267,12 +267,16 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const scene: THREE.Scene | undefined = st.current.scene;
     if (!scene || !ghost) return;
     const gg = new THREE.Group();
-    const m = ghost.mesh, pos = new Float32Array(m.positions.length);
+    // Ohne Entwurf nur die beige Bezugskante (kein Vorschaukörper).
+    const m = ghost.mesh;
+    if (m) {
+    const pos = new Float32Array(m.positions.length);
     for (let i = 0; i < pos.length; i += 3) { pos[i] = m.positions[i]; pos[i + 1] = m.positions[i + 2]; pos[i + 2] = m.positions[i + 1]; }
     const idx: number[] = []; for (let i = 0; i + 2 < m.indices.length; i += 3) idx.push(m.indices[i], m.indices[i + 2], m.indices[i + 1]);
     const geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
     gg.add(new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x9aa1ab, transparent: true, opacity: 0.38, roughness: 0.6, depthWrite: false, side: THREE.DoubleSide })));
     gg.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: 0xd9dde3, transparent: true, opacity: 0.7 })));
+    }
     if (ghost.edge) {
       const [a, b] = ghost.edge.map(p => new THREE.Vector3(p.x, p.z, p.y));
       const r = Math.max(0.025, a.distanceTo(b) * 0.008);
@@ -366,11 +370,13 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         g.add(obj);
         if (obj instanceof THREE.Mesh) {
           const mesh = obj, mat=mesh.material as THREE.MeshStandardMaterial;
+          if (d.glow && !d.texture) { mat.emissive.copy(mat.color); mat.emissiveIntensity = d.glow; }
           if (d.surfaceOpacity !== undefined) { mat.opacity=d.surfaceOpacity;mat.transparent=true;mat.depthWrite=false;mat.side=THREE.DoubleSide; }
           if (d.texture && textureFor && !d.material) textureFor(d).then(res=>{
             if(!res||st.current.gen!==gen||!mesh.parent)return;
             const tex=new THREE.CanvasTexture(res.canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
             mat.map=tex;if(!sel)mat.color.set("#ffffff");
+            if(d.glow){mat.emissive.set("#ffffff");mat.emissiveMap=tex;mat.emissiveIntensity=d.glow;}
             if(res.transparent){mat.transparent=true;mat.alphaTest=0.01;mat.depthWrite=false;}
             mat.needsUpdate=true;
           }).catch(()=>{});
