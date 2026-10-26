@@ -32,7 +32,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 
 ## Architekturregeln
 - Manual 3D edits share transient sheet-qualified selection and draft routing through `manualMoveState`; source commits use one `runAction`, while previews use isolated scene copies to protect persistence and wall topology.
-- Combined 3D manipulation uses two official Three.js controls with one gesture owner and one pivot; axis-only snap contacts and helper geometry stay transient in `manipulationSnap`, while device preferences stay outside project data to preserve shared undo and persistence.
+- Combined 3D manipulation uses two official Three.js controls with one gesture owner and one pivot; snap contacts, face-contact grids and 0,00 m level glow stay transient in `manipulationSnap`/viewer, the moved copy is only a preview until one commit, and device preferences stay outside project data to preserve shared undo and persistence.
 - Tilt reference display uses the stored physical tilt frame until a draft changes it; boundary heights come from derived geometry, so selecting another reference never relocates the solid's highlighted edge.
 - Rigid spatial orientation is `pose3D` in CAD coordinates, relative to sheet elevation; derive it after existing tilt and before relationships, and serialize it through object metadata so repeated rotations, copies and exports share one model.
 - 3D materials are object metadata with project-file image references; export the derived scene as standard glTF/GLB so other renderers receive PBR values and textures without a separate CAD model.
