@@ -178,6 +178,21 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
       if (moved < 5 && travelled < 7 && performance.now() - downAt.t < 500 && e.button === 0 && e.type === "pointerup") {
         const r = el.getBoundingClientRect();
+        // Neigung bearbeiten offen: Kanten des ausgewählten Körpers direkt in 3D wählbar.
+        const gp = getTiltDraftPreview();
+        if (gp?.edges?.length && gp.onPickEdge) {
+          const sx = e.clientX - r.left, sy = e.clientY - r.top, tol = e.pointerType === "touch" ? 26 : 14;
+          const scr = (p: { x: number; y: number; z: number }) => { const v = new THREE.Vector3(p.x, p.z, p.y).project(camera); return { x: (v.x + 1) / 2 * r.width, y: (1 - v.y) / 2 * r.height, ok: v.z < 1 }; };
+          let best = -1, bd = tol;
+          gp.edges.forEach(([pa, pb], i) => {
+            const a = scr(pa), b = scr(pb); if (!a.ok || !b.ok) return;
+            const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+            const t = l2 > 0 ? Math.max(0, Math.min(1, ((sx - a.x) * dx + (sy - a.y) * dy) / l2)) : 0;
+            const d = Math.hypot(sx - (a.x + t * dx), sy - (a.y + t * dy));
+            if (d < bd) { bd = d; best = i; }
+          });
+          if (best >= 0) { gp.onPickEdge(best); return; }
+        }
         ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
         ray.params.Line = { threshold: Math.max(0.05, orbit.r * 0.004) };
         const hit = ray.intersectObjects(group.children, true)[0];
