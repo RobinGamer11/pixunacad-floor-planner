@@ -43,7 +43,7 @@ describe("Paket 02",()=>{
   it("Infobox schwebt vertikal, ist größer/dicker und enthält eine Inhaltsfläche",()=>{
     const [body,face]=deriveInfoBox({id:"i",x:1,y:2,sizeM:0.5,title:"Baustelle"},"s",3);
     expect(infoBoxDimensions({sizeM:0.5})).toEqual({width:0.8,height:0.8,thickness:0.06,elevation:0.15});
-    expect(body.type).toBe("prism");if(body.type==='prism'){expect(body.z0).toBe(3.15);expect(body.z1).toBeCloseTo(3.95);}
+    expect(body.type).toBe("mesh");if(body.type==='mesh'){const zs=body.mesh.positions.filter((_,i)=>i%3===2);expect(Math.min(...zs)).toBeCloseTo(3.15);expect(Math.max(...zs)).toBeCloseTo(3.95);}
     expect(face.texture?.list).toBe("infoBoxes");expect(face.uvs).toHaveLength(8);
   });
   it("Türmaße folgen Laibung, Wandhöhenlage und Öffnungshöhe; geschlossen ist Standard",()=>{
