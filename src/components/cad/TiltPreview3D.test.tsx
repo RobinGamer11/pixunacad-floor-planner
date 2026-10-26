@@ -28,7 +28,7 @@ function setup() {
   const onParentDown = vi.fn(), onPickEdge = vi.fn(), onEdgeDrag = vi.fn();
   const view = render(<div onPointerDown={onParentDown}><TiltPreview3D
     obj={{ id: "test", points: [{x:0,y:0},{x:4,y:0},{x:4,y:2},{x:0,y:2}], heightM:2 }}
-    base={0} edge={0} selectable={new Set([0,1,2,3])} onPickEdge={onPickEdge} onEdgeDrag={onEdgeDrag}
+    base={0} draftTilt={undefined} edge={0} selectable={new Set([0,1,2,3])} onPickEdge={onPickEdge} onEdgeDrag={onEdgeDrag}
   /></div>);
   const canvas = view.container.querySelector("canvas");
   if (!canvas) throw new Error("Missing preview canvas");
