@@ -99,14 +99,11 @@ function renderInfoBoxTexture(box: any): PlaneTextureResult | null {
   bg.addColorStop(0, "#fbfaf7"); bg.addColorStop(1, tone.body);
   ctx.save();ctx.beginPath();ctx.arc(N/2,N/2,N/2,0,Math.PI*2);ctx.clip();
   ctx.fillStyle = bg; ctx.fillRect(0, 0, N, N);
-  // Pin wie in 2D: rund, Ecke unten links spitz (50% 50% 50% 19%).
-  const cx = N / 2, cy = N / 2, R = N * 0.42, rs = R * 0.38;
-  const x0 = cx - R, y0 = cy - R, x1 = cx + R, y1 = cy + R;
+  // Circular face follows the circular body, retaining the info symbol or initials.
+  const cx = N / 2, cy = N / 2, R = N * 0.42;
   const pin = () => {
     ctx.beginPath();
-    ctx.moveTo(cx, y0);
-    ctx.arcTo(x1, y0, x1, cy, R); ctx.arcTo(x1, y1, cx, y1, R);
-    ctx.arcTo(x0, y1, x0, cy, rs); ctx.arcTo(x0, y0, cx, y0, R);
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
     ctx.closePath();
   };
   ctx.save(); ctx.shadowColor = "rgba(40,36,30,0.18)"; ctx.shadowBlur = 36; ctx.shadowOffsetY = 12;
