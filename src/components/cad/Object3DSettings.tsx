@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, A
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
+import { sharedFields3D } from "@/cad/three3d/multiEdit3D";
 import { sheetElevationM } from "@/cad/SheetManager";
 import { computeStairGeometry } from "@/cad/stairGeometry";
 import { cardinalEdge, convexHull, frameForCardinal, genericVertex, resolveGenericTilt, withOpposite, type Cardinal } from "@/cad/three3d/tiltGeometry";
@@ -156,7 +157,9 @@ export const Object3DSettings: React.FC<{
   const elevItems = items.filter(x => x.kind !== "door");
   const elevVals = elevItems.map(x => objectElevationM(x.obj));
   const elevCommon = elevVals.length && elevVals.every(v => Math.abs(v - elevVals[0]) < 1e-9) ? elevVals[0] : null;
-  const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0) delete x.obj.elevationM; else x.obj.elevationM = v; } });
+  const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0 && x.kind !== "infobox") delete x.obj.elevationM; else x.obj.elevationM = v; } });
+  // Mehrfachauswahl: gleiche Eigenschaften gemeinsam bearbeiten (ein Undo-Schritt).
+  const shared = multi ? sharedFields3D(items) : [];
   const name = obj.objName || obj.objCode || "";
 
   const body = (
@@ -178,6 +181,10 @@ export const Object3DSettings: React.FC<{
           {elevItems.length > 0 && (
             <NumField label={`Höhenlage ü. Blatt${multi ? ` (${elevItems.length} Objekte)` : ""}`} info={`Bezogen auf das Blatt (Blatthöhe ${fmt(sheetZ)} m). Negative Werte erlaubt.`} value={elevCommon} onCommit={allEditable ? setElev : undefined} />
           )}
+          {shared.map(f => (
+            <NumField key={f.key} label={`${f.label} (${items.length} Objekte)`} value={f.value} min={Number.isFinite(f.min) ? f.min : undefined} minExclusive={f.minExclusive}
+              onCommit={allEditable ? (v) => act(app, () => f.write(v)) : undefined} />
+          ))}
           {!multi && isDoor && <DoorFields app={app} obj={obj} editable={editable(obj)} />}
           {!multi && kind === "wall" && (
             <NumField label="Körperhöhe (Wandhöhe)" info={`Anschlüsse an Nachbarwände entstehen automatisch. Wanddicke ${fmt(Number(obj.thicknessM) || 0)} m.`} value={Number(obj.heightM) || 0} min={0} minExclusive
