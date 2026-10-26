@@ -58,6 +58,9 @@
     /* Höhenillustration: feste Papierfarben, unabhängig vom Editor-Theme. */
     --cad-height-body: 0 0% 100%;
     --cad-height-outline: 0 0% 0%;
+    --gizmo-x: 8 66% 58%;
+    --gizmo-y: 146 38% 48%;
+    --gizmo-z: 211 66% 58%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
