@@ -5,7 +5,7 @@
  * Bibliotheks-Körperhöhe). Jede bestätigte Änderung = genau ein Undo-Schritt (runAction).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon, BrickWall, Hexagon, DoorOpen, AppWindow, Stairs, Package, FileText, Type, Table, Minus, PenLine, Boxes } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon, BrickWall, Hexagon, DoorOpen, AppWindow, Footprints, Package, FileText, Type, Table, Minus, PenLine, Boxes } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
@@ -127,7 +127,7 @@ const KIND_ICON = (kind: string, obj: any): React.ReactNode => {
   const icon = kind === "wall" ? BrickWall
     : kind === "hatch" ? Hexagon
     : kind === "door" ? (obj?.kind === "window" ? AppWindow : DoorOpen)
-    : kind === "stair" ? Stairs
+    : kind === "stair" ? Footprints
     : kind === "library" ? Package
     : kind === "document" ? FileText
     : kind === "textbox" ? Type
@@ -184,7 +184,7 @@ export const Object3DSettings: React.FC<{
   const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0 && x.kind !== "infobox") delete x.obj.elevationM; else x.obj.elevationM = v; } });
   // Mehrfachauswahl: gleiche Eigenschaften gemeinsam bearbeiten (ein Undo-Schritt).
   const shared = multi ? sharedFields3D(items) : [];
-  const name = obj.objName || obj.objCode || "";
+  const name = obj.objName || obj.objCode || ""; // eslint-disable-line @typescript-eslint/no-unused-vars -- kept for future header use
 
   const body = (
     <div className="space-y-2.5 text-xs">
