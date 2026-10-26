@@ -1,5 +1,12 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## 3D-Korrekturen – aktueller Auftrag
+- [ ] Objekteinstellungen bei Manuell bewegen unverändert lassen; separate Bewegungsfelder entfernen
+- [ ] Kontakt-Hilfsraster unabhängig und immer schaltbar, standardmäßig ein
+- [ ] Leichter leuchtender Winkelfang bei Vielfachen von 45°
+- [ ] Infobox als Kreis-Körper ohne herausragende Streifen
+- [ ] Regressionstests und verfügbare Browserprüfung
+
 ## Kombiniertes 3D-Paket – 26.10.2026
 - [x] Bezugskante und Kantenwahl entlang der tatsächlichen geneigten Körpergeometrie; gespeicherter Rahmen bleibt beim Kantenwechsel unverändert
 - [x] Gemeinsames Verschieben-/Drehen-Gizmo mit Weltachsen und zoomstabiler Größe
