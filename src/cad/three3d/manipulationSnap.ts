@@ -72,3 +72,28 @@ export function snapRotationAngle(angle:number,step:number,previous:number|null)
   const nearest=Math.round(angle/step)*step;
   return Math.abs(angle-nearest)<=tolerance?{angle:nearest,contact:nearest}:{angle,contact:null};
 }
+export interface Box3 { x0:number;x1:number;y0:number;y1:number;z0:number;z1:number }
+export function boxOf(points: Vec3[]): Box3|null {
+  if(!points.length)return null;
+  const b={x0:Infinity,x1:-Infinity,y0:Infinity,y1:-Infinity,z0:Infinity,z1:-Infinity};
+  for(const p of points){b.x0=Math.min(b.x0,p.x);b.x1=Math.max(b.x1,p.x);b.y0=Math.min(b.y0,p.y);b.y1=Math.max(b.y1,p.y);b.z0=Math.min(b.z0,p.z);b.z1=Math.max(b.z1,p.z);}
+  return b;
+}
+/** Face contact of the moving box with another body: plane axis and coordinate. */
+export interface FaceContact { axis: WorldAxis; at: number; box: Box3 }
+export function faceContacts(moving: Box3, others: Box3[], eps=.01): FaceContact[] {
+  const out: FaceContact[]=[], ov=(a0:number,a1:number,b0:number,b1:number)=>Math.min(a1,b1)-Math.max(a0,b0)>-eps;
+  const strict=(a0:number,a1:number,b0:number,b1:number)=>Math.min(a1,b1)-Math.max(a0,b0)>eps;
+  for(const o of others){
+    const ox=strict(moving.x0,moving.x1,o.x0,o.x1),oy=strict(moving.y0,moving.y1,o.y0,o.y1),oz=strict(moving.z0,moving.z1,o.z0,o.z1);
+    void ov;
+    if(ox&&oy)for(const at of [o.z1,o.z0])if(Math.abs(moving.z0-at)<eps||Math.abs(moving.z1-at)<eps){out.push({axis:"z",at,box:moving});break;}
+    if(oy&&oz)for(const at of [o.x1,o.x0])if(Math.abs(moving.x0-at)<eps||Math.abs(moving.x1-at)<eps){out.push({axis:"x",at,box:moving});break;}
+    if(ox&&oz)for(const at of [o.y1,o.y0])if(Math.abs(moving.y0-at)<eps||Math.abs(moving.y1-at)<eps){out.push({axis:"y",at,box:moving});break;}
+  }
+  return out;
+}
+/** Level (sheet or 3D ground) on which the moving body rests; earlier entries (sheets) win at equal height. */
+export function restingLevel<T extends {z:number}>(moving: Box3, levels: T[], eps=.005): T|null {
+  return levels.find(l=>Math.abs(moving.z0-l.z)<eps)??null;
+}
