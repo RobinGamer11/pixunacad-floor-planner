@@ -9,6 +9,7 @@ import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { Maximize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { deriveHatch } from "@/cad/three3d/geometryDerivation";
 import { pieceMesh, piecePoints } from "@/cad/three3d/geometryDerivation";
 import type { MeshData } from "@/cad/three3d/solidMesh";
@@ -51,7 +52,8 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
 
   // Einmalige Einrichtung; Ressourcen beim Schließen freigeben.
   useEffect(() => {
-    const el = host.current!; const W = el.clientWidth || 260, H = 180;
+    const el = host.current; if (!el) return;
+    const W = el.clientWidth || 260, H = 220;
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
     catch { el.dataset.noWebgl = "1"; return; } // ohne WebGL: Bedienung über Zahl/Regler bleibt
@@ -76,6 +78,10 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
 
     // Tipp vs. Ziehen unterscheiden; Kantenzug nur an der gewählten Kante.
     const cv = renderer.domElement;
+    // The preview owns its gestures: never let a parent panel capture a camera drag.
+    const isolatePointer = (e: PointerEvent) => { e.stopPropagation(); };
+    const preventAux = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };
+    const isolateWheel = (e: WheelEvent) => { e.stopPropagation(); };
     let down: { id: number; x: number; y: number; moved: boolean; edgeDrag: boolean; ppm: number } | null = null;
     let touches = 0;
     const screen = (v: THREE.Vector3) => { const r = cv.getBoundingClientRect(); const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * r.width, y: (1 - p.y) / 2 * r.height }; };
@@ -103,7 +109,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
       const P = props.current;
       let edgeDrag = false, ppm = 1;
       const dragIdx = P.highlight ? -2 : P.edge;
-      if (P.onEdgeDrag && dragIdx !== null && nearestEdge(cx, cy) === dragIdx) {
+      if ((e.pointerType !== "mouse" || e.button === 0) && P.onEdgeDrag && dragIdx !== null && nearestEdge(cx, cy) === dragIdx) {
         const e0 = st.current.edges.find((x: any) => x.i === dragIdx);
         if (e0) {
           const mid = e0.a.clone().add(e0.b).multiplyScalar(0.5);
@@ -122,12 +128,31 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     const onUp = (e: PointerEvent) => {
       touches = Math.max(0, touches - 1);
       const d = down; down = null; controls.enabled = true;
-      if (!d || d.id !== e.pointerId || d.moved || d.edgeDrag) return; // Fingerheben hält die Vorschau
+      if (!d || d.id !== e.pointerId || d.moved || d.edgeDrag || e.type === "pointercancel" || (e.pointerType === "mouse" && e.button !== 0 && e.button !== 2)) return; // Fingerheben hält die Vorschau
       const r = cv.getBoundingClientRect(); const hit = nearestEdgeHit(e.clientX - r.left, e.clientY - r.top, true);
       if (hit && hit.i >= 0 && props.current.selectable.has(hit.i)) props.current.onPickEdge?.(hit.i, hit.level);
     };
     cv.addEventListener("pointerdown", onDown, true); window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); window.addEventListener("pointercancel", onUp);
+    cv.addEventListener("pointerdown", isolatePointer);
+    cv.addEventListener("mousedown", preventAux);
+    cv.addEventListener("auxclick", preventAux);
+    cv.addEventListener("wheel", isolateWheel, { passive: true });
+    const resetGesture = () => {
+      down = null; touches = 0;
+      // enabled=false makes OrbitControls ignore moves, but does not clear its pointer list.
+      // Disconnect/reconnect releases captures and document listeners as well as that list.
+      controls.disconnect(); controls.connect(); controls.enabled = true;
+    };
+    const lostCapture = () => { if (down || touches) resetGesture(); };
+    cv.addEventListener("lostpointercapture", lostCapture);
+    window.addEventListener("blur", resetGesture);
     return () => {
+      cv.removeEventListener("pointerdown", isolatePointer);
+      cv.removeEventListener("mousedown", preventAux);
+      cv.removeEventListener("auxclick", preventAux);
+      cv.removeEventListener("wheel", isolateWheel);
+      cv.removeEventListener("lostpointercapture", lostCapture);
+      window.removeEventListener("blur", resetGesture);
       cv.removeEventListener("pointerdown", onDown, true); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp);
       ro.disconnect(); controls.dispose();
       group.traverse((o: any) => { o.geometry?.dispose?.(); o.material?.dispose?.(); });
@@ -160,7 +185,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
       for (let i = 0; i < pos.length; i += 3) { pos[i] = m.positions[i]; pos[i + 1] = m.positions[i + 2]; pos[i + 2] = m.positions[i + 1]; }
       const idx: number[] = []; for (let i = 0; i < m.indices.length; i += 3) idx.push(m.indices[i], m.indices[i + 2], m.indices[i + 1]);
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-      g.computeBoundingBox(); s.body = g.boundingBox!.clone();
+      g.computeBoundingBox(); s.body = g.boundingBox?.clone() ?? null;
       s.group.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: obj.fillColor || "#cfc6b0", roughness: 0.85, flatShading: true, side: THREE.DoubleSide })));
       s.group.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 25), new THREE.LineBasicMaterial({ color: 0x2a2f3a, transparent: true, opacity: 0.55 })));
     }
@@ -205,12 +230,12 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
   }, [JSON.stringify([obj?.id, pts, obj?.holes, obj?.bulges, obj?.heightM, obj?.elevationM, obj?.fillColor, draftTilt, edge, edgeLevel, frame?.axis, frame?.dir, base, pieces?.map((x: any) => x.mesh?.positions?.length ?? x.type), framePts, highlight, ringFaces])]);
 
   return (
-    <div ref={host} className="relative w-full overflow-hidden rounded-lg border" style={{ height: 180, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
-      <button type="button" onClick={fit} title="Gesamtes Objekt anzeigen" aria-label="Gesamtes Objekt anzeigen"
-        className="absolute right-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-md border"
+    <div ref={host} className="relative w-full overflow-hidden rounded-lg border" style={{ height: 220, borderColor: "hsl(var(--overlay-surface) / 0.16)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
+      <Button variant="ghost" size="icon" type="button" onClick={fit} title="Gesamtes Objekt anzeigen" aria-label="Gesamtes Objekt anzeigen"
+        className="absolute right-1.5 top-1.5 grid h-9 w-9 place-items-center rounded-md border"
         style={{ borderColor: "hsl(var(--overlay-surface) / 0.2)", background: "hsl(var(--overlay-ink) / 0.85)", color: "hsl(var(--overlay-surface))" }}>
         <Maximize2 size={12} />
-      </button>
+      </Button>
       {children}
     </div>
   );
