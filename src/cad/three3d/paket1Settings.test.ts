@@ -32,6 +32,15 @@ describe("Paket 1 – 3D-Einstellungen", () => {
     expect(extent(tilted)).toBeCloseTo(extent(parts), 6);
   });
 
+  it("Kante neigen: Fenster bleibt exakt an seinem Platz, Aussparung folgt dem Fenster", () => {
+    const tw: any = { ...wall, tilt3D: { edgeIndex: -1, a: { x: 0, y: -0.15 }, b: { x: 5, y: -0.15 }, count: 4, cardinal: "bottom", angleDeg: 30, mode: "lift" } };
+    const parts = deriveOpening(door, tw, "s", 0);
+    expect(tiltOpeningWithWall(tw, deriveWall(tw, [], "s", 0), parts, 0)).toBe(parts);
+    const [c] = openingCutters(tw, [door], "s", 0, deriveWall(tw, [], "s", 0));
+    const zs = c.positions.filter((_, i) => i % 3 === 2);
+    expect(Math.min(...zs)).toBeCloseTo(0.9, 9); expect(Math.max(...zs)).toBeCloseTo(2.1, 9);
+  });
+
   it("Mehrfachauswahl: gleiche Wandhöhe wird angezeigt und gemeinsam gesetzt", () => {
     const a = { heightM: 2.5 }, b = { heightM: 2.5 };
     const [f] = sharedFields3D([{ kind: "wall", obj: a }, { kind: "wall", obj: b }]);
