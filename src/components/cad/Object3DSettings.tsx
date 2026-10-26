@@ -24,6 +24,9 @@ import { deriveHatch } from "@/cad/three3d/geometryDerivation";
 import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 import { projectionCos } from "@/cad/three3d/tiltGeometry";
 import { setOpeningState } from "@/cad/three3d/projectBridge";
+import { boundaryRings } from "@/cad/three3d/tiltBoundary";
+import { normalizedPose } from "@/cad/three3d/spatialTransform";
+import { Matrix4, Vector3 } from "three";
 
 const C = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
@@ -256,8 +259,8 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const outline: Vec2[] = generic ? convexHull(rawPts) : rawPts;
   const resolveNow = () => generic ? resolveGenericTilt(obj.tilt3D, rawPts, z) : resolveTilt(obj, z);
   const resolved = resolveNow();
-  const firstEdge = () => generic ? null : (straightEdgeIndices(obj)[0] ?? null);
-  const initCard = (t: any): Cardinal | null => t?.cardinal ?? (generic && !t ? "bottom" : null);
+  const firstEdge = () => generic ? (outline.length > 1 ? 0 : null) : (straightEdgeIndices(obj)[0] ?? null);
+  const initCard = (t: any): Cardinal | null => t?.cardinal ?? null;
   const [edge, setEdge] = useState<number | null>(resolved?.frame && !stored?.cardinal ? resolved.frame.edgeIndex : firstEdge());
   const [card, setCard] = useState<Cardinal | null>(initCard(stored));
   const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual"; opposite: boolean } | null>(null);
@@ -289,6 +292,11 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     ? { ...tf, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb, anchor: cur.anchor, ...(cur.basis ? { basis: cur.basis } : {}), ...(cur.opposite ? { opposite: true } : {}), projDeg }
     : (session ? undefined : stored);
   const draftPieces = generic ? (draftTilt ? deriveObjectFromApp(app, obj, draftTilt) : flatPieces) : undefined;
+  // Selecting a new reference does not until a numeric edit replace the stored physical tilt.
+  const displayFrame = draftTilt ? resolveGenericTilt(draftTilt, rawPts, z)?.frame : undefined;
+  const pose = normalizedPose(obj.pose3D);
+  const poseMatrix = pose ? new Matrix4().makeTranslation(0,0,sheetZ).multiply(new Matrix4().fromArray(pose)).multiply(new Matrix4().makeTranslation(0,0,-sheetZ)) : null;
+  const posePoint = (p: {x:number;y:number;z:number}) => { if(!poseMatrix)return p;const v=new Vector3(p.x,p.y,p.z).applyMatrix4(poseMatrix);return {x:v.x,y:v.y,z:v.z}; };
   // Gedachte Kante räumlich (Oberkante bzw. Unterkante bei „Kanten bündig“ unten).
   const highlight = cEdge && frame ? (() => {
     const zz = cur.plumb && cur.mode === "rotate" && cur.anchor === "bottom" ? z : z + h;
@@ -299,9 +307,15 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
 
   // Echte Kanten bei allen Objektarten: Ober-/Unterkanten der Hülle räumlich (Auswahl/Hervorhebung).
   const ringFaces = generic ? (() => {
-    const dt: any = draftTilt, f2 = dt ? frameAt(dt.angleDeg, !!dt.opposite)?.frame : undefined;
-    const tv = (p: Vec2, zz: number) => dt && f2 ? genericVertex(p.x, p.y, zz, f2, dt, h) : { x: p.x, y: p.y, z: zz };
-    return { top: pts.map(p => tv(p, z + h)), bottom: pts.map(p => tv(p, z)) };
+    // Flat derivation already includes pose3D; undo it before applying tilt, then restore.
+    const inverse = poseMatrix?.clone().invert();
+    const canonicalFlat = poseMatrix ? flatPieces.map(d=>{
+      if(d.type!=="mesh")return d;
+      const positions=d.mesh.positions.slice();
+      for(let i=0;i<positions.length;i+=3){const v=new Vector3(positions[i],positions[i+1],positions[i+2]);if(inverse)v.applyMatrix4(inverse);positions[i]=v.x;positions[i+1]=v.y;positions[i+2]=v.z;}
+      return {...d,mesh:{...d.mesh,positions}};
+    }) : flatPieces;
+    return boundaryRings(canonicalFlat,pts,p=>posePoint(draftTilt&&displayFrame?genericVertex(p.x,p.y,p.z,displayFrame,draftTilt,h):p));
   })() : undefined;
 
   const begin = (patch: Partial<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual"; opposite: boolean }>) => setSession({ ...cur, ...patch });
@@ -346,7 +360,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     if (generic) {
       const m = live ? mergeMeshes((draftPieces || []).map(meshOfDerived)) : null;
       const re = !card && ringFaces && edge !== null && pts.length ? [ringFaces.top[edge], ringFaces.top[(edge + 1) % pts.length]] as any : undefined;
-      const e = (highlight as any) ?? re;
+      const e = re ?? (highlight as any);
       setTiltDraftPreview({ mesh: m ?? undefined, edge: e, ...pickable(ringFaces?.top) }); return;
     }
     const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", sheetZ);
@@ -414,7 +428,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
 
       <Section title="Neigung bearbeiten">
         {resolved?.error && <div className="rounded-lg border px-2 py-1.5 text-[11px]" style={C.err}>{resolved.error}</div>}
-        <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={card ? null : edge} pieces={draftPieces} highlight={highlight} ring={generic ? pts : undefined} ringFaces={ringFaces} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
+        <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={card ? null : edge} pieces={draftPieces} highlight={generic && !card ? undefined : highlight} ring={generic ? pts : undefined} ringFaces={ringFaces} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
           bottomSelectable={cur.plumb && cur.mode === "rotate"}
           onPickEdge={editable ? (i, level) => {
             setCard(null);
