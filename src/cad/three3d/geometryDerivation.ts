@@ -20,6 +20,7 @@ import { meshOf, subtractPrism } from "./relations";
 import { genericVertex, resolveGenericTilt, scaleAcrossAxis, tiltShape, tiltShapeError } from "./tiltGeometry";
 import { csgMesh, faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 import type { Material3D } from "./materials";
+import { patternOf, type Pattern3D } from "./pattern3D";
 import { deriveOpening } from "./openingGeometry";
 import { deriveInfoBox } from "./infoBoxGeometry";
 import { projectionCos } from "./tiltGeometry";
@@ -88,7 +89,7 @@ export interface Mesh3D {
 }
 
 export interface Texture3D { list: "documents" | "textBoxes" | "tables" | "libraryInstances" | "infoBoxes"; corners?: Vec2[]; snapshot?: unknown; objectId?: string }
-export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { spatialPoints?: Vec3[]; note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[]; /** Leichtes Eigenleuchten (0…1), z. B. Infobox-Symbol. */ glow?: number };
+export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { spatialPoints?: Vec3[]; note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[]; pattern?: Pattern3D; /** Leichtes Eigenleuchten (0…1), z. B. Infobox-Symbol. */ glow?: number };
 
 export interface DeriveOptions {
   /** Grundrissgröße eines Bibliotheksobjekts (lokal, vor Skalierung). */
@@ -418,8 +419,9 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     const ord = orderOf.get(o) ?? 0;
     const tilted = !preTilted && o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
     const list = applySpatialPose(tilted, o.pose3D, base);
-    for (const d of list) { d.order = ord; d.material = d.part === "frame" ? o.frameMaterial3D ?? o.material3D : d.part === "glass" || d.part === "leaf" ? o.panelMaterial3D ?? o.material3D : o.material3D; out.push(d); }
+    const pat = d0Pattern(o); for (const d of list) { d.order = ord; if (pat && !d.texture && d.source !== "door" && d.source !== "window" && d.type !== "line") d.pattern = pat; d.material = d.part === "frame" ? o.frameMaterial3D ?? o.material3D : d.part === "glass" || d.part === "leaf" ? o.panelMaterial3D ?? o.material3D : o.material3D; out.push(d); }
   };
+  const d0Pattern = (o: any) => patternOf(o, (scene.walls || []).includes(o) ? "walls" : "other");
   const doors = (scene.doors || []).filter(vis);
   // Geneigte Wände: erst ohne Öffnungen neigen, dann die (starr mitgeführten) Öffnungen ausschneiden –
   // so verzieht sich die Aussparung bei „Kante neigen“/„Kanten bündig“ nie mit der Wand.
