@@ -84,6 +84,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     const isolateWheel = (e: WheelEvent) => { e.stopPropagation(); };
     let down: { id: number; x: number; y: number; moved: boolean; edgeDrag: boolean; ppm: number } | null = null;
     let touches = 0;
+    const activePointers = new Set<number>();
     const screen = (v: THREE.Vector3) => { const r = cv.getBoundingClientRect(); const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * r.width, y: (1 - p.y) / 2 * r.height }; };
     // Großzügige Fangzone (Finger/Tablet): 28 px, bei Maus 18 px.
     let fingerTol = 18;
@@ -102,6 +103,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     };
     const nearestEdge = (cx: number, cy: number) => nearestEdgeHit(cx, cy)?.i ?? -1;
     const onDown = (e: PointerEvent) => {
+      activePointers.add(e.pointerId);
       fingerTol = e.pointerType === "mouse" ? 18 : 28;
       touches++;
       if (touches > 1) { down = null; controls.enabled = true; return; } // Pinch = nur Kamera
@@ -126,6 +128,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
       if (down.edgeDrag) props.current.onEdgeDrag?.("move", -(e.clientY - down.y) / down.ppm);
     };
     const onUp = (e: PointerEvent) => {
+      activePointers.delete(e.pointerId);
       touches = Math.max(0, touches - 1);
       const d = down; down = null; controls.enabled = true;
       if (!d || d.id !== e.pointerId || d.moved || d.edgeDrag || e.type === "pointercancel" || (e.pointerType === "mouse" && e.button !== 0 && e.button !== 2)) return; // Fingerheben hält die Vorschau
@@ -139,9 +142,11 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     cv.addEventListener("wheel", isolateWheel, { passive: true });
     const resetGesture = () => {
       down = null; touches = 0;
-      // enabled=false makes OrbitControls ignore moves, but does not clear its pointer list.
-      // Disconnect/reconnect releases captures and document listeners as well as that list.
-      controls.disconnect(); controls.connect(); controls.enabled = true;
+      // OrbitControls must receive cancellation to clear its internal pointer list.
+      for (const pointerId of [...activePointers]) {
+        cv.dispatchEvent(new PointerEvent("pointercancel", { pointerId }));
+      }
+      activePointers.clear(); controls.enabled = true;
     };
     const lostCapture = () => { if (down || touches) resetGesture(); };
     cv.addEventListener("lostpointercapture", lostCapture);
