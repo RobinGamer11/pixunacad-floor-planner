@@ -195,7 +195,7 @@ export const Object3DSettings: React.FC<{
               {multi ? <Boxes size={26} style={{ color: "hsl(var(--accent-gold))" }} /> : KIND_ICON(kind, obj)}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-base font-bold leading-tight">{multi ? `${items.length} Objekte` : (obj.objName || KIND_LABEL(kind, obj))}</div>
+              <div className="truncate text-base font-bold leading-tight">{headerTitle}</div>
               {!multi && <div className="truncate text-[12px]" style={C.muted}>{obj.objCode ? `#${obj.objCode}` : (obj.objName ? KIND_LABEL(kind, obj) : "ohne Namen")}</div>}
             </div>
             {onCollapse && (
