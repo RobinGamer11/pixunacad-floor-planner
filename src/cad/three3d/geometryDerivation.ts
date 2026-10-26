@@ -88,7 +88,7 @@ export interface Mesh3D {
 }
 
 export interface Texture3D { list: "documents" | "textBoxes" | "tables" | "libraryInstances" | "infoBoxes"; corners?: Vec2[]; snapshot?: unknown; objectId?: string }
-export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { spatialPoints?: Vec3[]; note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[] };
+export type Derived3D = (Prism3D | Plane3D | Line3D | Mesh3D) & { spatialPoints?: Vec3[]; note?: string; material?: Material3D; part?: "frame" | "leaf" | "glass"; surfaceOpacity?: number; texture?: Texture3D; uvs?: number[]; /** Leichtes Eigenleuchten (0…1), z. B. Infobox-Symbol. */ glow?: number };
 
 export interface DeriveOptions {
   /** Grundrissgröße eines Bibliotheksobjekts (lokal, vor Skalierung). */

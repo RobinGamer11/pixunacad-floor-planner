@@ -370,11 +370,13 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         g.add(obj);
         if (obj instanceof THREE.Mesh) {
           const mesh = obj, mat=mesh.material as THREE.MeshStandardMaterial;
+          if (d.glow && !d.texture) { mat.emissive.copy(mat.color); mat.emissiveIntensity = d.glow; }
           if (d.surfaceOpacity !== undefined) { mat.opacity=d.surfaceOpacity;mat.transparent=true;mat.depthWrite=false;mat.side=THREE.DoubleSide; }
           if (d.texture && textureFor && !d.material) textureFor(d).then(res=>{
             if(!res||st.current.gen!==gen||!mesh.parent)return;
             const tex=new THREE.CanvasTexture(res.canvas);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=4;
             mat.map=tex;if(!sel)mat.color.set("#ffffff");
+            if(d.glow){mat.emissive.set("#ffffff");mat.emissiveMap=tex;mat.emissiveIntensity=d.glow;}
             if(res.transparent){mat.transparent=true;mat.alphaTest=0.01;mat.depthWrite=false;}
             mat.needsUpdate=true;
           }).catch(()=>{});
