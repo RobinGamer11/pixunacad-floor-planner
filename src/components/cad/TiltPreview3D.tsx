@@ -200,8 +200,12 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     const bot = (ringFaces?.bottom ?? d?.faces?.bottom?.outer) as { x: number; y: number; z: number }[] | undefined;
     const zbot = d?.type === "prism" ? d.z0 : undefined;
     const gold = (a: THREE.Vector3, b: THREE.Vector3) => {
-      s.group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: 0xc8954a, linewidth: 3 })));
-      s.group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, 0.008 * Math.max(1, a.distanceTo(b) / 4), 6), new THREE.MeshBasicMaterial({ color: 0xc8954a })));
+      // Gut erkennbar: kräftiger Kern + weicher Schein, immer sichtbar (auch hinter dem Körper).
+      const r = 0.03 * Math.max(1, a.distanceTo(b) / 4);
+      const core = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 10), new THREE.MeshBasicMaterial({ color: 0xe0a94f, depthTest: false, transparent: true, opacity: 1 }));
+      const halo = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r * 2.4, 10), new THREE.MeshBasicMaterial({ color: 0xf2cf8a, depthTest: false, depthWrite: false, transparent: true, opacity: 0.35 }));
+      core.renderOrder = 20; halo.renderOrder = 19;
+      s.group.add(halo, core);
     };
     for (let i = 0; i < pts.length; i++) {
       const j = (i + 1) % pts.length;
