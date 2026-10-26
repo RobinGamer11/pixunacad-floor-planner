@@ -2,6 +2,8 @@ import { Object3D, Raycaster, Vector2, type Camera } from "three";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 
 type Axis = "X"|"Y"|"Z";
+/** r169 accepts normalized coordinates; @types still declares browser PointerEvent. */
+export function controlPointer(x:number,y:number,button:number):PointerEvent { return {x,y,button} as PointerEvent; }
 type Internals = TransformControls & { _gizmo: {picker:Record<"translate"|"rotate",Object3D>;gizmo:Record<"translate"|"rotate",Object3D>;helper:Record<"translate"|"rotate",Object3D>} };
 /** Two official Three.js controls share one pivot, but exactly one owns each gesture. */
 export function combinedGizmo(camera:Camera,element:HTMLElement,pivot:Object3D) {

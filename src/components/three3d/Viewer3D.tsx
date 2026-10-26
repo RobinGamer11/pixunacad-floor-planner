@@ -13,7 +13,7 @@ import { disposeTransformControls } from "./disposeTransformControls";
 import { CAD_TO_THREE, moveMatrix, type MoveDelta } from "@/cad/three3d/spatialTransform";
 import type { ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
-import { combinedGizmo } from "./combinedGizmo";
+import { combinedGizmo, controlPointer } from "./combinedGizmo";
 import { DEFAULT_SNAP_3D, spatialFeatures, snapAxisMove, snapRotationAngle, type SnapSettings3D, type SnapContact, type WorldAxis } from "@/cad/three3d/manipulationSnap";
 
 export interface CameraState { tx: number; ty: number; tz: number; r: number; theta: number; phi: number }
@@ -181,7 +181,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       if(picked){
         activeControl=picked.control;activePointer=e.pointerId;snapContact=null;angleContact=null;startQuaternion=pivot.quaternion.clone();marker.visible=false;
         activeControl.axis=picked.axis;
-        const r=el.getBoundingClientRect();activeControl.pointerDown({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1,button:0});
+        const r=el.getBoundingClientRect();activeControl.pointerDown(controlPointer((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1,0));
         st.current.gizmoGesture=true;el.setPointerCapture(e.pointerId);return;
       }
       st.current.gizmoGesture=false;travelled=0;
@@ -192,7 +192,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       if (pts.size === 2) { const [a, b] = [...pts.values()]; lastPinch = Math.hypot(a.x - b.x, a.y - b.y); lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
     };
     const onMove = (e: PointerEvent) => {
-      if(activeControl){if(activePointer!==e.pointerId)return;const r=el.getBoundingClientRect();activeControl.pointerMove({x:(e.clientX-r.left)/r.width*2-1,y:-(e.clientY-r.top)/r.height*2+1,button:-1});return;}
+      if(activeControl){if(activePointer!==e.pointerId)return;const r=el.getBoundingClientRect();activeControl.pointerMove(controlPointer((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1,-1));return;}
       if(!pts.size){const hit=gizmo.pick(e.clientX,e.clientY,st.current.transformMode??"translate");for(const c of gizmo.controls)c.axis=hit?.control===c?hit.axis:null;el.style.cursor=hit?"grab":"";}
       const p = pts.get(e.pointerId); if (!p) return;
       e.stopPropagation();
@@ -219,7 +219,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const ray = new THREE.Raycaster();
     const onUp = (e: PointerEvent) => {
       e.stopPropagation();
-      if(st.current.gizmoGesture){if(activePointer!==e.pointerId)return;activeControl?.pointerUp({x:0,y:0,button:0});activeControl=null;activePointer=null;st.current.gizmoGesture=false;return;}
+      if(st.current.gizmoGesture){if(activePointer!==e.pointerId)return;activeControl?.pointerUp(controlPointer(0,0,0));activeControl=null;activePointer=null;st.current.gizmoGesture=false;return;}
       pts.delete(e.pointerId);
       if (pts.size < 2) lastPinch = 0;
       const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
@@ -319,7 +319,8 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const selectedWalls=new Set(items.filter(d=>selected.has(keyOf(d))&&d.source==="wall").map(keyOf));
     // Wall openings belong to the moving group even if they were not explicitly picked.
     const excluded=new Set(selected);
-    for(const d of items)if(d.parentId&&selectedWalls.has(`${d.sheetId}::${d.parentId}`))excluded.add(keyOf(d));
+    // Dependent opening meshes have no parent metadata: never snap a wall to its attached openings.
+    for(const d of items)if((d.source==="door"||d.source==="window")&&[...selectedWalls].some(key=>key.startsWith(`${d.sheetId}::`)))excluded.add(keyOf(d));
     st.current.snapSources=spatialFeatures(items.filter(d=>selected.has(keyOf(d)))).points;
     st.current.snapTargets=spatialFeatures(items.filter(d=>!excluded.has(keyOf(d))));
   },[manual?.baseline]);
