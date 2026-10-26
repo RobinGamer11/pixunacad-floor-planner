@@ -14,6 +14,19 @@ import { disposeTransformControls } from "./disposeTransformControls";
 import { CAD_TO_THREE, moveMatrix, type MoveDelta } from "@/cad/three3d/spatialTransform";
 import type { ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
+import { materialKey, materialName, type Pattern3D } from "@/cad/three3d/pattern3D";
+import { getPatternTile, type HatchPatternId } from "@/cad/hatchPatterns";
+
+const patternTexCache=new Map<string,THREE.CanvasTexture>();
+function patternTexture(color:string,p:Pattern3D):THREE.CanvasTexture{
+  const key=materialKey(color,p);const hit=patternTexCache.get(key);if(hit)return hit;
+  const S=256,c=document.createElement("canvas");c.width=c.height=S;const ctx=c.getContext("2d")!;
+  ctx.fillStyle=color;ctx.fillRect(0,0,S,S);
+  try{ctx.drawImage(getPatternTile(p.id as HatchPatternId,S,p.color,2),0,0,S,S);}catch{/* Muster nicht verfügbar */}
+  const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.anisotropy=4;
+  tex.center.set(.5,.5);tex.rotation=-(p.angleDeg||0)*Math.PI/180;
+  if(patternTexCache.size>200)patternTexCache.clear();patternTexCache.set(key,tex);return tex;
+}
 import { combinedGizmo, controlPointer } from "./combinedGizmo";
 import { DEFAULT_SNAP_3D, boxOf, faceContacts, restingLevel, spatialFeatures, snapAxisMove, snapRotationAngle, type SnapSettings3D, type SnapContact, type WorldAxis } from "@/cad/three3d/manipulationSnap";
 
@@ -558,36 +571,27 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
             if(res.transparent){mat.transparent=true;mat.alphaTest=0.01;mat.depthWrite=false;}
             mat.needsUpdate=true;
           }).catch(()=>{});
-          if (d.material) {
-            const material=d.material;
-            mat.name=material.name;mat.roughness=material.roughness;mat.metalness=material.metalness;
-            mat.opacity=material.opacity*(d.surfaceOpacity??1);mat.transparent=mat.opacity<1;mat.depthWrite=mat.opacity>=0.99;
-            mat.emissive.copy(mat.color);mat.emissiveIntensity=material.emissiveIntensity;
-            const src=materialImage?.(material);
-            if(src) {
-              if(d.type !== "plane" && !d.texture) {
-                const p=mesh.geometry.getAttribute("position"), n=mesh.geometry.getAttribute("normal"),uv:number[]=[];
-                for(let i=0;i<p.count;i++) {
-                  const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i)),nz=Math.abs(n.getZ(i));
-                  uv.push((nx>=ny&&nx>=nz?p.getZ(i):p.getX(i))/material.scaleM,(ny>=nx&&ny>=nz?p.getZ(i):p.getY(i))/material.scaleM);
-                }
-                mesh.geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));
+          if (d.pattern && !d.texture) {
+            const pat=d.pattern;
+            const p=mesh.geometry.getAttribute("position"), n=mesh.geometry.getAttribute("normal"),uv:number[]=[];
+            if(p&&n){
+              for(let i=0;i<p.count;i++){
+                const x=p.getX(i)+mesh.position.x,y=p.getY(i)+mesh.position.y,z=p.getZ(i)+mesh.position.z;
+                const nx=Math.abs(n.getX(i)),ny=Math.abs(n.getY(i)),nz=Math.abs(n.getZ(i));
+                uv.push((nx>=ny&&nx>=nz?z:x)/pat.tileM,(ny>=nx&&ny>=nz?z:y)/pat.tileM);
               }
-              const tex=new THREE.TextureLoader().load(src,loaded=>{
-                if(st.current.gen!==gen||!mesh.parent){loaded.dispose();return;}
-                loaded.colorSpace=THREE.SRGBColorSpace;loaded.wrapS=loaded.wrapT=THREE.RepeatWrapping;
-                if(d.type==='plane'){const a=d.outline[0],b=d.outline[1],e=d.outline[3];if(a&&b&&e)loaded.repeat.set(Math.hypot(b.x-a.x,b.y-a.y)/material.scaleM,Math.hypot(e.x-a.x,e.y-a.y)/material.scaleM);}
-                else if(d.texture?.corners?.length===4){const [a,b,,e]=d.texture.corners;loaded.repeat.set(Math.hypot(b.x-a.x,b.y-a.y)/material.scaleM,Math.hypot(e.x-a.x,e.y-a.y)/material.scaleM);}
-                mat.map?.dispose();mat.map=loaded;if(!sel)mat.color.set("#ffffff");mat.emissiveMap=loaded;mat.needsUpdate=true;
-              });
-              mesh.userData.tex=tex;
+              mesh.geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));
+              mat.map=patternTexture(d.color,pat);if(!sel)mat.color.set("#ffffff");else mat.color.set("#9cc0ff");
+              mat.name=materialName(d.color,pat);mat.needsUpdate=true;
             }
           }
+          mesh.userData.matKey=d.texture?`tex:${obj.name}`:materialKey(d.color,d.pattern,d.surfaceOpacity!==undefined?`|o${d.surfaceOpacity}`:"")+(d.glow?`|g${d.glow}`:"");
+          if(!mat.name)mat.name=materialName(d.color,d.pattern);
         }
       }
     }
     if (!st.current.fitted && items.length) { st.current.fitted = true; fit(); }
-  }, [items, selectedKey, selectedKeys, textureFor, materialImage]);
+  }, [items, selectedKey, selectedKeys, textureFor]);
 
   const fit = () => {
     const { group, orbit, apply, camera } = st.current; if (!group) return;
@@ -605,13 +609,18 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     exportGLB: async () => {
       const g: THREE.Group | undefined=st.current.group;if(!g)throw new Error("3D-Ansicht nicht bereit.");
       const {GLTFExporter}=await import("three/examples/jsm/exporters/GLTFExporter.js");
-      const copy=g.clone(true);
+      const copy=g.clone(true);const sharedMats=new Map<string,THREE.Material>();
       for(const child of [...copy.children]) {
         if(!(child instanceof THREE.Mesh)){copy.remove(child);continue;}
-        child.material=(child.material as THREE.MeshStandardMaterial).clone();
-        const material=child.material as THREE.MeshStandardMaterial;
+        // Ein Material je Farbe + Muster: gleiche Kombination = dasselbe Material.
+        const key=child.userData.matKey as string|undefined;
+        const shared=key?sharedMats.get(key):undefined;
+        if(shared){child.material=shared;continue;}
+        const material=(child.material as THREE.MeshStandardMaterial).clone();
         const data=items.find(d=>d.sheetId===child.userData.sheetId&&d.sourceId===child.userData.sourceId&&d.part===child.userData.part);
-        material.color.set(data?.material&&material.map ? "#ffffff" : data?.color??"#ffffff");
+        material.color.set(material.map ? "#ffffff" : data?.color??"#ffffff");
+        if(data)material.name=data.texture?child.name:materialName(data.color,data.pattern);
+        child.material=material;if(key)sharedMats.set(key,material);
       }
       const result=await new GLTFExporter().parseAsync(copy,{binary:true,onlyVisible:true});
       if(!(result instanceof ArrayBuffer))throw new Error("GLB konnte nicht erstellt werden.");
