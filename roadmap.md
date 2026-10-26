@@ -1,5 +1,10 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Neigungsfenster – aktueller Auftrag
+- [ ] Blockade nach gedrücktem Mausrad reproduzieren und Gesten sauber voneinander trennen
+- [ ] Nur Manuell-bewegen-/Neigungsbereich gemäß hochgeladener Vorlage gestalten, Breite und Funktionen erhalten
+- [ ] Regressionstests und Browserprüfung; GitHub-Übertragung prüfen
+
 ## 3D-Korrekturen – aktueller Auftrag
 - [x] Objekteinstellungen bei Manuell bewegen unverändert lassen; separate Bewegungsfelder entfernen; Bestätigung über der Ansicht
 - [x] Kontakt-Hilfsraster unabhängig und immer schaltbar, standardmäßig ein
