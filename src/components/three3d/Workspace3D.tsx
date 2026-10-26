@@ -281,7 +281,9 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     const next=!manualOn;setManualOn(next);setPicking(null);setTiltDraftPreview(null);
     if(next&&refs3D.length)try{replaceSession(beginManualMove(app,refs3D,items));}catch(e){setMoveError(e instanceof Error?e.message:"Auswahl nicht möglich.");}
   });
-  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove} snapSettings={snapSettings} onSnapSettings={setSnapSettings}/>;
+  const poseRot=useMemo(()=>{const p=selObj&&normalizedPose(selObj.pose3D);if(!p)return null;const e=new Euler().setFromRotationMatrix(new Matrix4().fromArray(p));const d=(r:number)=>(Math.round(r*1800/Math.PI)/10).toLocaleString("de-DE");return {x:d(e.x),y:d(e.y),z:d(e.z)};},[selObj,selObj?.pose3D,tick]);
+  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove} snapSettings={snapSettings} onSnapSettings={setSnapSettings}
+    rotation={poseRot} onResetRotation={selObj?()=>guardChange(()=>app.runAction?.(()=>{delete selObj.pose3D;})):undefined}/>;
 
   const levels=useMemo(()=>[...app.sheetManager.list().filter(s=>sheetParticipatesIn3D(s,app.activeSheetId)).map(s=>({z:sheetElevationM(s),label:s.name})),{z:0,label:"3D-Oberfläche"}],[app,tick]);
   const movePreview=useMemo(()=>{
