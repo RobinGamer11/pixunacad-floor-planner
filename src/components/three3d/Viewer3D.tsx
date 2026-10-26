@@ -1,3 +1,4 @@
+import { getTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 /**
  * 3D-Ansicht (lazy geladen). Rendert nur abgeleitete Körper der gemeinsamen CadApp –
  * keine eigene CAD-Instanz, kein eigener Verlauf. Navigation: Orbit (Drehen,

@@ -298,7 +298,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   })() : undefined;
 
   // Echte Kanten bei allen Objektarten: Ober-/Unterkanten der Hülle räumlich (Auswahl/Hervorhebung).
-  const ringFaces = generic && !card ? (() => {
+  const ringFaces = generic ? (() => {
     const dt: any = draftTilt, f2 = dt ? frameAt(dt.angleDeg, !!dt.opposite)?.frame : undefined;
     const tv = (p: Vec2, zz: number) => dt && f2 ? genericVertex(p.x, p.y, zz, f2, dt, h) : { x: p.x, y: p.y, z: zz };
     return { top: pts.map(p => tv(p, z + h)), bottom: pts.map(p => tv(p, z)) };
