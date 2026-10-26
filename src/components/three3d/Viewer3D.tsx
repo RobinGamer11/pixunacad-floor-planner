@@ -40,7 +40,7 @@ interface Props {
   /** Klick ins Leere (kein Körper getroffen). */
   onEmpty?: () => void;
   /** Flüchtige Neigungsvorschau (transparent grau, Bezugskante beige). */
-  ghost?: { mesh: { positions: number[]; indices: number[] }; edge?: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }] } | null;
+  ghost?: { mesh?: { positions: number[]; indices: number[] }; edge?: [{ x: number; y: number; z: number }, { x: number; y: number; z: number }] } | null;
   /** Inhalt einer flachen Platte (Dokument, Text, Tabelle) als Bild. */
   textureFor?: (d: Derived3D) => Promise<{ canvas: HTMLCanvasElement; transparent: boolean; failed: boolean } | null>;
   materialImage?: (m: Material3D) => string | undefined;
