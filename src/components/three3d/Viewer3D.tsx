@@ -82,7 +82,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     host.appendChild(renderer.domElement);
     renderer.domElement.style.touchAction = "none";
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 5000);
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.005, 5000);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8170, 1.1));
     const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(30, 60, 20); scene.add(sun);
     const grid = new THREE.GridHelper(200, 200, 0xc9b98f, 0xe2dccd); scene.add(grid);
@@ -154,7 +154,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const orbit = { target: new THREE.Vector3(), r: 25, theta: Math.PI / 4, phi: Math.PI / 3.2 };
     const apply = () => {
       orbit.phi = Math.min(Math.PI - 0.05, Math.max(0.05, orbit.phi));
-      orbit.r = Math.min(3000, Math.max(0.3, orbit.r));
+      orbit.r = Math.min(3000, Math.max(0.02, orbit.r));
       camera.position.set(
         orbit.target.x + orbit.r * Math.sin(orbit.phi) * Math.cos(orbit.theta),
         orbit.target.y + orbit.r * Math.cos(orbit.phi),
@@ -321,7 +321,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       // Gizmo keeps its size in the scene: zooming in makes it larger, zooming out smaller.
       if(st.current.manual&&st.current.gizmoRef){
         const ref=st.current.gizmoRef as {dist:number;size:number},dist=Math.max(.01,camera.position.distanceTo(pivot.position));
-        const size=Math.min(8,Math.max(.12,ref.size*ref.dist/dist));
+        const size=Math.min(12,Math.max(.01,ref.size*ref.dist/dist));
         gizmo.translate.setSize(size);gizmo.rotate.setSize(size*.78);
         center.visible=true;center.position.copy(pivot.position);center.scale.setScalar(ref.dist*ref.size*.012);
       } else center.visible=false;
@@ -363,7 +363,9 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     gizmo.attach();
     if(!st.current.gizmoRef||st.current.gizmoRef.baseline!==manual.baseline){
       const cam:THREE.Camera=st.current.camera,p=new THREE.Vector3(manual.pivot.x,manual.pivot.z,manual.pivot.y);
-      st.current.gizmoRef={baseline:manual.baseline,dist:Math.max(.5,cam.position.distanceTo(p)),size:snapSettings.size};
+      void cam;void p;st.current.gizmoRef={baseline:manual.baseline,dist:6,size:snapSettings.size};
+    }
+    if(st.current.gizmoRef){st.current.gizmoRef.size=snapSettings.size;
     }
     if(!gizmo.controls.some(c=>c.dragging)){
       pivot.position.set(manual.pivot.x+manual.delta.x,manual.pivot.z+manual.delta.z,manual.pivot.y+manual.delta.y);
