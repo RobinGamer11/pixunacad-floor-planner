@@ -87,21 +87,28 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [selKey, setSelKey] = useState<string | null>(null);
   const [refs3D,setRefs3D]=useState<ObjectRef3D[]>([]);
   const [multiSelect,setMultiSelect]=useState(false);
-  const [manualOn,setManualOn]=useState(false);
+  // „Manuell bewegen“ ist eine lokale Geräte-Einstellung und gilt für jede Auswahl.
+  const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")==="1";}catch{return false;}});
+  const setManualOn=(v:boolean)=>{setManualOnRaw(v);try{localStorage.setItem("pixuna.3d.manualOn",v?"1":"0");}catch{}};
   const [manualSession,setManualSession]=useState<ManualMoveSession|null>(null);
   const sessionRef=useRef<ManualMoveSession|null>(null);
   const [moveError,setMoveError]=useState<string|null>(null);
   const numericValid=useRef(true);
   const onNumericValidity=useCallback((valid:boolean)=>{numericValid.current=valid;},[]);
   const [moveMode,setMoveMode]=useState<"translate"|"rotate">("translate");
+  // Gizmo-Größe 1–100 % (lokal, für alle Gizmos gleich); 1 % sehr klein.
+  const [gizmoPct,setGizmoPct]=useState<number>(()=>{try{const v=Number(localStorage.getItem("pixuna.3d.gizmoSize"));return Number.isFinite(v)&&v>=1&&v<=100?v:40;}catch{return 40;}});
+  useEffect(()=>{try{localStorage.setItem("pixuna.3d.gizmoSize",String(gizmoPct));}catch{}},[gizmoPct]);
   // Fixed default snapping; only the contact helper grid switch is a local device preference.
-  const [snapSettings,setSnapSettings]=useState<SnapSettings3D>(()=>{try{const raw=JSON.parse(localStorage.getItem("pixuna.3d.manipulation")??"null");return {...DEFAULT_SNAP_3D,grid:normalizeSnapSettings(raw).grid};}catch{return {...DEFAULT_SNAP_3D};}});
-  useEffect(()=>{try{localStorage.setItem("pixuna.3d.manipulation",JSON.stringify({grid:snapSettings.grid}));}catch{}},[snapSettings]);
+  const [snapSettingsRaw,setSnapSettings]=useState<SnapSettings3D>(()=>{try{const raw=JSON.parse(localStorage.getItem("pixuna.3d.manipulation")??"null");return {...DEFAULT_SNAP_3D,grid:normalizeSnapSettings(raw).grid};}catch{return {...DEFAULT_SNAP_3D};}});
+  const snapSettings=useMemo(()=>({...snapSettingsRaw,size:0.03+(gizmoPct-1)*(1.6-0.03)/99}),[snapSettingsRaw,gizmoPct]);
+  useEffect(()=>{try{localStorage.setItem("pixuna.3d.manipulation",JSON.stringify({grid:snapSettingsRaw.grid}));}catch{}},[snapSettingsRaw]);
   const [previewItems,setPreviewItems]=useState<Derived3D[]|null>(null);
   const [pendingChange,setPendingChange]=useState<(()=>void)|null>(null);
   const replaceSession=(s:ManualMoveSession|null)=>{sessionRef.current=s;state3D(app).draftActive=!!s;setManualSession(s);if(!s){setPreviewItems(null);setMoveError(null);}};
-  const cancelMove=()=>{replaceSession(null);setManualOn(false);setPendingChange(null);};
-  const applyMove=()=>{const s=sessionRef.current;if(!s)return;if(!numericValid.current){setMoveError("Bitte alle ungültigen Zahlen korrigieren.");return;}try{commitManualMove(app,s);replaceSession(null);setManualOn(false);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);next?.();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
+  const restartSession=()=>{const refs=state3D(app).refs;if(!refs.length)return;try{replaceSession(beginManualMove(app,refs));}catch{/* Auswahl evtl. gesperrt */}};
+  const cancelMove=()=>{replaceSession(null);setPendingChange(null);if(manualOn)restartSession();};
+  const applyMove=()=>{const s=sessionRef.current;if(!s)return;if(!numericValid.current){setMoveError("Bitte alle ungültigen Zahlen korrigieren.");return;}try{commitManualMove(app,s);replaceSession(null);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);if(next)next();else if(manualOn)restartSession();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
   const guardChange=(next:()=>void)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){setPendingChange(()=>next);return;}replaceSession(null);next();};
   const updateDelta=(delta:MoveDelta)=>{const s=sessionRef.current;if(!s)return;const next={...s,delta};replaceSession(next);try{setPreviewItems(previewManualMove(app,next));setMoveError(null);}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung nicht möglich.");}};
   useEffect(()=>enter3DEditor(app,()=>{if(!sessionRef.current)return false;replaceSession(null);setManualOn(false);setPendingChange(null);return true;},()=>setTick(t=>t+1)),[app]);
