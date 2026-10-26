@@ -63,7 +63,7 @@ export const InfoTip: React.FC<{ text: string }> = ({ text }) => (
     <PopoverTrigger asChild>
       <button type="button" aria-label="Info" className="ml-1 inline-grid h-4 w-4 place-items-center rounded-full border align-middle" style={C.field}><InfoIcon size={10} /></button>
     </PopoverTrigger>
-    <PopoverContent side="top" className="w-56 border p-2 text-[11px] leading-snug" style={C.card}>{text}</PopoverContent>
+    <PopoverContent side="top" className="w-72 border p-3 text-xs leading-snug" style={C.card}>{text}</PopoverContent>
   </Popover>
 );
 
@@ -121,6 +121,24 @@ export const BigChoice: React.FC<{ active?: boolean; disabled?: boolean; icon?: 
 );
 
 const KIND_LABEL = (kind: string, obj: any) => ({ wall: "Wand", hatch: obj?.isPolygon ? "Polygon" : "Schraffur", door: obj?.kind === "window" ? "Fenster" : "Tür", stair: "Treppe", library: "Bibliothekselement", document: "Dokument", textbox: "Text", table: "Tabelle", segment: "Linie", dimension: "Maßkette", freeStroke: "Freihand" } as Record<string, string>)[kind] ?? "Objekt";
+
+/** Piktogramm pro Werkzeugtyp in der 3D-Kopfzeile. */
+const KIND_ICON = (kind: string, obj: any): React.ReactNode => {
+  const icon = kind === "wall" ? BrickWall
+    : kind === "hatch" ? Hexagon
+    : kind === "door" ? (obj?.kind === "window" ? AppWindow : DoorOpen)
+    : kind === "stair" ? Stairs
+    : kind === "library" ? Package
+    : kind === "document" ? FileText
+    : kind === "textbox" ? Type
+    : kind === "table" ? Table
+    : kind === "segment" ? Minus
+    : kind === "dimension" ? Ruler
+    : kind === "freeStroke" ? PenLine
+    : Box;
+  const Icon = icon;
+  return <Icon size={26} style={{ color: "hsl(var(--accent-gold))" }} />;
+};
 
 export const Object3DSettings: React.FC<{
   app: any; defaultOpen?: boolean; onlyKinds?: string[]; exceptKinds?: string[]; className?: string;
