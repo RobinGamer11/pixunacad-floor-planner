@@ -38,7 +38,7 @@ import { DEFAULT_PRESETS, PRESET_OPTIONS, type RenderPresets } from "@/cad/three
 import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Settings } from "lucide-react";
 import { Joystick3D } from "./Joystick3D";
 import { loadSens, saveSens, speedFactor, stickFactor, type Sens3D } from "./sensitivity";
-import { MaterialPanel } from "./MaterialPanel";
+import { PatternToggle3D } from "./PatternToggle3D";
 import InfoBoxSettingsPanel from "@/components/cad/InfoBoxSettingsPanel";
 import { infoBoxUi } from "@/lib/infoBoxUi";
 import { setObjectMaterial, setOpeningState } from "@/cad/three3d/projectBridge";
@@ -246,7 +246,6 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const selObj = sel ? findObject(app, sel.sheetId, sel.id)?.obj : null;
   const rels: Relation3D[] = selObj?.relations3D || [];
   const selectedHit = sel ? findObject(app, sel.sheetId,sel.id) : null;
-  const materialImage = useCallback((m: Material3D) => project?.files?.find(f=>f.id===m.imageFileId)?.dataUrl,[project?.files]);
   const exportGLB = async () => {
     if(sessionRef.current){guardChange(()=>void exportGLB());return;}
     setBusy(true);setDossierMsg(null);
@@ -296,8 +295,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={items} movePreview={movePreview} levels={levels} selectedKey={selKey} selectedKeys={selectedKeys3D} manual={manualSession} transformMode={moveMode} snapSettings={snapSettings} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
-            onMaterialDrop={(sheetId,id,materialId)=>guardChange(()=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);})}
+          <Viewer3D ref={viewer} items={items} movePreview={movePreview} levels={levels} selectedKey={selKey} selectedKeys={selectedKeys3D} manual={manualSession} transformMode={moveMode} snapSettings={snapSettings} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={ghost} textureFor={textureFor}
             onToggleOpening={(sheetId,id)=>guardChange(()=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);})} />
         </Suspense>
         <div className="absolute left-3 top-14 z-10"><Button size="sm" variant={multiSelect?"default":"outline"} aria-pressed={multiSelect} onClick={()=>setMultiSelect(v=>!v)}><CopyCheck size={14}/>Mehrfachauswahl</Button></div>
@@ -510,7 +508,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
             </section>
           } />
         )}
-        <MaterialPanel key={selKey} app={app} project={project} selected={sel && selectedHit ? {...sel,...selectedHit}:null}/>
+        <PatternToggle3D app={app} target={sel && selectedHit ? { obj: selectedHit.obj, list: selectedHit.list } : null} onChange={()=>setTick(t=>t+1)} />
       </aside>
     </div>
   );

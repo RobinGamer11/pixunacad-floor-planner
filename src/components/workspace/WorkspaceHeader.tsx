@@ -185,6 +185,8 @@ export function WorkspaceHeader({
             active={mode === "cad"}
             onClick={goCad}
           />
+          <ModeDivider />
+          <ModeButton icon={<Box size={13} />} label="3D" active={mode === "3d"} onClick={go3d} />
           {showExportTab && (
             <>
               <ModeDivider />
@@ -196,8 +198,6 @@ export function WorkspaceHeader({
               />
             </>
           )}
-          <ModeDivider />
-          <ModeButton icon={<Box size={13} />} label="3D" active={mode === "3d"} onClick={go3d} />
         </div>
       </div>
 
