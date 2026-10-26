@@ -82,7 +82,11 @@ const CadPage = () => {
   useEffect(() => {
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
   }, [tabletAidOn]);
-  const helpOn = project?.settings?.helpOn ?? true;
+  // Bedienungshilfe: sofort lokal umschalten; Projekt-Einstellung nur als Startwert/Speicherung
+  // (ein voller Projektspeicher darf das Ein-/Ausschalten nie blockieren).
+  const [helpLocal, setHelpLocal] = useState<boolean | null>(null);
+  const helpOn = helpLocal ?? project?.settings?.helpOn ?? true;
+  const toggleHelp = () => { const next = !helpOn; setHelpLocal(next); if (project) projectStore.setHelpOn(project.id, next); };
 
   const [presenting, setPresenting] = useState(false);
   const handlePresent = () => {
@@ -131,7 +135,7 @@ const CadPage = () => {
         onPresent={handlePresent}
         onShare={() => {}}
         helpOn={helpOn}
-        onToggleHelp={() => project && projectStore.setHelpOn(project.id, !helpOn)}
+        onToggleHelp={toggleHelp}
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
