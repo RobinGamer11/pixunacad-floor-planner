@@ -90,6 +90,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   // „Manuell bewegen“ ist eine lokale Geräte-Einstellung und gilt für jede Auswahl.
   const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")==="1";}catch{return false;}});
   const setManualOn=(v:boolean)=>{setManualOnRaw(v);try{localStorage.setItem("pixuna.3d.manualOn",v?"1":"0");}catch{}};
+  const manualOnRef=useRef(manualOn);manualOnRef.current=manualOn;
   const [manualSession,setManualSession]=useState<ManualMoveSession|null>(null);
   const sessionRef=useRef<ManualMoveSession|null>(null);
   const [moveError,setMoveError]=useState<string|null>(null);
@@ -111,7 +112,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const applyMove=()=>{const s=sessionRef.current;if(!s)return;if(!numericValid.current){setMoveError("Bitte alle ungültigen Zahlen korrigieren.");return;}try{commitManualMove(app,s);replaceSession(null);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);if(next)next();else if(manualOn)restartSession();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
   const guardChange=(next:()=>void)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){setPendingChange(()=>next);return;}replaceSession(null);next();};
   const updateDelta=(delta:MoveDelta)=>{const s=sessionRef.current;if(!s)return;const next={...s,delta};replaceSession(next);try{setPreviewItems(previewManualMove(app,next));setMoveError(null);}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung nicht möglich.");}};
-  useEffect(()=>enter3DEditor(app,()=>{if(!sessionRef.current)return false;replaceSession(null);setManualOn(false);setPendingChange(null);return true;},()=>setTick(t=>t+1)),[app]);
+  useEffect(()=>enter3DEditor(app,()=>{if(!sessionRef.current)return false;replaceSession(null);setPendingChange(null);return true;},()=>setTick(t=>t+1)),[app]);
   useEffect(()=>{
     const beforeLeave=(e:BeforeUnloadEvent)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){e.preventDefault();e.returnValue="";}};
     const navigation=(e:MouseEvent)=>{
@@ -169,14 +170,21 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
 
   // Gemeinsamen Projektzustand beobachten (kein eigener Zustand, nur Lesen).
   useEffect(() => {
+    let cheap = "";
     const read = () => {
+      // Nur neu ableiten, wenn sich Inhalt, Blätter oder Auswahl geändert haben (sonst ruckelt die Ansicht).
+      const selNow: any = app.selection;
+      const ck = JSON.stringify([app.contentRevision, app.activeSheetId, app.sheetManager.toJSON(), infoBoxUi.get().selectedId, selNow ? ID_FIELDS.map(f => selNow[f]) : null, state3D(app).refs, manualOnRef.current, !!sessionRef.current]);
+      if (ck === cheap) return;
+      cheap = ck;
       const r = deriveFromApp(app);
       const sel: any = app.selection;
       const id = infoBoxUi.get().selectedId ?? (sel ? ID_FIELDS.map(f => sel[f]).find(Boolean) : null);
       const state=state3D(app);
       state.refs=state.refs.filter(x=>r.items.some(d=>d.sheetId===x.sheetId&&d.sourceId===x.id)&&editableRef3D(app,x));
       if(!state.refs.length&&id&&editableRef3D(app,{sheetId:app.activeSheetId,id}))state.refs=[{sheetId:app.activeSheetId,id}];
-      if(sessionRef.current&&app.contentRevision!==sessionRef.current.revision){replaceSession(null);setManualOn(false);}
+      if(sessionRef.current&&app.contentRevision!==sessionRef.current.revision){replaceSession(null);}
+      if(!sessionRef.current&&manualOnRef.current&&state.refs.length){try{replaceSession(beginManualMove(app,state.refs));}catch{}}
       const sk=state.refs[0]?refKey3D(state.refs[0]):null;
       const sig = JSON.stringify([r.items, app.sheetManager.toJSON(), app.activeSheetId, sk, state.refs, r.issues, r.items.map(texturedKey)]);
       if (sig === lastSig.current) return;
@@ -384,6 +392,11 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
                     </label>
                   ))}
                   <div className="text-[9px] text-muted-foreground">Gilt für Joysticks, Tastatur und Maus.</div>
+                  <label className="block pt-1 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+                    <span className="flex justify-between text-[11px]"><span>Gizmo-Größe</span><span className="tabular-nums">{gizmoPct} %</span></span>
+                    <input type="range" min={1} max={100} step={1} value={gizmoPct} aria-label="Gizmo-Größe"
+                      onChange={e => setGizmoPct(parseInt(e.target.value, 10))} className="w-full" />
+                  </label>
                   <label className="block pt-1 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
                     <span className="flex justify-between text-[11px]"><span>Joystick-Größe</span><span className="tabular-nums">{sens.stick} %</span></span>
                     <input type="range" min={1} max={100} step={1} value={sens.stick} aria-label="Joystick-Größe"
