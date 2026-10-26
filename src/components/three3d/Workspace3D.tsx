@@ -8,7 +8,7 @@ import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 import { type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
 import { Object3DSettings, BigChoice } from "@/components/cad/Object3DSettings";
-import { Crosshair, X as XIcon, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Crosshair, X as XIcon, PanelRightOpen } from "lucide-react";
 const REL = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
   field: { background: "hsl(var(--overlay-surface) / 0.07)", borderColor: "hsl(var(--overlay-surface) / 0.18)", color: "hsl(var(--overlay-surface))" },
