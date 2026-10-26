@@ -4,7 +4,7 @@
 - [x] Bezugskante und Kantenwahl entlang der tatsächlichen geneigten Körpergeometrie; gespeicherter Rahmen bleibt beim Kantenwechsel unverändert
 - [x] Gemeinsames Verschieben-/Drehen-Gizmo mit Weltachsen und zoomstabiler Größe
 - [x] Flüchtiges beiges Fangraster, Kontaktmarker, Hysterese und Winkelfang; lokale Einstellungen
-- [x] 105 Regressionstests; getrennte Browser-Prüfszene: Achspfeil und Drehring, dezente echte Wandkante, Zahl 1,25 m, Übernehmen (1 Undo), Undo/Redo, Desktop und 937×876; keine Laufzeitfehler; automatische Typ-/Buildprüfung OK
+- [x] 106 Regressionstests; neue Dateien gezielt lintfrei; getrennte Browser-Prüfszene: Achspfeil und Drehring, dezente echte Wandkante, Zahl 1,25 m, Übernehmen (1 Undo), Undo/Redo, Desktop und 937×876; keine Laufzeitfehler; automatische Typ-/Buildprüfung OK
 - [ ] Angemeldete Projekt-Abnahme und echtes Tablet – Projektseite führt im Prüfkontext zu /login; kein Tablet verfügbar
 - [ ] GitHub-main-Übertragung verifizieren – Commit/Push verwaltet Lovable, nicht manuell zulässig
 
