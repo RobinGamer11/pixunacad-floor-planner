@@ -335,6 +335,8 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   // Jedes Objekt unabhängig: offene Entwürfe werden beim Objektwechsel verworfen, nie übertragen.
   // 3D-Vorschau (flüchtig) des Entwurfs auf dem ausgewählten Körper.
   // Beige Bezugskante von Anfang an; grauer Vorschaukörper nur bei offenem Entwurf.
+  const pickRef = useRef<(i: number) => void>(() => {});
+  pickRef.current = (i: number) => { if (!straight.has(i)) return; setCard(null); if (i !== edge) setEdge(i); };
   useEffect(() => {
     const live = !!(session && draftTilt);
     // Wählbare Außenkanten auch im 3D-Hauptfenster (gleiche Regel wie im Neigungsfenster).
