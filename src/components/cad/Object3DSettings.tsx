@@ -250,7 +250,7 @@ const DoorFields: React.FC<{ app: any; obj: any; editable: boolean }> = ({ app, 
 const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: boolean; generic?: boolean }> = ({ app, obj, sheetZ, editable, generic }) => {
   const z = sheetZ + objectElevationM(obj);
   // Allgemeine Objekte: Teile ohne Neigung (für Umriss und Körperhöhe).
-  const flatPieces = generic ? deriveObjectFromApp(app, obj, undefined) : [];
+  const flatPieces = generic ? deriveObjectFromApp(app, obj, undefined, true) : [];
   const h = generic ? Math.max(0, ...flatPieces.map((d: any) => (d.z1 ?? d.z ?? z) - z)) : Math.max(0, Number(obj.heightM) || 0);
   const holes = generic ? [] : (obj.holes || []).filter((r: any) => r?.length >= 3);
   const stored = obj.tilt3D;
@@ -307,15 +307,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
 
   // Echte Kanten bei allen Objektarten: Ober-/Unterkanten der Hülle räumlich (Auswahl/Hervorhebung).
   const ringFaces = generic ? (() => {
-    // Flat derivation already includes pose3D; undo it before applying tilt, then restore.
-    const inverse = poseMatrix?.clone().invert();
-    const canonicalFlat = poseMatrix ? flatPieces.map(d=>{
-      if(d.type!=="mesh")return d;
-      const positions=d.mesh.positions.slice();
-      for(let i=0;i<positions.length;i+=3){const v=new Vector3(positions[i],positions[i+1],positions[i+2]);if(inverse)v.applyMatrix4(inverse);positions[i]=v.x;positions[i+1]=v.y;positions[i+2]=v.z;}
-      return {...d,mesh:{...d.mesh,positions}};
-    }) : flatPieces;
-    return boundaryRings(canonicalFlat,pts,p=>posePoint(draftTilt&&displayFrame?genericVertex(p.x,p.y,p.z,displayFrame,draftTilt,h):p));
+    return boundaryRings(flatPieces,pts,p=>posePoint(draftTilt&&displayFrame?genericVertex(p.x,p.y,p.z,displayFrame,draftTilt,h):p));
   })() : undefined;
 
   const begin = (patch: Partial<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual"; opposite: boolean }>) => setSession({ ...cur, ...patch });
