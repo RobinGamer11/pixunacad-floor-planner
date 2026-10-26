@@ -48,6 +48,8 @@ import { ManualMovePanel } from "./ManualMovePanel";
 import { beginManualMove, changedMove, commitManualMove, editableRef3D, previewManualMove, refKey3D, type ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { enter3DEditor, state3D, type ObjectRef3D } from "@/cad/three3d/manualMoveState";
 import type { MoveDelta } from "@/cad/three3d/spatialTransform";
+import { normalizedPose } from "@/cad/three3d/spatialTransform";
+import { Euler, Matrix4 } from "three";
 import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 import { CopyCheck } from "lucide-react";
 import { DEFAULT_SNAP_3D, normalizeSnapSettings, type SnapSettings3D } from "@/cad/three3d/manipulationSnap";
