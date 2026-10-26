@@ -419,7 +419,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     const ord = orderOf.get(o) ?? 0;
     const tilted = !preTilted && o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
     const list = applySpatialPose(tilted, o.pose3D, base);
-    const pat = d0Pattern(o); for (const d of list) { d.order = ord; if (pat && !d.texture && d.source !== "door" && d.source !== "window" && d.type !== "line") d.pattern = pat; d.material = d.part === "frame" ? o.frameMaterial3D ?? o.material3D : d.part === "glass" || d.part === "leaf" ? o.panelMaterial3D ?? o.material3D : o.material3D; out.push(d); }
+    const pat = d0Pattern(o); for (const d of list) { d.order = ord; if (pat && !d.texture && d.source !== "door" && d.source !== "window" && d.type !== "line") d.pattern = pat; out.push(d); }
   };
   const d0Pattern = (o: any) => patternOf(o, (scene.walls || []).includes(o) ? "walls" : "other");
   const doors = (scene.doors || []).filter(vis);
