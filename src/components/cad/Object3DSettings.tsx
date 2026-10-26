@@ -184,7 +184,7 @@ export const Object3DSettings: React.FC<{
   const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0 && x.kind !== "infobox") delete x.obj.elevationM; else x.obj.elevationM = v; } });
   // Mehrfachauswahl: gleiche Eigenschaften gemeinsam bearbeiten (ein Undo-Schritt).
   const shared = multi ? sharedFields3D(items) : [];
-  const name = obj.objName || obj.objCode || ""; // eslint-disable-line @typescript-eslint/no-unused-vars -- kept for future header use
+  const headerTitle = multi ? `${items.length} Objekte` : (obj.objName || KIND_LABEL(kind, obj));
 
   const body = (
     <div className="space-y-2.5 text-xs">
