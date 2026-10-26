@@ -18,20 +18,12 @@ export function infoBoxTone(box: { kind?: string; status?: string }) {
   return { accent: "#c2a77f", body: "#ede6da" };
 }
 
-/** Pin outline in the vertical plane (u across, v up): three round corners, one sharper bottom-left tip like the 2D pin. */
+/** Circular body in the vertical plane; height/width preserve existing size settings. */
 export function infoBoxPinOutline(width: number, height: number, seg = 10): { u: number; v: number }[] {
-  const m = Math.min(width, height), R = m / 2, r = m * 0.19, hw = width / 2;
-  const corners: [number, number, number, number][] = [
-    [hw - R, R, R, -Math.PI / 2],          // bottom-right
-    [hw - R, height - R, R, 0],            // top-right
-    [-hw + R, height - R, R, Math.PI / 2], // top-left
-    [-hw + r, r, r, Math.PI],              // bottom-left (tip)
-  ];
-  const out: { u: number; v: number }[] = [];
-  for (const [cu, cv, rad, a0] of corners) for (let i = 0; i <= seg; i++) {
-    const a = a0 + (i / seg) * (Math.PI / 2); out.push({ u: cu + Math.cos(a) * rad, v: cv + Math.sin(a) * rad });
-  }
-  return out;
+  return Array.from({length: Math.max(32, seg * 8)}, (_, i, ) => {
+    const a = i * Math.PI * 2 / Math.max(32, seg * 8);
+    return {u: Math.cos(a) * width / 2, v: height / 2 + Math.sin(a) * height / 2};
+  });
 }
 
 export function deriveInfoBox(box: InfoBoxShape & {id:string;x:number;y:number;title?:string}, sheetId: string, base: number): Derived3D[] {
@@ -49,8 +41,10 @@ export function deriveInfoBox(box: InfoBoxShape & {id:string;x:number;y:number;t
   }
   const tone = infoBoxTone(box);
   const body: Derived3D = { type:"mesh", source:"infobox", sourceId:box.id, sheetId, closed:false, color:tone.body, mesh:{ positions, indices }, glow:0.12 } as Derived3D;
-  // Vertical front quad with ordinary UVs; the pin texture is transparent outside its outline.
+  // The textured face shares the circular boundary; no rectangular overlay or edge spokes.
   const yT = yF + 0.004;
-  const front: Derived3D = { type:"mesh", source:"infobox", sourceId:box.id, sheetId, closed:false, color:"#ffffff", mesh:{ positions:[box.x-width/2,yT,z+height,box.x+width/2,yT,z+height,box.x+width/2,yT,z,box.x-width/2,yT,z],indices:[0,1,2,0,2,3] }, texture:{list:"infoBoxes",corners:[]}, uvs:[0,1,1,1,1,0,0,0], glow:0.35 };
+  const facePositions = [box.x,yT,z+height/2], faceIndices:number[] = [], uvs=[.5,.5];
+  ring.forEach((p,i)=>{facePositions.push(box.x+p.u,yT,z+p.v);uvs.push(p.u/width+.5,p.v/height);faceIndices.push(0,1+i,1+(i+1)%n);});
+  const front: Derived3D = { type:"mesh", source:"infobox", sourceId:box.id, sheetId, closed:false, color:"#ffffff", mesh:{positions:facePositions,indices:faceIndices}, texture:{list:"infoBoxes",corners:[]}, uvs, glow:0.35 };
   return [body, front];
 }

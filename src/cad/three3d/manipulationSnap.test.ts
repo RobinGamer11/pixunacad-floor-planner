@@ -3,6 +3,14 @@ import { DEFAULT_SNAP_3D, normalizeSnapSettings, snapAxisMove, snapRotationAngle
 import { ZERO_MOVE } from "./spatialTransform";
 const p={x:0,y:0,z:0}, settings={...DEFAULT_SNAP_3D,grid:false};
 describe("3D world-axis snapping",()=>{
+  it("contact grid defaults on independently of manual movement",()=>{
+    expect(DEFAULT_SNAP_3D.grid).toBe(true);expect(normalizeSnapSettings(null).grid).toBe(true);
+  });
+  it.each([45,90,135,180,-45,-90])("lightly catches the default rotation at %s degrees",angle=>{
+    expect(DEFAULT_SNAP_3D.angleDeg).toBe(45);
+    expect(snapRotationAngle(angle-1,DEFAULT_SNAP_3D.angleDeg,null)).toEqual({angle,contact:angle});
+    expect(snapRotationAngle(angle-4,DEFAULT_SNAP_3D.angleDeg,null)).toEqual({angle:angle-4,contact:null});
+  });
   it("snaps a contact without changing the two other axes or rotation",()=>{
     const delta={...ZERO_MOVE,x:1.96,y:3,z:4,rz:20};
     const result=snapAxisMove(delta,"x",p,[p],{points:[{x:2,y:3,z:4}],edges:[]},settings,.1,null);

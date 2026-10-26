@@ -97,9 +97,10 @@ function renderInfoBoxTexture(box: any): PlaneTextureResult | null {
   // Hintergrund: sanfter Verlauf in der Grundfarbe.
   const bg = ctx.createLinearGradient(0, 0, 0, N);
   bg.addColorStop(0, "#fbfaf7"); bg.addColorStop(1, tone.body);
+  ctx.save();ctx.beginPath();ctx.arc(N/2,N/2,N/2,0,Math.PI*2);ctx.clip();
   ctx.fillStyle = bg; ctx.fillRect(0, 0, N, N);
   // Pin wie in 2D: rund, Ecke unten links spitz (50% 50% 50% 19%).
-  const cx = N / 2, cy = task || !box.title ? N / 2 : N * 0.42, R = N * 0.27, rs = R * 0.38;
+  const cx = N / 2, cy = N / 2, R = N * 0.42, rs = R * 0.38;
   const x0 = cx - R, y0 = cy - R, x1 = cx + R, y1 = cy + R;
   const pin = () => {
     ctx.beginPath();
@@ -123,11 +124,7 @@ function renderInfoBoxTexture(box: any): PlaneTextureResult | null {
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.56, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx, cy - R * 0.02); ctx.lineTo(cx, cy + R * 0.3); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy - R * 0.27, R * 0.06, 0, Math.PI * 2); ctx.fill();
-    if (box.title) {
-      ctx.fillStyle = "#3b362f"; ctx.font = `600 ${Math.round(N * 0.07)}px sans-serif`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(String(box.title), cx, N * 0.82, N * 0.86);
-    }
   }
-  return { canvas, transparent: false, failed: false };
+  ctx.restore();
+  return { canvas, transparent: true, failed: false };
 }
