@@ -8,7 +8,7 @@ import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 import { type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
 import { Object3DSettings, BigChoice } from "@/components/cad/Object3DSettings";
-import { Crosshair, X as XIcon, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Crosshair, X as XIcon, PanelRightOpen } from "lucide-react";
 const REL = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
   field: { background: "hsl(var(--overlay-surface) / 0.07)", borderColor: "hsl(var(--overlay-surface) / 0.18)", color: "hsl(var(--overlay-surface))" },
@@ -48,6 +48,8 @@ import { ManualMovePanel } from "./ManualMovePanel";
 import { beginManualMove, changedMove, commitManualMove, editableRef3D, previewManualMove, refKey3D, type ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { enter3DEditor, state3D, type ObjectRef3D } from "@/cad/three3d/manualMoveState";
 import type { MoveDelta } from "@/cad/three3d/spatialTransform";
+import { normalizedPose } from "@/cad/three3d/spatialTransform";
+import { Euler, Matrix4 } from "three";
 import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 import { CopyCheck } from "lucide-react";
 import { DEFAULT_SNAP_3D, normalizeSnapSettings, type SnapSettings3D } from "@/cad/three3d/manipulationSnap";
@@ -279,7 +281,9 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     const next=!manualOn;setManualOn(next);setPicking(null);setTiltDraftPreview(null);
     if(next&&refs3D.length)try{replaceSession(beginManualMove(app,refs3D,items));}catch(e){setMoveError(e instanceof Error?e.message:"Auswahl nicht möglich.");}
   });
-  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove} snapSettings={snapSettings} onSnapSettings={setSnapSettings}/>;
+  const poseRot=useMemo(()=>{const p=selObj&&normalizedPose(selObj.pose3D);if(!p)return null;const e=new Euler().setFromRotationMatrix(new Matrix4().fromArray(p));const d=(r:number)=>(Math.round(r*1800/Math.PI)/10).toLocaleString("de-DE");return {x:d(e.x),y:d(e.y),z:d(e.z)};},[selObj,selObj?.pose3D,tick]);
+  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove} snapSettings={snapSettings} onSnapSettings={setSnapSettings}
+    rotation={poseRot} onResetRotation={selObj?()=>guardChange(()=>app.runAction?.(()=>{delete selObj.pose3D;})):undefined}/>;
 
   const levels=useMemo(()=>[...app.sheetManager.list().filter(s=>sheetParticipatesIn3D(s,app.activeSheetId)).map(s=>({z:sheetElevationM(s),label:s.name})),{z:0,label:"3D-Oberfläche"}],[app,tick]);
   const movePreview=useMemo(()=>{
@@ -458,10 +462,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         <button onClick={() => setPanelOpen(true)} title="Panel einblenden" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} /></button>
       </div>}
       <aside className={`${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-        <div className="flex justify-end -mt-1 -mr-1"><button type="button" onClick={() => setPanelOpen(false)} title="Einklappen" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightClose size={14} className="text-muted-foreground" /></button></div>
-
         {!sel ? movePanel : selectedHit?.list === "infoBoxes" ? <><InfoBoxSettingsPanel app={app} in3D />{movePanel}</> : (
-          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} manualMove={movePanel} relations={
+          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} onCollapse={()=>setPanelOpen(false)} manualMove={movePanel} relations={
             <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>

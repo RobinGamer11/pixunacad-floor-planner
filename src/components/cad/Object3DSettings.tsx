@@ -5,7 +5,7 @@
  * Bibliotheks-Körperhöhe). Jede bestätigte Änderung = genau ein Undo-Schritt (runAction).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon, BrickWall, Hexagon, DoorOpen, AppWindow, Footprints, Package, FileText, Type, Table, Minus, PenLine, Boxes } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
@@ -27,7 +27,7 @@ import { projectionCos } from "@/cad/three3d/tiltGeometry";
 import { setOpeningState } from "@/cad/three3d/projectBridge";
 import { boundaryRings } from "@/cad/three3d/tiltBoundary";
 import { normalizedPose } from "@/cad/three3d/spatialTransform";
-import { Matrix4, Euler, Vector3 } from "three";
+import { Matrix4, Vector3 } from "three";
 
 const C = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
@@ -63,7 +63,7 @@ export const InfoTip: React.FC<{ text: string }> = ({ text }) => (
     <PopoverTrigger asChild>
       <button type="button" aria-label="Info" className="ml-1 inline-grid h-4 w-4 place-items-center rounded-full border align-middle" style={C.field}><InfoIcon size={10} /></button>
     </PopoverTrigger>
-    <PopoverContent side="top" className="w-56 border p-2 text-[11px] leading-snug" style={C.card}>{text}</PopoverContent>
+    <PopoverContent side="top" className="w-72 border p-3 text-xs leading-snug" style={C.card}>{text}</PopoverContent>
   </Popover>
 );
 
@@ -122,14 +122,34 @@ export const BigChoice: React.FC<{ active?: boolean; disabled?: boolean; icon?: 
 
 const KIND_LABEL = (kind: string, obj: any) => ({ wall: "Wand", hatch: obj?.isPolygon ? "Polygon" : "Schraffur", door: obj?.kind === "window" ? "Fenster" : "Tür", stair: "Treppe", library: "Bibliothekselement", document: "Dokument", textbox: "Text", table: "Tabelle", segment: "Linie", dimension: "Maßkette", freeStroke: "Freihand" } as Record<string, string>)[kind] ?? "Objekt";
 
+/** Piktogramm pro Werkzeugtyp in der 3D-Kopfzeile. */
+const KIND_ICON = (kind: string, obj: any): React.ReactNode => {
+  const icon = kind === "wall" ? BrickWall
+    : kind === "hatch" ? Hexagon
+    : kind === "door" ? (obj?.kind === "window" ? AppWindow : DoorOpen)
+    : kind === "stair" ? Footprints
+    : kind === "library" ? Package
+    : kind === "document" ? FileText
+    : kind === "textbox" ? Type
+    : kind === "table" ? Table
+    : kind === "segment" ? Minus
+    : kind === "dimension" ? Ruler
+    : kind === "freeStroke" ? PenLine
+    : Box;
+  const Icon = icon;
+  return <Icon size={26} style={{ color: "hsl(var(--accent-gold))" }} />;
+};
+
 export const Object3DSettings: React.FC<{
   app: any; defaultOpen?: boolean; onlyKinds?: string[]; exceptKinds?: string[]; className?: string;
   /** Nur im 3D-Bereich: Kopfzeile mit „Im CAD bearbeiten“. */
   onEditInCad?: () => void;
+  /** Nur im 3D-Bereich: Panel einklappen (Pfeil oben rechts in der Kopfzeile). */
+  onCollapse?: () => void;
   /** Nur im 3D-Bereich: Körperbeziehungen als vierte Karte. */
   relations?: React.ReactNode;
   manualMove?: React.ReactNode; manualActive?: boolean;
-}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, relations, manualMove }) => {
+}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, onCollapse, relations, manualMove }) => {
   const [open, setOpen] = useState(defaultOpen);
   const [, force] = useState(0);
   const [items, setItems] = useState<{ kind: string; obj: any }[]>([]);
@@ -164,17 +184,30 @@ export const Object3DSettings: React.FC<{
   const setElev = (v: number) => act(app, () => { for (const x of elevItems) { if (!editable(x.obj)) continue; if (v === 0 && x.kind !== "infobox") delete x.obj.elevationM; else x.obj.elevationM = v; } });
   // Mehrfachauswahl: gleiche Eigenschaften gemeinsam bearbeiten (ein Undo-Schritt).
   const shared = multi ? sharedFields3D(items) : [];
-  const name = obj.objName || obj.objCode || "";
+  const headerTitle = multi ? `${items.length} Objekte` : (obj.objName || KIND_LABEL(kind, obj));
 
   const body = (
     <div className="space-y-2.5 text-xs">
       {onEditInCad && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border p-2.5" style={C.card}>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold leading-tight">{multi ? `${items.length} Objekte` : KIND_LABEL(kind, obj)}</div>
-            {!multi && <div className="truncate text-[11px]" style={C.muted}>{name ? `${obj.objName || ""}${obj.objCode ? ` · #${obj.objCode}` : ""}` : "ohne Namen"}</div>}
+        <div className="rounded-xl border p-3" style={C.card}>
+          <div className="flex items-center gap-3">
+            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border" style={C.field}>
+              {multi ? <Boxes size={26} style={{ color: "hsl(var(--accent-gold))" }} /> : KIND_ICON(kind, obj)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-base font-bold leading-tight">{headerTitle}</div>
+              {!multi && <div className="truncate text-[12px]" style={C.muted}>{obj.objCode ? `#${obj.objCode}` : (obj.objName ? KIND_LABEL(kind, obj) : "ohne Namen")}</div>}
+            </div>
+            {onCollapse && (
+              <button type="button" onClick={onCollapse} title="Einklappen" aria-label="Einklappen"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border" style={C.field}>
+                <ChevronRight size={16} />
+              </button>
+            )}
           </div>
-          <button type="button" onClick={onEditInCad} className="flex h-10 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium" style={C.field}><Pencil size={14} /> Im CAD bearbeiten</button>
+          <button type="button" onClick={onEditInCad} className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border text-[13px] font-medium" style={C.field}>
+            <Pencil size={14} style={{ color: "hsl(var(--accent-gold))" }} /> Im CAD bearbeiten
+          </button>
         </div>
       )}
       {!allEditable && <Note>Ebene gesperrt – nur Anzeige.</Note>}
@@ -420,8 +453,8 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
       </Section>}
 
       <section className="space-y-3 rounded-lg border p-2.5 text-xs" style={C.card}>
-        <h3 className="text-sm font-semibold">Neigung bearbeiten</h3>
-        <TiltStep number={1} label="Kante wählen" />
+        <h3 className="text-sm font-semibold">Neigung einer Kante bearbeiten</h3>
+        <TiltStep number={1} label="Kante wählen" info="Ansicht drehen und zoomen möglich" />
         {resolved?.error && <div className="rounded-lg border px-2 py-1.5 text-[11px]" style={C.err}>{resolved.error}</div>}
         <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={card ? null : edge} pieces={draftPieces} highlight={generic && !card ? undefined : highlight} ring={generic ? pts : undefined} ringFaces={ringFaces} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
           bottomSelectable={cur.plumb && cur.mode === "rotate"}
@@ -442,7 +475,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
             <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all" style={{ left: cur.opposite ? 22 : 3, background: cur.opposite ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))" }} />
           </button>
         </label>}
-        <TiltStep number={2} label="Neigungsart wählen" />
+        <TiltStep number={2} label="Neigungsart der Kante wählen" />
         <div className="flex gap-2">
           <BigChoice active={cur.mode === "rotate"} disabled={!canEdit} icon={<Box size={15} />} label="Körper neigen" onClick={() => begin({ mode: "rotate" })} title="Gesamter Körper wird um die gegenüberliegende Seite geneigt" />
           <BigChoice active={cur.mode === "lift"} disabled={!canEdit} icon={<ArrowUpFromLine size={15} />} label="Kante neigen" onClick={() => begin({ mode: "lift" })} title="Gewählte Oberkante wird geneigt, Gegenkante und Unterseite bleiben fest" />
@@ -454,14 +487,9 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
             <BigChoice active={cur.basis === "actual"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Ruler size={15} />} label="Tatsächliche Fläche" onClick={() => begin({ basis: "actual" })} />
           </div>
         </div>
-        <TiltStep number={3} label="Winkel einstellen" />
+        <TiltStep number={3} label="Winkel der Kante einstellen" />
         <div className="space-y-2">
-          {pose && (() => { const e = new Euler().setFromRotationMatrix(new Matrix4().fromArray(pose)); const d = (r: number) => (Math.round(r * 1800 / Math.PI) / 10).toLocaleString("de-DE"); return (
-            <div className="flex items-center justify-between gap-2 text-[11px]"><span style={C.muted}>Drehung (Gizmo)<InfoTip text="Räumliche Drehung aus „Manuell bewegen“ um X, Y und die senkrechte Achse. Wirkt zusätzlich zum Neigungswinkel." /></span>
-              <span className="tabular-nums">X {d(e.x)}° · Y {d(e.y)}° · Z {d(e.z)}°</span>
-              <button type="button" disabled={!editable} title="Drehung zurücksetzen" className="h-6 w-6 grid place-items-center rounded hover:bg-muted disabled:opacity-40" onClick={() => act(app, () => { delete obj.pose3D; })}><RotateCcw size={12} /></button>
-            </div>); })()}
-          <div className="flex items-center justify-between text-[11px]"><span style={C.muted}>Neigungswinkel<InfoTip text="Bei genau ±90° wird der Körper starr aufgerichtet. Grundfläche fest, Kante neigen und lotrechte Seiten sind dort mathematisch nicht als endliche Höhenfunktion möglich. Tatsächliche Fläche bleibt erhalten; die 2D-Projektion behält eine minimale, rücksetzbare Breite." /></span>
+          <div className="flex items-center justify-between text-[11px]"><span style={C.muted}>Neigungswinkel</span>
             <div className="flex items-center gap-1">
               <input type="text" inputMode="decimal" disabled={!canEdit} value={angleDraft ?? fmt(cur.angle, 1)}
                 onChange={(e) => { angleDraftRef.current = e.target.value; setAngleDraft(e.target.value); setAngleErr(null); }} onBlur={commitAngleText}
@@ -504,6 +532,6 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
 };
 
 
-function TiltStep({ number, label }: { number: number; label: string }) {
-  return <div className="flex items-center gap-2 border-t pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)" }}><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold" style={C.field}>{number}</span><h4 className="text-xs font-semibold">{label}</h4></div>;
+function TiltStep({ number, label, info }: { number: number; label: string; info?: string }) {
+  return <div className="flex items-center gap-2 border-t pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)" }}><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold" style={C.field}>{number}</span><h4 className="text-xs font-semibold">{label}{info && <InfoTip text={info} />}</h4></div>;
 }
