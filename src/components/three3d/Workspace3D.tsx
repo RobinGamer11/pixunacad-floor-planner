@@ -462,10 +462,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         <button onClick={() => setPanelOpen(true)} title="Panel einblenden" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} /></button>
       </div>}
       <aside className={`${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-        <div className="flex justify-end -mt-1 -mr-1"><button type="button" onClick={() => setPanelOpen(false)} title="Einklappen" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightClose size={14} className="text-muted-foreground" /></button></div>
-
         {!sel ? movePanel : selectedHit?.list === "infoBoxes" ? <><InfoBoxSettingsPanel app={app} in3D />{movePanel}</> : (
-          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} manualMove={movePanel} relations={
+          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} onCollapse={()=>setPanelOpen(false)} manualMove={movePanel} relations={
             <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>
