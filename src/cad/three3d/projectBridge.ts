@@ -10,6 +10,7 @@ import { appendSceneObjects } from "../sceneSerde";
 import { Scene } from "../Scene";
 import { infoBoxUi } from "@/lib/infoBoxUi";
 import type { Material3D } from "./materials";
+import { hasPattern } from "./pattern3D";
 import { deriveProject3D, deriveScene3D, type Derived3D } from "./geometryDerivation";
 import { objectDisplayName } from "../objectMeta";
 import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "../ProjectionRender";
@@ -239,4 +240,27 @@ export function sheetSnapshotOf(app: CadApp, sheetId: string): any | null {
 
 export function libraryDefinitionsOf(app: CadApp): any[] {
   return (app as any).libraryDefinitions || [];
+}
+
+/** Muster in 3D ein-/ausblenden – ein Objekt oder (ohne Ziel) alle Objekte mit Muster; ein Undo-Schritt. */
+export function setPattern3D(app: CadApp, on: boolean, target?: { obj: any; list: string } | null) {
+  const apply = (o: any) => { if (on) delete o.pattern3D; else o.pattern3D = false; };
+  const editable = (o: any) => !o?.labelId || app.labelManager.isEditable(o.labelId);
+  app.runAction(() => {
+    if (target) { if (editable(target.obj)) apply(target.obj); return; }
+    for (const sh of app.sheetManager.list()) {
+      const sc = sceneOf(app, sh.id); if (!sc) continue;
+      for (const l of OBJECT_LISTS) for (const o of sc[l] || []) if (editable(o) && hasPattern(o, l)) apply(o);
+    }
+  });
+}
+
+/** Status über alle Objekte mit Muster: "on" | "off" | "mixed" | "none". */
+export function pattern3DState(app: CadApp): "on" | "off" | "mixed" | "none" {
+  let on = 0, off = 0;
+  for (const sh of app.sheetManager.list()) {
+    const sc = sceneOf(app, sh.id); if (!sc) continue;
+    for (const l of OBJECT_LISTS) for (const o of sc[l] || []) if (hasPattern(o, l)) { if (o.pattern3D === false) off++; else on++; }
+  }
+  return on + off === 0 ? "none" : off === 0 ? "on" : on === 0 ? "off" : "mixed";
 }
