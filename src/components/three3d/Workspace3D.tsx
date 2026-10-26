@@ -94,8 +94,9 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const numericValid=useRef(true);
   const onNumericValidity=useCallback((valid:boolean)=>{numericValid.current=valid;},[]);
   const [moveMode,setMoveMode]=useState<"translate"|"rotate">("translate");
-  const [snapSettings,setSnapSettings]=useState<SnapSettings3D>(()=>{try{return normalizeSnapSettings(JSON.parse(localStorage.getItem("pixuna.3d.manipulation")??"null"));}catch{return {...DEFAULT_SNAP_3D};}});
-  useEffect(()=>{try{localStorage.setItem("pixuna.3d.manipulation",JSON.stringify(snapSettings));}catch{}},[snapSettings]);
+  // Fixed default snapping; only the contact helper grid switch is a local device preference.
+  const [snapSettings,setSnapSettings]=useState<SnapSettings3D>(()=>{try{const raw=JSON.parse(localStorage.getItem("pixuna.3d.manipulation")??"null");return {...DEFAULT_SNAP_3D,grid:normalizeSnapSettings(raw).grid};}catch{return {...DEFAULT_SNAP_3D};}});
+  useEffect(()=>{try{localStorage.setItem("pixuna.3d.manipulation",JSON.stringify({grid:snapSettings.grid}));}catch{}},[snapSettings]);
   const [previewItems,setPreviewItems]=useState<Derived3D[]|null>(null);
   const [pendingChange,setPendingChange]=useState<(()=>void)|null>(null);
   const replaceSession=(s:ManualMoveSession|null)=>{sessionRef.current=s;state3D(app).draftActive=!!s;setManualSession(s);if(!s){setPreviewItems(null);setMoveError(null);}};
@@ -260,12 +261,18 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   });
   const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove} snapSettings={snapSettings} onSnapSettings={setSnapSettings}/>;
 
+  const levels=useMemo(()=>[...app.sheetManager.list().filter(s=>sheetParticipatesIn3D(s,app.activeSheetId)).map(s=>({z:sheetElevationM(s),label:s.name})),{z:0,label:"3D-Oberfläche"}],[app,tick]);
+  const movePreview=useMemo(()=>{
+    if(!manualSession||!previewItems)return null;
+    const keys=new Set(manualSession.refs.map(refKey3D)),orig=new Map<Derived3D,string>();
+    return previewItems.filter((d,i)=>keys.has(`${d.sheetId}::${d.sourceId}`)||((d.source==="door"||d.source==="window")&&(orig.get(d)??JSON.stringify(d))!==JSON.stringify(items[i])));
+  },[manualSession,previewItems,items]);
   const btn = "h-8 px-2.5 rounded-md text-xs font-medium border hover:bg-muted disabled:opacity-40";
   return (
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={previewItems??items} selectedKey={selKey} selectedKeys={refs3D.map(refKey3D)} manual={manualSession} transformMode={moveMode} snapSettings={snapSettings} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
+          <Viewer3D ref={viewer} items={items} movePreview={movePreview} levels={levels} selectedKey={selKey} selectedKeys={refs3D.map(refKey3D)} manual={manualSession} transformMode={moveMode} snapSettings={snapSettings} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
             onMaterialDrop={(sheetId,id,materialId)=>guardChange(()=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);})}
             onToggleOpening={(sheetId,id)=>guardChange(()=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);})} />
         </Suspense>
