@@ -397,21 +397,44 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     const rank = opts.labelFrontRank ? opts.labelFrontRank(l) : 0;
     orderedLabelItems(scene, l).forEach((it, i) => orderOf.set(it.obj, rank * 1e6 + i));
   }
-  const push = (o: any, items: Derived3D[]) => {
+  const push = (o: any, items: Derived3D[], preTilted = false) => {
     const ord = orderOf.get(o) ?? 0;
-    const tilted = o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
+    const tilted = !preTilted && o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
     const list = applySpatialPose(tilted, o.pose3D, base);
     for (const d of list) { d.order = ord; d.material = d.part === "frame" ? o.frameMaterial3D ?? o.material3D : d.part === "glass" || d.part === "leaf" ? o.panelMaterial3D ?? o.material3D : o.material3D; out.push(d); }
   };
   const doors = (scene.doors || []).filter(vis);
-  const walls = deriveWalls(scene, doors, sheetId, base, vis);
-  for (const [w, parts] of walls) push(w, parts);
+  // Geneigte Wände: erst ohne Öffnungen neigen, dann die (starr mitgeführten) Öffnungen ausschneiden –
+  // so verzieht sich die Aussparung bei „Kante neigen“/„Kanten bündig“ nie mit der Wand.
+  const tiltedWallIds = new Set((scene.walls || []).filter((w: any) => w?.tilt3D).map((w: any) => w.id));
+  const walls = deriveWalls(scene, doors.filter((d: any) => !tiltedWallIds.has(d.wallId)), sheetId, base, vis);
+  const openingParts = new Map<any, Derived3D[]>();
   for (const d of doors) {
     const wall = (scene.walls || []).find((w: any) => w.id === d.wallId);
-    if (wall && vis(wall)) {
-      const parts = deriveOpening(d, wall, sheetId, base);
-      push(d, applySpatialPose(wall.tilt3D ? tiltOpeningWithWall(wall, walls.get(wall) || [], parts, base + objectElevationM(wall)) : parts, wall.pose3D, base));
+    if (!wall || !vis(wall)) continue;
+    const parts = deriveOpening(d, wall, sheetId, base);
+    openingParts.set(d, wall.tilt3D ? tiltOpeningWithWall(wall, walls.get(wall) || [], parts, base + objectElevationM(wall)) : parts);
+  }
+  for (const [w, parts] of walls) {
+    if (!w.tilt3D) { push(w, parts); continue; }
+    const z0w = base + objectElevationM(w);
+    let tilted = applyGenericTilt(w, parts, z0w);
+    const own = doors.filter((d: any) => d.wallId === w.id);
+    const cutters = own.length ? openingCutters(w, own, sheetId, base, walls.get(w) || []) : [];
+    if (cutters.length && !tilted.some((d: any) => d.note)) {
+      tilted = tilted.flatMap((d: any) => {
+        let m = meshOf(d);
+        if (!m) return [d];
+        for (const c of cutters) { if (!m) break; try { m = csgMesh(m, c, "subtract"); } catch { /* Ausschnitt fehlgeschlagen – Wand bleibt */ } }
+        return m ? [{ ...d, type: "mesh", mesh: m, closed: true } as any] : [];
+      });
     }
+    push(w, tilted, true);
+  }
+  for (const d of doors) {
+    const parts = openingParts.get(d);
+    const wall = (scene.walls || []).find((w: any) => w.id === d.wallId);
+    if (parts && wall) push(d, applySpatialPose(parts, wall.pose3D, base));
   }
   for (const b of scene.infoBoxes || []) if (vis(b)) push(b, deriveInfoBox(b, sheetId, base));
   for (const h of scene.hatches || []) { if (!vis(h)) continue; const d = deriveHatch(h, sheetId, base); if (d) push(h, [d]); }
