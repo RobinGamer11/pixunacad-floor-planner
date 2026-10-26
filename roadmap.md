@@ -1,5 +1,11 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Kombiniertes 3D-Paket – 26.10.2026
+- [ ] Bezugskante und Kantenwahl entlang der tatsächlichen geneigten Körpergeometrie
+- [ ] Gemeinsames Verschieben-/Drehen-Gizmo mit Weltachsen und zoomstabiler Größe
+- [ ] Flüchtiges beiges Fangraster, Kontaktmarker, Hysterese und Winkelfang; lokale Einstellungen
+- [ ] Regressionstests und Browserprüfung; automatisches Prüfergebnis und GitHub-main-Status nennen
+
 ## Option B – Manuell bewegen und Vercel, 25.10.2026
 - [x] 3D-Ansichtswechsel: r169-Absturz reproduziert; Helper-Freigabe korrigiert; 15 Tests und Browser-Unmount ohne Fehler geprüft
 - [x] Gemeinsame flüchtige 3D-Auswahl und Transformationssitzung mit Weltachsen, Zahlenfeldern, Übernehmen/Verwerfen
