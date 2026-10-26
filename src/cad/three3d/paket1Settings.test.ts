@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveWall, tiltOpeningWithWall } from "./geometryDerivation";
+import { deriveWall, openingCutters, tiltOpeningWithWall } from "./geometryDerivation";
 import { deriveOpening } from "./openingGeometry";
 import { deriveInfoBox, infoBoxTone } from "./infoBoxGeometry";
 import { sharedFields3D } from "./multiEdit3D";
