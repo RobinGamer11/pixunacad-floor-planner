@@ -270,7 +270,16 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         else st.current.onEmpty?.();
       }
     };
-    const onWheel = (e: WheelEvent) => { e.preventDefault(); orbit.r *= Math.exp(e.deltaY * 0.0012); apply(); };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const f = Math.exp(e.deltaY * 0.0012);
+      // Nah am Ziel: statt anzuhalten durch den Zielpunkt hindurchfahren (auch unter 0,00 m).
+      if (f < 1 && orbit.r * f < 0.25) {
+        const fwd = orbit.target.clone().sub(camera.position).normalize();
+        orbit.target.addScaledVector(fwd, Math.max(0.01, orbit.r) * (1 - f) * 4);
+      } else orbit.r *= f;
+      apply();
+    };
     el.addEventListener("pointerdown", onDown); el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp); el.addEventListener("pointercancel", onUp);
     el.addEventListener("wheel", onWheel, { passive: false });

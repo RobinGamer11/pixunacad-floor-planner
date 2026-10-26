@@ -8,7 +8,7 @@ import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 import { type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
 import { Object3DSettings, BigChoice } from "@/components/cad/Object3DSettings";
-import { Crosshair, X as XIcon } from "lucide-react";
+import { Crosshair, X as XIcon, PanelRightClose, PanelRightOpen } from "lucide-react";
 const REL = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
   field: { background: "hsl(var(--overlay-surface) / 0.07)", borderColor: "hsl(var(--overlay-surface) / 0.18)", color: "hsl(var(--overlay-surface))" },
@@ -86,6 +86,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [tick, setTick] = useState(0);
   const [selKey, setSelKey] = useState<string | null>(null);
   const [refs3D,setRefs3D]=useState<ObjectRef3D[]>([]);
+  const selectedKeys3D=useMemo(()=>refs3D.map(refKey3D),[refs3D]);
+  const [panelOpen,setPanelOpen]=useState(true);
   const [multiSelect,setMultiSelect]=useState(false);
   // „Manuell bewegen“ ist eine lokale Geräte-Einstellung und gilt für jede Auswahl.
   const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")==="1";}catch{return false;}});
@@ -111,7 +113,10 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const cancelMove=()=>{replaceSession(null);setPendingChange(null);if(manualOn)restartSession();};
   const applyMove=()=>{const s=sessionRef.current;if(!s)return;if(!numericValid.current){setMoveError("Bitte alle ungültigen Zahlen korrigieren.");return;}try{commitManualMove(app,s);replaceSession(null);const current=deriveFromApp(app);setItems(current.items);setIssues(current.issues);setTick(t=>t+1);const next=pendingChange;setPendingChange(null);if(next)next();else if(manualOn)restartSession();}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung fehlgeschlagen.");}};
   const guardChange=(next:()=>void)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){setPendingChange(()=>next);return;}replaceSession(null);next();};
-  const updateDelta=(delta:MoveDelta)=>{const s=sessionRef.current;if(!s)return;const next={...s,delta};replaceSession(next);try{setPreviewItems(previewManualMove(app,next));setMoveError(null);}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung nicht möglich.");}};
+  const previewFrame=useRef(0);
+  const updateDelta=(delta:MoveDelta)=>{const s=sessionRef.current;if(!s)return;const next={...s,delta};replaceSession(next);
+    // Vorschau höchstens einmal pro Bild berechnen (sonst ruckelt das Ziehen).
+    if(previewFrame.current)return;previewFrame.current=requestAnimationFrame(()=>{previewFrame.current=0;const cur=sessionRef.current;if(!cur)return;try{setPreviewItems(previewManualMove(app,cur));setMoveError(null);}catch(e){setMoveError(e instanceof Error?e.message:"Bewegung nicht möglich.");}});};
   useEffect(()=>enter3DEditor(app,()=>{if(!sessionRef.current)return false;replaceSession(null);setPendingChange(null);return true;},()=>setTick(t=>t+1)),[app]);
   useEffect(()=>{
     const beforeLeave=(e:BeforeUnloadEvent)=>{if(sessionRef.current&&changedMove(sessionRef.current.delta)){e.preventDefault();e.returnValue="";}};
@@ -287,7 +292,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={items} movePreview={movePreview} levels={levels} selectedKey={selKey} selectedKeys={refs3D.map(refKey3D)} manual={manualSession} transformMode={moveMode} snapSettings={snapSettings} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
+          <Viewer3D ref={viewer} items={items} movePreview={movePreview} levels={levels} selectedKey={selKey} selectedKeys={selectedKeys3D} manual={manualSession} transformMode={moveMode} snapSettings={snapSettings} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
             onMaterialDrop={(sheetId,id,materialId)=>guardChange(()=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);})}
             onToggleOpening={(sheetId,id)=>guardChange(()=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);})} />
         </Suspense>
@@ -449,7 +454,11 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         )}
       </div>
 
-      <aside className="w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      {!panelOpen && <div className="shrink-0 border-l p-1" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+        <button onClick={() => setPanelOpen(true)} title="Panel einblenden" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} /></button>
+      </div>}
+      <aside className={`${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+        <div className="flex justify-end -mt-1 -mr-1"><button type="button" onClick={() => setPanelOpen(false)} title="Einklappen" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightClose size={14} className="text-muted-foreground" /></button></div>
 
         {!sel ? movePanel : selectedHit?.list === "infoBoxes" ? <><InfoBoxSettingsPanel app={app} in3D />{movePanel}</> : (
           <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} manualMove={movePanel} relations={
