@@ -260,14 +260,14 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   const resolveNow = () => generic ? resolveGenericTilt(obj.tilt3D, rawPts, z) : resolveTilt(obj, z);
   const resolved = resolveNow();
   const firstEdge = () => generic ? (outline.length > 1 ? 0 : null) : (straightEdgeIndices(obj)[0] ?? null);
-  const initCard = (t: any): Cardinal | null => t?.cardinal ?? null;
-  const [edge, setEdge] = useState<number | null>(resolved?.frame && !stored?.cardinal ? resolved.frame.edgeIndex : firstEdge());
+  const initCard = (t: any): Cardinal | null => generic && flatPieces.some(d=>d.source==="wall") ? null : t?.cardinal ?? null;
+  const [edge, setEdge] = useState<number | null>(resolved?.frame && !stored?.cardinal && resolved.frame.edgeIndex >= 0 ? resolved.frame.edgeIndex : firstEdge());
   const [card, setCard] = useState<Cardinal | null>(initCard(stored));
   const [session, setSession] = useState<{ angle: number; mode: TiltMode; plumb: boolean; anchor: "top" | "bottom"; basis?: "plan" | "actual"; opposite: boolean } | null>(null);
   useEffect(() => {
     const r = resolveNow();
     setCard(initCard(obj.tilt3D));
-    setEdge(r?.frame && !obj.tilt3D?.cardinal ? r.frame.edgeIndex : firstEdge()); setSession(null);
+    setEdge(r?.frame && !obj.tilt3D?.cardinal && r.frame.edgeIndex >= 0 ? r.frame.edgeIndex : firstEdge()); setSession(null);
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [obj]);
 
@@ -288,9 +288,9 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     ? { edgeIndex: -1, a: { x: cEdge[0].x, y: cEdge[0].y }, b: { x: cEdge[1].x, y: cEdge[1].y }, count: outline.length, cardinal: card }
     : edge !== null ? { edgeIndex: edge, a: { x: pts[edge].x, y: pts[edge].y }, b: { x: pts[(edge + 1) % pts.length].x, y: pts[(edge + 1) % pts.length].y }, count: pts.length } : null;
   const tf = tiltFields();
-  const draftTilt = tf && frame && Math.abs(cur.angle) > 1e-9 && !shapeErr
+  const draftTilt = !session ? stored : tf && frame && Math.abs(cur.angle) > 1e-9 && !shapeErr
     ? { ...tf, angleDeg: cur.angle, mode: cur.mode, plumb: cur.plumb, anchor: cur.anchor, ...(cur.basis ? { basis: cur.basis } : {}), ...(cur.opposite ? { opposite: true } : {}), projDeg }
-    : (session ? undefined : stored);
+    : undefined;
   const draftPieces = generic ? (draftTilt ? deriveObjectFromApp(app, obj, draftTilt) : flatPieces) : undefined;
   // Selecting a new reference does not until a numeric edit replace the stored physical tilt.
   const displayFrame = draftTilt ? resolveGenericTilt(draftTilt, rawPts, z)?.frame : undefined;
