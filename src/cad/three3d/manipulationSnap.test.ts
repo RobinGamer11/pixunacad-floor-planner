@@ -41,4 +41,18 @@ describe("3D world-axis snapping",()=>{
   it("validates local controls without permitting scaling or invalid intervals",()=>{
     expect(normalizeSnapSettings({stepM:0,angleDeg:Infinity,size:3})).toEqual({...DEFAULT_SNAP_3D,stepM:.001,size:2});
   });
+});import { faceContacts, restingLevel } from "./manipulationSnap";
+describe("contact helper grid",()=>{
+  const m={x0:0,x1:1,y0:0,y1:1,z0:1,z1:2};
+  it("detects a body resting on top of another",()=>{expect(faceContacts(m,[{x0:0,x1:2,y0:0,y1:2,z0:0,z1:1}])[0]).toMatchObject({axis:"z",at:1});});
+  it("detects a side contact and ignores distant bodies",()=>{
+    expect(faceContacts(m,[{x0:1,x1:2,y0:0,y1:1,z0:1,z1:2}])[0]).toMatchObject({axis:"x",at:1});
+    expect(faceContacts(m,[{x0:3,x1:4,y0:0,y1:1,z0:1,z1:2}])).toHaveLength(0);
+  });
+  it("rests on a sheet at exactly 0,00 m above it, preferring the sheet over the ground",()=>{
+    const levels=[{z:1,label:"Seite 2"},{z:0,label:"Seite 1"},{z:0,label:"3D-Oberfläche"}];
+    expect(restingLevel(m,levels)?.label).toBe("Seite 2");
+    expect(restingLevel({...m,z0:0},levels)?.label).toBe("Seite 1");
+    expect(restingLevel({...m,z0:.3},levels)).toBeNull();
+  });
 });

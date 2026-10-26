@@ -58,7 +58,8 @@ export function snapAxisMove(delta: MoveDelta, axis: WorldAxis, pivot: Vec3, mov
   });
   if(best)return {delta:{...delta,[axis]:best.value},contact:best};
   const absolute=pivot[axis]+delta[axis], rounded=Math.round(absolute/settings.stepM)*settings.stepM;
-  if(settings.grid&&Math.abs(rounded-absolute)<=Math.min(tolerance,settings.stepM*.25)){
+  // Helper grid catches generously (but never more than 40 % of a step, so free values stay reachable).
+  if(settings.grid&&Math.abs(rounded-absolute)<=Math.min(tolerance*2,settings.stepM*.4)){
     const target={x:pivot.x+delta.x,y:pivot.y+delta.y,z:pivot.z+delta.z,[axis]:rounded};
     const contact:SnapContact={key:`g:${axis}:${rounded}`,value:rounded-pivot[axis],moving:target,target,kind:"grid"};
     return {delta:{...delta,[axis]:contact.value},contact};
