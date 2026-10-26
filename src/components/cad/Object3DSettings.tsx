@@ -453,8 +453,8 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
       </Section>}
 
       <section className="space-y-3 rounded-lg border p-2.5 text-xs" style={C.card}>
-        <h3 className="text-sm font-semibold">Neigung bearbeiten</h3>
-        <TiltStep number={1} label="Kante wählen" />
+        <h3 className="text-sm font-semibold">Neigung einer Kante bearbeiten</h3>
+        <TiltStep number={1} label="Kante wählen" info="Ansicht drehen und zoomen möglich" />
         {resolved?.error && <div className="rounded-lg border px-2 py-1.5 text-[11px]" style={C.err}>{resolved.error}</div>}
         <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={card ? null : edge} pieces={draftPieces} highlight={generic && !card ? undefined : highlight} ring={generic ? pts : undefined} ringFaces={ringFaces} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
           bottomSelectable={cur.plumb && cur.mode === "rotate"}
@@ -475,7 +475,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
             <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all" style={{ left: cur.opposite ? 22 : 3, background: cur.opposite ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))" }} />
           </button>
         </label>}
-        <TiltStep number={2} label="Neigungsart wählen" />
+        <TiltStep number={2} label="Neigungsart der Kante wählen" />
         <div className="flex gap-2">
           <BigChoice active={cur.mode === "rotate"} disabled={!canEdit} icon={<Box size={15} />} label="Körper neigen" onClick={() => begin({ mode: "rotate" })} title="Gesamter Körper wird um die gegenüberliegende Seite geneigt" />
           <BigChoice active={cur.mode === "lift"} disabled={!canEdit} icon={<ArrowUpFromLine size={15} />} label="Kante neigen" onClick={() => begin({ mode: "lift" })} title="Gewählte Oberkante wird geneigt, Gegenkante und Unterseite bleiben fest" />
@@ -487,7 +487,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
             <BigChoice active={cur.basis === "actual"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Ruler size={15} />} label="Tatsächliche Fläche" onClick={() => begin({ basis: "actual" })} />
           </div>
         </div>
-        <TiltStep number={3} label="Winkel einstellen" />
+        <TiltStep number={3} label="Winkel der Kante einstellen" />
         <div className="space-y-2">
           {pose && (() => { const e = new Euler().setFromRotationMatrix(new Matrix4().fromArray(pose)); const d = (r: number) => (Math.round(r * 1800 / Math.PI) / 10).toLocaleString("de-DE"); return (
             <div className="flex items-center justify-between gap-2 text-[11px]"><span style={C.muted}>Drehung (Gizmo)<InfoTip text="Räumliche Drehung aus „Manuell bewegen“ um X, Y und die senkrechte Achse. Wirkt zusätzlich zum Neigungswinkel." /></span>
