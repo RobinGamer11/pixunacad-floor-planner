@@ -128,7 +128,7 @@ export const Object3DSettings: React.FC<{
   /** Nur im 3D-Bereich: Körperbeziehungen als vierte Karte. */
   relations?: React.ReactNode;
   manualMove?: React.ReactNode; manualActive?: boolean;
-}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, relations, manualMove, manualActive }) => {
+}> = ({ app, defaultOpen = false, onlyKinds, exceptKinds, className, onEditInCad, relations, manualMove }) => {
   const [open, setOpen] = useState(defaultOpen);
   const [, force] = useState(0);
   const [items, setItems] = useState<{ kind: string; obj: any }[]>([]);

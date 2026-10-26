@@ -20,7 +20,7 @@ export function infoBoxTone(box: { kind?: string; status?: string }) {
 
 /** Circular body in the vertical plane; height/width preserve existing size settings. */
 export function infoBoxPinOutline(width: number, height: number, seg = 10): { u: number; v: number }[] {
-  return Array.from({length: Math.max(32, seg * 8)}, (_, i, ) => {
+  return Array.from({length: Math.max(32, seg * 8)}, (_, i) => {
     const a = i * Math.PI * 2 / Math.max(32, seg * 8);
     return {u: Math.cos(a) * width / 2, v: height / 2 + Math.sin(a) * height / 2};
   });
