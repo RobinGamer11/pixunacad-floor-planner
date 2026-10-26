@@ -1,5 +1,12 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Neigungsfenster – aktueller Auftrag
+- [x] Mausrad-Autoscroll unterdrücken; Vorschaugesten vom Eltern-Scroll trennen; Fokus-/Capture-Verlust beendet Kamerageste
+- [x] Manueller Bewegungs-/Neigungsbereich dunkler, drei klare Neigungsschritte, größere Seitenknöpfe; Leistenbreite und Datenlogik unverändert
+- [x] 12 Regressionstests bestanden (temporärer Ersatz für defektes optionales canvas-Modul); automatische Prüfung OK; isolierte Browser-Vorschau: Pan, Fokusverlust, Orbit und Fit ohne Escape
+- [ ] Angemeldete Projektabnahme – Projekt führt im Prüfkontext zur Anmeldung
+- [ ] GitHub-Übertragung – Lovable verwaltet Commit/Push; GitHub main bei 576da7e5, noch keine neue Übertragung verifiziert
+
 ## 3D-Korrekturen – aktueller Auftrag
 - [x] Objekteinstellungen bei Manuell bewegen unverändert lassen; separate Bewegungsfelder entfernen; Bestätigung über der Ansicht
 - [x] Kontakt-Hilfsraster unabhängig und immer schaltbar, standardmäßig ein

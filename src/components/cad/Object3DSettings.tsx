@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Check, X as XIcon, RotateCcw, Pencil, Box, ArrowUpFromLine, Grid2x2, Ruler, Info as InfoIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { resolveSelectedObjects } from "@/components/cad/ObjectInfoTabs";
 import { libraryBodyHeightM, objectElevationM } from "@/cad/objectMeta";
@@ -402,10 +403,10 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
     : topSurfaceArea(pts, holes, dt?.mode, dt?.plumb, dt?.angleDeg || 0, dFrame && dt?.plumb ? plumbScale(dFrame, h, dt.anchor) : 1);
   const canEdit = editable && !!tf && !!frame;
   const cardBtn = (c: Cardinal, icon: React.ReactNode, label: string, pos: string) => (
-    <button key={c} type="button" disabled={!editable} title={`Waagerechte/lotrechte Bezugskante am äußersten Punkt: ${label}`} aria-label={`Bezugskante ${label}`} aria-pressed={card === c}
+    <Button variant="ghost" key={c} type="button" disabled={!editable} title={`Waagerechte/lotrechte Bezugskante am äußersten Punkt: ${label}`} aria-label={`Bezugskante ${label}`} aria-pressed={card === c}
       onClick={() => { setCard(card === c ? null : c); if (card === c) setEdge(e => e ?? firstEdge() ?? (pts.length ? 0 : null)); }}
-      className={`absolute z-10 flex h-7 items-center gap-1 rounded-md border px-1.5 text-[10px] font-medium disabled:opacity-40 ${pos}`}
-      style={card === c ? C.gold : { ...C.field, background: "hsl(var(--overlay-ink) / 0.85)" }}>{icon}{label}</button>
+      className={`absolute z-10 flex h-9 items-center gap-1 rounded-md border px-2 text-[11px] font-medium disabled:opacity-40 ${pos}`}
+      style={card === c ? C.gold : { ...C.field, background: "hsl(var(--overlay-ink) / 0.85)" }}>{icon}{label}</Button>
   );
   const pct = ((cur.angle + 90) / 180) * 100;
 
@@ -418,7 +419,9 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
         </div>
       </Section>}
 
-      <Section title="Neigung bearbeiten">
+      <section className="space-y-3 rounded-lg border p-2.5 text-xs" style={C.card}>
+        <h3 className="text-sm font-semibold">Neigung bearbeiten</h3>
+        <TiltStep number={1} label="Kante wählen" />
         {resolved?.error && <div className="rounded-lg border px-2 py-1.5 text-[11px]" style={C.err}>{resolved.error}</div>}
         <TiltPreview3D obj={obj} base={sheetZ} draftTilt={draftTilt} edge={card ? null : edge} pieces={draftPieces} highlight={generic && !card ? undefined : highlight} ring={generic ? pts : undefined} ringFaces={ringFaces} edgeLevel={cur.plumb && cur.mode === "rotate" ? cur.anchor : "top"} frame={frame} selectable={straight}
           bottomSelectable={cur.plumb && cur.mode === "rotate"}
@@ -432,18 +435,27 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
           {cardBtn("left", <ArrowLeft size={11} />, "Links", "left-1.5 top-1/2 -translate-y-1/2")}
           {cardBtn("right", <ArrowRight size={11} />, "Rechts", "right-1.5 top-1/2 -translate-y-1/2")}
         </TiltPreview3D>
+        {tf && <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5" style={{ ...C.field, opacity: canEdit ? 1 : 0.5 }}>
+          <span className="flex items-center text-[12px]">Gegenüberliegende Kante neigen<InfoTip text="Die gewählte Kante bleibt fest, die gegenüberliegende Seite wird geneigt." /></span>
+          <button type="button" role="switch" aria-checked={cur.opposite} aria-label="Gegenüberliegende Kante neigen" disabled={!canEdit} onClick={() => begin({ opposite: !cur.opposite })}
+            className="relative h-6 w-11 shrink-0 rounded-full border transition-colors" style={cur.opposite ? C.gold : C.field}>
+            <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all" style={{ left: cur.opposite ? 22 : 3, background: cur.opposite ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))" }} />
+          </button>
+        </label>}
+        <TiltStep number={2} label="Neigungsart wählen" />
         <div className="flex gap-2">
           <BigChoice active={cur.mode === "rotate"} disabled={!canEdit} icon={<Box size={15} />} label="Körper neigen" onClick={() => begin({ mode: "rotate" })} title="Gesamter Körper wird um die gegenüberliegende Seite geneigt" />
           <BigChoice active={cur.mode === "lift"} disabled={!canEdit} icon={<ArrowUpFromLine size={15} />} label="Kante neigen" onClick={() => begin({ mode: "lift" })} title="Gewählte Oberkante wird geneigt, Gegenkante und Unterseite bleiben fest" />
         </div>
         <div className="space-y-1" style={{ opacity: canEdit && cur.mode === "rotate" && !cur.plumb ? 1 : 0.45 }}>
-          <div className="flex items-center text-[11px]" style={C.muted}>Orientierung an<InfoTip text="Grundfläche: der Körper bleibt im Grundriss wie in 2D gezeichnet und wird durch die Neigung größer. Tatsächliche Fläche: die Fläche bleibt gleich, der Grundriss wird kleiner – so auch in 2D angezeigt." /></div>
+          <div className="flex items-center text-[11px]" style={C.muted}>Was soll gleich bleiben?<InfoTip text="Grundfläche: der Körper bleibt im Grundriss wie in 2D gezeichnet und wird durch die Neigung größer. Tatsächliche Fläche: die Fläche bleibt gleich, der Grundriss wird kleiner – so auch in 2D angezeigt." /></div>
           <div className="flex gap-2">
             <BigChoice active={cur.basis === "plan"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Grid2x2 size={15} />} label="Grundfläche" onClick={() => begin({ basis: "plan" })} />
             <BigChoice active={cur.basis === "actual"} disabled={!canEdit || cur.mode !== "rotate" || cur.plumb} icon={<Ruler size={15} />} label="Tatsächliche Fläche" onClick={() => begin({ basis: "actual" })} />
           </div>
         </div>
-        <div className="space-y-1">
+        <TiltStep number={3} label="Winkel einstellen" />
+        <div className="space-y-2">
           {pose && (() => { const e = new Euler().setFromRotationMatrix(new Matrix4().fromArray(pose)); const d = (r: number) => (Math.round(r * 1800 / Math.PI) / 10).toLocaleString("de-DE"); return (
             <div className="flex items-center justify-between gap-2 text-[11px]"><span style={C.muted}>Drehung (Gizmo)<InfoTip text="Räumliche Drehung aus „Manuell bewegen“ um X, Y und die senkrechte Achse. Wirkt zusätzlich zum Neigungswinkel." /></span>
               <span className="tabular-nums">X {d(e.x)}° · Y {d(e.y)}° · Z {d(e.z)}°</span>
@@ -468,13 +480,6 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
           </div>
           {angleErr && <div className="text-[10px]" style={C.err}>{angleErr}</div>}
         </div>
-        {tf && <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5" style={{ ...C.field, opacity: canEdit ? 1 : 0.5 }}>
-          <span className="flex items-center text-[12px]">Gegenüberliegende Kante neigen<InfoTip text="Die gewählte Kante bleibt fest, die gegenüberliegende Seite wird geneigt." /></span>
-          <button type="button" role="switch" aria-checked={cur.opposite} aria-label="Gegenüberliegende Kante neigen" disabled={!canEdit} onClick={() => begin({ opposite: !cur.opposite })}
-            className="relative h-6 w-11 shrink-0 rounded-full border transition-colors" style={cur.opposite ? C.gold : C.field}>
-            <span className="absolute top-0.5 h-4 w-4 rounded-full transition-all" style={{ left: cur.opposite ? 22 : 3, background: cur.opposite ? "hsl(var(--overlay-ink))" : "hsl(var(--overlay-surface))" }} />
-          </button>
-        </label>}
         <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5" title={cur.basis === "plan" ? "Nur bei „Tatsächliche Fläche“ verfügbar" : undefined} style={{ ...C.field, opacity: canEdit && cur.mode === "rotate" && cur.basis !== "plan" ? 1 : 0.4, cursor: cur.basis === "plan" ? "not-allowed" : undefined }}>
           <span className="flex items-center text-[12px]">Kanten bündig<InfoTip text="Die gewählte Kante bleibt an ihrer Stelle, die Seiten werden lotrecht. Oberkante gewählt: die Kante darunter wird lotrecht nach unten geführt. Unterkante gewählt (in der Vorschau antippen): die Kante darüber wird lotrecht nach oben geführt. Der Körper wird nicht länger." /></span>
           <button type="button" role="switch" aria-checked={cur.plumb} disabled={!canEdit || cur.mode === "lift" || cur.basis === "plan"} onClick={() => begin({ plumb: !cur.plumb })}
@@ -493,8 +498,12 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
             <BigChoice disabled={!editable || !stored} icon={<RotateCcw size={15} />} label="Auf 0° zurücksetzen" onClick={() => act(app, () => { unproject(); delete obj.tilt3D; })} />
           </div>
         )}
-      </Section>
+      </section>
     </>
   );
 };
 
+
+function TiltStep({ number, label }: { number: number; label: string }) {
+  return <div className="flex items-center gap-2 border-t pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)" }}><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold" style={C.field}>{number}</span><h4 className="text-xs font-semibold">{label}</h4></div>;
+}
