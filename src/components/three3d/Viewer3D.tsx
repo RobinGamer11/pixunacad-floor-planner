@@ -6,6 +6,7 @@ import { getTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
  * Richtungsfeld auf Touchgeräten).
  */
 import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
+import { pieceMesh } from "@/cad/three3d/geometryDerivation";
 import * as THREE from "three";
 import type { Derived3D } from "@/cad/three3d/geometryDerivation";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
@@ -14,7 +15,7 @@ import { CAD_TO_THREE, moveMatrix, type MoveDelta } from "@/cad/three3d/spatialT
 import type { ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
 import { combinedGizmo, controlPointer } from "./combinedGizmo";
-import { DEFAULT_SNAP_3D, spatialFeatures, snapAxisMove, snapRotationAngle, type SnapSettings3D, type SnapContact, type WorldAxis } from "@/cad/three3d/manipulationSnap";
+import { DEFAULT_SNAP_3D, boxOf, faceContacts, restingLevel, spatialFeatures, snapAxisMove, snapRotationAngle, type SnapSettings3D, type SnapContact, type WorldAxis } from "@/cad/three3d/manipulationSnap";
 
 export interface CameraState { tx: number; ty: number; tz: number; r: number; theta: number; phi: number }
 export interface Viewer3DHandle {
@@ -50,6 +51,10 @@ interface Props {
   materialImage?: (m: Material3D) => string | undefined;
   onMaterialDrop?: (sheetId: string, id: string, materialId: string) => void;
   onToggleOpening?: (sheetId: string, id: string) => void;
+  /** Transient moved copy of the selection (Vorschau bis „Übernehmen“). */
+  movePreview?: Derived3D[] | null;
+  /** Sheet heights and the 3D ground (z = 0) for 0,00 m contact feedback and snapping. */
+  levels?: { z: number; label: string }[];
 }
 
 const keyOf = (d: Derived3D) => `${d.sheetId}::${d.sourceId}`;
@@ -60,7 +65,8 @@ function shapeOf(outer: { x: number; y: number }[], holes: { x: number; y: numbe
   return s;
 }
 
-const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, selectedKeys, manual, transformMode = "translate", onTransform, snapSettings = DEFAULT_SNAP_3D, onPick, onEmpty, textureFor, ghost, materialImage, onMaterialDrop, onToggleOpening }, ref) {
+const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, selectedKeys, manual, transformMode = "translate", onTransform, snapSettings = DEFAULT_SNAP_3D, onPick, onEmpty, textureFor, ghost, materialImage, onMaterialDrop, onToggleOpening, movePreview, levels }, ref) {
+  const badgeRef = useRef<HTMLDivElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
 
@@ -95,6 +101,15 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         if(o.name==="Z")m.color.copy(cssColor("--gizmo-y"));
       }
     });
+    // Modern look: slim, slightly translucent axes; rings softer than arrows; golden pivot dot.
+    for(const c of gizmo.controls)c.getHelper().traverse(o=>{
+      const material=(o as THREE.Mesh).material as THREE.MeshBasicMaterial|undefined;
+      if(!material||Array.isArray(material))return;
+      material.transparent=true;material.opacity=c.mode==="rotate"?.55:.92;
+      if((o as THREE.Mesh).isMesh&&c.mode==="translate"&&["X","Y","Z"].includes(o.name))o.scale.multiply(new THREE.Vector3(1,1,1));
+    });
+    const center=new THREE.Mesh(new THREE.SphereGeometry(1,20,14),new THREE.MeshBasicMaterial({color:gold,depthTest:false,depthWrite:false,transparent:true,opacity:.95}));
+    center.renderOrder=30;center.visible=false;center.raycast=()=>{};scene.add(center);
     const snapGroup=new THREE.Group();scene.add(snapGroup);
     const marker=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:gold,depthTest:false,depthWrite:false}));
     marker.visible=false;marker.renderOrder=20;snapGroup.add(marker);
@@ -120,6 +135,12 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         const tolerance=camera.position.distanceTo(pivot.position)*2*Math.tan(camera.fov*Math.PI/360)/Math.max(1,renderer.domElement.clientHeight)*10;
         const result=snapAxisMove(delta,worldAxis,session.pivot,st.current.snapSources??[],st.current.snapTargets??{points:[],edges:[]},settings,tolerance,snapContact);
         delta=result.delta;snapContact=result.contact;
+        const lv:{z:number;label:string}[]=st.current.levels??[];
+        if(worldAxis==="z"&&settings.enabled&&(!snapContact||snapContact.kind==="grid")&&lv.length){
+          const m=moveMatrix({...delta,z:0},session.pivot),zs=(st.current.snapSources??[]).map((p:{x:number;y:number;z:number})=>new THREE.Vector3(p.x,p.y,p.z).applyMatrix4(m).z);
+          if(zs.length){const bottom=Math.min(...zs)+delta.z,hit=lv.map(l=>({l,d:Math.abs(l.z-bottom)})).sort((a,b)=>a.d-b.d)[0];
+            if(hit&&hit.d<=tolerance*2){delta={...delta,z:delta.z+hit.l.z-bottom};snapContact=null;}}
+        }
         pivot.position.set(session.pivot.x+delta.x,session.pivot.z+delta.z,session.pivot.y+delta.y);
       }
       marker.visible=control.mode==="translate"?!!snapContact:angleContact!==null;
@@ -296,6 +317,15 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       }
       if (sticks.look.x || sticks.look.y) look(sticks.look.x * dt * 1.6 * sens.look, -sticks.look.y * dt * 1.2 * sens.look);
       marker.scale.setScalar(camera.position.distanceTo(pivot.position)*.005);
+      // Gizmo keeps its size in the scene: zooming in makes it larger, zooming out smaller.
+      if(st.current.manual&&st.current.gizmoRef){
+        const ref=st.current.gizmoRef as {dist:number;size:number},dist=Math.max(.01,camera.position.distanceTo(pivot.position));
+        const size=Math.min(8,Math.max(.12,ref.size*ref.dist/dist));
+        gizmo.translate.setSize(size);gizmo.rotate.setSize(size*.78);
+        center.visible=true;center.position.copy(pivot.position);center.scale.setScalar(ref.dist*ref.size*.012);
+      } else center.visible=false;
+      const badge=badgeRef.current,anchor:THREE.Vector3|null=st.current.badgeAnchor??null;
+      if(badge){if(anchor){const v=anchor.clone().project(camera);badge.style.display=v.z<1?"block":"none";badge.style.left=`${(v.x+1)/2*el.clientWidth}px`;badge.style.top=`${(1-v.y)/2*el.clientHeight}px`;}else badge.style.display="none";}
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
@@ -304,7 +334,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens, controls, gizmo, pivot, snapGroup, marker };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
-      window.removeEventListener("blur",cancelPointer);for(const c of gizmo.controls)disposeTransformControls(c);scene.remove(pivot);disposeGroup(snapGroup);
+      window.removeEventListener("blur",cancelPointer);for(const c of gizmo.controls)disposeTransformControls(c);scene.remove(pivot);disposeGroup(snapGroup);scene.remove(center);center.geometry.dispose();(center.material as THREE.Material).dispose();
       window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true); window.removeEventListener("blur", clearHeld);
       disposeGroup(group); grid.geometry.dispose(); (grid.material as THREE.Material).dispose?.();
       renderer.dispose(); renderer.forceContextLoss?.(); el.remove();
@@ -312,7 +342,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
   }, []);
 
   st.current.onPick = onPick; st.current.onEmpty = onEmpty; st.current.onMaterialDrop = onMaterialDrop; st.current.onToggleOpening = onToggleOpening;
-  st.current.manual=manual;st.current.onTransform=onTransform;st.current.snapSettings=snapSettings;st.current.transformMode=transformMode;
+  st.current.manual=manual;st.current.onTransform=onTransform;st.current.snapSettings=snapSettings;st.current.transformMode=transformMode;st.current.levels=levels;
   useEffect(()=>{
     if(!manual)return;
     const selected=new Set(manual.refs.map(r=>`${r.sheetId}::${r.id}`));
@@ -323,12 +353,18 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     for(const d of items)if((d.source==="door"||d.source==="window")&&[...selectedWalls].some(key=>key.startsWith(`${d.sheetId}::`)))excluded.add(keyOf(d));
     st.current.snapSources=spatialFeatures(items.filter(d=>selected.has(keyOf(d)))).points;
     st.current.snapTargets=spatialFeatures(items.filter(d=>!excluded.has(keyOf(d))));
+    const byKey=new Map<string,Derived3D[]>();for(const d of items)if(!excluded.has(keyOf(d))&&d.type!=="line"&&d.type!=="plane"){const k=keyOf(d);byKey.set(k,[...(byKey.get(k)??[]),d]);}
+    st.current.targetBoxes=[...byKey.values()].map(list=>boxOf(spatialFeatures(list).points)).filter(Boolean);
   },[manual?.baseline]);
   useEffect(()=>{
     const gizmo:ReturnType<typeof combinedGizmo>|undefined=st.current.gizmo,pivot:THREE.Object3D|undefined=st.current.pivot;
     if(!gizmo||!pivot)return;
-    if(!manual){gizmo.detach();if(st.current.marker)st.current.marker.visible=false;return;}
-    gizmo.attach();gizmo.translate.setSize(snapSettings.size);gizmo.rotate.setSize(snapSettings.size*.78);
+    if(!manual){st.current.gizmoRef=null;gizmo.detach();if(st.current.marker)st.current.marker.visible=false;return;}
+    gizmo.attach();
+    if(!st.current.gizmoRef||st.current.gizmoRef.baseline!==manual.baseline){
+      const cam:THREE.Camera=st.current.camera,p=new THREE.Vector3(manual.pivot.x,manual.pivot.z,manual.pivot.y);
+      st.current.gizmoRef={baseline:manual.baseline,dist:Math.max(.5,cam.position.distanceTo(p)),size:snapSettings.size};
+    }
     if(!gizmo.controls.some(c=>c.dragging)){
       pivot.position.set(manual.pivot.x+manual.delta.x,manual.pivot.z+manual.delta.z,manual.pivot.y+manual.delta.y);
       const rotation=moveMatrix({...manual.delta,x:0,y:0,z:0},{x:0,y:0,z:0});
