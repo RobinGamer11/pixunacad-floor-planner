@@ -106,7 +106,6 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       const material=(o as THREE.Mesh).material as THREE.MeshBasicMaterial|undefined;
       if(!material||Array.isArray(material))return;
       material.transparent=true;material.opacity=c.mode==="rotate"?.55:.92;
-      if((o as THREE.Mesh).isMesh&&c.mode==="translate"&&["X","Y","Z"].includes(o.name))o.scale.multiply(new THREE.Vector3(1,1,1));
     });
     const center=new THREE.Mesh(new THREE.SphereGeometry(1,20,14),new THREE.MeshBasicMaterial({color:gold,depthTest:false,depthWrite:false,transparent:true,opacity:.95}));
     center.renderOrder=30;center.visible=false;center.raycast=()=>{};scene.add(center);
@@ -371,18 +370,61 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       pivot.quaternion.setFromRotationMatrix(CAD_TO_THREE.clone().multiply(rotation).multiply(CAD_TO_THREE));
     }
   },[manual,transformMode,snapSettings.size]);
+  // Contact helper grid (only while touching another body) and 0,00 m glow on a sheet or the 3D ground.
   useEffect(()=>{
     const group:THREE.Group|undefined=st.current.snapGroup;if(!group)return;
-    const positions:number[]=[];
-    if(manual&&snapSettings.enabled&&snapSettings.grid){
-      const p=manual.pivot,step=snapSettings.stepM,half=10*step;
-      const cx=Math.round((p.x+manual.delta.x)/step)*step,cy=Math.round((p.y+manual.delta.y)/step)*step,z=p.z+manual.delta.z;
-      for(let i=-10;i<=10;i++){const x=cx+i*step,y=cy+i*step;positions.push(x,z,cy-half,x,z,cy+half,cx-half,z,y,cx+half,z,y);}
-    }
+    st.current.badgeAnchor=null;if(badgeRef.current)badgeRef.current.style.display="none";
+    if(!manual)return;
     const css=getComputedStyle(document.documentElement), color=new THREE.Color(`hsl(${css.getPropertyValue("--accent-gold-soft").trim().replace(/ /g,", ")})`);
-    const lines=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position",new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color,transparent:true,opacity:.3,depthWrite:false}));lines.raycast=()=>{};group.add(lines);
-    return()=>{group.remove(lines);lines.geometry.dispose();(lines.material as THREE.Material).dispose();};
-  },[manual,snapSettings]);
+    const selected=new Set(manual.refs.map(r=>`${r.sheetId}::${r.id}`));
+    const moving=boxOf(spatialFeatures((movePreview??items).filter(d=>selected.has(keyOf(d)))).points);
+    if(!moving)return;
+    const added:THREE.Object3D[]=[];
+    const positions:number[]=[];
+    if(snapSettings.enabled&&snapSettings.grid){
+      const step=snapSettings.stepM,pad=4*step,r=(v:number)=>Math.round(v/step)*step;
+      for(const c of faceContacts(moving,st.current.targetBoxes??[])){
+        // grid lines in the contact plane, covering the touching face plus a margin
+        const [u,v]=c.axis==="z"?(["x","y"] as const):c.axis==="x"?(["y","z"] as const):(["x","z"] as const);
+        const u0=r(moving[`${u}0`]-pad),u1=r(moving[`${u}1`]+pad),v0=r(moving[`${v}0`]-pad),v1=r(moving[`${v}1`]+pad);
+        const P=(uu:number,vv:number)=>{const q={x:0,y:0,z:0,[c.axis]:c.at,[u]:uu,[v]:vv} as {x:number;y:number;z:number};return [q.x,q.z,q.y];};
+        for(let t=u0;t<=u1+1e-9;t+=step)positions.push(...P(t,v0),...P(t,v1));
+        for(let t=v0;t<=v1+1e-9;t+=step)positions.push(...P(u0,t),...P(u1,t));
+      }
+    }
+    if(positions.length){
+      const lines=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position",new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color,transparent:true,opacity:.45,depthWrite:false}));
+      lines.raycast=()=>{};group.add(lines);added.push(lines);
+    }
+    const level=restingLevel(moving,levels??[]);
+    if(level){
+      const w=moving.x1-moving.x0,d=moving.y1-moving.y0,m=Math.max(.25,.2*Math.max(w,d));
+      const glowMat=new THREE.MeshBasicMaterial({color,transparent:true,opacity:.35,depthWrite:false,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-4});
+      // soft edge: inner bright pad + wider faint halo reaching past the object's sides
+      for(const [grow,op] of [[m*.35,.42],[m,.18]] as const){
+        const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w+2*grow,d+2*grow),glowMat.clone());(mesh.material as THREE.MeshBasicMaterial).opacity=op;
+        mesh.rotation.x=-Math.PI/2;mesh.position.set((moving.x0+moving.x1)/2,level.z+.002,(moving.y0+moving.y1)/2);mesh.raycast=()=>{};mesh.renderOrder=5;group.add(mesh);added.push(mesh);
+      }
+      glowMat.dispose();
+      st.current.badgeAnchor=new THREE.Vector3(moving.x1+m,level.z,(moving.y0+moving.y1)/2);
+      if(badgeRef.current)badgeRef.current.textContent=`0,00 m ${level.label}`;
+    }
+    return()=>{for(const o of added){group.remove(o);const g=o as THREE.Mesh;g.geometry.dispose();(g.material as THREE.Material).dispose();}};
+  },[manual,movePreview,items,levels,snapSettings]);
+  // Move preview: original stays in place, the moved copy is a translucent grey body.
+  useEffect(()=>{
+    const scene:THREE.Scene|undefined=st.current.scene;if(!scene||!manual||!movePreview?.length)return;
+    const gg=new THREE.Group();
+    for(const d of movePreview){
+      const m=pieceMesh(d);if(!m||!m.indices.length)continue;
+      const pos=new Float32Array(m.positions.length);for(let i=0;i<pos.length;i+=3){pos[i]=m.positions[i];pos[i+1]=m.positions[i+2];pos[i+2]=m.positions[i+1];}
+      const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.BufferAttribute(pos,3));geo.setIndex([...m.indices]);geo.computeVertexNormals();
+      gg.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9aa1ab,transparent:true,opacity:.42,roughness:.6,depthWrite:false,side:THREE.DoubleSide})));
+      gg.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo,25),new THREE.LineBasicMaterial({color:0xd9dde3,transparent:true,opacity:.75})));
+    }
+    gg.traverse(o=>{(o as any).raycast=()=>{};});gg.renderOrder=10;scene.add(gg);
+    return()=>{scene.remove(gg);gg.traverse((o:any)=>{o.geometry?.dispose?.();o.material?.dispose?.();});};
+  },[manual,movePreview]);
 
   // Neigungsvorschau: eigener, nicht anklickbarer Körper über dem (unveränderten) Original.
   useEffect(() => {
@@ -592,7 +634,9 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     move: (dir, on) => { const h: Set<string> | undefined = st.current.held; if (!h) return; on ? h.add(dir) : h.delete(dir); },
   }));
 
-  return <div ref={hostRef} className="absolute inset-0" />;
+  return <div className="absolute inset-0"><div ref={hostRef} className="absolute inset-0" />
+    <div ref={badgeRef} aria-live="polite" className="pointer-events-none absolute z-10 hidden -translate-y-1/2 translate-x-2 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-medium tabular-nums shadow-sm backdrop-blur-sm"
+      style={{ borderColor: "hsl(var(--accent-gold) / 0.35)", background: "hsl(var(--overlay-ink) / 0.72)", color: "hsl(var(--overlay-surface))" }} /></div>;
 });
 
 function disposeGroup(g: THREE.Group) {
