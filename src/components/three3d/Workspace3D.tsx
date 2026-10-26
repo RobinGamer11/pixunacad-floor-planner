@@ -277,6 +277,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
             onToggleOpening={(sheetId,id)=>guardChange(()=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);})} />
         </Suspense>
         <div className="absolute left-3 top-14 z-10"><Button size="sm" variant={multiSelect?"default":"outline"} aria-pressed={multiSelect} onClick={()=>setMultiSelect(v=>!v)}><CopyCheck size={14}/>Mehrfachauswahl</Button></div>
+        {manualSession && changedMove(manualSession.delta) && !pendingChange && <div className="absolute left-1/2 bottom-32 z-20 flex -translate-x-1/2 gap-2 whitespace-nowrap"><Button size="sm" disabled={!!moveError} onClick={applyMove}>Übernehmen</Button><Button size="sm" variant="outline" onClick={cancelMove}>Verwerfen</Button></div>}
         {pendingChange&&<div role="dialog" aria-label="Unbestätigte Bewegung" className="absolute left-1/2 top-1/2 z-30 w-64 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-4 shadow-lg space-y-3 text-sm"><p>Bewegung übernehmen oder verwerfen?</p><div className="flex gap-2"><Button size="sm" disabled={!!moveError} onClick={applyMove}>Übernehmen</Button><Button size="sm" variant="outline" onClick={()=>{const next=pendingChange;cancelMove();next();}}>Verwerfen</Button></div></div>}
         {picking && (
           <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-lg border px-3 py-2 text-xs font-medium shadow-lg" style={REL.active}>
@@ -431,7 +432,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
       <aside className="w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
 
         {!sel ? movePanel : selectedHit?.list === "infoBoxes" ? <><InfoBoxSettingsPanel app={app} in3D />{movePanel}</> : (
-          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} manualMove={movePanel} manualActive={manualOn} relations={manualOn?null:
+          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} manualMove={movePanel} relations={
             <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>

@@ -178,7 +178,7 @@ export const Object3DSettings: React.FC<{
       )}
       {!allEditable && <Note>Ebene gesperrt – nur Anzeige.</Note>}
 
-      <fieldset disabled={manualActive} className={manualActive?"pointer-events-none opacity-50":undefined}>
+      <fieldset>
       <Section title="Höhenlage und Körperhöhe">
         <div className="grid grid-cols-1 gap-2">
           {elevItems.length > 0 && (
@@ -213,8 +213,8 @@ export const Object3DSettings: React.FC<{
       </fieldset>
 
       {manualMove}
-      {!manualActive && !multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
-      {!manualActive && !multi && !(kind === "hatch" && !isPolygon) && kind !== "door" && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} generic />}
+      {!multi && kind === "hatch" && !isPolygon && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} />}
+      {!multi && !(kind === "hatch" && !isPolygon) && kind !== "door" && <HatchSections app={app} obj={obj} sheetZ={sheetZ} editable={editable(obj)} generic />}
       {relations}
     </div>
   );

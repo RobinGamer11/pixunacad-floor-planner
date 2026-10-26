@@ -6,11 +6,11 @@ import type { Vec3 } from "./solidMesh";
 
 export type WorldAxis = "x" | "y" | "z";
 export interface SnapSettings3D { enabled: boolean; grid: boolean; stepM: number; angleDeg: number; size: number }
-export const DEFAULT_SNAP_3D: SnapSettings3D = { enabled: true, grid: true, stepM: .1, angleDeg: 15, size: 1.15 };
+export const DEFAULT_SNAP_3D: SnapSettings3D = { enabled: true, grid: true, stepM: .1, angleDeg: 45, size: 1.15 };
 export function normalizeSnapSettings(raw: Partial<SnapSettings3D> | null): SnapSettings3D {
   const num = (v: unknown, fallback: number, min: number, max: number) => typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
   return { enabled: typeof raw?.enabled === "boolean" ? raw.enabled : true, grid: typeof raw?.grid === "boolean" ? raw.grid : true,
-    stepM: num(raw?.stepM, .1, .001, 10), angleDeg: num(raw?.angleDeg, 15, 1, 90), size: num(raw?.size, 1.15, .5, 2) };
+    stepM: num(raw?.stepM, .1, .001, 10), angleDeg: num(raw?.angleDeg, 45, 1, 90), size: num(raw?.size, 1.15, .5, 2) };
 }
 export interface SpatialFeatures { points: Vec3[]; edges: [Vec3, Vec3][] }
 /** Sharp mesh edges, never triangulation diagonals or hypothetical bounding-box edges. */
