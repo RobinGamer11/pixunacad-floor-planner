@@ -37,7 +37,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Tilt reference display uses the stored physical tilt frame until a draft changes it; boundary heights come from derived geometry, so selecting another reference never relocates the solid's highlighted edge.
 - Tilt preview owns canvas pointer and wheel gestures; cancel OrbitControls pointers on focus/capture loss and suppress middle-button autoscroll so panel scrolling cannot lock camera navigation.
 - Rigid spatial orientation is `pose3D` in CAD coordinates, relative to sheet elevation; derive it after existing tilt and before relationships, and serialize it through object metadata so repeated rotations, copies and exports share one model.
-- 3D materials are object metadata with project-file image references; export the derived scene as standard glTF/GLB so other renderers receive PBR values and textures without a separate CAD model.
+- 3D surfaces derive only from each object's 2D color and pattern via `cad/three3d/pattern3D.ts`; GLB export shares one material per color+pattern key so external renderers see the CAD look without separate material data (old `material3D` fields stay stored but unused).
 - Keep the existing Three.js viewer engine for incremental 3D work; replacing it would risk the shared CAD selection and navigation behavior.
 - Unterordner haben eigene `AGENTS.md` – vor Änderungen dort lesen (z. B. `src/cad/AGENTS.md`).
 - Öffnen/Laden folgt nur `decideOpen` in `src/lib/cloudProjectState.ts` – Leerstand überschreibt nie die Cloud, keine automatische Vermischung.
