@@ -23,7 +23,8 @@ import type { Material3D } from "./materials";
 import { deriveOpening } from "./openingGeometry";
 import { deriveInfoBox } from "./infoBoxGeometry";
 import { projectionCos } from "./tiltGeometry";
-import { applySpatialPose } from "./spatialTransform";
+import { applySpatialPose, posePiece } from "./spatialTransform";
+import { Matrix4 } from "three";
 
 export type Solid3DSource =
   | "wall" | "hatch" | "stair" | "document" | "textbox" | "table" | "library"
@@ -278,6 +279,46 @@ export function piecePoints(items: any[]): Vec2[] {
 }
 
 /** Neigung beliebiger Objekte (nicht Schraffur) über gedachte Kanten: punktweise auf alle Teile. */
+/**
+ * Türen/Fenster folgen der Wandneigung starr: Lage und Drehung aus dem
+ * Wandkörper (gleicher Rahmen wie die Wand), Maße bleiben unverändert –
+ * Öffnungen werden nie gedehnt oder geschert.
+ */
+export function tiltOpeningWithWall(wall: any, wallParts: Derived3D[], parts: Derived3D[], z0: number): Derived3D[] {
+  const t = wall?.tilt3D;
+  if (!t || !parts.length || !wallParts.length) return parts;
+  const r = resolveGenericTilt(t, piecePoints(wallParts), z0);
+  if (!r?.frame) return parts;
+  let zTop = z0;
+  for (const d of wallParts as any[]) zTop = Math.max(zTop, d.z1 ?? d.z ?? z0);
+  const h = zTop - z0;
+  if (tiltShapeError(t.mode, r.frame, h, t.plumb, t.anchor)) return parts;
+  const pts = piecePoints(parts);
+  if (!pts.length) return parts;
+  let cx = 0, cy = 0, zb = Infinity;
+  for (const p of pts) { cx += p.x; cy += p.y; }
+  cx /= pts.length; cy /= pts.length;
+  for (const d of parts as any[]) zb = Math.min(zb, d.z0 ?? d.z ?? z0);
+  if (!Number.isFinite(zb)) zb = z0;
+  const T = (x: number, y: number, z: number) => genericVertex(x, y, z, r.frame!, t, h);
+  const e = 0.05, o = T(cx, cy, zb);
+  const col = (p: Vec3) => [(p.x - o.x) / e, (p.y - o.y) / e, (p.z - o.z) / e];
+  const nrm = (v: number[]) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return v.map(c => c / l); };
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const sub = (a: number[], b: number[], k: number) => a.map((c, i) => c - b[i] * k);
+  // Orthonormaler Rahmen (Gram-Schmidt): Hochrichtung der Wand zuerst, dann Wandrichtungen.
+  const uz = nrm(col(T(cx, cy, zb + e)));
+  let ux = col(T(cx + e, cy, zb)); ux = nrm(sub(ux, uz, dot(ux, uz)));
+  const uy = [uz[1] * ux[2] - uz[2] * ux[1], uz[2] * ux[0] - uz[0] * ux[2], uz[0] * ux[1] - uz[1] * ux[0]];
+  const m = new Matrix4().set(
+    ux[0], uy[0], uz[0], o.x - (ux[0] * cx + uy[0] * cy + uz[0] * zb),
+    ux[1], uy[1], uz[1], o.y - (ux[1] * cx + uy[1] * cy + uz[1] * zb),
+    ux[2], uy[2], uz[2], o.z - (ux[2] * cx + uy[2] * cy + uz[2] * zb),
+    0, 0, 0, 1,
+  );
+  return parts.map(d => posePiece(d, m));
+}
+
 export function applyGenericTilt(o: any, items: Derived3D[], z0: number): Derived3D[] {
   const t = o?.tilt3D;
   if (!t || !items.length) return items;
@@ -369,7 +410,7 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     const wall = (scene.walls || []).find((w: any) => w.id === d.wallId);
     if (wall && vis(wall)) {
       const parts = deriveOpening(d, wall, sheetId, base);
-      push(d, applySpatialPose(wall.tilt3D ? applyGenericTilt(wall, parts, base + objectElevationM(wall)) : parts, wall.pose3D, base));
+      push(d, applySpatialPose(wall.tilt3D ? tiltOpeningWithWall(wall, walls.get(wall) || [], parts, base + objectElevationM(wall)) : parts, wall.pose3D, base));
     }
   }
   for (const b of scene.infoBoxes || []) if (vis(b)) push(b, deriveInfoBox(b, sheetId, base));
