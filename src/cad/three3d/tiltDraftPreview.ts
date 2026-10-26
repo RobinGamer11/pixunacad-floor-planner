@@ -4,7 +4,7 @@
  */
 import type { MeshData, Vec3 } from "./solidMesh";
 
-export interface TiltDraftPreview { mesh: MeshData; edge?: [Vec3, Vec3] }
+export interface TiltDraftPreview { mesh?: MeshData; edge?: [Vec3, Vec3] }
 
 let current: TiltDraftPreview | null = null;
 const subs = new Set<() => void>();
