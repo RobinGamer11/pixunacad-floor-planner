@@ -298,7 +298,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   })() : undefined;
 
   // Echte Kanten bei allen Objektarten: Ober-/Unterkanten der Hülle räumlich (Auswahl/Hervorhebung).
-  const ringFaces = generic && !card ? (() => {
+  const ringFaces = generic ? (() => {
     const dt: any = draftTilt, f2 = dt ? frameAt(dt.angleDeg, !!dt.opposite)?.frame : undefined;
     const tv = (p: Vec2, zz: number) => dt && f2 ? genericVertex(p.x, p.y, zz, f2, dt, h) : { x: p.x, y: p.y, z: zz };
     return { top: pts.map(p => tv(p, z + h)), bottom: pts.map(p => tv(p, z)) };
@@ -335,13 +335,19 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
   // Jedes Objekt unabhängig: offene Entwürfe werden beim Objektwechsel verworfen, nie übertragen.
   // 3D-Vorschau (flüchtig) des Entwurfs auf dem ausgewählten Körper.
   // Beige Bezugskante von Anfang an; grauer Vorschaukörper nur bei offenem Entwurf.
+  const pickRef = useRef<(i: number) => void>(() => {});
+  pickRef.current = (i: number) => { if (!straight.has(i)) return; setCard(null); if (i !== edge) setEdge(i); };
   useEffect(() => {
     const live = !!(session && draftTilt);
+    // Wählbare Außenkanten auch im 3D-Hauptfenster (gleiche Regel wie im Neigungsfenster).
+    const pickable = (ring: any[] | undefined) => ring && ring.length === pts.length && editable
+      ? { edges: pts.map((_, i) => [ring[i], ring[(i + 1) % ring.length]] as any).map((ed, i) => straight.has(i) ? ed : [ed[0], ed[0]]), onPickEdge: (i: number) => pickRef.current(i) }
+      : {};
     if (generic) {
       const m = live ? mergeMeshes((draftPieces || []).map(meshOfDerived)) : null;
-      const re = ringFaces && edge !== null && pts.length ? [ringFaces.top[edge], ringFaces.top[(edge + 1) % pts.length]] as any : undefined;
+      const re = !card && ringFaces && edge !== null && pts.length ? [ringFaces.top[edge], ringFaces.top[(edge + 1) % pts.length]] as any : undefined;
       const e = (highlight as any) ?? re;
-      setTiltDraftPreview(m || e ? { mesh: m ?? undefined, edge: e } : null); return;
+      setTiltDraftPreview({ mesh: m ?? undefined, edge: e, ...pickable(ringFaces?.top) }); return;
     }
     const d: any = deriveHatch({ ...obj, tilt3D: draftTilt }, "preview", sheetZ);
     const m = live ? meshOfDerived(d) : null;
@@ -352,9 +358,10 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
       e = edge !== null && ring && ring.length === pts.length ? [ring[edge], ring[(edge + 1) % ring.length]] : undefined;
       if (!e && edge !== null && pts.length > edge && !d?.faces) { const zz = z + h; e = [{ ...pts[edge], z: zz }, { ...pts[(edge + 1) % pts.length], z: zz }]; }
     }
-    setTiltDraftPreview(m || e ? { mesh: m ?? undefined, edge: e } : null);
+    const topRing = d?.faces?.top?.outer ?? pts.map(p => ({ ...p, z: z + h }));
+    setTiltDraftPreview({ mesh: m ?? undefined, edge: e, ...pickable(topRing) });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify([session, draftTilt, edge, card, obj?.id, pts, sheetZ, highlight])]);
+  }, [JSON.stringify([session, draftTilt, edge, card, obj?.id, pts, sheetZ, highlight, editable])]);
   useEffect(() => () => setTiltDraftPreview(null), [obj]);
   const cancel = () => setSession(null);
   useEffect(() => {

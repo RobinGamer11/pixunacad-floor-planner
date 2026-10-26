@@ -171,7 +171,7 @@ export const TiltPreview3D: React.FC<Props & { children?: React.ReactNode }> = (
     const zbot = d?.type === "prism" ? d.z0 : undefined;
     const gold = (a: THREE.Vector3, b: THREE.Vector3) => {
       s.group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: 0xc8954a, linewidth: 3 })));
-      s.group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, 0.02 * Math.max(1, a.distanceTo(b) / 3), 6), new THREE.MeshBasicMaterial({ color: 0xc8954a })));
+      s.group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, 0.008 * Math.max(1, a.distanceTo(b) / 4), 6), new THREE.MeshBasicMaterial({ color: 0xc8954a })));
     };
     for (let i = 0; i < pts.length; i++) {
       const j = (i + 1) % pts.length;

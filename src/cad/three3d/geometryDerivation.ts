@@ -16,9 +16,9 @@ export { libraryBodyHeightM };
 import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
 import { buildHealedWallSolidRing } from "../wallSolid";
-import { subtractPrism } from "./relations";
+import { meshOf, subtractPrism } from "./relations";
 import { genericVertex, resolveGenericTilt, scaleAcrossAxis, tiltShape, tiltShapeError } from "./tiltGeometry";
-import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
+import { csgMesh, faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 import type { Material3D } from "./materials";
 import { deriveOpening } from "./openingGeometry";
 import { deriveInfoBox } from "./infoBoxGeometry";
@@ -158,6 +158,22 @@ export function deriveWall(wall: any, doors: any[], sheetId: string, base: numbe
   catch { return [full]; }
 }
 
+/** Aussparungsvolumen der Öffnungen einer geneigten Wand – starr wie die Fenster/Türen mitgeführt. */
+export function openingCutters(wall: any, doors: any[], sheetId: string, base: number, wallParts: Derived3D[]): MeshData[] {
+  const h = Math.max(0, Number(wall.heightM) || 0);
+  const z0 = base + objectElevationM(wall);
+  const across = Math.max(0, Number(wall.thicknessM) || 0) + 0.05;
+  const out: MeshData[] = [];
+  for (const o of wallOpenings(wall, doors)) {
+    const top = Math.min(o.top, h);
+    if (top <= o.sill + EPS) continue;
+    const p: Prism3D = { type: "prism", source: "wall", sourceId: wall.id, sheetId, footprint: wallBandPolygon(wall, o.from, o.to, across), holes: [], z0: z0 + o.sill, z1: z0 + top, color: "#000" };
+    for (const d of tiltOpeningWithWall(wall, wallParts, [p], z0)) { const m = meshOf(d) ?? (d.type === "mesh" ? d.mesh : null); if (m) out.push(m); }
+  }
+  return out;
+}
+
+
 function distPointSeg(p: Vec2, a: Vec2, b: Vec2): number {
   const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
   const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
@@ -286,7 +302,8 @@ export function piecePoints(items: any[]): Vec2[] {
  */
 export function tiltOpeningWithWall(wall: any, wallParts: Derived3D[], parts: Derived3D[], z0: number): Derived3D[] {
   const t = wall?.tilt3D;
-  if (!t || !parts.length || !wallParts.length) return parts;
+  // „Kante neigen“: Unterseite bleibt fest – Öffnungen bleiben exakt an ihrem Platz.
+  if (!t || t.mode === "lift" || !parts.length || !wallParts.length) return parts;
   const r = resolveGenericTilt(t, piecePoints(wallParts), z0);
   if (!r?.frame) return parts;
   let zTop = z0;
@@ -397,21 +414,44 @@ export function deriveScene3D(scene: any, sheet: Sheet, opts: DeriveOptions = {}
     const rank = opts.labelFrontRank ? opts.labelFrontRank(l) : 0;
     orderedLabelItems(scene, l).forEach((it, i) => orderOf.set(it.obj, rank * 1e6 + i));
   }
-  const push = (o: any, items: Derived3D[]) => {
+  const push = (o: any, items: Derived3D[], preTilted = false) => {
     const ord = orderOf.get(o) ?? 0;
-    const tilted = o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
+    const tilted = !preTilted && o?.tilt3D && !(scene.hatches || []).includes(o) ? applyGenericTilt(o, items, base + objectElevationM(o)) : items;
     const list = applySpatialPose(tilted, o.pose3D, base);
     for (const d of list) { d.order = ord; d.material = d.part === "frame" ? o.frameMaterial3D ?? o.material3D : d.part === "glass" || d.part === "leaf" ? o.panelMaterial3D ?? o.material3D : o.material3D; out.push(d); }
   };
   const doors = (scene.doors || []).filter(vis);
-  const walls = deriveWalls(scene, doors, sheetId, base, vis);
-  for (const [w, parts] of walls) push(w, parts);
+  // Geneigte Wände: erst ohne Öffnungen neigen, dann die (starr mitgeführten) Öffnungen ausschneiden –
+  // so verzieht sich die Aussparung bei „Kante neigen“/„Kanten bündig“ nie mit der Wand.
+  const tiltedWallIds = new Set((scene.walls || []).filter((w: any) => w?.tilt3D).map((w: any) => w.id));
+  const walls = deriveWalls(scene, doors.filter((d: any) => !tiltedWallIds.has(d.wallId)), sheetId, base, vis);
+  const openingParts = new Map<any, Derived3D[]>();
   for (const d of doors) {
     const wall = (scene.walls || []).find((w: any) => w.id === d.wallId);
-    if (wall && vis(wall)) {
-      const parts = deriveOpening(d, wall, sheetId, base);
-      push(d, applySpatialPose(wall.tilt3D ? tiltOpeningWithWall(wall, walls.get(wall) || [], parts, base + objectElevationM(wall)) : parts, wall.pose3D, base));
+    if (!wall || !vis(wall)) continue;
+    const parts = deriveOpening(d, wall, sheetId, base);
+    openingParts.set(d, wall.tilt3D ? tiltOpeningWithWall(wall, walls.get(wall) || [], parts, base + objectElevationM(wall)) : parts);
+  }
+  for (const [w, parts] of walls) {
+    if (!w.tilt3D) { push(w, parts); continue; }
+    const z0w = base + objectElevationM(w);
+    let tilted = applyGenericTilt(w, parts, z0w);
+    const own = doors.filter((d: any) => d.wallId === w.id);
+    const cutters = own.length ? openingCutters(w, own, sheetId, base, walls.get(w) || []) : [];
+    if (cutters.length && !tilted.some((d: any) => d.note)) {
+      tilted = tilted.flatMap((d: any) => {
+        let m = meshOf(d);
+        if (!m) return [d];
+        for (const c of cutters) { if (!m) break; try { m = csgMesh(m, c, "subtract"); } catch { /* Ausschnitt fehlgeschlagen – Wand bleibt */ } }
+        return m ? [{ ...d, type: "mesh", mesh: m, closed: true } as any] : [];
+      });
     }
+    push(w, tilted, true);
+  }
+  for (const d of doors) {
+    const parts = openingParts.get(d);
+    const wall = (scene.walls || []).find((w: any) => w.id === d.wallId);
+    if (parts && wall) push(d, applySpatialPose(parts, wall.pose3D, base));
   }
   for (const b of scene.infoBoxes || []) if (vis(b)) push(b, deriveInfoBox(b, sheetId, base));
   for (const h of scene.hatches || []) { if (!vis(h)) continue; const d = deriveHatch(h, sheetId, base); if (d) push(h, [d]); }
