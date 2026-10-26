@@ -489,12 +489,7 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
         </div>
         <TiltStep number={3} label="Winkel der Kante einstellen" />
         <div className="space-y-2">
-          {pose && (() => { const e = new Euler().setFromRotationMatrix(new Matrix4().fromArray(pose)); const d = (r: number) => (Math.round(r * 1800 / Math.PI) / 10).toLocaleString("de-DE"); return (
-            <div className="flex items-center justify-between gap-2 text-[11px]"><span style={C.muted}>Drehung (Gizmo)<InfoTip text="Räumliche Drehung aus „Manuell bewegen“ um X, Y und die senkrechte Achse. Wirkt zusätzlich zum Neigungswinkel." /></span>
-              <span className="tabular-nums">X {d(e.x)}° · Y {d(e.y)}° · Z {d(e.z)}°</span>
-              <button type="button" disabled={!editable} title="Drehung zurücksetzen" className="h-6 w-6 grid place-items-center rounded hover:bg-muted disabled:opacity-40" onClick={() => act(app, () => { delete obj.pose3D; })}><RotateCcw size={12} /></button>
-            </div>); })()}
-          <div className="flex items-center justify-between text-[11px]"><span style={C.muted}>Neigungswinkel<InfoTip text="Bei genau ±90° wird der Körper starr aufgerichtet. Grundfläche fest, Kante neigen und lotrechte Seiten sind dort mathematisch nicht als endliche Höhenfunktion möglich. Tatsächliche Fläche bleibt erhalten; die 2D-Projektion behält eine minimale, rücksetzbare Breite." /></span>
+          <div className="flex items-center justify-between text-[11px]"><span style={C.muted}>Neigungswinkel</span>
             <div className="flex items-center gap-1">
               <input type="text" inputMode="decimal" disabled={!canEdit} value={angleDraft ?? fmt(cur.angle, 1)}
                 onChange={(e) => { angleDraftRef.current = e.target.value; setAngleDraft(e.target.value); setAngleErr(null); }} onBlur={commitAngleText}
@@ -537,6 +532,6 @@ const HatchSections: React.FC<{ app: any; obj: any; sheetZ: number; editable: bo
 };
 
 
-function TiltStep({ number, label }: { number: number; label: string }) {
-  return <div className="flex items-center gap-2 border-t pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)" }}><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold" style={C.field}>{number}</span><h4 className="text-xs font-semibold">{label}</h4></div>;
+function TiltStep({ number, label, info }: { number: number; label: string; info?: string }) {
+  return <div className="flex items-center gap-2 border-t pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)" }}><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold" style={C.field}>{number}</span><h4 className="text-xs font-semibold">{label}{info && <InfoTip text={info} />}</h4></div>;
 }
