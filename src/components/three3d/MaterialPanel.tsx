@@ -26,8 +26,10 @@ export function MaterialPanel({ app, project, selected }: { app: CadApp; project
     setError(null);
     try {
       if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error("Bitte PNG, JPEG oder WebP auswählen.");
-      const dataUrl = await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(new Error("Bild konnte nicht gelesen werden."));r.readAsDataURL(file);});
-      const imageFileId = projectStore.addFile(project.id,"files",null,{name:file.name,dataUrl,mimeType:file.type,sizeBytes:file.size});
+      // Materialbilder auf max. 1024 px verkleinern und komprimieren (Fotos sind sonst zu groß für den Projektspeicher).
+      const dataUrl = await compressImage(file);
+      const sizeBytes = Math.round((dataUrl.length - dataUrl.indexOf(",") - 1) * 3 / 4);
+      const imageFileId = projectStore.addFile(project.id,"files",null,{name:file.name,dataUrl,mimeType:dataUrl.slice(5,dataUrl.indexOf(";")),sizeBytes});
       if (!imageFileId) throw new Error("Bild konnte nicht gespeichert werden. Speicherplatz und Verbindung prüfen.");
       const m: Material3D = {...DEFAULT_MATERIAL,id:crypto.randomUUID(),name:file.name.replace(/\.[^.]+$/,""),imageFileId};
       if (!savePalette(m)) throw new Error("Material konnte nicht gespeichert werden."); setDraft(m);
@@ -54,4 +56,12 @@ function Numeric({label,value,min,max,sliderMax=max,onCommit}:{label:string;valu
   const pending=useRef<number|null>(null);
   const commit=(raw:number)=>{pending.current=null;if(Number.isFinite(raw)&&raw!==value)onCommit(Math.max(min,Math.min(max,raw)));setV(null);};
   return <label className="block text-xs"><span className="flex items-center justify-between gap-2">{label}<input aria-label={label} type="number" step="any" min={min} max={max} value={v??value} className="cad-settings-input h-8 w-20 px-2" onChange={e=>{pending.current=e.target.valueAsNumber;setV(e.target.valueAsNumber);}} onBlur={()=>{if(pending.current!==null)commit(pending.current);}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();}}/></span><input aria-label={`${label} Regler`} className="mt-1 w-full" type="range" min={min} max={sliderMax} step="any" value={v??Math.min(value,sliderMax)} onChange={e=>{pending.current=e.target.valueAsNumber;setV(e.target.valueAsNumber);}} onPointerUp={()=>{if(pending.current!==null)commit(pending.current);}} onKeyUp={()=>{if(pending.current!==null)commit(pending.current);}} onBlur={()=>{if(pending.current!==null)commit(pending.current);}}/></label>;
+}
+async function compressImage(file: File, max = 1024): Promise<string> {
+  const bmp = await createImageBitmap(file).catch(() => { throw new Error("Bild konnte nicht gelesen werden."); });
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
+  c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.();
+  const webp = c.toDataURL("image/webp", 0.82);
+  return webp.startsWith("data:image/webp") ? webp : c.toDataURL("image/jpeg", 0.82);
 }
