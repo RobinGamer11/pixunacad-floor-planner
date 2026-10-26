@@ -13,6 +13,8 @@ import { disposeTransformControls } from "./disposeTransformControls";
 import { CAD_TO_THREE, moveMatrix, type MoveDelta } from "@/cad/three3d/spatialTransform";
 import type { ManualMoveSession } from "@/cad/three3d/manualMoveSession";
 import { MATERIAL_DRAG_TYPE, type Material3D } from "@/cad/three3d/materials";
+import { combinedGizmo, controlPointer } from "./combinedGizmo";
+import { DEFAULT_SNAP_3D, spatialFeatures, snapAxisMove, snapRotationAngle, type SnapSettings3D, type SnapContact, type WorldAxis } from "@/cad/three3d/manipulationSnap";
 
 export interface CameraState { tx: number; ty: number; tz: number; r: number; theta: number; phi: number }
 export interface Viewer3DHandle {
@@ -37,6 +39,7 @@ interface Props {
   manual?: ManualMoveSession | null;
   transformMode?: "translate"|"rotate";
   onTransform?: (delta: MoveDelta) => void;
+  snapSettings?: SnapSettings3D;
   onPick: (sheetId: string, id: string, additive?: boolean) => void;
   /** Klick ins Leere (kein Körper getroffen). */
   onEmpty?: () => void;
@@ -57,7 +60,7 @@ function shapeOf(outer: { x: number; y: number }[], holes: { x: number; y: numbe
   return s;
 }
 
-const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, selectedKeys, manual, transformMode = "translate", onTransform, onPick, onEmpty, textureFor, ghost, materialImage, onMaterialDrop, onToggleOpening }, ref) {
+const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, selectedKey, selectedKeys, manual, transformMode = "translate", onTransform, snapSettings = DEFAULT_SNAP_3D, onPick, onEmpty, textureFor, ghost, materialImage, onMaterialDrop, onToggleOpening }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const st = useRef<any>({});
 
@@ -79,17 +82,52 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const grid = new THREE.GridHelper(200, 200, 0xc9b98f, 0xe2dccd); scene.add(grid);
     const group = new THREE.Group(); scene.add(group);
     const pivot = new THREE.Object3D(); scene.add(pivot);
-    const controls = new TransformControls(camera,renderer.domElement);
-    controls.setSpace("world");controls.setSize(1.15);controls.enabled=false;
-    const helper=controls.getHelper();scene.add(helper);
-    const transformed=()=>{
-      const session: ManualMoveSession | undefined=st.current.manual;if(!session||!controls.dragging)return;
+    const gizmo=combinedGizmo(camera,renderer.domElement,pivot), controls=gizmo.translate;
+    for(const c of gizmo.controls)scene.add(c.getHelper());
+    const cssColor=(token:string)=>{const hsl=css.getPropertyValue(token).trim();return new THREE.Color(`hsl(${hsl.replace(/ /g,", ")})`);};
+    const gold=cssColor("--accent-gold-soft");
+    for(const c of gizmo.controls)c.getHelper().traverse(o=>{
+      const material=(o as THREE.Mesh).material;
+      if(material&&!Array.isArray(material)&&"color" in material){
+        const m=material as THREE.MeshBasicMaterial;
+        if(o.name==="X")m.color.copy(cssColor("--gizmo-x"));
+        if(o.name==="Y")m.color.copy(cssColor("--gizmo-z"));
+        if(o.name==="Z")m.color.copy(cssColor("--gizmo-y"));
+      }
+    });
+    const snapGroup=new THREE.Group();scene.add(snapGroup);
+    const marker=new THREE.Mesh(new THREE.SphereGeometry(1,12,8),new THREE.MeshBasicMaterial({color:gold,depthTest:false,depthWrite:false}));
+    marker.visible=false;marker.renderOrder=20;snapGroup.add(marker);
+    let snapContact:SnapContact|null=null,angleContact:number|null=null;
+    let activeControl:TransformControls|null=null,activePointer:number|null=null;
+    let startQuaternion=new THREE.Quaternion();
+    const transformed=(control:TransformControls)=>{
+      const session: ManualMoveSession | undefined=st.current.manual;if(!session||!control.dragging)return;
+      const settings:SnapSettings3D=st.current.snapSettings??DEFAULT_SNAP_3D;
+      const worldAxis:WorldAxis=control.axis==="X"?"x":control.axis==="Y"?"z":"y";
+      if(control.mode==="rotate"&&settings.enabled){
+        const raw=(control as TransformControls & {rotationAngle:number}).rotationAngle*180/Math.PI;
+        const snapped=snapRotationAngle(raw,settings.angleDeg,angleContact);angleContact=snapped.contact;
+        if(snapped.contact!==null){
+          const axis=new THREE.Vector3(control.axis==="X"?1:0,control.axis==="Y"?1:0,control.axis==="Z"?1:0);
+          pivot.quaternion.copy(new THREE.Quaternion().setFromAxisAngle(axis,snapped.angle*Math.PI/180).multiply(startQuaternion));
+        }
+      }
       const cad=CAD_TO_THREE.clone().multiply(new THREE.Matrix4().compose(new THREE.Vector3(),pivot.quaternion,new THREE.Vector3(1,1,1))).multiply(CAD_TO_THREE);
       const euler=new THREE.Euler().setFromRotationMatrix(cad,"XYZ"), k=180/Math.PI;
-      st.current.onTransform?.({x:pivot.position.x-session.pivot.x,y:pivot.position.z-session.pivot.y,z:pivot.position.y-session.pivot.z,rx:euler.x*k,ry:euler.y*k,rz:euler.z*k});
+      let delta:MoveDelta={x:pivot.position.x-session.pivot.x,y:pivot.position.z-session.pivot.y,z:pivot.position.y-session.pivot.z,rx:euler.x*k,ry:euler.y*k,rz:euler.z*k};
+      if(control.mode==="translate"){
+        const tolerance=camera.position.distanceTo(pivot.position)*2*Math.tan(camera.fov*Math.PI/360)/Math.max(1,renderer.domElement.clientHeight)*10;
+        const result=snapAxisMove(delta,worldAxis,session.pivot,st.current.snapSources??[],st.current.snapTargets??{points:[],edges:[]},settings,tolerance,snapContact);
+        delta=result.delta;snapContact=result.contact;
+        pivot.position.set(session.pivot.x+delta.x,session.pivot.z+delta.z,session.pivot.y+delta.y);
+      }
+      marker.visible=control.mode==="translate"?!!snapContact:angleContact!==null;
+      if(snapContact)marker.position.set(snapContact.target.x,snapContact.target.z,snapContact.target.y);
+      else marker.position.copy(pivot.position);
+      st.current.onTransform?.(delta);
     };
-    controls.addEventListener("objectChange",transformed);
-    controls.addEventListener("dragging-changed",e=>{st.current.gizmoDragging=e.value;});
+    for(const c of gizmo.controls)c.addEventListener("objectChange",()=>transformed(c));
     // Orbit-Zustand (Kugelkoordinaten um Zielpunkt)
     const orbit = { target: new THREE.Vector3(), r: 25, theta: Math.PI / 4, phi: Math.PI / 3.2 };
     const apply = () => {
@@ -138,7 +176,14 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     for (const t of ["mousedown", "mouseup", "click", "dblclick", "touchstart", "touchend"]) el.addEventListener(t, stopAll);
     const onDown = (e: PointerEvent) => {
       e.stopPropagation();
-      if(controls.dragging || (controls.enabled&&controls.axis)) { st.current.gizmoGesture=true;return; }
+      if(activeControl)return;
+      const picked=e.button===0?gizmo.pick(e.clientX,e.clientY,st.current.transformMode??"translate"):null;
+      if(picked){
+        activeControl=picked.control;activePointer=e.pointerId;snapContact=null;angleContact=null;startQuaternion=pivot.quaternion.clone();marker.visible=false;
+        activeControl.axis=picked.axis;
+        const r=el.getBoundingClientRect();activeControl.pointerDown(controlPointer((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1,0));
+        st.current.gizmoGesture=true;el.setPointerCapture(e.pointerId);return;
+      }
       st.current.gizmoGesture=false;travelled=0;
       el.setPointerCapture(e.pointerId);
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -147,7 +192,8 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       if (pts.size === 2) { const [a, b] = [...pts.values()]; lastPinch = Math.hypot(a.x - b.x, a.y - b.y); lastMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
     };
     const onMove = (e: PointerEvent) => {
-      if(st.current.gizmoGesture||controls.dragging)return;
+      if(activeControl){if(activePointer!==e.pointerId)return;const r=el.getBoundingClientRect();activeControl.pointerMove(controlPointer((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1,-1));return;}
+      if(!pts.size){const hit=gizmo.pick(e.clientX,e.clientY,st.current.transformMode??"translate");for(const c of gizmo.controls)c.axis=hit?.control===c?hit.axis:null;el.style.cursor=hit?"grab":"";}
       const p = pts.get(e.pointerId); if (!p) return;
       e.stopPropagation();
       const dx = e.clientX - p.x, dy = e.clientY - p.y;
@@ -173,7 +219,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     const ray = new THREE.Raycaster();
     const onUp = (e: PointerEvent) => {
       e.stopPropagation();
-      if(st.current.gizmoGesture){st.current.gizmoGesture=false;return;}
+      if(st.current.gizmoGesture){if(activePointer!==e.pointerId)return;activeControl?.pointerUp(controlPointer(0,0,0));activeControl=null;activePointer=null;st.current.gizmoGesture=false;return;}
       pts.delete(e.pointerId);
       if (pts.size < 2) lastPinch = 0;
       const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
@@ -207,7 +253,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     el.addEventListener("pointerup", onUp); el.addEventListener("pointercancel", onUp);
     el.addEventListener("wheel", onWheel, { passive: false });
     el.addEventListener("contextmenu", e => e.preventDefault());
-    const cancelPointer=()=>{pts.clear();mode=null;lastPinch=0;st.current.gizmoGesture=false;if(controls.dragging){controls.pointerUp(null);}};
+    const cancelPointer=()=>{pts.clear();mode=null;lastPinch=0;st.current.gizmoGesture=false;activeControl?.pointerUp(null);activeControl=null;activePointer=null;};
     el.addEventListener("lostpointercapture",cancelPointer);window.addEventListener("blur",cancelPointer);
     const pickAt = (x: number, y: number) => {
       const r=el.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1),camera);
@@ -249,15 +295,16 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         apply();
       }
       if (sticks.look.x || sticks.look.y) look(sticks.look.x * dt * 1.6 * sens.look, -sticks.look.y * dt * 1.2 * sens.look);
+      marker.scale.setScalar(camera.position.distanceTo(pivot.position)*.005);
       renderer.render(scene, camera);
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
 
-    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens, controls, pivot };
+    st.current = { ...st.current, scene, group, camera, orbit, apply, held, renderer, grid, sticks, sens, controls, gizmo, pivot, snapGroup, marker };
     return () => {
       cancelAnimationFrame(raf); ro.disconnect();
-      window.removeEventListener("blur",cancelPointer);disposeTransformControls(controls);scene.remove(pivot);
+      window.removeEventListener("blur",cancelPointer);for(const c of gizmo.controls)disposeTransformControls(c);scene.remove(pivot);disposeGroup(snapGroup);
       window.removeEventListener("keydown", kd, true); window.removeEventListener("keyup", ku, true); window.removeEventListener("blur", clearHeld);
       disposeGroup(group); grid.geometry.dispose(); (grid.material as THREE.Material).dispose?.();
       renderer.dispose(); renderer.forceContextLoss?.(); el.remove();
@@ -265,18 +312,41 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
   }, []);
 
   st.current.onPick = onPick; st.current.onEmpty = onEmpty; st.current.onMaterialDrop = onMaterialDrop; st.current.onToggleOpening = onToggleOpening;
-  st.current.manual=manual;st.current.onTransform=onTransform;
+  st.current.manual=manual;st.current.onTransform=onTransform;st.current.snapSettings=snapSettings;st.current.transformMode=transformMode;
   useEffect(()=>{
-    const controls:TransformControls|undefined=st.current.controls,pivot:THREE.Object3D|undefined=st.current.pivot;
-    if(!controls||!pivot)return;
-    if(!manual){controls.detach();controls.enabled=false;return;}
-    controls.enabled=true;controls.setMode(transformMode);controls.attach(pivot);
-    if(!controls.dragging){
+    if(!manual)return;
+    const selected=new Set(manual.refs.map(r=>`${r.sheetId}::${r.id}`));
+    const selectedWalls=new Set(items.filter(d=>selected.has(keyOf(d))&&d.source==="wall").map(keyOf));
+    // Wall openings belong to the moving group even if they were not explicitly picked.
+    const excluded=new Set(selected);
+    // Dependent opening meshes have no parent metadata: never snap a wall to its attached openings.
+    for(const d of items)if((d.source==="door"||d.source==="window")&&[...selectedWalls].some(key=>key.startsWith(`${d.sheetId}::`)))excluded.add(keyOf(d));
+    st.current.snapSources=spatialFeatures(items.filter(d=>selected.has(keyOf(d)))).points;
+    st.current.snapTargets=spatialFeatures(items.filter(d=>!excluded.has(keyOf(d))));
+  },[manual?.baseline]);
+  useEffect(()=>{
+    const gizmo:ReturnType<typeof combinedGizmo>|undefined=st.current.gizmo,pivot:THREE.Object3D|undefined=st.current.pivot;
+    if(!gizmo||!pivot)return;
+    if(!manual){gizmo.detach();if(st.current.marker)st.current.marker.visible=false;return;}
+    gizmo.attach();gizmo.translate.setSize(snapSettings.size);gizmo.rotate.setSize(snapSettings.size*.78);
+    if(!gizmo.controls.some(c=>c.dragging)){
       pivot.position.set(manual.pivot.x+manual.delta.x,manual.pivot.z+manual.delta.z,manual.pivot.y+manual.delta.y);
       const rotation=moveMatrix({...manual.delta,x:0,y:0,z:0},{x:0,y:0,z:0});
       pivot.quaternion.setFromRotationMatrix(CAD_TO_THREE.clone().multiply(rotation).multiply(CAD_TO_THREE));
     }
-  },[manual,transformMode]);
+  },[manual,transformMode,snapSettings.size]);
+  useEffect(()=>{
+    const group:THREE.Group|undefined=st.current.snapGroup;if(!group)return;
+    const positions:number[]=[];
+    if(manual&&snapSettings.enabled&&snapSettings.grid){
+      const p=manual.pivot,step=snapSettings.stepM,half=10*step;
+      const cx=Math.round((p.x+manual.delta.x)/step)*step,cy=Math.round((p.y+manual.delta.y)/step)*step,z=p.z+manual.delta.z;
+      for(let i=-10;i<=10;i++){const x=cx+i*step,y=cy+i*step;positions.push(x,z,cy-half,x,z,cy+half,cx-half,z,y,cx+half,z,y);}
+    }
+    const css=getComputedStyle(document.documentElement), color=new THREE.Color(`hsl(${css.getPropertyValue("--accent-gold-soft").trim().replace(/ /g,", ")})`);
+    const lines=new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position",new THREE.Float32BufferAttribute(positions,3)),new THREE.LineBasicMaterial({color,transparent:true,opacity:.3,depthWrite:false}));lines.raycast=()=>{};group.add(lines);
+    return()=>{group.remove(lines);lines.geometry.dispose();(lines.material as THREE.Material).dispose();};
+  },[manual,snapSettings]);
 
   // Neigungsvorschau: eigener, nicht anklickbarer Körper über dem (unveränderten) Original.
   useEffect(() => {
@@ -460,11 +530,12 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     setCamera: (c) => { const o = st.current.orbit; if (!o) return; o.target.set(c.tx, c.ty, c.tz); o.r = c.r; o.theta = c.theta; o.phi = c.phi; st.current.apply(); st.current.fitted = true; },
     capture: (points) => {
       const { renderer, scene, camera, grid } = st.current; if (!renderer) return null;
-      const helper=st.current.controls?.getHelper(),wasVisible=helper?.visible;
-      if(helper)helper.visible=false;
+      const helpers:THREE.Object3D[]=(st.current.gizmo?.controls??[]).map((c:TransformControls)=>c.getHelper());
+      const visibility=helpers.map(h=>h.visible);helpers.forEach(h=>h.visible=false);
+      const snapVisible=st.current.snapGroup?.visible;if(st.current.snapGroup)st.current.snapGroup.visible=false;
       grid.visible = false; renderer.render(scene, camera);
       const png = renderer.domElement.toDataURL("image/png");
-      if(helper)helper.visible=wasVisible;
+      helpers.forEach((h,i)=>h.visible=visibility[i]);if(st.current.snapGroup)st.current.snapGroup.visible=snapVisible;
       grid.visible = st.current.gridOn !== false;
       const w = renderer.domElement.width, h = renderer.domElement.height;
       const badges = points.map(p => {

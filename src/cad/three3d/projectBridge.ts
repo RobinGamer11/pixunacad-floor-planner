@@ -46,14 +46,16 @@ function relationSources(app: CadApp): RelationSource[] {
  * Nur Vorschau: Teile eines einzelnen Objekts mit einer Entwurfsneigung (ohne Beziehungen).
  * Setzt `tilt3D` nur synchron für die Ableitung und stellt es sofort wieder her.
  */
-export function deriveObjectFromApp(app: CadApp, obj: any, tilt: any): Derived3D[] {
+export function deriveObjectFromApp(app: CadApp, obj: any, tilt: any, canonical = false): Derived3D[] {
   const had = Object.prototype.hasOwnProperty.call(obj, "tilt3D"), prev = obj.tilt3D;
+  const pose=obj.pose3D,hadPose=Object.prototype.hasOwnProperty.call(obj,"pose3D");
   try {
+    if(canonical)delete obj.pose3D;
     if (tilt) obj.tilt3D = tilt; else delete obj.tilt3D;
     const sh = (app.sheetManager as any).getById?.(app.activeSheetId);
     if (!sh) return [];
     return deriveScene3D(sceneOf(app, sh.id), sh, { ...deriveOpts(app), isLabelVisible: () => true }).filter(d => d.sourceId === obj.id);
-  } finally { if (had) obj.tilt3D = prev; else delete obj.tilt3D; }
+  } finally { if (had) obj.tilt3D = prev; else delete obj.tilt3D; if(canonical){if(hadPose)obj.pose3D=pose;else delete obj.pose3D;} }
 }
 
 export function deriveFromApp(app: CadApp): { items: Derived3D[]; issues: RelationIssue[] } {

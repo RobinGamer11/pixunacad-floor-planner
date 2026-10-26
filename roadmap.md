@@ -1,5 +1,13 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## Kombiniertes 3D-Paket – 26.10.2026
+- [x] Bezugskante und Kantenwahl entlang der tatsächlichen geneigten Körpergeometrie; gespeicherter Rahmen bleibt beim Kantenwechsel unverändert
+- [x] Gemeinsames Verschieben-/Drehen-Gizmo mit Weltachsen und zoomstabiler Größe
+- [x] Flüchtiges beiges Fangraster, Kontaktmarker, Hysterese und Winkelfang; lokale Einstellungen
+- [x] 106 Regressionstests; neue Dateien gezielt lintfrei; getrennte Browser-Prüfszene: Achspfeil und Drehring, dezente echte Wandkante, Zahl 1,25 m, Übernehmen (1 Undo), Undo/Redo, Desktop und 937×876; keine Laufzeitfehler; automatische Typ-/Buildprüfung OK
+- [ ] Angemeldete Projekt-Abnahme und echtes Tablet – Projektseite führt im Prüfkontext zu /login; kein Tablet verfügbar
+- [ ] GitHub-main-Übertragung verifizieren – Commit/Push verwaltet Lovable, nicht manuell zulässig
+
 ## Option B – Manuell bewegen und Vercel, 25.10.2026
 - [x] 3D-Ansichtswechsel: r169-Absturz reproduziert; Helper-Freigabe korrigiert; 15 Tests und Browser-Unmount ohne Fehler geprüft
 - [x] Gemeinsame flüchtige 3D-Auswahl und Transformationssitzung mit Weltachsen, Zahlenfeldern, Übernehmen/Verwerfen
@@ -306,4 +314,4 @@ und meldet bei nicht zueinander passenden Objektarten einen kurzen Hinweis.
 - [x] Fenster/Türen starr in geneigten/höheren Wänden
 - [x] Infobox in 3D als 2D-Pin, gedämpfte Farben, leichtes Leuchten
 - [x] „Kanten bündig“ bei Grundfläche ausgegraut; beige Kante sofort in 3D; alle Wandkanten anklickbar
-- [ ] Paket 2: Gizmo und Fangraster
+- [x] Paket 2: Gizmo und Fangraster (kombiniert mit tatsächlicher Kantenmarkierung, siehe 26.10.2026 oben)

@@ -50,6 +50,7 @@ import { enter3DEditor, state3D, type ObjectRef3D } from "@/cad/three3d/manualMo
 import type { MoveDelta } from "@/cad/three3d/spatialTransform";
 import { setTiltDraftPreview } from "@/cad/three3d/tiltDraftPreview";
 import { CopyCheck } from "lucide-react";
+import { DEFAULT_SNAP_3D, normalizeSnapSettings, type SnapSettings3D } from "@/cad/three3d/manipulationSnap";
 
 const Viewer3D = lazy(() => import("./Viewer3D"));
 
@@ -93,6 +94,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const numericValid=useRef(true);
   const onNumericValidity=useCallback((valid:boolean)=>{numericValid.current=valid;},[]);
   const [moveMode,setMoveMode]=useState<"translate"|"rotate">("translate");
+  const [snapSettings,setSnapSettings]=useState<SnapSettings3D>(()=>{try{return normalizeSnapSettings(JSON.parse(localStorage.getItem("pixuna.3d.manipulation")??"null"));}catch{return {...DEFAULT_SNAP_3D};}});
+  useEffect(()=>{try{localStorage.setItem("pixuna.3d.manipulation",JSON.stringify(snapSettings));}catch{}},[snapSettings]);
   const [previewItems,setPreviewItems]=useState<Derived3D[]|null>(null);
   const [pendingChange,setPendingChange]=useState<(()=>void)|null>(null);
   const replaceSession=(s:ManualMoveSession|null)=>{sessionRef.current=s;state3D(app).draftActive=!!s;setManualSession(s);if(!s){setPreviewItems(null);setMoveError(null);}};
@@ -255,14 +258,14 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     const next=!manualOn;setManualOn(next);setPicking(null);setTiltDraftPreview(null);
     if(next&&refs3D.length)try{replaceSession(beginManualMove(app,refs3D,items));}catch(e){setMoveError(e instanceof Error?e.message:"Auswahl nicht möglich.");}
   });
-  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove}/>;
+  const movePanel=<ManualMovePanel enabled={manualOn} count={refs3D.length} session={manualSession} mode={moveMode} error={moveError} onValidity={onNumericValidity} onToggle={toggleManual} onMode={setMoveMode} onDelta={updateDelta} onApply={applyMove} onCancel={cancelMove} snapSettings={snapSettings} onSnapSettings={setSnapSettings}/>;
 
   const btn = "h-8 px-2.5 rounded-md text-xs font-medium border hover:bg-muted disabled:opacity-40";
   return (
     <div className="absolute inset-0 z-[40] flex bg-background">
       <div className="relative flex-1 min-w-0">
         <Suspense fallback={<div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">3D-Ansicht wird geladen …</div>}>
-          <Viewer3D ref={viewer} items={previewItems??items} selectedKey={selKey} selectedKeys={refs3D.map(refKey3D)} manual={manualSession} transformMode={moveMode} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
+          <Viewer3D ref={viewer} items={previewItems??items} selectedKey={selKey} selectedKeys={refs3D.map(refKey3D)} manual={manualSession} transformMode={moveMode} snapSettings={snapSettings} onTransform={updateDelta} onPick={onPick} onEmpty={() => { if (!picking) guardChange(()=>{state3D(app).refs=[];setRefs3D([]);setSelKey(null);clearCadSelection(app);}); }} ghost={manualOn?null:ghost} textureFor={textureFor} materialImage={materialImage}
             onMaterialDrop={(sheetId,id,materialId)=>guardChange(()=>{const m=project?.settings?.materials3D?.find(x=>x.id===materialId);if(m)setObjectMaterial(app,sheetId,id,m);})}
             onToggleOpening={(sheetId,id)=>guardChange(()=>{const hit=findObject(app,sheetId,id);if(hit)setOpeningState(app,sheetId,id,!hit.obj.open3D);})} />
         </Suspense>
