@@ -143,6 +143,8 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
         pivot.position.set(session.pivot.x+delta.x,session.pivot.z+delta.z,session.pivot.y+delta.y);
       }
       marker.visible=control.mode==="translate"?!!snapContact:angleContact!==null;
+      (center.material as THREE.MeshBasicMaterial).color.copy(angleContact!==null?gold:cssColor("--accent-gold-soft"));
+      (center.material as THREE.MeshBasicMaterial).opacity=angleContact!==null?1:.65;
       if(snapContact)marker.position.set(snapContact.target.x,snapContact.target.z,snapContact.target.y);
       else marker.position.copy(pivot.position);
       st.current.onTransform?.(delta);
@@ -343,8 +345,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
   st.current.onPick = onPick; st.current.onEmpty = onEmpty; st.current.onMaterialDrop = onMaterialDrop; st.current.onToggleOpening = onToggleOpening;
   st.current.manual=manual;st.current.onTransform=onTransform;st.current.snapSettings=snapSettings;st.current.transformMode=transformMode;st.current.levels=levels;
   useEffect(()=>{
-    if(!manual)return;
-    const selected=new Set(manual.refs.map(r=>`${r.sheetId}::${r.id}`));
+    const selected=new Set(manual?manual.refs.map(r=>`${r.sheetId}::${r.id}`):selectedKeys??(selectedKey?[selectedKey]:[]));
     const selectedWalls=new Set(items.filter(d=>selected.has(keyOf(d))&&d.source==="wall").map(keyOf));
     // Wall openings belong to the moving group even if they were not explicitly picked.
     const excluded=new Set(selected);
@@ -354,7 +355,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     st.current.snapTargets=spatialFeatures(items.filter(d=>!excluded.has(keyOf(d))));
     const byKey=new Map<string,Derived3D[]>();for(const d of items)if(!excluded.has(keyOf(d))&&d.type!=="line"&&d.type!=="plane"){const k=keyOf(d);byKey.set(k,[...(byKey.get(k)??[]),d]);}
     st.current.targetBoxes=[...byKey.values()].map(list=>boxOf(spatialFeatures(list).points)).filter(Boolean);
-  },[manual?.baseline]);
+  },[manual?.baseline,items,selectedKey,selectedKeys]);
   useEffect(()=>{
     const gizmo:ReturnType<typeof combinedGizmo>|undefined=st.current.gizmo,pivot:THREE.Object3D|undefined=st.current.pivot;
     if(!gizmo||!pivot)return;
@@ -374,9 +375,9 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
   useEffect(()=>{
     const group:THREE.Group|undefined=st.current.snapGroup;if(!group)return;
     st.current.badgeAnchor=null;if(badgeRef.current)badgeRef.current.style.display="none";
-    if(!manual)return;
+    if(!snapSettings.grid)return;
     const css=getComputedStyle(document.documentElement), color=new THREE.Color(`hsl(${css.getPropertyValue("--accent-gold-soft").trim().replace(/ /g,", ")})`);
-    const selected=new Set(manual.refs.map(r=>`${r.sheetId}::${r.id}`));
+    const selected=new Set(manual?manual.refs.map(r=>`${r.sheetId}::${r.id}`):selectedKeys??(selectedKey?[selectedKey]:[]));
     const moving=boxOf(spatialFeatures((movePreview??items).filter(d=>selected.has(keyOf(d)))).points);
     if(!moving)return;
     const added:THREE.Object3D[]=[];
@@ -410,7 +411,7 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
       if(badgeRef.current)badgeRef.current.textContent=`0,00 m ${level.label}`;
     }
     return()=>{for(const o of added){group.remove(o);const g=o as THREE.Mesh;g.geometry.dispose();(g.material as THREE.Material).dispose();}};
-  },[manual,movePreview,items,levels,snapSettings]);
+  },[manual,movePreview,items,levels,snapSettings,selectedKey,selectedKeys]);
   // Move preview: original stays in place, the moved copy is a translucent grey body.
   useEffect(()=>{
     const scene:THREE.Scene|undefined=st.current.scene;if(!scene||!manual||!movePreview?.length)return;
@@ -520,8 +521,10 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
           geo.computeVertexNormals();
           const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.85, side: d.closed ? THREE.FrontSide : THREE.DoubleSide, flatShading: true }));
           obj = m;
-          const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3a352c, transparent: true, opacity: 0.35 }));
-          edges.raycast = () => {}; g.add(edges);
+          if(d.source!=="infobox"){
+            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3a352c, transparent: true, opacity: 0.35 }));
+            edges.raycast = () => {}; g.add(edges);
+          }
         } else {
           const geo = new THREE.BufferGeometry().setFromPoints(d.spatialPoints ? d.spatialPoints.map(p=>new THREE.Vector3(p.x,p.z,p.y)) : d.points.map(p => new THREE.Vector3(p.x, d.z, p.y)));
           obj = new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));

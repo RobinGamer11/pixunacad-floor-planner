@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { applyGenericTilt } from "./geometryDerivation";
 import { frameForCardinal, genericVertex, projectionCos, scaleAcrossAxis } from "./tiltGeometry";
-import { deriveInfoBox, infoBoxDimensions } from "./infoBoxGeometry";
+import { deriveInfoBox, infoBoxDimensions, infoBoxPinOutline } from "./infoBoxGeometry";
 import { deriveOpening } from "./openingGeometry";
 import { DEFAULT_MATERIAL } from "./materials";
 import { copyObjectMeta, attachObjectMeta } from "../objectMeta";
@@ -44,7 +44,15 @@ describe("Paket 02",()=>{
     const [body,face]=deriveInfoBox({id:"i",x:1,y:2,sizeM:0.5,title:"Baustelle"},"s",3);
     expect(infoBoxDimensions({sizeM:0.5})).toEqual({width:0.8,height:0.8,thickness:0.06,elevation:0.15});
     expect(body.type).toBe("mesh");if(body.type==='mesh'){const zs=body.mesh.positions.filter((_,i)=>i%3===2);expect(Math.min(...zs)).toBeCloseTo(3.15);expect(Math.max(...zs)).toBeCloseTo(3.95);}
-    expect(face.texture?.list).toBe("infoBoxes");expect(face.uvs).toHaveLength(8);
+    expect(face.texture?.list).toBe("infoBoxes");
+    if(face.type==='mesh')expect(face.uvs?.length).toBe(face.mesh.positions.length/3*2);
+  });
+  it("Infobox body and textured face have a circular boundary, without a rectangular overlay",()=>{
+    const ring=infoBoxPinOutline(.8,.8);
+    ring.forEach(p=>expect(Math.hypot(p.u,p.v-.4)).toBeCloseTo(.4,10));
+    const [,face]=deriveInfoBox({id:'i',x:0,y:0,sizeM:.5},'s',0);
+    if(face.type!=='mesh')throw Error('Expected circular mesh');
+    for(let i=3;i<face.mesh.positions.length;i+=3)expect(Math.hypot(face.mesh.positions[i],face.mesh.positions[i+2]-.55)).toBeCloseTo(.4,10);
   });
   it("Türmaße folgen Laibung, Wandhöhenlage und Öffnungshöhe; geschlossen ist Standard",()=>{
     const parts=deriveOpening(door,wall,"s",3);

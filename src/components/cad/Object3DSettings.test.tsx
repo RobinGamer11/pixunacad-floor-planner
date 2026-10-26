@@ -62,6 +62,16 @@ describe("3D-Einstellungen – Neigen", () => {
     expect(h.tilt3D.mode).toBeUndefined();
     expect(h.points).toEqual(sq(0, 0, 4, 2));
   });
+  it("manual movement leaves existing height and tilt edits available with one commit", async () => {
+    vi.useFakeTimers();
+    const h:any={id:'manual',points:sq(0,0,4,2),holes:[],heightM:.2},app=fakeApp(h);
+    render(<Object3DSettings app={app} defaultOpen manualActive />);
+    await act(async()=>{vi.advanceTimersByTime(350);});vi.useRealTimers();
+    typeAngle('45');
+    expect(app.runAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Übernehmen'));
+    expect(h.tilt3D.angleDeg).toBe(45);expect(app.runAction).toHaveBeenCalledTimes(1);
+  });
 
   it("Kante neigen + Kanten bündig werden gespeichert", async () => {
     const h: any = { id: "R", points: sq(0, 0, 4, 2), holes: [], heightM: 0.2 };

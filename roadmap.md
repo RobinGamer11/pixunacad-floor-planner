@@ -1,5 +1,14 @@
 # Umsetzungspaket 1 – Projektzugriff, Netzwerk/Team, Beiträge
 
+## 3D-Korrekturen – aktueller Auftrag
+- [x] Objekteinstellungen bei Manuell bewegen unverändert lassen; separate Bewegungsfelder entfernen; Bestätigung über der Ansicht
+- [x] Kontakt-Hilfsraster unabhängig und immer schaltbar, standardmäßig ein
+- [x] Leichter leuchtender Winkelfang bei Vielfachen von 45°
+- [x] Infobox als Kreis-Körper ohne herausragende Streifen
+- [x] 54 Regressionstests; automatische Prüfung OK; separate Browser-Prüfszene bei 937×876: Kontaktraster ohne Bewegung ein/aus, Blatt-Glow, Neigung bleibt bedienbar, Kreis-Infobox, keine Laufzeitfehler
+- [ ] Prüfung im angemeldeten Projekt und echter Drehring-Geste – Projekt führt im Prüfkontext zur Anmeldung
+- [ ] GitHub-main-Übertragung – Lovable verwaltet Commit/Push; zuletzt main 2401a85d
+
 ## Kombiniertes 3D-Paket – 26.10.2026
 - [x] Bezugskante und Kantenwahl entlang der tatsächlichen geneigten Körpergeometrie; gespeicherter Rahmen bleibt beim Kantenwechsel unverändert
 - [x] Gemeinsames Verschieben-/Drehen-Gizmo mit Weltachsen und zoomstabiler Größe
