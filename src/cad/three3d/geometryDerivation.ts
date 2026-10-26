@@ -16,9 +16,9 @@ export { libraryBodyHeightM };
 import { documentVisibleCornersWorld } from "../documentGeometry";
 import { orderedLabelItems } from "../stackOrder";
 import { buildHealedWallSolidRing } from "../wallSolid";
-import { subtractPrism } from "./relations";
+import { meshOf, subtractPrism } from "./relations";
 import { genericVertex, resolveGenericTilt, scaleAcrossAxis, tiltShape, tiltShapeError } from "./tiltGeometry";
-import { faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
+import { csgMesh, faceMesh, resolveTilt, slabMesh, tiltMesh, tiltPoint, type MeshData, type Vec3 } from "./solidMesh";
 import type { Material3D } from "./materials";
 import { deriveOpening } from "./openingGeometry";
 import { deriveInfoBox } from "./infoBoxGeometry";
@@ -157,6 +157,22 @@ export function deriveWall(wall: any, doors: any[], sheetId: string, base: numbe
   try { return subtractPrism(full, cutters).filter(p => polyArea(p.footprint) > 1e-9); }
   catch { return [full]; }
 }
+
+/** Aussparungsvolumen der Öffnungen einer geneigten Wand – starr wie die Fenster/Türen mitgeführt. */
+export function openingCutters(wall: any, doors: any[], sheetId: string, base: number, wallParts: Derived3D[]): MeshData[] {
+  const h = Math.max(0, Number(wall.heightM) || 0);
+  const z0 = base + objectElevationM(wall);
+  const across = Math.max(0, Number(wall.thicknessM) || 0) + 0.05;
+  const out: MeshData[] = [];
+  for (const o of wallOpenings(wall, doors)) {
+    const top = Math.min(o.top, h);
+    if (top <= o.sill + EPS) continue;
+    const p: Prism3D = { type: "prism", source: "wall", sourceId: wall.id, sheetId, footprint: wallBandPolygon(wall, o.from, o.to, across), holes: [], z0: z0 + o.sill, z1: z0 + top, color: "#000" };
+    for (const d of tiltOpeningWithWall(wall, wallParts, [p], z0)) { const m = meshOf(d) ?? (d.type === "mesh" ? d.mesh : null); if (m) out.push(m); }
+  }
+  return out;
+}
+
 
 function distPointSeg(p: Vec2, a: Vec2, b: Vec2): number {
   const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
