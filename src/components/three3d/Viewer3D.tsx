@@ -279,9 +279,9 @@ const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D({ items, se
     }
     if (ghost.edge) {
       const [a, b] = ghost.edge.map(p => new THREE.Vector3(p.x, p.z, p.y));
-      const r = Math.max(0.025, a.distanceTo(b) * 0.008);
-      gg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 8), new THREE.MeshBasicMaterial({ color: 0xe8cf9a })));
-      gg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r * 2.6, 8), new THREE.MeshBasicMaterial({ color: 0xe8cf9a, transparent: true, opacity: 0.25, depthWrite: false })));
+      const r = Math.min(0.012, Math.max(0.006, a.distanceTo(b) * 0.003));
+      gg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r, 8), new THREE.MeshBasicMaterial({ color: 0xe8cf9a, depthTest: false, transparent: true, opacity: 0.95 })));
+      gg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(a, b), 1, r * 2, 8), new THREE.MeshBasicMaterial({ color: 0xe8cf9a, transparent: true, opacity: 0.15, depthWrite: false, depthTest: false })));
     }
     gg.traverse(o => { (o as any).raycast = () => {}; });
     gg.renderOrder = 10;

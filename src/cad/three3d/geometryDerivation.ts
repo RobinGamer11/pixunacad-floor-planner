@@ -302,7 +302,8 @@ export function piecePoints(items: any[]): Vec2[] {
  */
 export function tiltOpeningWithWall(wall: any, wallParts: Derived3D[], parts: Derived3D[], z0: number): Derived3D[] {
   const t = wall?.tilt3D;
-  if (!t || !parts.length || !wallParts.length) return parts;
+  // „Kante neigen“: Unterseite bleibt fest – Öffnungen bleiben exakt an ihrem Platz.
+  if (!t || t.mode === "lift" || !parts.length || !wallParts.length) return parts;
   const r = resolveGenericTilt(t, piecePoints(wallParts), z0);
   if (!r?.frame) return parts;
   let zTop = z0;
