@@ -497,6 +497,67 @@ function drawTile(ctx: CanvasRenderingContext2D, id: BuiltinHatchPatternId, s: n
 
 const tileCache = new Map<string, HTMLCanvasElement>();
 
+/** Bauplan geometrischer Kacheln — der Vektor-PDF-Export zeichnet sie neu statt als Pixel. */
+export interface VectorTileSource { id: BuiltinHatchPatternId; s: number; color: string; lw: number }
+const vectorTiles = new WeakMap<object, VectorTileSource>();
+export function vectorTileSource(tile: unknown): VectorTileSource | null {
+  return tile && typeof tile === "object" ? vectorTiles.get(tile as object) ?? null : null;
+}
+/** Zeichnet eine geometrische Kachel in einen beliebigen (Vektor-)Context. */
+export function drawVectorPatternTile(ctx: CanvasRenderingContext2D, src: VectorTileSource) {
+  drawTile(ctx, src.id, src.s, src.color, src.lw);
+}
+
+/** Bildschirm: unterhalb dieser Kachelgröße (px) wird das Muster zur Fläche. */
+export const PATTERN_FLAT_BELOW_PX = 4;
+/** Bildschirm: ab dieser Kachelgröße (px) erscheint das Muster voll. */
+export const PATTERN_DETAIL_FROM_PX = 8;
+
+/** Weicher Übergang 0..1 zwischen Flächen- und Detailanzeige. */
+export function patternDetailWeight(tilePx: number): number {
+  if (!(tilePx > PATTERN_FLAT_BELOW_PX)) return 0;
+  if (tilePx >= PATTERN_DETAIL_FROM_PX) return 1;
+  const t = (tilePx - PATTERN_FLAT_BELOW_PX) / (PATTERN_DETAIL_FROM_PX - PATTERN_FLAT_BELOW_PX);
+  return t * t * (3 - 2 * t);
+}
+
+/** Kachelauflösung passend zur Bildschirmgröße (Zweierpotenz, ≤ 2× Verkleinerung). */
+export function patternRenderPx(tilePx: number): number {
+  let r = 16;
+  while (r < 128 && r < tilePx) r *= 2;
+  return r;
+}
+
+const meanCache = new Map<string, { r: number; g: number; b: number; a: number }>();
+/** Mittlerer Farbton + Deckung einer Kachel (für die Flächenanzeige). */
+function tileMeanColor(tile: CanvasImageSource & { width: number; height: number }, key: string | null) {
+  if (key) { const hit = meanCache.get(key); if (hit) return hit; }
+  let out = { r: 0, g: 0, b: 0, a: 0 };
+  try {
+    const c = document.createElement("canvas");
+    c.width = 16; c.height = 16;
+    const g = c.getContext("2d", { willReadFrequently: true } as any) as CanvasRenderingContext2D | null;
+    if (g) {
+      g.imageSmoothingEnabled = true;
+      (g as any).imageSmoothingQuality = "high";
+      g.drawImage(tile, 0, 0, 16, 16);
+      const d = g.getImageData(0, 0, 16, 16).data;
+      let r = 0, gg = 0, b = 0, a = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const al = d[i + 3] / 255;
+        r += d[i] * al; gg += d[i + 1] * al; b += d[i + 2] * al; a += al;
+      }
+      const cnt = d.length / 4;
+      out = a > 0 ? { r: r / a, g: gg / a, b: b / a, a: a / cnt } : { r: 0, g: 0, b: 0, a: 0 };
+    }
+  } catch { /* kein Canvas: Fläche bleibt leer */ }
+  if (key) {
+    if (meanCache.size > 200) meanCache.clear();
+    meanCache.set(key, out);
+  }
+  return out;
+}
+
 export function getPatternTile(id: HatchPatternId, sizePx: number, color: string, lineWidthPx: number): HTMLCanvasElement {
   const s = Math.max(6, Math.round(sizePx));
   const lw = Math.max(0.4, lineWidthPx);
@@ -521,6 +582,7 @@ export function getPatternTile(id: HatchPatternId, sizePx: number, color: string
     ctx.drawImage(img, 0, 0, w, h);
   } else {
     drawTile(ctx, id as BuiltinHatchPatternId, s, color, lw);
+    vectorTiles.set(c, { id: id as BuiltinHatchPatternId, s, color, lw });
   }
 
   if (tileCache.size > 120) tileCache.clear();
@@ -560,15 +622,40 @@ export function fillWithHatchPattern(
 ): void {
   // Kachelgröße rein in CAD-Einheiten (Meter) -> Bildschirm; zoom-konsistent.
   const tilePx = PATTERN_BASE_TILE_M * Math.max(0.02, opt.scale) * pxPerMeter;
-  if (!(tilePx > 0.5) || !Number.isFinite(tilePx)) return;
+  if (!(tilePx > 0) || !Number.isFinite(tilePx)) return;
+  // Vektor-PDF: immer volle Geometrie (keine Bildschirm-Vereinfachung).
+  const vector = !!(ctx as any).__vectorRecorder;
   const stretch = Math.max(0.1, Math.min(10, opt.stretch ?? 1));
-  // Feste Render-Auflösung der Kachel: kein Umschalten/Runden beim Zoomen.
-  const RENDER_PX = 128;
+  // Bildschirm: Detailgewicht nach tatsächlicher Kachelgröße (kürzere Kante).
+  const screenTile = tilePx * Math.min(1, stretch);
+  const detail = vector ? 1 : patternDetailWeight(screenTile);
+  if (detail < 1) {
+    // Unterhalb der darstellbaren Detailgröße: gleichmäßiger Mittelton mit
+    // der Deckung, die das Muster an der Detailgrenze hat.
+    const refPx = 64;
+    const kRef = PATTERN_DETAIL_FROM_PX / refPx;
+    const lwRef = Math.round(Math.max(0.35, Math.min(refPx / 12, opt.lineWidthPx / kRef)) * 4) / 4;
+    const refTile = opt.tileOverride ?? getPatternTile(opt.patternId, refPx, opt.color, lwRef);
+    const mean = tileMeanColor(refTile as any, opt.tileOverride ? null : `${opt.patternId}|${opt.color}|${lwRef}`);
+    const flatA = mean.a * opt.alpha * (1 - detail);
+    if (flatA > 0.002) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, flatA);
+      ctx.fillStyle = `rgb(${Math.round(mean.r)},${Math.round(mean.g)},${Math.round(mean.b)})`;
+      ctx.fillRect(bbox.x, bbox.y, bbox.w, bbox.h);
+      ctx.restore();
+    }
+    if (detail <= 0) return;
+  }
+  // Kachelauflösung nahe der Bildschirmgröße: feine Linien bleiben beim
+  // Herauszoomen zusammenhängend statt zu Einzelpunkten zu zerfallen.
+  const RENDER_PX = vector ? 128 : patternRenderPx(tilePx);
   const k = tilePx / RENDER_PX;
   // Linienstärke im Kachelraum so wählen, dass sie nach Skalierung
-  // konstante Bildschirmstärke ergibt.
+  // konstante Bildschirmstärke ergibt (mind. ~0,75 px, sonst Punktraster).
   const kAvg = k * Math.sqrt(stretch);
-  const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, opt.lineWidthPx / Math.max(1e-6, kAvg)));
+  const lwScreen = vector ? opt.lineWidthPx : Math.max(0.75, opt.lineWidthPx);
+  const lwRaw = Math.max(0.35, Math.min(RENDER_PX / 12, lwScreen / Math.max(1e-6, kAvg)));
   const lwTile = Math.round(lwRaw * 4) / 4; // quantisiert -> stabiler Kachel-Cache
   const tile = opt.tileOverride ?? getPatternTile(opt.patternId, RENDER_PX, opt.color, lwTile);
   const pat = ctx.createPattern(tile, "repeat");
@@ -586,9 +673,12 @@ export function fillWithHatchPattern(
     (pat as any).setTransform?.(m);
   } catch { /* ältere Engine: ohne Transform zeichnen */ }
 
+  const prevSmooth = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = true;
   ctx.save();
-  ctx.globalAlpha = opt.alpha;
+  ctx.globalAlpha = opt.alpha * detail;
   ctx.fillStyle = pat;
   ctx.fillRect(bbox.x, bbox.y, bbox.w, bbox.h);
   ctx.restore();
+  ctx.imageSmoothingEnabled = prevSmooth;
 }

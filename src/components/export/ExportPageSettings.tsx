@@ -5,6 +5,8 @@ import { usePlanUi } from "./useExportApp";
 import { HOLE_PATTERN_OPTIONS, type HolePunchSide } from "@/cad/pageGuides";
 import type { SpreadLayoutMode } from "@/cad/PlanManager";
 import { SettingsSection, SettingsRow, SettingsSelect, OrientationButtons, MarginsField, SettingsButton, settingsFieldClass, settingsBorder } from "@/components/pageSettings/PageSettingsParts";
+import { SheetPreviewThumb } from "./SheetPreviewThumb";
+import { ChevronDown } from "lucide-react";
 import { Link2, Link2Off, RotateCcw, Snowflake, Pencil, Plus, AlertTriangle, Check, Move as MoveIcon } from "lucide-react";
 
 /**
@@ -17,6 +19,8 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
 }) {
   // leichte Abfrage für Auswahländerungen im PlanController (Canvas-Interaktion)
   usePlanUi(app, 400);
+  // Auswahl der zu platzierenden Zeichnung (nur lokal, nie Projektdaten).
+  const [picked, setPicked] = React.useState<string | null>(null);
   const pm = app.planManager;
   const plan = app.activePlanId ? pm.getById(app.activePlanId) : null;
   const sheets = app.sheetManager.list();
@@ -42,52 +46,95 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
   const field = "w-full h-8 px-2 rounded border bg-transparent text-xs";
   const border = { borderColor: "hsl(var(--hairline))" };
   const set = (fn: () => void) => app.mutatePlans(fn);
+  const pickedId = picked && sheets.some(s => s.id === picked) ? picked : (sheets[0]?.id ?? null);
 
   return (
-    <div className="export-settings p-3 space-y-5 text-xs">
-      <Section title="CAD-Blätter">
-        <div className="text-[11px] text-muted-foreground leading-snug">
-          Antippen platziert das Blatt auf dieser Seite. Ausschnitte bleiben verknüpft und aktualisieren sich automatisch.
-        </div>
-        <div className="space-y-1">
-          {sheets.map(s => (
-            <button key={s.id} type="button" className="w-full h-9 px-2 rounded border flex items-center gap-2 text-left" style={border}
-              onClick={() => app.placeSheetOnActivePlan(s.id)}>
-              <Plus size={13} /> <span className="truncate">{s.name}</span>
-            </button>
-          ))}
-        </div>
-      </Section>
+    <div className="export-settings p-3 space-y-3 text-xs">
+      <DarkCard title="Zeichnung platzieren">
+        {sheets.length === 0 ? (
+          <div className="text-[11px]" style={D.muted}>Noch kein CAD-Blatt vorhanden.</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {sheets.map(s => {
+              const active = s.id === pickedId;
+              return (
+                <button key={s.id} type="button" aria-pressed={active} title={s.name}
+                  onClick={() => setPicked(s.id)}
+                  className="relative rounded-md border-2 p-1 text-left transition-colors"
+                  style={{ borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--overlay-surface) / 0.14)", background: "hsl(var(--overlay-surface) / 0.05)" }}>
+                  <div className="h-16 w-full overflow-hidden rounded-sm" style={{ background: "hsl(var(--overlay-surface) / 0.94)" }}>
+                    <SheetPreviewThumb app={app} sheetId={s.id} revision={app.contentRevision} />
+                  </div>
+                  <div className="mt-1 truncate px-0.5 text-[11px]" style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--overlay-surface))" }}>{s.name}</div>
+                  {active && (
+                    <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full" style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--overlay-ink))" }}>
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <button type="button" disabled={!pickedId}
+          onClick={() => pickedId && app.placeSheetOnActivePlan(pickedId)}
+          className="mt-3 flex h-9 w-full items-center justify-center gap-1.5 rounded-md text-xs font-semibold disabled:opacity-40"
+          style={D.gold}>
+          <Plus size={14} /> Auf Seite platzieren
+        </button>
+        <div className="mt-2 text-[10px]" style={D.muted}>Änderungen im CAD werden übernommen.</div>
+      </DarkCard>
 
-      <SettingsSection title="SEITENEINSTELLUNGEN">
-        <SettingsRow label="Seitentitel">
-          <input key={plan.id + plan.name} defaultValue={plan.name} className={settingsFieldClass} style={settingsBorder}
+      <DarkCard title="Seite einrichten">
+        <DarkRow label="Seitentitel">
+          <input key={plan.id + plan.name} defaultValue={plan.name} className={darkField} style={D.field}
             onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== plan.name) set(() => pm.renamePlan(plan.id, v)); }}
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); e.stopPropagation(); }} />
-        </SettingsRow>
-        <SettingsRow label="Format">
-          <SettingsSelect value={plan.formatKey}
-            options={[...PaperFormats.filter(f => ["a5", "a4", "a3", "a2"].includes(f.key)).map(f => ({ value: f.key, label: `${f.label} (${f.width} × ${f.height} mm)` })), { value: "free", label: "Freies Format" }]}
-            onChange={(v) => set(() => pm.setFormat(plan.id, { formatKey: v }))} />
-        </SettingsRow>
-        {plan.formatKey === "free" ? (
+        </DarkRow>
+        <DarkRow label="Papierformat">
+          <select value={plan.formatKey} className={darkField} style={D.field}
+            onChange={(e) => set(() => pm.setFormat(plan.id, { formatKey: e.target.value }))}>
+            {[...PaperFormats.filter(f => ["a5", "a4", "a3", "a2"].includes(f.key)).map(f => ({ value: f.key, label: `${f.label} (${f.width} × ${f.height} mm)` })), { value: "free", label: "Freies Format" }]
+              .map(o => <option key={o.value} value={o.value} style={{ color: "initial" }}>{o.label}</option>)}
+          </select>
+        </DarkRow>
+        {plan.formatKey === "free" && (
           <div className="grid grid-cols-2 gap-2 text-[11px]">
-            <label>Breite (mm)<input type="number" min={10} key={"w" + plan.freeWidth} defaultValue={plan.freeWidth} className={settingsFieldClass} style={settingsBorder}
+            <label style={D.muted}>Breite (mm)<input type="number" min={10} key={"w" + plan.freeWidth} defaultValue={plan.freeWidth} className={darkField} style={D.field}
               onBlur={(e) => set(() => pm.setFormat(plan.id, { freeWidth: Number(e.target.value) }))} /></label>
-            <label>Höhe (mm)<input type="number" min={10} key={"h" + plan.freeHeight} defaultValue={plan.freeHeight} className={settingsFieldClass} style={settingsBorder}
+            <label style={D.muted}>Höhe (mm)<input type="number" min={10} key={"h" + plan.freeHeight} defaultValue={plan.freeHeight} className={darkField} style={D.field}
               onBlur={(e) => set(() => pm.setFormat(plan.id, { freeHeight: Number(e.target.value) }))} /></label>
           </div>
-        ) : (
-          <SettingsRow label="Ausrichtung">
-            <OrientationButtons landscape={plan.landscape} onChange={(v) => set(() => pm.setFormat(plan.id, { landscape: v }))} />
-          </SettingsRow>
         )}
-        <SettingsRow label="Ränder">
-          <MarginsField value={plan.marginsMm} onChange={(v) => set(() => pm.setPageSettings(plan.id, { marginsMm: v }))} />
-        </SettingsRow>
-      </SettingsSection>
+        {plan.formatKey !== "free" && (
+          <DarkRow label="Ausrichtung">
+            <div className="grid grid-cols-2 gap-1.5">
+              {([[false, "Hochformat"], [true, "Querformat"]] as const).map(([land, label]) => {
+                const active = plan.landscape === land;
+                return (
+                  <button key={label} type="button" aria-pressed={active}
+                    onClick={() => set(() => pm.setFormat(plan.id, { landscape: land }))}
+                    className="flex h-8 items-center justify-center gap-1.5 rounded-md border text-[11px]"
+                    style={active ? D.gold : D.field}>
+                    <span className="inline-block rounded-[2px] border" style={{ width: land ? 13 : 9, height: land ? 9 : 13, borderColor: "currentColor" }} />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </DarkRow>
+        )}
+        <DarkRow label="Seitenränder">
+          <div className="flex items-center gap-1.5">
+            <input type="number" min={0} step={1} key={"m" + plan.marginsMm} defaultValue={plan.marginsMm} className={darkField} style={D.field}
+              onBlur={(e) => { const v = Math.max(0, Number(e.target.value) || 0); if (v !== plan.marginsMm) set(() => pm.setPageSettings(plan.id, { marginsMm: v })); }}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); e.stopPropagation(); }} />
+            <span className="text-[11px]" style={D.muted}>mm</span>
+          </div>
+        </DarkRow>
+      </DarkCard>
 
-      <SettingsSection title="ABHEFTUNG">
+      <DarkCollapse title="Abheftung">
         <SettingsRow label="Lochung">
           <SettingsSelect value={plan.holePattern} options={HOLE_PATTERN_OPTIONS.map(o => ({ value: o.key, label: o.label }))}
             onChange={(v) => set(() => pm.setPageSettings(plan.id, { holePattern: v }))} />
@@ -98,9 +145,9 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
             onChange={(v) => set(() => pm.setPageSettings(plan.id, { holePunchSide: v }))} />
         </SettingsRow>
         <div className="text-[10px] text-muted-foreground">Nur Hilfsanzeige mit Fangpunkten – erscheint nie in der PDF.</div>
-      </SettingsSection>
+      </DarkCollapse>
 
-      <SettingsSection title="SEITENANSICHT (VERBUND)">
+      <DarkCollapse title="Seiten verbinden">
         {!inSpread ? (
           <>
             <div className="text-[11px] text-muted-foreground">Einzelseite. Mit einer benachbarten Seite verbinden, um eine zusammenhängende Seitenansicht zu erhalten.</div>
@@ -142,7 +189,7 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
             <SettingsButton onClick={() => set(() => pm.unlinkFromSpread(plan.id))}><Link2Off size={12} /> Aus Verbund lösen</SettingsButton>
           </>
         )}
-      </SettingsSection>
+      </DarkCollapse>
 
       {selProj && (
         <Section title="Ausgewählter Ausschnitt">
@@ -186,6 +233,50 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="space-y-2">
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--ink-soft))" }}>{title}</div>
       {children}
+    </div>
+  );
+}
+
+/** Dunkler PixunaCAD-Kartenstil mit warmem Gold für aktive Elemente. */
+const D = {
+  card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" } as React.CSSProperties,
+  field: { background: "hsl(var(--overlay-surface) / 0.07)", borderColor: "hsl(var(--overlay-surface) / 0.18)", color: "hsl(var(--overlay-surface))" } as React.CSSProperties,
+  muted: { color: "hsl(var(--overlay-surface) / 0.62)" } as React.CSSProperties,
+  gold: { background: "hsl(var(--accent-gold))", borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--overlay-ink))" } as React.CSSProperties,
+};
+const darkField = "w-full h-8 px-2 rounded-md border text-xs outline-none focus:ring-1 focus:ring-[hsl(var(--accent-gold))]";
+
+function DarkCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border p-3" style={D.card}>
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: "hsl(var(--accent-gold))" }}>{title}</div>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  );
+}
+
+function DarkRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[86px_minmax(0,1fr)] items-center gap-2 text-[11px]">
+      <span className="truncate" style={D.muted}>{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+function DarkCollapse({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div className="rounded-lg border" style={D.card}>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(o => !o)}
+        className="flex w-full items-center justify-between px-3 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em]"
+        style={{ color: open ? "hsl(var(--accent-gold))" : "hsl(var(--overlay-surface))" }}>
+        {title}
+        <ChevronDown size={14} className="transition-transform" style={{ transform: open ? "rotate(180deg)" : undefined }} />
+      </button>
+      {open && (
+        <div className="export-dark-collapse space-y-3 border-t px-3 pb-3 pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)", color: "hsl(var(--overlay-surface))", ["--muted-foreground" as any]: "var(--overlay-surface)", ["--foreground" as any]: "var(--overlay-surface)", ["--hairline" as any]: "var(--overlay-surface)" }}>{children}</div>
+      )}
     </div>
   );
 }

@@ -296,6 +296,8 @@ export class Renderer {
    * eingefügte Objekte) nur EINMAL dekodiert im Speicher liegen.
    */
   private _docImageCache = new Map<string, HTMLImageElement>();
+  /** Optional (Vektor-PDF): übernimmt das Zeichnen eines Dokuments; true = erledigt. */
+  documentDrawHook: ((doc: DocumentObject, ctx: CanvasRenderingContext2D, wPx: number, hPx: number) => boolean) | null = null;
 
   /**
    * Zeichnet ALLE Objekte gruppiert nach Label-ID, von Hintergrund zu Vordergrund.
@@ -1109,6 +1111,13 @@ export class Renderer {
         ctx.rect(clipL, clipT, clipW, clipH);
         ctx.clip();
       }
+    }
+    // Vektor-PDF-Export: eingefügte PDF-Seiten als Original-Seite ausgeben
+    // (gleiche Matrix, gleicher Zuschnitt wie oben gesetzt).
+    if (this.documentDrawHook && !getDocWarp(doc) && !isDisplayGradientActive((doc as any).displayGradient)) {
+      let handled = false;
+      try { handled = this.documentDrawHook(doc, ctx, wPx, hPx); } catch { handled = false; }
+      if (handled) { ctx.restore(); return; }
     }
     // Transparenzverlauf: Erst wird das Dokument wie bisher gezeichnet
     // (Filter, Hintergrundentfernung, Warp); die Maske wirkt danach auf das

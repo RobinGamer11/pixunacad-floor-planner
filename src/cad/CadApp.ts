@@ -189,6 +189,11 @@ export interface MeasureSettingsRefs {
   doorHeightText?: HTMLInputElement;
 }
 
+/** Kamera-Obergrenze im CAD (px/m). */
+export const SHEET_MAX_CAMERA_SCALE = 4000;
+/** Kamera-Obergrenze der Exportansicht (px je Papiermeter): 20 mm Papier ≈ 500 px. */
+export const EXPORT_MAX_CAMERA_SCALE = 25000;
+
 export class CadApp {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -4090,6 +4095,8 @@ export class CadApp {
         try { (this.activeTool as any)?.reset?.(); } catch { /* noop */ }
         this.pointEditMenu.hide();
         this.hub.hide();
+        // Exportansicht: deutlich näher an das Papier zoomen (20 mm ≈ 400 px).
+        this.camera.maxScale = EXPORT_MAX_CAMERA_SCALE;
         // Kamera: gespeicherten Zustand wiederherstellen — sonst Fit auf Papier.
         const cached = this._camStateByPlanId.get(this.activePlanId);
         if (cached) {
@@ -4127,6 +4134,8 @@ export class CadApp {
     } else {
       const leavingPlan = this.renderer.planMode != null;
       this.renderer.planMode = null;
+      this.camera.maxScale = SHEET_MAX_CAMERA_SCALE;
+      if (this.camera.scale > this.camera.maxScale) this.camera.scale = this.camera.maxScale;
       this.topology.planFrame = null;
       this.renderer.planTracingLayers = [];
       // Nur beim Verlassen einer Exportseite: Kamera des Zeichenblatts wiederherstellen

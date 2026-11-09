@@ -47,6 +47,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Export = dieselbe `CadApp` (`?view=export`), Mutationen nur `CadApp.mutatePlans` (s. `docs/export-architecture.md`).
 - Export-Bedienzustände sind lokal/flüchtig, nie Cloud/Undo/Snapshot/localStorage; Fangpunkte von Hintergrundseiten nur über `TopologyEngine.tracingSnapScenes`.
 - Die frühere Projektmappe ist entfernt; nur `src/lib/legacyMappeMigration.ts` kennt alte Feldnamen und bereinigt nur den Projekt-Payload (nie CAD/Export).
+- PDF-Ausschnitte mit Szenenstand laufen über denselben `Renderer` in `cad/pdfVector/PdfCanvasRecorder.ts` (Vektoren, Bilder, Original-PDF-Seiten unter einer `computeProjectionLayout`-Transformation) – kein Rasterpfad, damit Bildschirm und PDF deckungsgleich bleiben.
 - Export-Ausschnitt: Sitzung in `PlanController` (`_drag.preview`), Projection erst bei ✓/Enter.
 
 ## Hilfslinien
