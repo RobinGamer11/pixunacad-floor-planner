@@ -533,7 +533,7 @@ export class PdfCanvasRecorder {
       for (const v of M) arr.push(PDFNumber.of(Number.isFinite(v) ? v : 0));
       dict.set(PDFName.of("Matrix"), arr);
       dict.set(PDFName.of("Resources"), book.resourceDictFor(used));
-      const stream = ctx.flateStream(content, (dict as any).dict ? {} : {});
+      const stream = ctx.flateStream(content);
       // Dict-Einträge in den Stream übernehmen.
       for (const [k, v] of dict.entries()) stream.dict.set(k, v);
       const ref = ctx.register(stream);
