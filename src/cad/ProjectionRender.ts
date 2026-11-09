@@ -130,7 +130,7 @@ function drawSnapshotLabels(r: any, snapshot: any) {
     try { r._drawWallsForLabel(labelId); } catch { }
     try { r._drawDoorsForLabel(labelId); } catch { }
     try { r._drawStairsForLabel(labelId); } catch { }
-    try { r._drawSegmentsForLabel(labelId); } catch { }
+    try { r._drawSegmentsForLabel(labelId); } catch (e) { console.warn("DBGSEG", e && (e as any).stack); }
     try { r._drawFreeStrokesForLabel(labelId); } catch { }
     try { r._drawDimensionsForLabel(labelId); } catch { }
     try { r._drawTextBoxesForLabel(labelId); } catch { }
