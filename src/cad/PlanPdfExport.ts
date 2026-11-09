@@ -8,7 +8,7 @@
  *  - Geometrisches Clipping (Liang-Barsky für Linien, Sutherland-Hodgman für Polygone)
  *    am Clip-Rechteck im lokalen, rotierten Plan-mm-System
  */
-import { PDFDocument, PDFPage, rgb, degrees } from "pdf-lib";
+import { PDFDocument, PDFPage, rgb } from "pdf-lib";
 import type { Plan } from "./PlanManager";
 import { getPlanPaperSize, type SpreadRect } from "./PlanManager";
 import {
@@ -16,7 +16,9 @@ import {
   computeProjectionLayout,
   type ProjectionItem,
 } from "./PlanProjections";
-import { ProjectionCamera, renderProjectionCanvas, preloadSnapshotDocImages } from "./ProjectionRender";
+import { ProjectionCamera, drawSheetSnapshotContent, preloadSnapshotDocImages } from "./ProjectionRender";
+import { PdfCanvasRecorder, PdfResourceBook, pushRawContent, type Mat } from "./pdfVector/PdfCanvasRecorder";
+import type { PDFEmbeddedPage } from "pdf-lib";
 import { Defaults } from "./constants";
 
 import { MM_TO_PT } from "@/lib/scale";
@@ -111,39 +113,6 @@ function rot(p: { x: number; y: number }, ang: number): { x: number; y: number }
   return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
 }
 
-/** Dezenter Platzhalter für PDF-Seiten-Dokumente (im Offscreen-Durchlauf nicht renderbar). */
-function drawDocumentPlaceholderPdf(
-  page: PDFPage,
-  doc: any,
-  toLocalMm: (sx: number, sy: number) => { x: number; y: number },
-  clip: ClipRect,
-  localToPdf: (lx: number, ly: number) => { x: number; y: number },
-) {
-  const w = (doc.widthM || 0) / 2;
-  const h = (doc.heightM || 0) / 2;
-  const cRot = doc.rotationRad || 0;
-  const cx = doc.position.x + w, cy = doc.position.y + h;
-  const corners = [
-    { x: -w, y: -h }, { x: w, y: -h }, { x: w, y: h }, { x: -w, y: h },
-  ].map(c => {
-    const r = rot(c, cRot);
-    return { x: cx + r.x, y: cy + r.y };
-  });
-  const localPoly = corners.map(p => toLocalMm(p.x, p.y));
-  const clipped = clipPolygon(localPoly, clip);
-  if (clipped.length < 3) return;
-  const path = clipped.map((p, i) => {
-    const q = localToPdf(p.x, p.y);
-    return `${i === 0 ? "M" : "L"}${q.x.toFixed(2)},${q.y.toFixed(2)}`;
-  }).join(" ") + " Z";
-  page.drawSvgPath(path, {
-    color: rgb(0.47, 0.47, 0.47),
-    opacity: 0.18,
-    borderColor: rgb(0, 0, 0),
-    borderWidth: 0.3,
-  });
-}
-
 /**
  * Zeichnet eine einzelne Projektion auf die PDF-Seite.
  * Koordinaten-Pipeline:
@@ -196,50 +165,21 @@ async function drawProjectionToPdf(
     return { x: mmX * MM_TO_PT, y: (place.pageHeightMm - mmY) * MM_TO_PT };
   };
 
-  // ---------- Vollständiger Inhalt: einmalig rastern, als PNG einbetten ----------
+  // ---------- Vollständiger Inhalt: als Vektoren über den echten Renderer ----------
   if (content?.snapshot) {
     const clipW = clip.right - clip.left;
     const clipH = clip.bottom - clip.top;
     if (clipW > 0 && clipH > 0) {
-      const DPI_PX_PER_MM = 300 / 25.4;
-      const MAX_DIM_PX = 4096;
-      const pxPerMm = Math.min(DPI_PX_PER_MM, MAX_DIM_PX / Math.max(clipW, clipH));
-      const pxPerSheetM = factor * 1000 * pxPerMm;
-      const cam = new ProjectionCamera(
-        pxPerSheetM,
-        (offMmX - clip.left) * pxPerMm,
-        (offMmY - clip.top) * pxPerMm,
-      );
-      const canvas = renderProjectionCanvas(
-        content.snapshot, content.definitions, cam,
-        clipW * pxPerMm, clipH * pxPerMm, content.docImages,
-      );
-      if (canvas) {
-        try {
-          // Anker = Ecke unten-links des Clip-Rechtecks im lokalen mm-System;
-          // das Bild wird um dieselbe Rotation gedreht, die auch die Vektor-
-          // Pipeline auf lokale Punkte anwendet (Vorzeichen: PDF-Y zeigt nach oben).
-          const anchorMm = rot({ x: clip.left, y: clip.bottom }, rotation);
-          const mmX = place.offXMm + paperCenterMmX + proj.x + anchorMm.x;
-          const mmY = place.offYMm + paperCenterMmY + proj.y + anchorMm.y;
-          const img = await pdf.embedPng(canvas.toDataURL("image/png"));
-          page.drawImage(img, {
-            x: mmX * MM_TO_PT,
-            y: (place.pageHeightMm - mmY) * MM_TO_PT,
-            width: clipW * MM_TO_PT,
-            height: clipH * MM_TO_PT,
-            rotate: degrees(-rotation * 180 / Math.PI),
-          });
-          // PDF-Seiten-Dokumente (pdf.js) sind im Offscreen-Durchlauf nicht
-          // verfügbar — dafür bleibt ein dezenter Platzhalter.
-          for (const d of (content.snapshot.documents || []) as any[]) {
-            if (!d || !d.pdfSourceB64 || (d as any)._snapOnly) continue;
-            drawDocumentPlaceholderPdf(page, d, toLocalMm, clip, localToPdf);
-          }
-          return;
-        } catch (err) {
-          console.warn("[PlanPdfExport] Raster-Projektion fehlgeschlagen, Vektor-Fallback:", err);
-        }
+      try {
+        const ops = await buildProjectionVectorContent(pdf, page, content.snapshot, content.definitions, content.docImages, {
+          factor, offMmX, offMmY, clip, rotation,
+          originMm: { x: place.offXMm + paperCenterMmX + proj.x, y: place.offYMm + paperCenterMmY + proj.y },
+          pageHeightMm: place.pageHeightMm,
+        });
+        pushRawContent(page, ops);
+        return;
+      } catch (err) {
+        console.warn("[PlanPdfExport] Vektor-Projektion fehlgeschlagen, vereinfachte Ausgabe:", err);
       }
     }
   }
@@ -319,6 +259,89 @@ async function drawProjectionToPdf(
       });
     }
   }
+}
+
+/** Auflösung des Aufzeichnungsraums (px je Papier-mm) — nur für Mindeststrichstärken/Schriftgrößen relevant, nicht für die Schärfe. */
+export const VECTOR_PX_PER_MM = 300 / 25.4;
+
+/**
+ * Äußere Matrix: lokale Aufzeichnungs-Pixel → PDF-Punkte. Gleiche Kette wie
+ * computeProjectionLayout/Bildschirm: Clip-Ursprung → Rotation → Papierlage → pt (Y nach oben).
+ */
+export function projectionOuterMatrix(o: {
+  clip: ClipRect; rotation: number; originMm: { x: number; y: number }; pageHeightMm: number; pxPerMm: number;
+}): Mat {
+  const s = MM_TO_PT, k = o.pxPerMm;
+  const c = Math.cos(o.rotation || 0), sn = Math.sin(o.rotation || 0);
+  const L = o.clip.left, T = o.clip.top;
+  return [
+    s * c / k, -s * sn / k,
+    -s * sn / k, -s * c / k,
+    s * (c * L - sn * T + o.originMm.x),
+    s * (o.pageHeightMm - (sn * L + c * T + o.originMm.y)),
+  ];
+}
+
+function b64ToBytes(b64: string): Uint8Array {
+  const raw = b64.includes(",") && b64.startsWith("data:") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  const bin = atob(raw);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+const embeddedPdfCache = new WeakMap<PDFDocument, Map<string, Promise<PDFEmbeddedPage | null>>>();
+function embedSourcePage(pdf: PDFDocument, b64: string, pageIndex: number): Promise<PDFEmbeddedPage | null> {
+  let m = embeddedPdfCache.get(pdf);
+  if (!m) { m = new Map(); embeddedPdfCache.set(pdf, m); }
+  const key = `${b64.length}:${b64.slice(0, 64)}:${b64.slice(-64)}:${pageIndex}`;
+  let job = m.get(key);
+  if (!job) {
+    job = (async () => {
+      try {
+        const [pg] = await pdf.embedPdf(b64ToBytes(b64), [Math.max(0, pageIndex | 0)]);
+        return pg ?? null;
+      } catch { return null; }
+    })();
+    m.set(key, job);
+  }
+  return job;
+}
+
+/** Zeichnet den Ausschnitt-Inhalt als PDF-Operatoren (Vektoren, Bilder, Original-PDF-Seiten). */
+export async function buildProjectionVectorContent(
+  pdf: PDFDocument, page: PDFPage, snapshot: any, definitions: any[] | undefined,
+  docImages: Map<string, HTMLImageElement> | undefined,
+  o: { factor: number; offMmX: number; offMmY: number; clip: ClipRect; rotation: number; originMm: { x: number; y: number }; pageHeightMm: number },
+): Promise<string> {
+  const k = VECTOR_PX_PER_MM;
+  const clipW = o.clip.right - o.clip.left, clipH = o.clip.bottom - o.clip.top;
+  // Eingefügte PDF-Seiten vorab einbetten (Original inkl. Vektoren/Bilder).
+  const pdfPages = new Map<string, PDFEmbeddedPage>();
+  for (const d of (snapshot?.documents || []) as any[]) {
+    if (!d || !d.pdfSourceB64 || d._snapOnly || !d.id) continue;
+    const pg = await embedSourcePage(pdf, String(d.pdfSourceB64), d.pageIndex || 0);
+    if (pg) pdfPages.set(d.id, pg);
+  }
+  const book = await PdfResourceBook.create(pdf, page, pdfPages);
+  const rec = new PdfCanvasRecorder(book, clipW * k, clipH * k);
+  const outer = projectionOuterMatrix({ clip: o.clip, rotation: o.rotation, originMm: o.originMm, pageHeightMm: o.pageHeightMm, pxPerMm: k });
+  rec.outer = outer;
+  // Zuschnitt des Ausschnitts.
+  rec.beginPath();
+  rec.rect(0, 0, clipW * k, clipH * k);
+  rec.clip();
+  rec.beginPath();
+  const cam = new ProjectionCamera(o.factor * 1000 * k, (o.offMmX - o.clip.left) * k, (o.offMmY - o.clip.top) * k);
+  const hook = (doc: any, ctx: any, wPx: number, hPx: number) => {
+    const pg = pdfPages.get(doc.id);
+    if (!pg || !(ctx instanceof PdfCanvasRecorder)) return false;
+    ctx.drawEmbeddedPdfPage(pg, wPx, hPx);
+    return true;
+  };
+  drawSheetSnapshotContent(rec as any, snapshot, cam, definitions, docImages, hook);
+  const body = await rec.content();
+  return `\nq\n% pixuna-projection\n${outer.map(v => String(Math.round(v * 1e6) / 1e6)).join(" ")} cm\n${body}Q\n`;
 }
 
 /** Erzeugt ein PDF mit einer Seite pro Plan und liefert die Bytes. */
