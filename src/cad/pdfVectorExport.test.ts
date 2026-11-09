@@ -2,7 +2,25 @@
 import { describe, it, expect } from "vitest";
 import { PDFDocument, PDFName, PDFArray, PDFRawStream, PDFRef } from "pdf-lib";
 import pako from "pako";
-import { exportPlansToPdf } from "./PlanPdfExport";
+
+// Schlanke DOM-Attrappe: Die Testumgebung hat kein natives Canvas-Modul.
+function fakeEl(): any {
+  const el: any = { style: {}, children: [], appendChild: (c: any) => c, removeChild: () => {}, setAttribute: () => {},
+    addEventListener: () => {}, removeEventListener: () => {}, getContext: () => null, classList: { add() {}, remove() {} } };
+  return el;
+}
+const g = globalThis as any;
+if (typeof g.document === "undefined") {
+  g.document = { createElement: fakeEl, createElementNS: fakeEl, body: fakeEl(), head: fakeEl(), documentElement: fakeEl(),
+    addEventListener: () => {}, removeEventListener: () => {}, fonts: { ready: Promise.resolve() } };
+  g.window = g;
+  g.window.devicePixelRatio = 1;
+  g.addEventListener = () => {}; g.removeEventListener = () => {};
+  g.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  g.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  g.Image = class { complete = false; naturalWidth = 0; width = 0; height = 0; src = ""; };
+}
+const load = () => import("./PlanPdfExport").then(m => m.exportPlansToPdf);
 
 const MM_PER_PT = 25.4 / 72;
 
@@ -66,7 +84,7 @@ const lenMm = (l: { a: [number, number]; b: [number, number] }) => Math.hypot(l.
 
 describe("Vektor-PDF: Maßstab der Ausschnitte", () => {
   it("5,00 m Linie misst bei 1:50 genau 100 mm als Vektor", async () => {
-    const bytes = await exportPlansToPdf([plan(50, 0)], () => null);
+    const bytes = await (await load())([plan(50, 0)], () => null);
     const lines = await strokedLines(bytes);
     expect(lines.length).toBeGreaterThan(0);
     const longest = Math.max(...lines.map(lenMm));
@@ -74,14 +92,14 @@ describe("Vektor-PDF: Maßstab der Ausschnitte", () => {
   });
 
   it("5,00 m Linie misst bei 1:100 genau 50 mm", async () => {
-    const bytes = await exportPlansToPdf([plan(100, 0)], () => null);
+    const bytes = await (await load())([plan(100, 0)], () => null);
     const longest = Math.max(...(await strokedLines(bytes)).map(lenMm));
     expect(longest).toBeCloseTo(50, 2);
   });
 
   it("gedrehter, zugeschnittener Ausschnitt: Drehung und Lage stimmen", async () => {
     const rot = Math.PI / 6;
-    const bytes = await exportPlansToPdf([plan(50, rot, { left: 0, right: 30, top: 0, bottom: 0 })], () => null);
+    const bytes = await (await load())([plan(50, rot, { left: 0, right: 30, top: 0, bottom: 0 })], () => null);
     const lines = await strokedLines(bytes);
     const l = lines.reduce((a, b) => (lenMm(b) > lenMm(a) ? b : a));
     // Linie bleibt 100 mm lang (Zuschnitt wirkt per Clip, nicht auf die Geometrie).
