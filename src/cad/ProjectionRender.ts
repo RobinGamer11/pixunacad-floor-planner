@@ -57,13 +57,13 @@ export function sceneFromSnapshot(snapshot: any): Scene | null {
 /** Renderer je Snapshot — Bild-/Composite-Caches bleiben so zwischen Frames erhalten. */
 const rendererCache = new WeakMap<object, Renderer>();
 
-function rendererFor(snapshot: any, definitions: any[] | undefined): Renderer | null {
+function rendererFor(snapshot: any, definitions: any[] | undefined, initialCtx?: CanvasRenderingContext2D): Renderer | null {
   const scene = sceneFromSnapshot(snapshot);
   if (!scene) return null;
   let r = rendererCache.get(snapshot) as any;
   if (!r) {
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+    let ctx: CanvasRenderingContext2D | null = initialCtx ?? null;
+    if (!ctx) { try { ctx = document.createElement("canvas").getContext("2d"); } catch { ctx = null; } }
     if (!ctx) return null;
     r = new Renderer(ctx, new ProjectionCamera(1, 0, 0) as any, scene, STUB_LABELS as any);
     r.libraryDefinitionSource = definitions ? () => definitions as any : null;
@@ -87,13 +87,19 @@ export function drawSheetSnapshotContent(
   cam: ProjectionCamera,
   definitions?: any[],
   docImages?: Map<string, HTMLImageElement>,
+  documentDrawHook?: ((doc: any, ctx: CanvasRenderingContext2D, wPx: number, hPx: number) => boolean) | null,
 ) {
-  const r = rendererFor(snapshot, definitions) as any;
+  const r = rendererFor(snapshot, definitions, ctx) as any;
   if (!r) return;
   r.ctx = ctx;
   r.camera = cam;
   r.setViewport(1e6, 1e6);
   if (docImages) r._docImageCache = docImages;
+  r.documentDrawHook = documentDrawHook ?? null;
+  try { drawSnapshotLabels(r, snapshot); } finally { r.documentDrawHook = null; }
+}
+
+function drawSnapshotLabels(r: any, snapshot: any) {
 
   const scene = sceneFromSnapshot(snapshot);
   if (!scene) return;
