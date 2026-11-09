@@ -49,7 +49,7 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
   const pickedId = picked && sheets.some(s => s.id === picked) ? picked : (sheets[0]?.id ?? null);
 
   return (
-    <div className="export-settings p-3 space-y-5 text-xs">
+    <div className="export-settings p-3 space-y-3 text-xs">
       <DarkCard title="Zeichnung platzieren">
         {sheets.length === 0 ? (
           <div className="text-[11px]" style={D.muted}>Noch kein CAD-Blatt vorhanden.</div>
@@ -275,7 +275,7 @@ function DarkCollapse({ title, children }: { title: string; children: React.Reac
         <ChevronDown size={14} className="transition-transform" style={{ transform: open ? "rotate(180deg)" : undefined }} />
       </button>
       {open && (
-        <div className="export-dark-collapse space-y-3 border-t px-3 pb-3 pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)" }}>{children}</div>
+        <div className="export-dark-collapse space-y-3 border-t px-3 pb-3 pt-3" style={{ borderColor: "hsl(var(--overlay-surface) / 0.14)", color: "hsl(var(--overlay-surface))", ["--muted-foreground" as any]: "var(--overlay-surface)", ["--foreground" as any]: "var(--overlay-surface)", ["--hairline" as any]: "var(--overlay-surface)" }}>{children}</div>
       )}
     </div>
   );
