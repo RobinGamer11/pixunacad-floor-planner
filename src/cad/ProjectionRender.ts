@@ -122,15 +122,15 @@ function drawSnapshotLabels(r: any, snapshot: any) {
   for (const labelId of labelIds) {
     // Gleiche Reihenfolge wie im Haupt-Renderer (Hintergrund → Vordergrund).
     if (hasExplicitStackOrder(scene, labelId)) {
-      try { r._drawLabelByStackOrder(labelId); } catch (e) { console.warn("DBGSTK", e && (e as any).stack); }
+      try { r._drawLabelByStackOrder(labelId); } catch { /* ein Objekt darf den Ausschnitt nicht killen */ }
       continue;
     }
-    try { r._drawDocumentsForLabel(labelId); } catch (e) { console.warn("DBGDOC", e && (e as any).stack); }
-    try { r._drawHatchesForLabel(labelId); } catch (e) { console.warn("DBGH", e && (e as any).stack); }
+    try { r._drawDocumentsForLabel(labelId); } catch { /* ein Objekt darf den Ausschnitt nicht killen */ }
+    try { r._drawHatchesForLabel(labelId); } catch { /* ein Objekt darf den Ausschnitt nicht killen */ }
     try { r._drawWallsForLabel(labelId); } catch { }
     try { r._drawDoorsForLabel(labelId); } catch { }
     try { r._drawStairsForLabel(labelId); } catch { }
-    try { r._drawSegmentsForLabel(labelId); } catch (e) { console.warn("DBGSEG", e && (e as any).stack); }
+    try { r._drawSegmentsForLabel(labelId); } catch { /* ein Objekt darf den Ausschnitt nicht killen */ }
     try { r._drawFreeStrokesForLabel(labelId); } catch { }
     try { r._drawDimensionsForLabel(labelId); } catch { }
     try { r._drawTextBoxesForLabel(labelId); } catch { }
