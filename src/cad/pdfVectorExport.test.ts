@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { PDFDocument, PDFName, PDFArray, PDFRawStream, PDFRef } from "pdf-lib";
 import pako from "pako";
