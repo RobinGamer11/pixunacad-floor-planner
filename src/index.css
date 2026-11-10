@@ -1714,3 +1714,6 @@ body[data-phone="1"][data-phone-mode="3d"][data-phone-panel="pages"] .w3d-right-
 }
 body[data-phone="1"][data-phone-mode="3d"][data-phone-panel="pages"] .w3d-right-tools > button { display: none; }
 body[data-phone="1"][data-phone-mode="3d"][data-phone-panel="pages"] .w3d-right-tools > div { max-height: none !important; box-shadow: none !important; border: 0 !important; margin: 0 !important; padding: 0 !important; }
+
+/* Handy: Einklappleiste des 3D-Fensters entfällt (Bedienfenster hat eigenen Schließen-Knopf). */
+body[data-phone="1"] .w3d-panel-bar { display: none !important; }

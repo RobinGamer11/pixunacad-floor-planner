@@ -465,7 +465,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
       <aside className={`w3d-panel ${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l flex-col text-sm ${panelOpen ? "flex" : ""}`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
         {/* Kopfleiste identisch zur CAD-Leiste: Titel + Einklappen rechts. */}
         <div className="w3d-panel-bar grid grid-cols-[1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="flex items-center justify-center gap-1.5 px-2 py-2.5 text-[11px] font-semibold" style={{ color: "hsl(var(--ink))", boxShadow: "inset 0 -2px 0 hsl(var(--accent-gold))" }}><SettingsIcon size={12} /><span className="truncate">3D-Einstellungen</span></div>
+          <div className="min-w-0 px-2 py-2 text-[11px] font-medium flex items-center justify-center gap-1" style={{ background: "hsl(var(--surface-muted))", color: "hsl(var(--ink))", borderBottom: "2px solid hsl(var(--accent-gold))" }}><SettingsIcon size={12} /><span className="truncate">3D-Einstellungen</span></div>
           <button type="button" onClick={() => setPanelOpen(false)} title="Einklappen" className="w-8 flex items-center justify-center hover:bg-muted border-l" style={{ borderColor: "hsl(var(--hairline))" }}>
             <PanelRightClose size={14} className="text-muted-foreground" />
           </button>
