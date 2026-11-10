@@ -1704,5 +1704,4 @@ body[data-phone="1"]:not([data-phone-mode="3d"])[data-phone-panel="props"] .cad-
 body[data-phone="1"]:not([data-phone-mode="3d"])[data-phone-panel="layers"] .cad-settings-sidebar { display: flex !important; flex-direction: column; }
 body[data-phone="1"] .cad-settings-sidebar > div:first-child { display: none !important; }
 body[data-phone="1"][data-phone-mode="3d"][data-phone-panel="props"] .w3d-panel { display: block !important; z-index: 76; }
-body[data-phone="1"] .cad-editor-shell { padding-bottom: 58px; }
 body[data-phone="1"] .w3d-left-tools, body[data-phone="1"] .w3d-right-tools { width: min(280px, calc(50% - 18px)); }
