@@ -56,7 +56,7 @@ function safeInset(name: string): number {
 
 /** Eingeklapptes Rad bleibt in der Zeichenfläche: rechts neben der sichtbaren Werkzeugleiste. */
 function collapsedLeft(): number {
-  if (typeof document === "undefined" || document.body.dataset.phone === "1") return 12;
+  if (typeof document === "undefined" || document.body.dataset.phone === "1" || /\/3d\/?$/.test(window.location.pathname)) return 12;
   const rail = document.querySelector(".cad-tool-rail") as HTMLElement | null;
   if (!rail) return 12;
   const r = rail.getBoundingClientRect();
@@ -287,10 +287,10 @@ export function TabletAidWheel() {
       {/* Kleine Randknöpfe im Hilfsrad-Stil: unten links einklappen, unten rechts Größe. */}
       <button type="button" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); setScaleOpen(false); setCollapsed(true); }} title="Hilfsrad einklappen" aria-label="Hilfsrad einklappen"
         className="absolute grid place-items-center rounded-full text-[13px] font-semibold"
-        style={WHEEL_SMALL_BTN({ left: 4, bottom: 4 })}>–</button>
+        style={WHEEL_SMALL_BTN({ left: -12, bottom: -12 })}>–</button>
       <button type="button" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); setScaleOpen((o) => !o); }} title="Größe des Hilfsrads" aria-label="Größe des Hilfsrads"
         className="absolute grid place-items-center rounded-full"
-        style={WHEEL_SMALL_BTN({ right: 4, bottom: 4 }, scaleOpen)}><SlidersHorizontal size={12} /></button>
+        style={WHEEL_SMALL_BTN({ right: -12, bottom: -12 }, scaleOpen)}><SlidersHorizontal size={12} /></button>
       {/* Zentrum: TABLET-Label + Toggles für Stift-Modus und Zoom-Sperre */}
       <CenterToggles />
 
