@@ -1,3 +1,4 @@
+import { ScrollEdgeHints } from "@/components/ScrollEdgeHints";
 import { toast } from "@/hooks/use-toast";
 import { saveLocalScene, loadLocalScene, onLocalSaveStatus } from "@/cad/persist/localScenePersist";
 import { TrashIcon } from "@/lib/trashIcon";
@@ -507,7 +508,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const leftSidebarRef = useRef<HTMLElement>(null);
   // Werkzeugleiste per Finger/Stift ziehen (Tablet) — ohne sichtbare Scrollbar.
-  const leftRailScroll = useDragScroll<HTMLElement>("y");
+  const leftRailDrag = useDragScroll<HTMLElement>("y");
+  const [railEl, setRailEl] = useState<HTMLElement | null>(null);
+  const leftRailScroll = useCallback((el: HTMLElement | null) => { leftRailDrag(el); setRailEl(el); }, [leftRailDrag]);
   // Outside-Klick und ESC schließen das Werkzeug-Flyout — siehe RailFlyout.
   const [canUndo, setCanUndo] = useState(false);
   /** Maßgeblicher Projektstand (Gerät/Cloud) lädt noch → keine Bearbeitung. */
@@ -1398,6 +1401,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     }}>
     <TableFormulaPickContext.Provider value={{ fn: tableFormulaFn, setFn: setTableFormulaFn }}>
     <div className="cad-editor-shell flex w-full h-full overflow-hidden" style={{ background: "hsl(var(--surface))" }}>
+      {!presenting && <ScrollEdgeHints target={railEl} axis="y" />}
       {/* Left Sidebar — im Präsentationsmodus ausgeblendet */}
       <aside
         ref={(el) => { (leftSidebarRef as any).current = el; leftRailScroll(el); }}

@@ -311,6 +311,7 @@ export function WorkspaceHeader({
         )}
       </div>
     </header>
+    </>
   );
 }
 
