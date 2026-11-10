@@ -32,7 +32,7 @@ import {
   Loader2,
   Users,
   Play,
-  Compass, Printer,
+  Printer,
   Trash2,
   Copy,
   Crosshair,
