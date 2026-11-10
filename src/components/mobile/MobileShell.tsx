@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Undo2, Redo2, Copy, ClipboardPaste, CopyPlus, Trash2, X, FileStack, Wrench, SlidersHorizontal,
   Layers, MoreHorizontal, Pencil, MousePointerSquareDashed, BringToFront, SendToBack, Crosshair, Presentation,
-  HelpCircle, Tablet, RotateCcw, Move,
+  HelpCircle, Tablet, RotateCcw, Move, Eye, EyeOff, FileText,
 } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import { phonePanelStore, usePhonePanel, readWheelScale, writeWheelScale, resetWheelPosition, WHEEL_MIN, WHEEL_MAX, type PhonePanel } from "@/lib/phoneLayout";
@@ -19,6 +19,27 @@ export interface MobileShellProps {
 }
 
 const NAV_H = 58;
+
+/** Sichtbare Inhaltsbereiche des Bedienfensters (eigene oder per CSS eingeblendete Leisten). */
+function phoneScrollRoots(): HTMLElement[] {
+  const panel = document.body.dataset.phonePanel;
+  if (!panel) return [];
+  const sel = [".phone-sheet-body", ".w3d-panel", ".w3d-right-tools", ".cad-settings-sidebar"].join(",");
+  return Array.from(document.querySelectorAll<HTMLElement>(sel)).filter((el) => el.offsetParent !== null || getComputedStyle(el).position === "fixed" && el.getClientRects().length > 0);
+}
+function biggestScroller(): HTMLElement | null {
+  let best: HTMLElement | null = null, area = 0;
+  for (const root of phoneScrollRoots()) {
+    for (const el of [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))]) {
+      if (el.scrollHeight <= el.clientHeight + 4) continue;
+      const oy = getComputedStyle(el).overflowY;
+      if (oy !== "auto" && oy !== "scroll") continue;
+      const a = el.clientWidth * el.clientHeight;
+      if (a > area) { area = a; best = el; }
+    }
+  }
+  return best;
+}
 const TITLES: Record<Exclude<PhonePanel, null>, string> = { pages: "Seiten", tools: "Werkzeuge", props: "Eigenschaften", layers: "Ebenen", more: "Mehr" };
 
 /** Verhindert, dass Tipps auf Bedienelemente als Zeichengeste auf der Fläche landen. */
@@ -90,6 +111,27 @@ export function MobileShell(p: MobileShellProps) {
     return () => rail.removeEventListener("click", onClick, true);
   }, [panel, p.app]);
 
+  // Scrollposition je Bereich merken (flüchtig, pro Ansicht).
+  const scrollMem = useRef(new Map<string, number>());
+  useEffect(() => {
+    if (!panel) return;
+    const key = `${p.mode}:${panel}`;
+    const onScroll = (e: Event) => {
+      const t = e.target as HTMLElement;
+      if (t instanceof HTMLElement && phoneScrollRoots().some((r) => r === t || r.contains(t))) scrollMem.current.set(key, t.scrollTop);
+    };
+    document.addEventListener("scroll", onScroll, true);
+    const want = scrollMem.current.get(key) ?? 0;
+    let n = 0;
+    const restore = () => {
+      const el = biggestScroller();
+      if (el) el.scrollTop = want;
+      if (++n < 6 && el && Math.abs(el.scrollTop - want) > 2) requestAnimationFrame(restore);
+    };
+    requestAnimationFrame(() => requestAnimationFrame(restore));
+    return () => document.removeEventListener("scroll", onScroll, true);
+  }, [panel, p.mode]);
+
   // Eingabefeld bei Tastatur in den sichtbaren Bereich holen.
   useEffect(() => {
     const on = (e: FocusEvent) => {
@@ -133,7 +175,8 @@ export function MobileShell(p: MobileShellProps) {
     { id: "layers", label: "Ebenen", Icon: Layers },
     { id: "more", label: "Mehr", Icon: MoreHorizontal },
   ];
-  const availableNav = navItems.filter((n) => !(p.mode === "3d" && (n.id === "tools" || n.id === "pages" || n.id === "layers")));
+  const availableNav = (p.mode === "3d" ? navItems.map((n) => n.id === "pages" ? { ...n, label: "Blätter" } : n) : navItems)
+    .filter((n) => !(p.mode === "3d" && n.id === "tools"));
 
   return (
     <>
@@ -181,8 +224,15 @@ export function MobileShell(p: MobileShellProps) {
         </div>
       )}
 
+      {(panel === "tools" && p.mode !== "3d") || (panel === "layers" && p.mode === "3d") ? (
+        <div {...shield} data-phone-scroll={panel} className="phone-sheet-body fixed inset-x-0 z-[76] overflow-y-auto overscroll-contain px-3 pb-4 text-sm"
+          style={{ bottom: "var(--phone-sheet-bottom)", height: "calc(var(--phone-sheet-h) - 48px)", background: "hsl(var(--surface-card))" }}>
+          {panel === "tools" ? <ToolsContent /> : <LayersContent3D app={p.app} />}
+        </div>
+      ) : null}
+
       {panel === "more" && (
-        <div {...shield} className="phone-sheet-body fixed inset-x-0 z-[75] overflow-y-auto overscroll-contain px-3 pb-4 text-sm"
+        <div {...shield} data-phone-scroll="more" className="phone-sheet-body fixed inset-x-0 z-[75] overflow-y-auto overscroll-contain px-3 pb-4 text-sm"
           style={{ bottom: "var(--phone-sheet-bottom)", height: "calc(var(--phone-sheet-h) - 48px)", background: "hsl(var(--surface-card))" }}>
           <MoreContent {...p} />
         </div>
@@ -205,6 +255,102 @@ export function MobileShell(p: MobileShellProps) {
   );
 }
 
+
+/* ── Werkzeuge: Gruppen, Beschriftung, „Zuletzt verwendet“ ──
+ * Kacheln steuern die vorhandenen Leistenknöpfe (kein zweiter Werkzeugzustand). */
+const RECENT_KEY = "pixuna.phone.recentTools";
+const GROUPS: { title: string; names: string[] }[] = [
+  { title: "Zeichnen", names: ["Wand", "Türen/Fenster", "Treppe", "Polygon", "Linie", "Freihand", "Schraffur", "Text", "Bibliothek", "Dokument"] },
+  { title: "Bearbeiten", names: ["Auswahl", "Radierer", "Pipette", "Cutter"] },
+  { title: "Messen", names: ["Maßkette", "Lineal"] },
+  { title: "Helfen", names: ["Raster"] },
+];
+const ALIAS: Record<string, string> = { "Radiergummi": "Radierer", "Raster-Einstellungen": "Raster" };
+type RailTool = { name: string; svg: string; active: boolean; el: HTMLButtonElement };
+export function railToolName(el: HTMLElement): string {
+  const raw = (el.getAttribute("aria-label") || el.getAttribute("title") || el.textContent || "").split(/ \(| —/)[0].trim();
+  return ALIAS[raw] ?? raw;
+}
+function readRail(): RailTool[] {
+  const out: RailTool[] = [];
+  document.querySelectorAll<HTMLButtonElement>(".cad-tool-rail .cad-rail-btn").forEach((el) => {
+    const name = railToolName(el);
+    if (!name || out.some((t) => t.name === name)) return;
+    out.push({ name, svg: el.querySelector("svg")?.outerHTML ?? "", active: el.classList.contains("active"), el });
+  });
+  return out;
+}
+export function readRecent(): string[] { try { const v = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); return Array.isArray(v) ? v.filter((x) => typeof x === "string").slice(0, 4) : []; } catch { return []; } }
+export function pushRecent(list: string[], name: string): string[] { return [name, ...list.filter((n) => n !== name)].slice(0, 4); }
+
+function ToolsContent() {
+  const [tools, setTools] = useState<RailTool[]>(readRail);
+  const [recent, setRecent] = useState<string[]>(readRecent);
+  useEffect(() => {
+    const rail = document.querySelector(".cad-tool-rail");
+    if (!rail) return;
+    const mo = new MutationObserver(() => setTools(readRail()));
+    mo.observe(rail, { subtree: true, attributes: true, attributeFilter: ["class"], childList: true });
+    return () => mo.disconnect();
+  }, []);
+  const use = (t: RailTool) => {
+    const next = pushRecent(recent, t.name); setRecent(next);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch {}
+    t.el.click();
+  };
+  const known = new Set(GROUPS.flatMap((g) => g.names));
+  const groups = GROUPS.map((g) => ({ title: g.title, items: g.names.map((n) => tools.find((t) => t.name === n)).filter(Boolean) as RailTool[] }));
+  const rest = tools.filter((t) => !known.has(t.name));
+  if (rest.length) groups[3].items.push(...rest);
+  const recentTools = recent.map((n) => tools.find((t) => t.name === n)).filter(Boolean) as RailTool[];
+  const Tile = ({ t }: { t: RailTool }) => (
+    <button type="button" onClick={() => use(t)} aria-pressed={t.active}
+      className="flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-xl border px-1 py-2 text-[11px] font-medium leading-tight"
+      style={{ borderColor: t.active ? "hsl(var(--accent-gold) / 0.7)" : "hsl(var(--hairline))", background: t.active ? "hsl(var(--accent-gold) / 0.15)" : "hsl(var(--surface-muted))", color: t.active ? "hsl(var(--accent-gold))" : "hsl(var(--ink))" }}>
+      <span aria-hidden className="grid h-5 place-items-center [&>svg]:h-5 [&>svg]:w-5" dangerouslySetInnerHTML={{ __html: t.svg }} />
+      <span className="text-center">{t.name}</span>
+    </button>
+  );
+  const grid = "grid grid-cols-4 gap-2";
+  return (
+    <div className="space-y-4 pt-1">
+      {recentTools.length > 0 && (
+        <div><div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--accent-gold))" }}>Zuletzt verwendet</div>
+          <div className={grid}>{recentTools.map((t) => <Tile key={"r" + t.name} t={t} />)}</div></div>
+      )}
+      {groups.filter((g) => g.items.length).map((g) => (
+        <div key={g.title}><div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--ink-soft))" }}>{g.title}</div>
+          <div className={grid}>{g.items.map((t) => <Tile key={t.name} t={t} />)}</div></div>
+      ))}
+    </div>
+  );
+}
+
+function LayersContent3D({ app }: { app: CadApp | null }) {
+  const [, force] = useState(0);
+  const groups = app?.labelManager.list() ?? [];
+  const toggle = (id: string) => {
+    if (!app) return;
+    app.labelManager.toggleVisible(id);
+    app.clearSelection?.();
+    app.refreshLabelUI();
+    force((n) => n + 1);
+  };
+  return (
+    <div className="space-y-1 pt-1">
+      <p className="px-1 pb-1 text-xs" style={{ color: "hsl(var(--ink-soft))" }}>Ausgeblendete Ebenen erscheinen nicht im 3D-Modell.</p>
+      {groups.map((g) => (
+        <button key={g.id} type="button" onClick={() => toggle(g.id)} aria-pressed={g.visible !== false}
+          className="flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left"
+          style={{ borderColor: "hsl(var(--hairline))", opacity: g.visible === false ? 0.5 : 1 }}>
+          {g.visible === false ? <EyeOff size={17} /> : <Eye size={17} style={{ color: "hsl(var(--accent-gold))" }} />}
+          <span className="flex-1 truncate">{g.name}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MoreContent(p: MobileShellProps) {
   const app = p.app;
   const [scale, setScale] = useState(readWheelScale);
@@ -219,6 +365,11 @@ function MoreContent(p: MobileShellProps) {
         <button className={row} disabled={!app?.canMoveSelectionStack("front")} onClick={() => stack("front")}><BringToFront size={17} />In den Vordergrund</button>
         <button className={row} disabled={!app?.canMoveSelectionStack("back")} onClick={() => stack("back")}><SendToBack size={17} />In den Hintergrund</button>
       </Section>
+      {p.mode === "3d" && (
+        <Section title="3D">
+          <button className={row} onClick={() => { phonePanelStore.set(null); window.dispatchEvent(new CustomEvent("pixuna-3d-open", { detail: "dossier" })); }}><FileText size={17} />Render-Dossier · PDF, JSON, GLB</button>
+        </Section>
+      )}
       <Section title="Ansicht">
         <button className={row} onClick={() => { p.onCenterView(); phonePanelStore.set(null); }}><Crosshair size={17} />Ansicht zentrieren</button>
         <button className={row} onClick={() => { phonePanelStore.set(null); p.onPresent(); }}><Presentation size={17} />Präsentationsmodus</button>

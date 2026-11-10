@@ -91,7 +91,8 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [refs3D,setRefs3D]=useState<ObjectRef3D[]>([]);
   const selectedKeys3D=useMemo(()=>refs3D.map(refKey3D),[refs3D]);
   const [panelOpen,setPanelOpen]=useState(true);
-  useEffect(()=>phonePanelStore.subscribe(()=>{ if(phonePanelStore.get()==="props") setPanelOpen(true); }),[]);
+  useEffect(()=>phonePanelStore.subscribe(()=>{ const p=phonePanelStore.get(); if(p==="props") setPanelOpen(true); if(p==="pages") setOpen("sheets"); else setOpen(o=>o==="sheets"&&document.body.dataset.phone==="1"?null:o); }),[]);
+  useEffect(()=>{const on=(e:Event)=>{const d=(e as CustomEvent).detail; if(d==="dossier"||d==="sheets") setOpen(d);}; window.addEventListener("pixuna-3d-open",on); return()=>window.removeEventListener("pixuna-3d-open",on);},[]);
   const [multiSelect,setMultiSelect]=useState(false);
   // „Manuell bewegen“ ist eine lokale Geräte-Einstellung und gilt für jede Auswahl.
   const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")==="1";}catch{return false;}});
@@ -183,7 +184,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
     const read = () => {
       // Nur neu ableiten, wenn sich Inhalt, Blätter oder Auswahl geändert haben (sonst ruckelt die Ansicht).
       const selNow: any = app.selection;
-      const ck = JSON.stringify([app.contentRevision, app.activeSheetId, app.sheetManager.toJSON(), infoBoxUi.get().selectedId, selNow ? ID_FIELDS.map(f => selNow[f]) : null, state3D(app).refs, manualOnRef.current, !!sessionRef.current]);
+      const ck = JSON.stringify([app.contentRevision, app.labelManager.list().map(g => g.visible === false ? g.id : "").join(","), app.activeSheetId, app.sheetManager.toJSON(), infoBoxUi.get().selectedId, selNow ? ID_FIELDS.map(f => selNow[f]) : null, state3D(app).refs, manualOnRef.current, !!sessionRef.current]);
       if (ck === cheap) return;
       cheap = ck;
       const r = deriveFromApp(app);
