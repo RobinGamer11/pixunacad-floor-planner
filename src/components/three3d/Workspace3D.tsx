@@ -95,7 +95,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   useEffect(()=>{const on=(e:Event)=>{const d=(e as CustomEvent).detail; if(d==="dossier"||d==="sheets") setOpen(d);}; window.addEventListener("pixuna-3d-open",on); return()=>window.removeEventListener("pixuna-3d-open",on);},[]);
   const [multiSelect,setMultiSelect]=useState(false);
   // „Manuell bewegen“ ist eine lokale Geräte-Einstellung und gilt für jede Auswahl.
-  const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")==="1";}catch{return false;}});
+  const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")!=="0";}catch{return true;}});
   const setManualOn=(v:boolean)=>{setManualOnRaw(v);try{localStorage.setItem("pixuna.3d.manualOn",v?"1":"0");}catch{}};
   const manualOnRef=useRef(manualOn);manualOnRef.current=manualOn;
   const [manualSession,setManualSession]=useState<ManualMoveSession|null>(null);

@@ -54,6 +54,15 @@ function safeInset(name: string): number {
   return Number.isFinite(px) ? px : 0;
 }
 
+/** Eingeklapptes Rad bleibt in der Zeichenfläche: rechts neben der sichtbaren Werkzeugleiste. */
+function collapsedLeft(): number {
+  if (typeof document === "undefined" || document.body.dataset.phone === "1") return 12;
+  const rail = document.querySelector(".cad-tool-rail") as HTMLElement | null;
+  if (!rail) return 12;
+  const r = rail.getBoundingClientRect();
+  return r.width > 0 && r.left < 40 ? Math.round(r.right + 12) : 12;
+}
+
 export function TabletAidWheel() {
   const STORAGE_KEY = "pixuna.tabletAid.pos";
   const size = 190;
@@ -202,7 +211,7 @@ export function TabletAidWheel() {
         disabled={collapsedForced}
         title={collapsedForced ? "Zu wenig Platz für das Hilfsrad – Bedienfenster schließen" : "Hilfsrad öffnen"}
         className="fixed grid place-items-center rounded-full border text-[10px] font-semibold"
-        style={{ left: 12, bottom: `calc(${reserveBottom() + 12}px + env(safe-area-inset-bottom, 0px))`, width: 48, height: 48, zIndex: 2147483000,
+        style={{ left: collapsedLeft(), bottom: `calc(${reserveBottom() + 12}px + env(safe-area-inset-bottom, 0px))`, width: 48, height: 48, zIndex: 2147483000,
           background: "hsl(var(--overlay-ink) / 0.86)", color: "hsl(var(--accent-gold))", borderColor: "hsl(var(--accent-gold) / 0.5)", touchAction: "none", opacity: collapsedForced ? 0.6 : 1 }}
       >Rad</button>
     );
