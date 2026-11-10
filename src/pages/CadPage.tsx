@@ -9,6 +9,8 @@ import { TabletAidWheel } from "@/components/TabletAidWheel";
 import type { CadApp } from "@/cad/CadApp";
 import { getLocalActivePage, setLocalActivePage } from "@/lib/exportLocalState";
 import { state3D } from "@/cad/three3d/manualMoveState";
+import { usePhoneLayout } from "@/lib/phoneLayout";
+import { MobileShell } from "@/components/mobile/MobileShell";
 
 const CadPage = () => {
   const { projectId } = useParams();
@@ -24,6 +26,7 @@ const CadPage = () => {
   const [canPaste, setCanPaste] = useState(false);
   const [multiPaste, setMultiPaste] = useState(false);
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
+  const phone = usePhoneLayout();
   // Export ist derselbe CAD-Bereich (dieselbe Engine/Verlauf) mit Exportseite aktiv.
   const view3d = location.pathname.endsWith("/3d");
   const exportView = location.pathname.endsWith("/export") || new URLSearchParams(location.search).get("view") === "export";
@@ -113,6 +116,33 @@ const CadPage = () => {
 
   return (
     <div className="cad-desktop-density flex flex-col h-[100dvh] min-h-0 w-screen overflow-hidden">
+      {phone && !presenting ? (
+      <MobileShell
+        projectId={projectId}
+        projectName={project?.name}
+        mode={view3d ? "3d" : exportView ? "export" : "cad"}
+        app={cadApp}
+        canUndo={canUndo || draftHistory}
+        canRedo={canRedo || draftHistory}
+        onUndo={() => editorRef.current?.undo()}
+        onRedo={() => editorRef.current?.redo()}
+        canCopy={canDelete}
+        onCopy={doCopy}
+        canPaste={canPaste}
+        onPaste={armPasteFromHeader}
+        multiPasteActive={multiPaste}
+        onMultiPaste={doMultiPasteFromHeader}
+        onStopMultiPaste={() => editorRef.current?.stopMultiPaste()}
+        canDelete={canDelete}
+        onDelete={() => editorRef.current?.deleteSelection()}
+        onCenterView={() => editorRef.current?.centerOnOrigin()}
+        onPresent={handlePresent}
+        helpOn={helpOn}
+        onToggleHelp={toggleHelp}
+        tabletAidOn={tabletAidOn}
+        onToggleTabletAid={() => setTabletAidOn((v) => !v)}
+      />
+      ) : !presenting || !phone ? (
       <WorkspaceHeader
         projectId={projectId}
         projectName={project?.name}
@@ -139,9 +169,11 @@ const CadPage = () => {
         tabletAidOn={tabletAidOn}
         onToggleTabletAid={() => setTabletAidOn((v) => !v)}
       />
+      ) : null}
       <main
         ref={mainRef}
         className="flex-1 relative min-h-0 bg-background"
+        style={phone && !presenting ? { marginBottom: "calc(58px + env(safe-area-inset-bottom, 0px))" } : undefined}
       >
         <CadEditor
           ref={editorRef}
