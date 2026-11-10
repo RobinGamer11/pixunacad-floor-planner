@@ -32,7 +32,7 @@ import {
   Loader2,
   Users,
   Play,
-  Compass, Printer,
+  Printer,
   Trash2,
   Copy,
   Crosshair,
@@ -42,6 +42,7 @@ import {
   TabletSmartphone,
   Wallet,
   Box,
+  DraftingCompass,
 } from "lucide-react";
 
 export type WorkspaceMode = "cad" | "export" | "3d" | "finance" | "board";
@@ -180,7 +181,7 @@ export function WorkspaceHeader({
              style={{ background: "hsl(var(--surface-muted))" }}>
 
           <ModeButton
-            icon={<Compass size={13} />}
+            icon={<DraftingCompass size={13} />}
             label="CAD"
             active={mode === "cad"}
             onClick={goCad}
