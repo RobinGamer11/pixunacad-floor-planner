@@ -63,7 +63,7 @@ export function TabletAidWheel() {
   const [vpTick, setVpTick] = useState(0);
   const reserveBottom = () => safeInset("--phone-bottom-reserve");
   const vpNow = visibleViewport();
-  const fitScale = Math.max(0.5, Math.min(userScale, (vpNow.w - 16) / size, (vpNow.h - 16 - reserveBottom()) / size));
+  const fitScale = Math.max(0.75, Math.min(userScale, (vpNow.w - 16) / size, (vpNow.h - 16 - reserveBottom()) / size));
   const scale = fitScale;
   const collapsedForced = (vpNow.h - 16 - reserveBottom()) / size < 0.75 * 0.98;
   const [collapsed, setCollapsed] = useState(false);
@@ -251,7 +251,7 @@ export function TabletAidWheel() {
           cursor: "grab",
         }}
       />
-      <button type="button" onClick={() => setCollapsed(true)} title="Hilfsrad einklappen" aria-label="Hilfsrad einklappen"
+      <button type="button" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); setCollapsed(true); }} title="Hilfsrad einklappen" aria-label="Hilfsrad einklappen"
         className="absolute grid place-items-center rounded-full text-[11px]"
         style={{ right: 2, top: 2, width: 26, height: 26, zIndex: 3, background: "hsl(var(--overlay-ink))", color: "hsl(var(--overlay-surface) / 0.8)", border: "1px solid hsl(var(--overlay-surface) / 0.3)" }}>–</button>
       {/* Zentrum: TABLET-Label + Toggles für Stift-Modus und Zoom-Sperre */}
