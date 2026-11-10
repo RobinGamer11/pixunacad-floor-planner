@@ -44,7 +44,7 @@ export function ScrollEdgeHints({ target, axis }: { target: HTMLElement | null; 
     };
   }, [target, axis]);
   const r = s.rect;
-  if (!r || (!s.a && !s.b)) return null;
+  if (!r || (!s.a && !s.b) || document.body.dataset.phone === "1") return null;
   const T = 22;
   const base: React.CSSProperties = { position: "fixed", pointerEvents: "none", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", color: "hsl(var(--accent-gold))", transition: "opacity 150ms" };
   const bg = (dir: string) => `linear-gradient(${dir}, hsl(var(--surface-card)) 35%, hsl(var(--surface-card) / 0))`;
