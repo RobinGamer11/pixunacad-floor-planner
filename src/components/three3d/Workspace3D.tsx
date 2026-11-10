@@ -2,6 +2,7 @@
  * 3D-Bereich über der gemeinsamen CadApp: Blattzusammenstellung, Auswahl,
  * Körperbeziehungen und Navigation. Alle Änderungen laufen über CadApp.runAction.
  */
+import { phonePanelStore } from "@/lib/phoneLayout";
 import type React from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { CadApp } from "@/cad/CadApp";
@@ -90,6 +91,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [refs3D,setRefs3D]=useState<ObjectRef3D[]>([]);
   const selectedKeys3D=useMemo(()=>refs3D.map(refKey3D),[refs3D]);
   const [panelOpen,setPanelOpen]=useState(true);
+  useEffect(()=>phonePanelStore.subscribe(()=>{ if(phonePanelStore.get()==="props") setPanelOpen(true); }),[]);
   const [multiSelect,setMultiSelect]=useState(false);
   // „Manuell bewegen“ ist eine lokale Geräte-Einstellung und gilt für jede Auswahl.
   const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")==="1";}catch{return false;}});
