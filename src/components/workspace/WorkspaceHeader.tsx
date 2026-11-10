@@ -2,6 +2,7 @@ import { isExportAreaEnabled } from "@/lib/exportFeature";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
+import { ScrollEdgeHints } from "@/components/ScrollEdgeHints";
 import {
   refreshProjectFromCloud,
   resolveProjectConflict,
@@ -109,7 +110,9 @@ export function WorkspaceHeader({
   onToggleHelp,
 }: Props) {
   const navigate = useNavigate();
-  const headerRef = useDragScroll<HTMLElement>("x");
+  const headerDrag = useDragScroll<HTMLElement>("x");
+  const [headerEl, setHeaderEl] = React.useState<HTMLElement | null>(null);
+  const headerRef = React.useCallback((el: HTMLElement | null) => { headerDrag(el); setHeaderEl(el); }, [headerDrag]);
 
   const goCad = () => projectId && navigate(`/project/${projectId}/cad`);
   const goExport = () => projectId && navigate(`/project/${projectId}/export`);
@@ -117,6 +120,8 @@ export function WorkspaceHeader({
   const showExportTab = isExportAreaEnabled() || mode === "export";
 
   return (
+    <>
+    <ScrollEdgeHints target={headerEl} axis="x" />
     <header
       ref={headerRef}
       className="workspace-header h-16 flex items-center gap-2 px-3 border-b shrink-0 overflow-x-auto overflow-y-hidden no-scrollbar whitespace-nowrap cursor-grab active:cursor-grabbing"
