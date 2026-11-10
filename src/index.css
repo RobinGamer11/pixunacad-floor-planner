@@ -1673,3 +1673,35 @@
 /* Treppen-Warnungen: im Dark Mode deutlich heller (Kontrast auf dunklem Grund). */
 .cad-stair-warning { color: hsl(var(--destructive)); font-weight: 500; }
 .dark .cad-stair-warning { color: hsl(0 92% 76%); }
+
+/* ── Handyoberfläche: vorhandene Leisten werden zum aufziehbaren Bedienfenster (gleiches DOM) ── */
+body[data-phone="1"] .cad-tool-rail,
+body[data-phone="1"] .cad-settings-sidebar,
+body[data-phone="1"] .w3d-panel {
+  position: fixed !important;
+  left: 0; right: 0;
+  bottom: var(--phone-sheet-bottom, 58px);
+  height: calc(var(--phone-sheet-h, 0px) - 48px) !important;
+  width: auto !important;
+  max-width: none !important;
+  z-index: 74;
+  border: 0 !important;
+  display: none !important;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+body[data-phone="1"] .cad-right-collapsed,
+body[data-phone="1"] .w3d-panel-collapsed { display: none !important; }
+body[data-phone="1"][data-phone-mode="cad"][data-phone-panel="tools"] .cad-tool-rail,
+body[data-phone="1"][data-phone-mode="export"][data-phone-panel="tools"] .cad-tool-rail {
+  display: flex !important; flex-direction: row; flex-wrap: wrap; align-content: flex-start; gap: 4px; padding: 4px 8px 12px;
+}
+body[data-phone="1"][data-phone-panel="tools"] .cad-tool-rail > div { flex-direction: row !important; flex-wrap: wrap; gap: 6px; width: 100%; padding-bottom: 6px; border-bottom: 1px solid hsl(var(--hairline)); }
+body[data-phone="1"][data-phone-panel="tools"] .cad-tool-rail .cad-rail-btn { width: 52px; height: 52px; border-radius: 12px; }
+body[data-phone="1"]:not([data-phone-mode="3d"])[data-phone-panel="pages"] .cad-settings-sidebar,
+body[data-phone="1"]:not([data-phone-mode="3d"])[data-phone-panel="props"] .cad-settings-sidebar,
+body[data-phone="1"]:not([data-phone-mode="3d"])[data-phone-panel="layers"] .cad-settings-sidebar { display: flex !important; flex-direction: column; }
+body[data-phone="1"] .cad-settings-sidebar > div:first-child { display: none !important; }
+body[data-phone="1"][data-phone-mode="3d"][data-phone-panel="props"] .w3d-panel { display: block !important; z-index: 76; }
+body[data-phone="1"] .w3d-left-tools, body[data-phone="1"] .w3d-right-tools { width: min(280px, calc(50% - 18px)); }

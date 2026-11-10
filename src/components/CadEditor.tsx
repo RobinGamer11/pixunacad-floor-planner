@@ -71,6 +71,7 @@ import { StackOrderButtons } from "@/components/cad/StackOrderButtons";
 import { ExportSidebar } from "@/components/export/ExportSidebar";
 import { ExportPageSettings } from "@/components/export/ExportPageSettings";
 import { SpreadHandles } from "@/components/export/SpreadHandles";
+import { phonePanelStore } from "@/lib/phoneLayout";
 
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
@@ -481,6 +482,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
+  // Handy-Bedienfenster: dieselbe rechte Leiste, nur Reiter von außen gewählt (kein zweites DOM).
+  useEffect(() => phonePanelStore.subscribe(() => {
+    const p = phonePanelStore.get();
+    if (p === "pages") { setRightOpen(true); setRightTab("sheets"); }
+    else if (p === "props") { setRightOpen(true); setRightTab("settings"); }
+    else if (p === "layers") { setRightOpen(true); setRightTab("layers"); }
+  }), []);
   const infoBoxState = useInfoBoxUi();
   const infoBoxActive = !!(infoBoxState.selectedId || infoBoxState.draft);
   useEffect(() => {
@@ -3578,7 +3586,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       </aside>
       ) : (
         <div
-          className="w-7 shrink-0 border-l flex items-start justify-center pt-3"
+          className="cad-right-collapsed w-7 shrink-0 border-l flex items-start justify-center pt-3"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >
           <button
