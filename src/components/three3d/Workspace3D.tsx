@@ -307,7 +307,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
           </div>
         )}
         {/* Oben links: Render-Dossier */}
-        <div className="absolute left-3 top-3 z-10 w-[280px]">
+        <div className="w3d-left-tools absolute left-3 top-3 z-10 w-[280px] max-w-[calc(100%-24px)]">
           <button className={`${btn} bg-card flex items-center gap-1.5`} onClick={() => setOpen(open === "dossier" ? null : "dossier")}>
             <FileText size={14} /> Render-Dossier <ChevronDown size={13} className={open === "dossier" ? "rotate-180" : ""} />
           </button>
@@ -345,7 +345,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
 </div>}
         </div>
         {/* Oben rechts: Blätter in 3D */}
-        <div className="absolute right-3 top-3 z-10 w-[280px] flex flex-col items-end">
+        <div className="w3d-right-tools absolute right-3 top-3 z-10 w-[280px] max-w-[calc(100%-24px)] flex flex-col items-end">
           <button className={`${btn} bg-card flex items-center gap-1.5`} onClick={() => setOpen(open === "sheets" ? null : "sheets")}>
             <Layers size={14} /> Blätter in 3D <ChevronDown size={13} className={open === "sheets" ? "rotate-180" : ""} />
           </button>
@@ -456,10 +456,10 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         )}
       </div>
 
-      {!panelOpen && <div className="shrink-0 border-l p-1" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      {!panelOpen && <div className="w3d-panel-collapsed shrink-0 border-l p-1" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
         <button onClick={() => setPanelOpen(true)} title="Panel einblenden" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} /></button>
       </div>}
-      <aside className={`${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      <aside className={`w3d-panel ${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
         {!sel ? movePanel : selectedHit?.list === "infoBoxes" ? <><InfoBoxSettingsPanel app={app} in3D />{movePanel}</> : (
           <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} onCollapse={()=>setPanelOpen(false)} manualMove={movePanel} relations={
             <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
