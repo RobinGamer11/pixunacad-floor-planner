@@ -338,7 +338,17 @@ export function TabletAidWheel() {
         icon={<Trash2 size={15} strokeWidth={1.6} />} />
 
     </div>
+    </>
   );
+}
+
+/** Kleine Randknöpfe im Stil des Hilfsrads (dunkel, feine Kante, Gold bei aktiv). */
+function WHEEL_SMALL_BTN(place: React.CSSProperties, active = false): React.CSSProperties {
+  return { ...place, width: 28, height: 28, zIndex: 3,
+    background: "hsl(var(--overlay-ink) / 0.82)", backdropFilter: "blur(10px)",
+    color: active ? "hsl(var(--accent-gold))" : "hsl(var(--overlay-surface) / 0.85)",
+    border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.7)" : "hsl(var(--overlay-surface) / 0.28)"}`,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.25)" };
 }
 
 function CenterToggles() {

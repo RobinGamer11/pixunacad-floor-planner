@@ -9,7 +9,7 @@ import type { CadApp } from "@/cad/CadApp";
 import type { Derived3D, Plane3D } from "@/cad/three3d/geometryDerivation";
 import { type Relation3D, type RelationIssue } from "@/cad/three3d/relations";
 import { Object3DSettings, BigChoice } from "@/components/cad/Object3DSettings";
-import { Crosshair, X as XIcon, PanelRightOpen } from "lucide-react";
+import { Crosshair, X as XIcon, PanelRightOpen, PanelRightClose, Settings as SettingsIcon } from "lucide-react";
 const REL = {
   card: { background: "hsl(var(--overlay-ink) / 0.94)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.14)" },
   field: { background: "hsl(var(--overlay-surface) / 0.07)", borderColor: "hsl(var(--overlay-surface) / 0.18)", color: "hsl(var(--overlay-surface))" },
@@ -459,12 +459,20 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
         )}
       </div>
 
-      {!panelOpen && <div className="w3d-panel-collapsed shrink-0 border-l p-1" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      {!panelOpen && <div className="w3d-panel-collapsed cad-right-collapsed w-7 shrink-0 border-l flex items-start justify-center pt-3" style={{ borderColor: "hsl(var(--hairline))" }}>
         <button onClick={() => setPanelOpen(true)} title="Panel einblenden" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted"><PanelRightOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} /></button>
       </div>}
-      <aside className={`w3d-panel ${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l overflow-y-auto p-3 space-y-4 text-sm`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+      <aside className={`w3d-panel ${panelOpen ? "" : "hidden "}w-[300px] shrink-0 border-l flex-col text-sm ${panelOpen ? "flex" : ""}`} style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+        {/* Kopfleiste identisch zur CAD-Leiste: Titel + Einklappen rechts. */}
+        <div className="w3d-panel-bar grid grid-cols-[1fr_auto] shrink-0 border-b items-stretch" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="flex items-center justify-center gap-1.5 px-2 py-2.5 text-[11px] font-semibold" style={{ color: "hsl(var(--ink))", boxShadow: "inset 0 -2px 0 hsl(var(--accent-gold))" }}><SettingsIcon size={12} /><span className="truncate">3D-Einstellungen</span></div>
+          <button type="button" onClick={() => setPanelOpen(false)} title="Einklappen" className="w-8 flex items-center justify-center hover:bg-muted border-l" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <PanelRightClose size={14} className="text-muted-foreground" />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
         {!sel ? movePanel : selectedHit?.list === "infoBoxes" ? <><InfoBoxSettingsPanel app={app} in3D />{movePanel}</> : (
-          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} onCollapse={()=>setPanelOpen(false)} manualMove={movePanel} relations={
+          <Object3DSettings app={app} defaultOpen onEditInCad={()=>guardChange(onEditInCad)} manualMove={movePanel} relations={
             <section className="space-y-2 rounded-xl border p-2.5 text-xs" style={REL.card}>
               <div className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={REL.muted}>Körperbeziehungen</div>
               <div className="space-y-1 rounded-lg border p-2" style={picking === "cutout" ? REL.active : REL.field}>
@@ -512,6 +520,7 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
           } />
         )}
         <PatternToggle3D app={app} target={sel && selectedHit ? { obj: selectedHit.obj, list: selectedHit.list } : null} onChange={()=>setTick(t=>t+1)} />
+      </div>
       </aside>
     </div>
   );
