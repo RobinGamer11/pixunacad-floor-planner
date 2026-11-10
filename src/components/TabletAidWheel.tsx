@@ -8,6 +8,7 @@ import {
   virtualKeyHold,
   primeTabletKeyboard,
 } from "@/lib/virtualInput";
+import { readWheelScale } from "@/lib/phoneLayout";
 
 /** Maus-Symbol im gleichen Stil wie die eingeblendete Bedienungshilfe. */
 function MouseIcon({ side, size = 29 }: { side: "left" | "right"; size?: number }) {
@@ -56,8 +57,26 @@ function safeInset(name: string): number {
 export function TabletAidWheel() {
   const STORAGE_KEY = "pixuna.tabletAid.pos";
   const size = 190;
-  // Unter dem Rad sitzt zusätzlich der kleine ENTF-Knopf (8 px Abstand).
   const totalHeight = size;
+  // Skalierung (75–150 %, lokal pro Gerät); zusätzlich an den sichtbaren Platz begrenzt.
+  const [userScale, setUserScale] = useState(readWheelScale);
+  const [vpTick, setVpTick] = useState(0);
+  const reserveBottom = () => safeInset("--phone-bottom-reserve");
+  const vpNow = visibleViewport();
+  const fitScale = Math.max(0.5, Math.min(userScale, (vpNow.w - 16) / size, (vpNow.h - 16 - reserveBottom()) / size));
+  const scale = fitScale;
+  const collapsedForced = (vpNow.h - 16 - reserveBottom()) / size < 0.75 * 0.98;
+  const [collapsed, setCollapsed] = useState(false);
+  void vpTick;
+  useEffect(() => {
+    const on = () => setUserScale(readWheelScale());
+    const onVp = () => setVpTick((t) => t + 1);
+    window.addEventListener("pixuna-wheel-settings", on);
+    window.addEventListener("resize", onVp);
+    window.addEventListener("pixuna-phone-layout", onVp);
+    window.visualViewport?.addEventListener("resize", onVp);
+    return () => { window.removeEventListener("pixuna-wheel-settings", on); window.removeEventListener("resize", onVp); window.removeEventListener("pixuna-phone-layout", onVp); window.visualViewport?.removeEventListener("resize", onVp); };
+  }, []);
 
   /**
    * Begrenzt eine gespeicherte Position auf den sichtbaren Bereich.
@@ -67,14 +86,14 @@ export function TabletAidWheel() {
   const clamp = React.useCallback((p: { x: number; y: number }) => {
     const { w, h } = visibleViewport();
     const margin = 8;
-    const bottomSafe = safeInset("--sab") || 0;
-    const maxX = Math.max(margin, w - size - margin);
-    const maxY = Math.max(margin, h - totalHeight - margin - bottomSafe);
+    const bottomSafe = (safeInset("--sab") || 0) + reserveBottom();
+    const maxX = Math.max(margin, w - size * scale - margin);
+    const maxY = Math.max(margin, h - totalHeight * scale - margin - bottomSafe);
     return {
       x: Math.min(Math.max(margin, p.x), maxX),
       y: Math.min(Math.max(margin, p.y), maxY),
     };
-  }, [size, totalHeight]);
+  }, [size, totalHeight, scale]);
 
   const [pos, setPos] = useState<{ x: number; y: number }>(() => {
     let stored: { x: number; y: number } | null = null;
@@ -96,6 +115,13 @@ export function TabletAidWheel() {
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch {}
   }, [pos]);
+  useEffect(() => {
+    const reset = () => { const { h } = visibleViewport(); setPos(clamp({ x: 16, y: h - totalHeight * scale - 24 })); };
+    window.addEventListener("pixuna-wheel-reset-pos", reset);
+    return () => window.removeEventListener("pixuna-wheel-reset-pos", reset);
+  }, [clamp, scale]);
+  // Größe / sichtbarer Bereich geändert → Position nachführen.
+  useEffect(() => { setPos((p) => { const c = clamp(p); return c.x === p.x && c.y === p.y ? p : c; }); }, [clamp, vpTick]);
 
   // Beim Einblenden sowie bei Größen-/Orientierungswechsel sofort einpassen.
   useEffect(() => {
@@ -165,6 +191,22 @@ export function TabletAidWheel() {
     dragRef.current = null;
   };
 
+  if (collapsed || collapsedForced) {
+    return (
+      <button
+        type="button"
+        data-tablet-aid="true"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => setCollapsed(false)}
+        disabled={collapsedForced}
+        title={collapsedForced ? "Zu wenig Platz für das Hilfsrad – Bedienfenster schließen" : "Hilfsrad öffnen"}
+        className="fixed grid place-items-center rounded-full border text-[10px] font-semibold"
+        style={{ left: 12, bottom: `calc(${reserveBottom() + 12}px + env(safe-area-inset-bottom, 0px))`, width: 48, height: 48, zIndex: 2147483000,
+          background: "hsl(var(--overlay-ink) / 0.86)", color: "hsl(var(--accent-gold))", borderColor: "hsl(var(--accent-gold) / 0.5)", touchAction: "none", opacity: collapsedForced ? 0.6 : 1 }}
+      >Rad</button>
+    );
+  }
+
   return (
     <div
       data-tablet-aid="true"
@@ -180,6 +222,8 @@ export function TabletAidWheel() {
         top: pos.y,
         width: size,
         height: totalHeight,
+        transform: scale !== 1 ? `scale(${scale})` : undefined,
+        transformOrigin: "0 0",
         touchAction: "none",
         // Immer im Vordergrund — über Panels, Hubs, Dialogen und Overlays.
         zIndex: 2147483000,
@@ -207,6 +251,9 @@ export function TabletAidWheel() {
           cursor: "grab",
         }}
       />
+      <button type="button" onClick={() => setCollapsed(true)} title="Hilfsrad einklappen" aria-label="Hilfsrad einklappen"
+        className="absolute grid place-items-center rounded-full text-[11px]"
+        style={{ right: 2, top: 2, width: 26, height: 26, zIndex: 3, background: "hsl(var(--overlay-ink))", color: "hsl(var(--overlay-surface) / 0.8)", border: "1px solid hsl(var(--overlay-surface) / 0.3)" }}>–</button>
       {/* Zentrum: TABLET-Label + Toggles für Stift-Modus und Zoom-Sperre */}
       <CenterToggles />
 
