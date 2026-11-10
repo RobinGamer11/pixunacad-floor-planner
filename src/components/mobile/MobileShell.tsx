@@ -6,7 +6,7 @@ import {
   HelpCircle, Tablet, RotateCcw, Move, Eye, EyeOff, FileText,
 } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
-import { phonePanelStore, usePhonePanel, readWheelScale, writeWheelScale, resetWheelPosition, WHEEL_MIN, WHEEL_MAX, type PhonePanel } from "@/lib/phoneLayout";
+import { phonePanelStore, usePhonePanel, readWheelScale, writeWheelScale, resetWheelPosition, wheelScaleToPercent, wheelPercentToScale, type PhonePanel } from "@/lib/phoneLayout";
 
 type Mode = "cad" | "3d" | "export";
 export interface MobileShellProps {
@@ -378,9 +378,9 @@ function MoreContent(p: MobileShellProps) {
       <Section title="Bedienung · Hilfsrad">
         <button className={row} onClick={p.onToggleTabletAid}><Tablet size={17} />Hilfsrad {p.tabletAidOn ? "ausblenden" : "einblenden"}</button>
         <div className="px-2 py-1">
-          <div className="mb-1 flex justify-between text-xs"><span>Größe</span><span className="tabular-nums font-semibold" style={{ color: "hsl(var(--accent-gold))" }}>{Math.round(scale * 100)} %</span></div>
-          <input type="range" min={WHEEL_MIN * 100} max={WHEEL_MAX * 100} step={5} value={Math.round(scale * 100)} className="w-full accent-primary"
-            onChange={(e) => { const v = Number(e.target.value) / 100; setScale(v); writeWheelScale(v); }} aria-label="Größe des Hilfsrads" />
+          <div className="mb-1 flex justify-between text-xs"><span>Größe</span><span className="tabular-nums font-semibold" style={{ color: "hsl(var(--accent-gold))" }}>{wheelScaleToPercent(scale)} %</span></div>
+          <input type="range" min={0} max={100} step={1} value={wheelScaleToPercent(scale)} className="w-full accent-primary"
+            onChange={(e) => { const v = wheelPercentToScale(Number(e.target.value)); setScale(v); writeWheelScale(v); }} aria-label="Größe des Hilfsrads" />
         </div>
         <button className={row} onClick={() => { setScale(1); writeWheelScale(1); }}><RotateCcw size={17} />Größe zurücksetzen</button>
         <button className={row} onClick={resetWheelPosition}><Move size={17} />Position zurücksetzen</button>

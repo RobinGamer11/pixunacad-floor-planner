@@ -64,4 +64,7 @@ export function writeWheelScale(v: number) {
   try { localStorage.setItem(WHEEL_SCALE_KEY, String(clampWheelScale(v))); } catch {}
   window.dispatchEvent(new CustomEvent("pixuna-wheel-settings"));
 }
+/** Anzeige 0–100 % ↔ physischer Faktor 0,75–1,5. */
+export const wheelScaleToPercent = (v: number) => Math.round((clampWheelScale(v) - WHEEL_MIN) / (WHEEL_MAX - WHEEL_MIN) * 100);
+export const wheelPercentToScale = (p: number) => clampWheelScale(WHEEL_MIN + Math.min(100, Math.max(0, p)) / 100 * (WHEEL_MAX - WHEEL_MIN));
 export function resetWheelPosition() { window.dispatchEvent(new CustomEvent("pixuna-wheel-reset-pos")); }

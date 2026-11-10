@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Keyboard, Trash2 } from "lucide-react";
+import { Keyboard, Trash2, SlidersHorizontal, RotateCcw, Move } from "lucide-react";
 import { setLmbHint as setGlobalLmbHint } from "@/cad/Input";
 import {
   virtualMouseClick,
@@ -8,7 +8,7 @@ import {
   virtualKeyHold,
   primeTabletKeyboard,
 } from "@/lib/virtualInput";
-import { readWheelScale } from "@/lib/phoneLayout";
+import { readWheelScale, writeWheelScale, resetWheelPosition, wheelScaleToPercent, wheelPercentToScale } from "@/lib/phoneLayout";
 
 /** Maus-Symbol im gleichen Stil wie die eingeblendete Bedienungshilfe. */
 function MouseIcon({ side, size = 29 }: { side: "left" | "right"; size?: number }) {
@@ -67,6 +67,7 @@ export function TabletAidWheel() {
   const scale = fitScale;
   const collapsedForced = (vpNow.h - 16 - reserveBottom()) / size < 0.75 * 0.98;
   const [collapsed, setCollapsed] = useState(false);
+  const [scaleOpen, setScaleOpen] = useState(false);
   void vpTick;
   useEffect(() => {
     const on = () => setUserScale(readWheelScale());
@@ -207,7 +208,30 @@ export function TabletAidWheel() {
     );
   }
 
+  const pct = wheelScaleToPercent(userScale);
+  const vpPop = visibleViewport();
+  const popW = 220;
+  const popLeft = Math.min(Math.max(8, pos.x), vpPop.w - popW - 8);
+  const popTop = pos.y > 150 ? pos.y - 142 : Math.min(vpPop.h - 150, pos.y + size * scale + 8);
   return (
+    <>
+    {scaleOpen && (
+      <div data-tablet-aid="true" onPointerDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}
+        className="fixed rounded-2xl border p-3 text-xs"
+        style={{ left: popLeft, top: popTop, width: popW, zIndex: 2147483001, background: "hsl(var(--overlay-ink) / 0.92)", color: "hsl(var(--overlay-surface))", borderColor: "hsl(var(--overlay-surface) / 0.28)", boxShadow: "0 12px 32px rgba(0,0,0,0.32)", backdropFilter: "blur(10px)" }}>
+        <div className="mb-1 flex items-center justify-between">
+          <span className="font-semibold">Größe</span>
+          <span className="tabular-nums font-semibold" style={{ color: "hsl(var(--accent-gold))" }}>{pct} %</span>
+        </div>
+        <input type="range" min={0} max={100} step={1} value={pct} aria-label="Größe des Hilfsrads" className="w-full" style={{ accentColor: "hsl(var(--accent-gold))" }}
+          onChange={(e) => writeWheelScale(wheelPercentToScale(Number(e.target.value)))} />
+        <div className="mt-2 flex gap-1.5">
+          <button type="button" onClick={() => writeWheelScale(1)} className="flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1.5" style={{ borderColor: "hsl(var(--overlay-surface) / 0.25)" }}><RotateCcw size={12} />Größe</button>
+          <button type="button" onClick={resetWheelPosition} className="flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1.5" style={{ borderColor: "hsl(var(--overlay-surface) / 0.25)" }}><Move size={12} />Position</button>
+          <button type="button" onClick={() => setScaleOpen(false)} className="rounded-lg border px-2 py-1.5" style={{ borderColor: "hsl(var(--overlay-surface) / 0.25)" }}>OK</button>
+        </div>
+      </div>
+    )}
     <div
       data-tablet-aid="true"
       className="fixed select-none"
@@ -251,9 +275,13 @@ export function TabletAidWheel() {
           cursor: "grab",
         }}
       />
-      <button type="button" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); setCollapsed(true); }} title="Hilfsrad einklappen" aria-label="Hilfsrad einklappen"
-        className="absolute grid place-items-center rounded-full text-[11px]"
-        style={{ right: 2, top: 2, width: 26, height: 26, zIndex: 3, background: "hsl(var(--overlay-ink))", color: "hsl(var(--overlay-surface) / 0.8)", border: "1px solid hsl(var(--overlay-surface) / 0.3)" }}>–</button>
+      {/* Kleine Randknöpfe im Hilfsrad-Stil: unten links einklappen, unten rechts Größe. */}
+      <button type="button" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); setScaleOpen(false); setCollapsed(true); }} title="Hilfsrad einklappen" aria-label="Hilfsrad einklappen"
+        className="absolute grid place-items-center rounded-full text-[13px] font-semibold"
+        style={WHEEL_SMALL_BTN({ left: 4, bottom: 4 })}>–</button>
+      <button type="button" onPointerDown={(e) => e.stopPropagation()} onPointerUp={(e) => { e.stopPropagation(); setScaleOpen((o) => !o); }} title="Größe des Hilfsrads" aria-label="Größe des Hilfsrads"
+        className="absolute grid place-items-center rounded-full"
+        style={WHEEL_SMALL_BTN({ right: 4, bottom: 4 }, scaleOpen)}><SlidersHorizontal size={12} /></button>
       {/* Zentrum: TABLET-Label + Toggles für Stift-Modus und Zoom-Sperre */}
       <CenterToggles />
 
@@ -310,7 +338,17 @@ export function TabletAidWheel() {
         icon={<Trash2 size={15} strokeWidth={1.6} />} />
 
     </div>
+    </>
   );
+}
+
+/** Kleine Randknöpfe im Stil des Hilfsrads (dunkel, feine Kante, Gold bei aktiv). */
+function WHEEL_SMALL_BTN(place: React.CSSProperties, active = false): React.CSSProperties {
+  return { ...place, width: 28, height: 28, zIndex: 3,
+    background: "hsl(var(--overlay-ink) / 0.82)", backdropFilter: "blur(10px)",
+    color: active ? "hsl(var(--accent-gold))" : "hsl(var(--overlay-surface) / 0.85)",
+    border: `1px solid ${active ? "hsl(var(--accent-gold) / 0.7)" : "hsl(var(--overlay-surface) / 0.28)"}`,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.25)" };
 }
 
 function CenterToggles() {
