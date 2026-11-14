@@ -80,6 +80,8 @@ const CadPage = () => {
   }, []);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
     try {
+      // Computer mit Maus/Tastatur: beim Start immer aus.
+      if (window.matchMedia?.("(any-pointer: fine)").matches) return false;
       const v = localStorage.getItem("pixuna.tabletAid");
       if (v === "1" || v === "0") return v === "1";
       // Ohne gespeicherte Wahl: nur auf Touch-Geräten ohne Maus/Tastatur an.
