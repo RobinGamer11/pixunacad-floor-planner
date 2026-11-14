@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import CadEditor, { type CadEditorHandle } from "@/components/CadEditor";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { WorkspaceHeader } from "@/components/workspace/WorkspaceHeader";
-import { LocalSaveIndicator } from "@/components/cad/LocalSaveIndicator";
 const Workspace3D = lazy(() => import("@/components/three3d/Workspace3D").then(m => ({ default: m.Workspace3D })));
 import { TabletAidWheel } from "@/components/TabletAidWheel";
 import type { CadApp } from "@/cad/CadApp";
@@ -85,11 +84,15 @@ const CadPage = () => {
   useEffect(() => {
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
   }, [tabletAidOn]);
-  // Bedienungshilfe: sofort lokal umschalten; Projekt-Einstellung nur als Startwert/Speicherung
-  // (ein voller Projektspeicher darf das Ein-/Ausschalten nie blockieren).
-  const [helpLocal, setHelpLocal] = useState<boolean | null>(null);
-  const helpOn = helpLocal ?? project?.settings?.helpOn ?? true;
-  const toggleHelp = () => { const next = !helpOn; setHelpLocal(next); if (project) projectStore.setHelpOn(project.id, next); };
+  // Hilfe ist ein Sitzungszustand, gespeicherte Altwerte öffnen sie nie automatisch.
+  const [helpSession, setHelpSession] = useState({ projectId, on: false });
+  const helpOn = helpSession.projectId === projectId && helpSession.on;
+  useEffect(() => { setHelpSession({ projectId, on: false }); }, [projectId]);
+  const toggleHelp = () => setHelpSession({ projectId, on: !helpOn });
+  const centerView = () => {
+    if (view3d) window.dispatchEvent(new Event("pixuna-3d-center"));
+    else editorRef.current?.centerOnOrigin();
+  };
 
   const [presenting, setPresenting] = useState(false);
   const handlePresent = () => {
@@ -135,7 +138,7 @@ const CadPage = () => {
         onStopMultiPaste={() => editorRef.current?.stopMultiPaste()}
         canDelete={canDelete}
         onDelete={() => editorRef.current?.deleteSelection()}
-        onCenterView={() => editorRef.current?.centerOnOrigin()}
+        onCenterView={centerView}
         onPresent={handlePresent}
         helpOn={helpOn}
         onToggleHelp={toggleHelp}
@@ -155,7 +158,7 @@ const CadPage = () => {
         onDelete={() => editorRef.current?.deleteSelection()}
         canCopy={canDelete}
         onCopy={doCopy}
-        onCenterView={() => editorRef.current?.centerOnOrigin()}
+        onCenterView={centerView}
 
         canPaste={canPaste}
         onPaste={armPasteFromHeader}
@@ -194,7 +197,6 @@ const CadPage = () => {
           helpOn={helpOn}
         />
         {view3d && cadApp && <Suspense fallback={null}><Workspace3D app={cadApp} projectId={projectId} onEditInCad={() => navigate(`/project/${projectId}/cad`)} helpOn={helpOn && !presenting} tabletAidOn={tabletAidOn} /></Suspense>}
-        {!presenting && <LocalSaveIndicator projectId={projectId} />}
         {presenting && (
           <button
             onClick={() => { setPresenting(false); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }}

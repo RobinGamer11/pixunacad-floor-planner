@@ -64,3 +64,5 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Infoboxen sind Szenenobjekte (`Scene.infoBoxes`, Serialisierung wie Treppen); flüchtige Auswahl/Entwurf nur in `lib/infoBoxUi.ts`, Bearbeitung nur im Einstellungspanel – keine DB-Kommentare mehr im CAD.
 - Stapelreihenfolge innerhalb einer Ebene nur über `src/cad/stackOrder.ts` (`stackOrder` via `objectMeta.ts`); fehlender Wert = alte Typordnung, damit Altprojekte unverändert bleiben.
 - Handylayout: Erkennung nur `src/lib/phoneLayout.ts`; die vorhandenen Leisten werden per CSS (`body[data-phone-panel]`) zum Bedienfenster – kein zweites DOM; die Handy-Werkzeugkacheln lösen nur die vorhandenen Leistenknöpfe aus, damit CadApp, Auswahl und Undo beim Öffnen/Drehen erhalten bleiben.
+- Workspace save feedback combines project-keyed local persistence acknowledgements and existing cloud source reports; neither a clean local state nor live mode alone proves cloud success.
+- Help visibility is session-only and starts off on project entry; changing CAD/3D/Export preserves it without changing project data.

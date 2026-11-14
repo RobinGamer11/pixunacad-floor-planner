@@ -1,6 +1,6 @@
 import { ScrollEdgeHints } from "@/components/ScrollEdgeHints";
 import { toast } from "@/hooks/use-toast";
-import { saveLocalScene, loadLocalScene, onLocalSaveStatus } from "@/cad/persist/localScenePersist";
+import { saveLocalScene, loadLocalScene, getLocalProjectSaveState, subscribeLocalProjectSaveState } from "@/cad/persist/localScenePersist";
 import { TrashIcon } from "@/lib/trashIcon";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
@@ -73,6 +73,8 @@ import { ExportSidebar } from "@/components/export/ExportSidebar";
 import { ExportPageSettings } from "@/components/export/ExportPageSettings";
 import { SpreadHandles } from "@/components/export/SpreadHandles";
 import { phonePanelStore } from "@/lib/phoneLayout";
+import { usePhoneLayout } from "@/lib/phoneLayout";
+import { PhoneSelectionButton } from "@/components/mobile/PhoneSelectionButton";
 
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
@@ -381,6 +383,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const app = appRef.current;
       const cvs = canvasRef.current;
       if (!app || !cvs) return;
+      if (app.activePlanId) { app.centerActiveExportView(); return; }
       const r = cvs.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) return;
       // Nur die Kamera-Position ändern — Maßstab, Raster, Objekte, Werkzeug bleiben.
@@ -482,6 +485,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
+  const phoneLayout = usePhoneLayout();
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
   // Handy-Bedienfenster: dieselbe rechte Leiste, nur Reiter von außen gewählt (kein zweites DOM).
   useEffect(() => phonePanelStore.subscribe(() => {
@@ -1048,7 +1052,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         console.error("Lokaler Stand nicht lesbar:", e);
       });
     }
-    const offSaveStatus = onLocalSaveStatus((s, d) => {
+    let previousSaveState = getLocalProjectSaveState(projectId);
+    const offSaveStatus = subscribeLocalProjectSaveState(() => {
+      const next = getLocalProjectSaveState(projectId);
+      if (next === previousSaveState) return;
+      previousSaveState = next;
+      const { status: s, detail: d } = next;
       if (s === "quota" || s === "blocked" || s === "error") toast({ title: s === "blocked" ? "Speichern gesperrt" : "Speichern fehlgeschlagen", description: d, variant: "destructive" });
     });
 
@@ -2167,7 +2176,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Ebenen-Button oben links: runder Button mit Icon + Anzahl. */}
         {!presenting && (
           <CanvasFabBar>
-            <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />
+            {phoneLayout ? <PhoneSelectionButton app={appRef.current} /> : <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />}
             <StackOrderButtons getApp={getStackApp} />
             <CommentModeButton disabled={!projectId} />
           </CanvasFabBar>

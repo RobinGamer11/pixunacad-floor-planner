@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Undo2, Redo2, Copy, ClipboardPaste, CopyPlus, Trash2, X, FileStack, Wrench, SlidersHorizontal,
   Layers, MoreHorizontal, Pencil, MousePointerSquareDashed, BringToFront, SendToBack, Crosshair, Presentation,
-  HelpCircle, Tablet, RotateCcw, Move, Eye, EyeOff, FileText,
+  HelpCircle, Tablet, RotateCcw, Move, Eye, EyeOff, FileText, DraftingCompass, Box, Printer,
 } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import { phonePanelStore, usePhonePanel, readWheelScale, writeWheelScale, resetWheelPosition, wheelScaleToPercent, wheelPercentToScale, type PhonePanel } from "@/lib/phoneLayout";
+
+import { Button } from "@/components/ui/button";
+import { WorkspaceSaveStatus } from "@/components/workspace/WorkspaceSaveStatus";
 
 type Mode = "cad" | "3d" | "export";
 export interface MobileShellProps {
@@ -144,6 +147,7 @@ export function MobileShell(p: MobileShellProps) {
   }, []);
 
   // Ziehgriff: nur der Griff verändert die Höhe, Inhalte scrollen unabhängig.
+  const grip = useRef<HTMLDivElement | null>(null);
   const drag = useRef<{ id: number; y0: number; h0: number; moved: boolean } | null>(null);
   const onGripDown = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -164,7 +168,12 @@ export function MobileShell(p: MobileShellProps) {
     if (h < halfH * 0.55) phonePanelStore.set(null);
     else phonePanelStore.setSnap(h > (halfH + fullH) / 2 ? "full" : "half");
   };
-  const cancelGrip = () => { drag.current = null; setDragH(null); };
+  const cancelGrip = () => {
+    const d = drag.current; drag.current = null; setDragH(null);
+    if (d) { try { grip.current?.releasePointerCapture(d.id); } catch {} }
+  };
+  const closeSheet = () => { cancelGrip(); phonePanelStore.set(null); };
+  useEffect(() => { if (!panel) cancelGrip(); }, [panel]);
 
   const go = (m: Mode) => p.projectId && navigate(`/project/${p.projectId}/${m}`);
   const showEdit = editOpen || p.canDelete || p.multiPasteActive;
@@ -186,40 +195,39 @@ export function MobileShell(p: MobileShellProps) {
           <div className="min-w-0 flex-1 truncate text-sm font-semibold" title={p.projectName}>{p.projectName || "Projekt"}</div>
           <IconBtn label="Rückgängig" disabled={!p.canUndo} onClick={p.onUndo}><Undo2 size={17} /></IconBtn>
           <IconBtn label="Wiederholen" disabled={!p.canRedo} onClick={p.onRedo}><Redo2 size={17} /></IconBtn>
-          <IconBtn label="Bearbeiten" active={showEdit} onClick={() => setEditOpen((v) => !v)}><Pencil size={16} /></IconBtn>
+          <WorkspaceSaveStatus key={p.projectId} projectId={p.projectId} />
+          <Button variant="outline" aria-label="Bearbeiten" aria-pressed={showEdit} className="phone-edit-toggle px-2" onClick={() => setEditOpen(v => !v)}><Pencil /><span className="hidden min-[440px]:inline">Bearbeiten</span></Button>
         </div>
-        <div className="grid grid-cols-3 gap-1 px-2 pb-1.5">
-          {(["cad", "3d", "export"] as Mode[]).map((m) => (
-            <button key={m} type="button" onClick={() => go(m)} className="h-8 rounded-md text-xs font-semibold"
-              style={{ background: p.mode === m ? "hsl(var(--accent-gold) / 0.18)" : "hsl(var(--surface-muted))", color: p.mode === m ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))", border: `1px solid ${p.mode === m ? "hsl(var(--accent-gold) / 0.6)" : "transparent"}` }}>
-              {m === "cad" ? "CAD" : m === "3d" ? "3D" : "Export"}
-            </button>
-          ))}
+        <div className="phone-mode-group mx-2 mb-1.5 grid grid-cols-3 gap-1 rounded-md p-1">
+          {(["cad", "3d", "export"] as Mode[]).map(m => {
+            const Icon = m === "cad" ? DraftingCompass : m === "3d" ? Box : Printer;
+            return <Button key={m} variant="ghost" aria-pressed={p.mode === m} onClick={() => go(m)} className="phone-mode-button h-9 gap-1 px-1 text-xs"><Icon />{m === "cad" ? "CAD" : m === "3d" ? "3D" : "Export"}</Button>;
+          })}
         </div>
       </header>
 
       {showEdit && p.mode !== "3d" && (
-        <div {...shield} className="phone-editbar fixed left-1/2 z-[80] flex -translate-x-1/2 items-center gap-1 rounded-xl border p-1 shadow-lg"
+        <div {...shield} className="phone-editbar fixed left-1/2 z-[80] flex max-w-[calc(100vw-112px)] -translate-x-1/2 items-center gap-1 rounded-lg border p-1 shadow-lg"
           style={{ top: `calc(${headerH + 8}px + env(safe-area-inset-top, 0px))`, background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
           <IconBtn label="Kopieren" disabled={!p.canCopy} onClick={p.onCopy}><Copy size={16} /></IconBtn>
           <IconBtn label="Einfügen" disabled={!p.canPaste} onClick={p.onPaste}><ClipboardPaste size={16} /></IconBtn>
           <IconBtn label={p.multiPasteActive ? "Mehrfach einfügen beenden" : "Mehrfach einfügen"} active={p.multiPasteActive} disabled={!p.canPaste && !p.multiPasteActive}
             onClick={p.multiPasteActive ? p.onStopMultiPaste : p.onMultiPaste}><CopyPlus size={16} /></IconBtn>
           <IconBtn label="Auswahl löschen" disabled={!p.canDelete} onClick={p.onDelete}><Trash2 size={16} /></IconBtn>
-          {p.multiPasteActive && <span className="px-1.5 text-[11px] font-semibold" style={{ color: "hsl(var(--accent-gold))" }}>Mehrfach aktiv</span>}
+
         </div>
       )}
 
       {panel && (
         <div {...shield} className="phone-sheet-chrome fixed inset-x-0 z-[75] rounded-t-2xl border-t"
           style={{ bottom: `calc(var(--phone-sheet-bottom) + var(--phone-sheet-h) - 48px)`, height: 48, background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))", boxShadow: "0 -8px 24px rgba(0,0,0,0.18)" }}>
-          <div onPointerDown={onGripDown} onPointerMove={onGripMove} onPointerUp={endGrip} onPointerCancel={cancelGrip} onLostPointerCapture={() => { if (drag.current) cancelGrip(); }}
-            className="absolute inset-x-0 top-0 h-6 cursor-ns-resize" style={{ touchAction: "none" }} aria-label="Bedienfenster vergrößern oder verkleinern">
+          <div ref={grip} onPointerDown={onGripDown} onPointerMove={onGripMove} onPointerUp={endGrip} onPointerCancel={cancelGrip} onLostPointerCapture={() => { if (drag.current) cancelGrip(); }}
+            className="absolute left-20 right-14 top-0 h-6 cursor-ns-resize" style={{ touchAction: "none" }} aria-label="Bedienfenster vergrößern oder verkleinern">
             <div className="mx-auto mt-2 h-1.5 w-11 rounded-full" style={{ background: "hsl(var(--ink-soft) / 0.45)" }} />
           </div>
-          <div className="flex h-full items-end justify-between px-3 pb-1.5">
+          <div className="pointer-events-none flex h-full items-end justify-between px-3 pb-1.5">
             <span className="text-sm font-semibold">{TITLES[panel]}</span>
-            <IconBtn label="Schließen" onClick={() => phonePanelStore.set(null)}><X size={16} /></IconBtn>
+            <div className="pointer-events-auto"><IconBtn label="Schließen" onClick={closeSheet}><X size={16} /></IconBtn></div>
           </div>
         </div>
       )}
@@ -238,6 +246,9 @@ export function MobileShell(p: MobileShellProps) {
         </div>
       )}
 
+      <div {...shield} className="phone-center-control fixed right-3 z-[65]" style={{ top: `calc(${headerH + 12}px + env(safe-area-inset-top, 0px))` }}>
+        <Button variant="outline" size="icon" className="phone-canvas-fab" aria-label="Ansicht zentrieren" title="Ansicht zentrieren" onClick={p.onCenterView}><Crosshair /></Button>
+      </div>
       <nav {...shield} className="phone-bottom-nav fixed inset-x-0 bottom-0 z-[78] grid border-t"
         style={{ gridTemplateColumns: `repeat(${availableNav.length}, 1fr)`, height: `calc(${NAV_H}px + env(safe-area-inset-bottom, 0px))`, paddingBottom: "env(safe-area-inset-bottom, 0px)", background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         {availableNav.map(({ id, label, Icon }) => {
@@ -354,36 +365,26 @@ function LayersContent3D({ app }: { app: CadApp | null }) {
 function MoreContent(p: MobileShellProps) {
   const app = p.app;
   const [scale, setScale] = useState(readWheelScale);
-  const [, force] = useState(0);
-  const stack = (dir: "front" | "back") => { app?.moveSelectionStack(dir); force((n) => n + 1); };
-  const row = "flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left disabled:opacity-40";
+  useEffect(() => { const on = () => setScale(readWheelScale()); window.addEventListener("pixuna-wheel-settings", on); return () => window.removeEventListener("pixuna-wheel-settings", on); }, []);
+  const tile = "phone-action-tile";
   return (
     <div className="space-y-4 pt-1">
-      <Section title="Auswahl">
-        <button className={row} disabled={p.mode === "3d"} onClick={() => { app?.selectAllInActiveCadPlan(); force((n) => n + 1); }}><MousePointerSquareDashed size={17} />Alles auswählen</button>
-        <button className={row} disabled={p.mode === "3d"} onClick={() => phonePanelStore.set("props")}><SlidersHorizontal size={17} />Auswahlfilter (in Eigenschaften)</button>
-        <button className={row} disabled={!app?.canMoveSelectionStack("front")} onClick={() => stack("front")}><BringToFront size={17} />In den Vordergrund</button>
-        <button className={row} disabled={!app?.canMoveSelectionStack("back")} onClick={() => stack("back")}><SendToBack size={17} />In den Hintergrund</button>
-      </Section>
-      {p.mode === "3d" && (
-        <Section title="3D">
-          <button className={row} onClick={() => { phonePanelStore.set(null); window.dispatchEvent(new CustomEvent("pixuna-3d-open", { detail: "dossier" })); }}><FileText size={17} />Render-Dossier · PDF, JSON, GLB</button>
-        </Section>
-      )}
-      <Section title="Ansicht">
-        <button className={row} onClick={() => { p.onCenterView(); phonePanelStore.set(null); }}><Crosshair size={17} />Ansicht zentrieren</button>
-        <button className={row} onClick={() => { phonePanelStore.set(null); p.onPresent(); }}><Presentation size={17} />Präsentationsmodus</button>
-        <button className={row} onClick={p.onToggleHelp}><HelpCircle size={17} />Hilfe {p.helpOn ? "ausblenden" : "einblenden"}</button>
-      </Section>
-      <Section title="Bedienung · Hilfsrad">
-        <button className={row} onClick={p.onToggleTabletAid}><Tablet size={17} />Hilfsrad {p.tabletAidOn ? "ausblenden" : "einblenden"}</button>
+      {p.mode === "3d" && <Section title="3D"><div className="grid grid-cols-3 gap-2"><Button variant="outline" className={tile} onClick={() => { phonePanelStore.set(null); window.dispatchEvent(new CustomEvent("pixuna-3d-open", { detail: "dossier" })); }}><FileText />Render-Dossier</Button></div></Section>}
+      <Section title="Ansicht"><div className="grid grid-cols-3 gap-2">
+        <Button variant="outline" className={tile} onClick={() => { phonePanelStore.set(null); p.onPresent(); }}><Presentation />Präsentation</Button>
+        <Button variant="outline" className={tile} aria-pressed={p.helpOn} onClick={p.onToggleHelp}><HelpCircle />Hilfe {p.helpOn ? "ausblenden" : "einblenden"}</Button>
+      </div></Section>
+      <Section title="Bedienung · Hilfsrad"><div className="grid grid-cols-3 gap-2">
+        <Button variant="outline" className={tile} aria-pressed={p.tabletAidOn} onClick={p.onToggleTabletAid}><Tablet />Hilfsrad</Button>
+        <Button variant="outline" className={tile} onClick={() => { setScale(1); writeWheelScale(1); }}><RotateCcw />Größe zurücksetzen</Button>
+        <Button variant="outline" className={tile} onClick={resetWheelPosition}><Move />Position zurücksetzen</Button>
+      </div>
         <div className="px-2 py-1">
           <div className="mb-1 flex justify-between text-xs"><span>Größe</span><span className="tabular-nums font-semibold" style={{ color: "hsl(var(--accent-gold))" }}>{wheelScaleToPercent(scale)} %</span></div>
           <input type="range" min={0} max={100} step={1} value={wheelScaleToPercent(scale)} className="w-full accent-primary"
             onChange={(e) => { const v = wheelPercentToScale(Number(e.target.value)); setScale(v); writeWheelScale(v); }} aria-label="Größe des Hilfsrads" />
         </div>
-        <button className={row} onClick={() => { setScale(1); writeWheelScale(1); }}><RotateCcw size={17} />Größe zurücksetzen</button>
-        <button className={row} onClick={resetWheelPosition}><Move size={17} />Position zurücksetzen</button>
+
       </Section>
     </div>
   );
@@ -393,17 +394,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section>
       <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--ink-soft))" }}>{title}</div>
-      <div className="rounded-xl border" style={{ borderColor: "hsl(var(--hairline))" }}>{children}</div>
+      <div>{children}</div>
     </section>
   );
 }
 
 function IconBtn({ label, onClick, disabled, active, children }: { label: string; onClick?: () => void; disabled?: boolean; active?: boolean; children: React.ReactNode }) {
-  return (
-    <button type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick}
-      className="grid h-10 w-10 shrink-0 place-items-center rounded-lg disabled:opacity-35"
-      style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--ink))", background: active ? "hsl(var(--accent-gold) / 0.15)" : "transparent" }}>
-      {children}
-    </button>
-  );
+  const edit = ["Kopieren", "Einfügen", "Mehrfach einfügen", "Mehrfach einfügen beenden", "Auswahl löschen"].includes(label);
+  return <Button variant="outline" type="button" aria-label={label} title={label} disabled={disabled} onClick={onClick} aria-pressed={active}
+    className={edit ? "phone-action-tile min-w-0 flex-1 px-1" : "h-10 w-10 shrink-0 p-0"}>
+    {children}{edit && <span>{label.startsWith("Mehrfach") ? "Mehrfach" : label === "Auswahl löschen" ? "Löschen" : label}</span>}
+  </Button>;
 }
