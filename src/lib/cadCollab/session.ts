@@ -287,7 +287,7 @@ export class CadCollabSession {
 
   private refreshDirty() {
     if (this.mode === "off") return;
-    const dirty = this.mode === "live" ? false : this.pendingOps().length > 0;
+    const dirty = this.pendingOps().length > 0;
     this.report({ dirty });
   }
 
@@ -342,10 +342,13 @@ export class CadCollabSession {
         conflict: this.conflict,
         updateAvailable: decision === "updateAvailable",
         deviceOnly: decision === "deviceOnly",
+        error: null,
+        ...(!this.conflict && decision !== "updateAvailable" && decision !== "deviceOnly" && this.pendingOps().length === 0 ? { lastSavedAt: Date.now() } : {}),
       });
       this.refreshDirty();
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({ error: "Der Cloudstand konnte nicht überprüft werden." });
     } finally {
       this.refreshing = false;
     }
@@ -388,7 +391,7 @@ export class CadCollabSession {
       this.replaceWithRemote(state);
       this.lastSeq = latestSeq;
       saveSeenSeq(this.baseKey, latestSeq);
-      this.report({ conflict: false, updateAvailable: false, deviceOnly: false, error: null });
+      this.report({ conflict: false, updateAvailable: false, deviceOnly: false, error: null, lastSavedAt: Date.now() });
       this.refreshDirty();
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
@@ -602,6 +605,7 @@ export class CadCollabSession {
    */
   notifyLocalChange() {
     if (this.destroyed || this.applyingRemote) return;
+    this.report({ dirty: true });
     window.clearTimeout(this.sendTimer);
     this.sendTimer = window.setTimeout(() => { void this.flush(); }, SEND_DEBOUNCE_MS);
   }
@@ -624,6 +628,7 @@ export class CadCollabSession {
       const ops = diffSceneIndexes(this.lastIndex, nextIndex);
       this.lastIndex = nextIndex;
       if (ops.length === 0) return;
+      this.report({ saving: true, error: null });
       // Bibliotheksdefinitionen zuerst: eine Instanz darf nie ohne Geometrie
       // bei der Gegenseite ankommen.
       ops.sort((a, b) => Number(isLibraryKind(b.objectKind)) - Number(isLibraryKind(a.objectKind)));
@@ -631,9 +636,11 @@ export class CadCollabSession {
         await this.writeOne(op);
         if (this.destroyed) return;
       }
+      this.report({ saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null });
     } catch (error) {
       if (!isCollabSchemaMissing(error)) console.error("CAD-Live-Änderung nicht gespeichert:", error);
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
+      this.report({ saving: false, dirty: true, error: "Die Teamübertragung ist fehlgeschlagen. Der Cloudstand ist nicht bestätigt." });
     } finally {
       this.flushing = false;
       if (this.flushAgain) {

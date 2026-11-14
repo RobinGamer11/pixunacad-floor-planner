@@ -1717,3 +1717,21 @@ body[data-phone="1"][data-phone-mode="3d"][data-phone-panel="pages"] .w3d-right-
 
 /* Handy: Einklappleiste des 3D-Fensters entfällt (Bedienfenster hat eigenen Schließen-Knopf). */
 body[data-phone="1"] .w3d-panel-bar { display: none !important; }
+
+/* Gemeinsame Speicheranzeige und berührbare Handyaktionen. */
+.workspace-save-complete { color: hsl(var(--ink)); background: hsl(var(--surface-card)); }
+.workspace-save-pending { color: hsl(var(--accent-gold)); background: hsl(var(--surface-muted)); }
+.workspace-save-badge { position: absolute; right: 2px; bottom: 2px; border-radius: 50%; background: hsl(var(--surface-card)); }
+.workspace-save-badge svg { width: 12px; height: 12px; }
+.phone-mode-group { background: hsl(var(--surface-muted)); }
+.phone-mode-button[aria-pressed="true"], .phone-action-tile[aria-pressed="true"], .phone-edit-toggle[aria-pressed="true"], .phone-canvas-fab[aria-pressed="true"] {
+  background: hsl(var(--accent-gold) / .2); color: hsl(var(--accent-gold)); border-color: hsl(var(--accent-gold));
+}
+.phone-action-tile { min-height: 68px; height: auto; flex-direction: column; gap: 5px; white-space: normal; font-size: 11px; line-height: 1.25; text-align: center; }
+.phone-action-tile svg { width: 20px; height: 20px; }
+.phone-action-tile span { overflow-wrap: anywhere; }
+.phone-canvas-fab { width: 44px; height: 44px; border-radius: 50%; background: hsl(var(--surface-card)); color: hsl(var(--ink)); border: 2px solid hsl(var(--accent-gold)); }
+.phone-canvas-fab svg { width: 21px; height: 21px; }
+body[data-phone="1"] .w3d-left-tools > button { display: none; }
+body[data-phone="1"] .w3d-right-tools { top: 64px; }
+body[data-phone="1"] .w3d-panel { pointer-events: auto; }
