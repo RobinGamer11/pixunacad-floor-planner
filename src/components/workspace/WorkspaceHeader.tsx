@@ -167,7 +167,7 @@ export function WorkspaceHeader({
 
 
         <div className="ml-2 flex items-center gap-1 rounded-lg border p-1 shrink-0" role="group" aria-label="Bereich wählen"
-             style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
+             style={{ background: "hsl(var(--ink) / 0.16)", borderColor: "hsl(var(--hairline))" }}>
 
           <ModeButton
             icon={<DraftingCompass size={13} />}

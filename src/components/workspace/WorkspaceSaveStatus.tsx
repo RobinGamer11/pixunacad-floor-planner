@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from "react";
-import { Cloud, Info, AlertTriangle, Loader2, CloudUpload, RefreshCw } from "lucide-react";
+import { Save, Info, AlertTriangle, Loader2, CloudUpload, RefreshCw } from "lucide-react";
 import { getLocalProjectSaveState, subscribeLocalProjectSaveState } from "@/cad/persist/localScenePersist";
 import { useProjectSyncState, saveProjectToCloud, refreshProjectFromCloud, resolveProjectConflict } from "@/lib/projectSync";
 import { registerProjectInCloud, useCloudProjectLifecycle } from "@/lib/useCloudProjectLifecycle";
@@ -27,7 +27,7 @@ export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string
     <Popover key={projectId}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="icon" aria-label="Speicherstatus" title="Speicherstatus" className={`relative shrink-0 ${compact ? "h-8 w-8 [&_svg]:size-4 " : ""}${state.complete ? "workspace-save-complete" : "workspace-save-pending"}`}>
-          {state.busy ? <Loader2 className="animate-spin" /> : <><Cloud /><span className="workspace-save-badge">{state.complete ? <Info /> : <AlertTriangle />}</span></>}
+          {state.busy ? <Loader2 className="animate-spin" /> : <><Save /><span className="workspace-save-badge">{state.complete ? <Info /> : <AlertTriangle />}</span></>}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="z-[100] max-w-[calc(100vw-24px)] space-y-3 text-sm" onPointerDown={e => e.stopPropagation()}>

@@ -28,3 +28,4 @@
 - [x] Modusrahmen heller, Buttons dunkler
 - [x] Handy-Export: Exportfenster-Symbolbutton oben links
 - [x] 3D: Mehrfachauswahl/Blätter oben am Rand; Kopiersymbol oben rechts am Handy raus
+- [x] Speichern-Symbol, Handy-Exportleiste, heller Modusrahmen, Ausrichtungssymbole

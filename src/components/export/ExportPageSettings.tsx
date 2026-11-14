@@ -112,12 +112,11 @@ export function ExportPageSettings({ app, onOpenSourceSheet }: {
               {([[false, "Hochformat"], [true, "Querformat"]] as const).map(([land, label]) => {
                 const active = plan.landscape === land;
                 return (
-                  <button key={label} type="button" aria-pressed={active}
+                  <button key={label} type="button" aria-pressed={active} aria-label={label} title={label}
                     onClick={() => set(() => pm.setFormat(plan.id, { landscape: land }))}
-                    className="flex h-8 items-center justify-center gap-1.5 rounded-md border text-[11px]"
+                    className="flex h-9 items-center justify-center rounded-md border"
                     style={active ? D.gold : D.field}>
-                    <span className="inline-block rounded-[2px] border" style={{ width: land ? 13 : 9, height: land ? 9 : 13, borderColor: "currentColor" }} />
-                    {label}
+                    <span className="inline-block rounded-[2px] border-[1.5px]" style={{ width: land ? 20 : 14, height: land ? 14 : 20, borderColor: "currentColor" }} />
                   </button>
                 );
               })}
