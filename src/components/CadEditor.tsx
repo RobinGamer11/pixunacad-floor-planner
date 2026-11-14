@@ -1,6 +1,6 @@
 import { ScrollEdgeHints } from "@/components/ScrollEdgeHints";
 import { toast } from "@/hooks/use-toast";
-import { saveLocalScene, loadLocalScene, onLocalSaveStatus } from "@/cad/persist/localScenePersist";
+import { saveLocalScene, loadLocalScene, getLocalProjectSaveState, subscribeLocalProjectSaveState } from "@/cad/persist/localScenePersist";
 import { TrashIcon } from "@/lib/trashIcon";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
@@ -1052,7 +1052,12 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         console.error("Lokaler Stand nicht lesbar:", e);
       });
     }
-    const offSaveStatus = onLocalSaveStatus((s, d) => {
+    let previousSaveState = getLocalProjectSaveState(projectId);
+    const offSaveStatus = subscribeLocalProjectSaveState(() => {
+      const next = getLocalProjectSaveState(projectId);
+      if (next === previousSaveState) return;
+      previousSaveState = next;
+      const { status: s, detail: d } = next;
       if (s === "quota" || s === "blocked" || s === "error") toast({ title: s === "blocked" ? "Speichern gesperrt" : "Speichern fehlgeschlagen", description: d, variant: "destructive" });
     });
 

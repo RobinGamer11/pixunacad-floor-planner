@@ -225,9 +225,9 @@ export function MobileShell(p: MobileShellProps) {
             className="absolute left-20 right-14 top-0 h-6 cursor-ns-resize" style={{ touchAction: "none" }} aria-label="Bedienfenster vergrößern oder verkleinern">
             <div className="mx-auto mt-2 h-1.5 w-11 rounded-full" style={{ background: "hsl(var(--ink-soft) / 0.45)" }} />
           </div>
-          <div className="flex h-full items-end justify-between px-3 pb-1.5">
+          <div className="pointer-events-none flex h-full items-end justify-between px-3 pb-1.5">
             <span className="text-sm font-semibold">{TITLES[panel]}</span>
-            <IconBtn label="Schließen" onClick={closeSheet}><X size={16} /></IconBtn>
+            <div className="pointer-events-auto"><IconBtn label="Schließen" onClick={closeSheet}><X size={16} /></IconBtn></div>
           </div>
         </div>
       )}

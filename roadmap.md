@@ -6,8 +6,9 @@
 - [x] Hilfsrad-Größe 0–100 %, Knöpfe am Rad, 3D-Fenster einklappbar wie CAD
 
 ## Handyoberfläche und gemeinsamer Speicherstatus (Basis 68a78b33)
-- [ ] Auswahlaktionen und Zentrieren auf der Zeichenfläche, beschriftete Mehr-Kacheln und deutliche Kopf-/Bearbeitungsbuttons
-- [ ] Hilfe startet pro Projektsitzung ausgeschaltet
-- [ ] Projektbezogene lokale und Cloud-Speichersignale im gemeinsamen Kopfsymbol zusammenführen
-- [ ] Bedienfenster zuverlässig schließen und Ziehzustand zurücksetzen
-- [ ] Regeltests und Browserprüfung CAD/3D/Export; Grenzen der Prüfung benennen
+- [x] Auswahlaktionen und Zentrieren auf der Zeichenfläche, beschriftete Mehr-Kacheln und deutliche Kopf-/Bearbeitungsbuttons
+- [x] Hilfe startet pro Projektsitzung ausgeschaltet
+- [x] Projektbezogene lokale und Cloud-Speichersignale im gemeinsamen Kopfsymbol zusammenführen
+- [x] Bedienfenster zuverlässig schließen und Ziehzustand zurücksetzen
+- [x] Regeltests: 23 bestanden; isolierte Browserprüfung CAD/3D/Export (keine angemeldete Projektabnahme)
+- [ ] Angemeldete Projektabnahme inklusive echter lokaler/Cloud-Speicherung: Projektzugriff im Browser führt zu /login, keine nutzbare Testsitzung verfügbar
