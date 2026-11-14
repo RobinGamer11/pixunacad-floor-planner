@@ -46,8 +46,8 @@ export function ScrollEdgeHints({ target, axis }: { target: HTMLElement | null; 
   const r = s.rect;
   if (!r || (!s.a && !s.b) || document.body.dataset.phone === "1") return null;
   const T = 46;
-  const base: React.CSSProperties = { position: "fixed", pointerEvents: "none", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", color: "hsl(var(--accent-gold))", transition: "opacity 150ms", filter: "drop-shadow(0 1px 1px hsl(var(--ink) / 0.35))" };
-  const bg = (dir: string) => `linear-gradient(${dir}, hsl(var(--surface-card)) 0%, hsl(var(--surface-card) / 0.92) 40%, hsl(var(--accent-gold) / 0.10) 75%, hsl(var(--surface-card) / 0))`;
+  const base: React.CSSProperties = { position: "fixed", pointerEvents: "none", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", color: "hsl(var(--accent-gold))", transition: "opacity 150ms", filter: "drop-shadow(0 1px 2px hsl(var(--ink) / 0.6))" };
+  const bg = (dir: string) => `linear-gradient(${dir}, hsl(var(--ink) / 0.55) 0%, hsl(var(--ink) / 0.32) 45%, hsl(var(--ink) / 0))`;
   const hint = (side: "a" | "b") => {
     if (axis === "x") {
       const st: React.CSSProperties = { ...base, top: r.top, height: r.height, width: T, left: side === "a" ? r.left : r.right - T, background: bg(side === "a" ? "to right" : "to left") };

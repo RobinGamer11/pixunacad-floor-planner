@@ -167,7 +167,7 @@ export function WorkspaceHeader({
 
 
         <div className="ml-2 flex items-center gap-1 rounded-lg border p-1 shrink-0" role="group" aria-label="Bereich wählen"
-             style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}>
+             style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
 
           <ModeButton
             icon={<DraftingCompass size={13} />}
@@ -194,7 +194,7 @@ export function WorkspaceHeader({
       {/* Right: Undo/Redo · Zoom · Präsentieren · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
 
-        <WorkspaceSaveStatus key={projectId} projectId={projectId} />
+        <WorkspaceSaveStatus key={projectId} projectId={projectId} compact />
 
 
         <button
@@ -269,7 +269,7 @@ export function WorkspaceHeader({
         {mode === "export" ? (
           <button
             onClick={onPresent}
-            className="h-8 px-3 rounded-md border flex items-center gap-1.5 text-xs font-medium"
+            className="h-8 px-2.5 xl:px-3 rounded-md border flex items-center gap-1.5 text-xs font-medium"
             style={{
               background: "hsl(var(--surface))",
               color: "hsl(var(--ink))",
@@ -277,7 +277,7 @@ export function WorkspaceHeader({
             }}
             title="Präsentieren"
           >
-            <Play size={13} /> Präsentieren
+            <Play size={13} /><span className="hidden xl:inline">Präsentieren</span>
           </button>
         ) : (
           <>
@@ -287,7 +287,7 @@ export function WorkspaceHeader({
               style={{ background: "hsl(var(--accent-gold-soft))", color: "hsl(var(--accent-gold))" }}
               title="Präsentieren"
             >
-              <Play size={13} /> Präsentieren
+              <Play size={13} /><span className="hidden xl:inline">Präsentieren</span>
             </button>
           </>
         )}
@@ -355,7 +355,7 @@ function ModeButton({
       aria-pressed={active}
       className="workspace-mode-button h-7 px-3 rounded-md border flex items-center gap-1.5 text-[11.5px] font-semibold transition-colors shrink-0"
       style={{
-        background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface-card))",
+        background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface-muted))",
         color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
         borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
         boxShadow: active ? "0 1px 3px hsl(var(--accent-gold) / 0.45)" : "0 1px 1px hsl(var(--ink) / 0.08)",

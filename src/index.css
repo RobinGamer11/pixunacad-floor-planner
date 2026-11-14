@@ -1740,3 +1740,13 @@ body[data-phone="1"] .w3d-panel { pointer-events: auto; }
 .phone-mode-button { border-color: hsl(var(--hairline)); background: hsl(var(--surface-card)); }
 .phone-cad-actions { scrollbar-width: none; padding-bottom: 2px; }
 .phone-cad-actions > * { flex-shrink: 0; }
+
+/* Handy-Export: linkes Exportfenster nur auf Knopfdruck als Überlagerung. */
+body[data-phone="1"] .export-sidebar, body[data-phone="1"] .export-sidebar-collapsed { display: none !important; }
+body[data-phone="1"][data-phone-export="1"] .export-sidebar {
+  display: flex !important; position: fixed; left: 0; top: var(--phone-header-h, 104px); bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+  width: min(300px, 86vw) !important; z-index: 70; box-shadow: 8px 0 24px hsl(var(--ink) / .22);
+}
+/* Handy 3D: Bedienknöpfe wieder direkt am oberen Rand. */
+body[data-phone="1"] .w3d-multi { top: 12px; }
+body[data-phone="1"] .w3d-right-tools { top: 12px; }

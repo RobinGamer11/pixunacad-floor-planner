@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 
-export function WorkspaceSaveStatus({ projectId }: { projectId?: string }) {
+export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string; compact?: boolean }) {
   useCloudProjectLifecycle(projectId);
   const cloud = useProjectSyncState(projectId);
   const local = useSyncExternalStore(subscribeLocalProjectSaveState, () => getLocalProjectSaveState(projectId));
@@ -26,7 +26,7 @@ export function WorkspaceSaveStatus({ projectId }: { projectId?: string }) {
   return <>
     <Popover key={projectId}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="icon" aria-label="Speicherstatus" title="Speicherstatus" className={`relative shrink-0 ${state.complete ? "workspace-save-complete" : "workspace-save-pending"}`}>
+        <Button variant="outline" size="icon" aria-label="Speicherstatus" title="Speicherstatus" className={`relative shrink-0 ${compact ? "h-8 w-8 [&_svg]:size-4 " : ""}${state.complete ? "workspace-save-complete" : "workspace-save-pending"}`}>
           {state.busy ? <Loader2 className="animate-spin" /> : <><Cloud /><span className="workspace-save-badge">{state.complete ? <Info /> : <AlertTriangle />}</span></>}
         </Button>
       </PopoverTrigger>
