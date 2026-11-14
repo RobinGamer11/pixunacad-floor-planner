@@ -4498,6 +4498,13 @@ export class CadApp {
   private _planEmptyScene: Scene | null = null;
 
   /** Zentriert Kamera auf (0,0) und zoomt so, dass das Papier mit Rand passt. */
+  centerActiveExportView() {
+    const page = this.renderer.planMode;
+    if (!page) return;
+    this._fitCameraToPaper(page.widthMm, page.heightMm);
+    this.renderer.render();
+  }
+
   private _fitCameraToPaper(widthMm: number, heightMm: number) {
     const rect = this.canvas.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;

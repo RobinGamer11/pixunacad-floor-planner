@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeIsPhone, clampWheelScale } from "./phoneLayout";
+import { computeIsPhone, clampWheelScale, phonePanelStore } from "./phoneLayout";
 
 describe("Handy-Erkennung", () => {
   it("Handy hoch (390×844) ist Handy", () => expect(computeIsPhone({ screenW: 390, screenH: 844, innerW: 390, coarse: true })).toBe(true));
@@ -9,4 +9,11 @@ describe("Handy-Erkennung", () => {
 });
 describe("Hilfsrad-Größe", () => {
   it("wird auf 75–150 % begrenzt", () => { expect(clampWheelScale(0.5)).toBe(0.75); expect(clampWheelScale(2)).toBe(1.5); expect(clampWheelScale(1.2)).toBe(1.2); });
+});
+describe("Bedienfenster schließen", () => {
+  it("schließt vollständig und öffnet nach Vollhöhe wieder halbhoch", () => {
+    phonePanelStore.set("tools"); phonePanelStore.setSnap("full");
+    phonePanelStore.set(null); expect(phonePanelStore.get()).toBeNull();
+    phonePanelStore.set("more"); expect(phonePanelStore.getSnap()).toBe("half"); phonePanelStore.set(null);
+  });
 });

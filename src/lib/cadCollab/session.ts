@@ -625,9 +625,9 @@ export class CadCollabSession {
     this.flushing = true;
     try {
       const nextIndex = indexSnapshot(this.opts.app.serializeForCollab());
-      const ops = diffSceneIndexes(this.lastIndex, nextIndex);
+      const ops = this.pendingOps();
       this.lastIndex = nextIndex;
-      if (ops.length === 0) return;
+      if (ops.length === 0) { this.report({ dirty: false, saving: false }); return; }
       this.report({ saving: true, error: null });
       // Bibliotheksdefinitionen zuerst: eine Instanz darf nie ohne Geometrie
       // bei der Gegenseite ankommen.

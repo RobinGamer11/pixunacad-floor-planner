@@ -383,6 +383,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       const app = appRef.current;
       const cvs = canvasRef.current;
       if (!app || !cvs) return;
+      if (app.activePlanId) { app.centerActiveExportView(); return; }
       const r = cvs.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) return;
       // Nur die Kamera-Position ändern — Maßstab, Raster, Objekte, Werkzeug bleiben.
