@@ -729,6 +729,7 @@ export class CadApp {
         this.stairTool.onPointMenuAction(action);
         return;
       }
+      if (this.selectTool.activateGroupMenu(action)) return;
       const sel = this.selection;
       if (sel && sel.type === SelectionType.TEXTBOX_HANDLE && (sel as any).textBoxId && sel.handleIndex != null) {
         this.selectTool.beginTextBoxHandleEdit((sel as any).textBoxId, sel.handleIndex, action);

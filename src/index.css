@@ -1753,3 +1753,8 @@ body[data-phone="1"] .w3d-right-tools { top: 12px; }
 
 .phone-export-fab { height: 48px; padding: 0 12px; gap: 2px; border-width: 2px; border-color: hsl(var(--accent-gold)); color: hsl(var(--accent-gold)); box-shadow: 0 2px 10px hsl(var(--accent-gold) / .35); }
 .phone-export-fab svg:first-child { width: 15px !important; height: 15px !important; }
+
+/* Handy: „Eigenschaften“ nach Werkzeugwahl dezent hervorheben. */
+@keyframes phone-props-hint { 0%,100% { background: hsl(var(--accent-gold) / 0.08); } 50% { background: hsl(var(--accent-gold) / 0.28); } }
+.phone-nav-btn[data-hint="1"] { animation: phone-props-hint 1.4s ease-in-out infinite; border-radius: 12px; }
+@media (prefers-reduced-motion: reduce) { .phone-nav-btn[data-hint="1"] { animation: none; background: hsl(var(--accent-gold) / 0.2); } }

@@ -105,6 +105,9 @@ export function MobileShell(p: MobileShellProps) {
   }, []);
   useEffect(() => { requestAnimationFrame(() => p.app?.resize?.()); }, [panel, p.app]);
 
+  // Hinweis: nach Werkzeugwahl leuchtet „Eigenschaften“, bis es geöffnet wird.
+  const [propsHint, setPropsHint] = useState(false);
+  useEffect(() => { if (panel === "props" || p.mode !== "cad") setPropsHint(false); }, [panel, p.mode]);
   // Werkzeugwahl: Zeichenwerkzeug gewählt → Fenster fährt zurück (bleibt markiert).
   useEffect(() => {
     if (panel !== "tools") return;
@@ -114,7 +117,7 @@ export function MobileShell(p: MobileShellProps) {
       const before = (p.app as any).activeTool;
       window.setTimeout(() => {
         const now = (p.app as any)?.activeTool;
-        if (now && now !== before && now !== (p.app as any).selectTool) phonePanelStore.set(null);
+        if (now && now !== before && now !== (p.app as any).selectTool) { phonePanelStore.set(null); setPropsHint(true); }
       }, 0);
     };
     rail.addEventListener("click", onClick, true);
@@ -287,10 +290,12 @@ export function MobileShell(p: MobileShellProps) {
         style={{ gridTemplateColumns: `repeat(${availableNav.length}, 1fr)`, height: `calc(${NAV_H}px + env(safe-area-inset-bottom, 0px))`, paddingBottom: "env(safe-area-inset-bottom, 0px)", background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         {availableNav.map(({ id, label, Icon }) => {
           const on = panel === id;
+          const hint = id === "props" && propsHint && !on;
           return (
             <button key={id} type="button" onClick={() => phonePanelStore.toggle(id)} aria-pressed={on}
-              className="flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium"
-              style={{ color: on ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }}>
+              data-hint={hint ? "1" : undefined}
+              className="phone-nav-btn flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium"
+               style={{ color: on || hint ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }}>
               <Icon size={19} /><span className="truncate max-w-full px-0.5">{label}</span>
             </button>
           );

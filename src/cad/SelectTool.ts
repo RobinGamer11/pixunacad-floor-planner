@@ -404,6 +404,22 @@ export class SelectTool {
   private _groupAnchorDx = 0;
   private _groupAnchorDy = 0;
 
+  private _groupDomMenuShown = false;
+  /** Aktion aus dem DOM-Punktmenü am Gruppen-Fangpunkt. */
+  activateGroupMenu(action: string): boolean {
+    if (!this.groupAnchorMenu || !this.groupAnchor || !this.marqueeSelectedIds.length) return false;
+    if (action !== PointEditAction.TRANSLATE && action !== PointEditAction.ROTATE && action !== PointEditAction.MOVE) return false;
+    this.groupAnchorMenu = false;
+    this._groupMenuRects = null;
+    this._groupDomMenuShown = false;
+    this.app.pointEditMenu.hide();
+    if (action === PointEditAction.ROTATE) this.startGroupRotate();
+    else { this.groupAnchorActive = true; this._groupAnchorDx = 0; this._groupAnchorDy = 0; }
+    this.snap = null;
+    try { this.app.renderer.render(); } catch {}
+    return true;
+  }
+
   /** Trefferprüfung für das Anker-Menü. */
   private _groupMenuHit(sx: number, sy: number): "move" | "rotate" | null {
     const r = this._groupMenuRects;
@@ -5323,62 +5339,12 @@ export class SelectTool {
       };
       this._groupMenuRects = rects;
 
-      const box = (r: { x: number; y: number; w: number; h: number }, icon: (cx: number, cy: number) => void) => {
-        const rad = 6;
-        ctx.save();
-        ctx.beginPath();
-        ctx.moveTo(r.x + rad, r.y);
-        ctx.lineTo(r.x + r.w - rad, r.y);
-        ctx.quadraticCurveTo(r.x + r.w, r.y, r.x + r.w, r.y + rad);
-        ctx.lineTo(r.x + r.w, r.y + r.h - rad);
-        ctx.quadraticCurveTo(r.x + r.w, r.y + r.h, r.x + r.w - rad, r.y + r.h);
-        ctx.lineTo(r.x + rad, r.y + r.h);
-        ctx.quadraticCurveTo(r.x, r.y + r.h, r.x, r.y + r.h - rad);
-        ctx.lineTo(r.x, r.y + rad);
-        ctx.quadraticCurveTo(r.x, r.y, r.x + rad, r.y);
-        ctx.closePath();
-        ctx.shadowColor = "rgba(0,0,0,0.18)";
-        ctx.shadowBlur = 16;
-        ctx.shadowOffsetY = 4;
-        ctx.fillStyle = "#ffffff";
-        ctx.fill();
-        ctx.shadowColor = "transparent";
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetY = 0;
-        ctx.strokeStyle = "rgba(0,0,0,0.10)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.strokeStyle = "#0f172a";
-        ctx.lineWidth = 1.8;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        icon(r.x + r.w / 2, r.y + r.h / 2);
-        ctx.restore();
-      };
-
-      // Icon „Verschieben“ (Vierrichtungs-Pfeil)
-      box(rects.move, (cx, cy) => {
-        const s = 6;
-        ctx.beginPath();
-        ctx.moveTo(cx - s, cy); ctx.lineTo(cx + s, cy);
-        ctx.moveTo(cx, cy - s); ctx.lineTo(cx, cy + s);
-        const t = 2.6;
-        ctx.moveTo(cx - s + t, cy - t); ctx.lineTo(cx - s, cy); ctx.lineTo(cx - s + t, cy + t);
-        ctx.moveTo(cx + s - t, cy - t); ctx.lineTo(cx + s, cy); ctx.lineTo(cx + s - t, cy + t);
-        ctx.moveTo(cx - t, cy - s + t); ctx.lineTo(cx, cy - s); ctx.lineTo(cx + t, cy - s + t);
-        ctx.moveTo(cx - t, cy + s - t); ctx.lineTo(cx, cy + s); ctx.lineTo(cx + t, cy + s - t);
-        ctx.stroke();
-      });
-      // Icon „Drehen“ (Kreisbogen mit Pfeil)
-      box(rects.rotate, (cx, cy) => {
-        ctx.beginPath();
-        ctx.arc(cx, cy, 6, Math.PI * 0.35, Math.PI * 1.9);
-        ctx.stroke();
-        const ax = cx + Math.cos(Math.PI * 0.35) * 6, ay = cy + Math.sin(Math.PI * 0.35) * 6;
-        ctx.beginPath();
-        ctx.moveTo(ax - 3.4, ay - 1.2); ctx.lineTo(ax, ay + 1.6); ctx.lineTo(ax + 2.6, ay - 2.4);
-        ctx.stroke();
-      });
+      // Gleiches DOM-Punktmenü wie beim Einzelobjekt (direkt antippbar, gleiche Symbole).
+      if (!this.app.pointEditMenu.visible || !this._groupDomMenuShown) {
+        this.app.pointEditMenu.showAt(a.x, a.y, [PointEditAction.TRANSLATE, PointEditAction.ROTATE]);
+        this._groupDomMenuShown = true;
+      }
+      this._groupMenuRects = null;
 
       // Ankerpunkt hervorheben
       ctx.save();
@@ -5389,6 +5355,11 @@ export class SelectTool {
       ctx.restore();
     }
 
+
+    if (this._groupDomMenuShown && !this.groupAnchorMenu) {
+      this._groupDomMenuShown = false;
+      this.app.pointEditMenu.hide();
+    }
 
     // Gruppen-Drehen: Achse vom Schwerpunkt zum Cursor + Winkelanzeige.
     if (this.groupRotateActive && this._groupRotCenter) {
