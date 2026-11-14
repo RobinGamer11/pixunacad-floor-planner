@@ -3,23 +3,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { ScrollEdgeHints } from "@/components/ScrollEdgeHints";
-import {
-  refreshProjectFromCloud,
-  resolveProjectConflict,
-  saveProjectToCloud,
-  useProjectSyncState,
-} from "@/lib/projectSync";
-import { registerProjectInCloud, useCloudProjectLifecycle } from "@/lib/useCloudProjectLifecycle";
-import { toast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { WorkspaceSaveStatus } from "./WorkspaceSaveStatus";
 import {
   ChevronLeft,
   Undo2,
@@ -212,7 +196,7 @@ export function WorkspaceHeader({
       {/* Right: Undo/Redo · Zoom · Präsentieren · Exportieren */}
       <div className="flex items-center gap-1.5 text-muted-foreground shrink-0 pl-2">
 
-        <CloudSaveControl projectId={projectId} />
+        <WorkspaceSaveStatus key={projectId} projectId={projectId} />
 
 
         <button
@@ -314,175 +298,6 @@ export function WorkspaceHeader({
     </>
   );
 }
-
-/**
- * Einziger Speicherweg für Projektinhalte: allein arbeiten und per Klick
- * objektweise sichern – oder, sobald jemand anderes im Projekt ist,
- * automatische Live-Synchronisierung.
- */
-const chip = "h-8 px-2.5 rounded-md flex items-center gap-1.5 text-[11px] font-medium";
-const mutedStyle = { background: "hsl(var(--surface-muted))", color: "hsl(var(--ink-soft))" };
-const buttonStyle = {
-  background: "hsl(var(--surface-muted))",
-  color: "hsl(var(--ink))",
-  borderColor: "hsl(var(--hairline))",
-};
-/** Auffälliger Gold-Stil wie die aktive Bedienungshilfe – für Cloud-Hinweise, die der Nutzer sehen soll. */
-const highlightStyle = {
-  background: "hsl(var(--accent-gold))",
-  color: "hsl(var(--surface))",
-  borderColor: "hsl(var(--accent-gold))",
-};
-
-function CloudSaveControl({ projectId }: { projectId?: string }) {
-  useCloudProjectLifecycle(projectId);
-  const sync = useProjectSyncState(projectId);
-  const [decisionOpen, setDecisionOpen] = React.useState(false);
-  const [busy, setBusy] = React.useState(false);
-  if (!projectId) return null;
-
-  const decide = async (choice: "cloud" | "device") => {
-    setBusy(true);
-    try { await resolveProjectConflict(projectId, choice); } finally { setBusy(false); setDecisionOpen(false); }
-  };
-
-  const decisionDialog = (
-    <AlertDialog open={decisionOpen} onOpenChange={setDecisionOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Welcher Stand soll gelten?</AlertDialogTitle>
-          <AlertDialogDescription>
-            {sync.conflict
-              ? "Auf diesem Gerät und in der Cloud liegen unterschiedliche Stände dieses Projekts. Sie werden nicht vermischt – bitte wähle einen aus."
-              : "In der Cloud liegt ein neuerer Stand. Auf diesem Gerät gibt es noch ungesicherte Änderungen."}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <div className="grid gap-2 text-sm">
-          <button
-            disabled={busy}
-            onClick={() => { void decide("cloud"); }}
-            className="rounded-md border p-3 text-left"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <div className="font-medium flex items-center gap-1.5"><CloudDownload size={14} /> Cloudstand laden</div>
-            <div className="text-muted-foreground text-xs mt-1">Der gesicherte Cloudstand ersetzt CAD und Export auf diesem Gerät. Abweichende Inhalte dieses Geräts werden verworfen.</div>
-          </button>
-          <button
-            disabled={busy}
-            onClick={() => { void decide("device"); }}
-            className="rounded-md border p-3 text-left"
-            style={{ borderColor: "hsl(var(--hairline))" }}
-          >
-            <div className="font-medium flex items-center gap-1.5"><Smartphone size={14} /> Gerätestand als Hauptstand übernehmen</div>
-            <div className="text-muted-foreground text-xs mt-1">Vorher wird eine lokale Sicherheitskopie angelegt. Danach ersetzt der Stand dieses Geräts den Cloudstand für alle Geräte.</div>
-          </button>
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>Später entscheiden</AlertDialogCancel>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-
-  if (sync.mode === "off") {
-    return (
-      <button
-        onClick={async () => {
-          const res = await registerProjectInCloud(projectId);
-          if (!res.ok) toast({ title: "Nur auf diesem Gerät", description: res.message, variant: "destructive" });
-        }}
-        className={`${chip} border`}
-        style={highlightStyle}
-        title="Dieses Projekt ist noch nicht mit deinem Konto verbunden. Klicken, um es in der Cloud anzumelden."
-      >
-        <Smartphone size={14} /> Nur auf diesem Gerät
-      </button>
-    );
-  }
-
-  if (sync.mode === "live") {
-    return (
-      <span
-        className={chip}
-        style={highlightStyle}
-        title="Alle Änderungen werden direkt mit dem Team synchronisiert."
-      >
-        <Users size={14} /> Live im Team
-      </span>
-    );
-  }
-
-  if (sync.saving) {
-    return (
-      <span className={chip} style={highlightStyle}>
-        <Loader2 size={14} className="animate-spin" /> Synchronisiere Änderungen …
-      </span>
-    );
-  }
-
-  if (sync.conflict || sync.updateAvailable) {
-    return (
-      <>
-        <button
-          onClick={() => setDecisionOpen(true)}
-          className={`${chip} border`}
-          style={highlightStyle}
-          title="Bitte wählen, welcher Stand gelten soll."
-        >
-          <AlertTriangle size={14} /> {sync.conflict ? "Stände abweichend" : "Aktualisierung verfügbar"}
-        </button>
-        {decisionDialog}
-      </>
-    );
-  }
-
-  if (sync.error) {
-    return (
-      <button
-        onClick={() => { void saveProjectToCloud(projectId); }}
-        className={`${chip} border`}
-        style={highlightStyle}
-        title={`${sync.error} Erneut versuchen?`}
-      >
-        <CloudUpload size={14} /> Sicherung fehlgeschlagen
-      </button>
-    );
-  }
-
-  if (!sync.dirty) {
-    return (
-      <span className="flex items-center gap-1">
-        <span className={chip} style={mutedStyle} title="Alle Änderungen sind in der Cloud gesichert.">
-          <Check size={14} /> In Cloud gesichert
-        </span>
-        <button
-          onClick={() => { void refreshProjectFromCloud(projectId); }}
-          className="h-8 w-8 rounded-md grid place-items-center"
-          style={highlightStyle}
-          title="Aus Cloud aktualisieren"
-          aria-label="Aus Cloud aktualisieren"
-        >
-          <RefreshCw size={14} />
-        </button>
-      </span>
-    );
-  }
-
-  return (
-    <button
-      onClick={() => { void saveProjectToCloud(projectId); }}
-      className={`${chip} border`}
-      style={highlightStyle}
-      title={sync.deviceOnly
-        ? "Noch kein Cloudstand – klicken, um den Stand dieses Geräts vollständig in die Cloud zu übernehmen."
-        : "Lokal gespeichert – noch nicht in Cloud gesichert"}
-    >
-      <CloudUpload size={14} /> {sync.deviceOnly ? "Nur auf diesem Gerät · In Cloud sichern" : "Ungesicherte Änderungen · In Cloud sichern"}
-    </button>
-  );
-}
-
-
 
 function HeaderAidToggle({
   active,
