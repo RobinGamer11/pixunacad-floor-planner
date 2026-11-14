@@ -19,7 +19,18 @@ type Listener = (s: LocalSaveStatus, detail?: string) => void;
 const listeners = new Set<Listener>();
 let status: LocalSaveStatus = "idle";
 export function onLocalSaveStatus(l: Listener) { listeners.add(l); l(status); return () => { listeners.delete(l); }; }
-function setStatus(s: LocalSaveStatus, detail?: string) { status = s; for (const l of listeners) l(s, detail); }
+export interface LocalProjectSaveState { status: LocalSaveStatus; detail?: string; savedAt: number | null }
+const localStates = new Map<string, LocalProjectSaveState>();
+const projectListeners = new Set<() => void>();
+const EMPTY_LOCAL: LocalProjectSaveState = { status: "idle", savedAt: null };
+export const getLocalProjectSaveState = (projectId?: string): LocalProjectSaveState => projectId ? localStates.get(projectId) ?? EMPTY_LOCAL : EMPTY_LOCAL;
+export function subscribeLocalProjectSaveState(fn: () => void) { projectListeners.add(fn); return () => { projectListeners.delete(fn); }; }
+function setStatus(projectId: string, s: LocalSaveStatus, detail?: string, savedAt?: number) {
+  status = s;
+  localStates.set(projectId, { status: s, detail, savedAt: savedAt ?? localStates.get(projectId)?.savedAt ?? null });
+  projectListeners.forEach(fn => fn());
+  for (const l of listeners) l(s, detail);
+}
 
 const blocked = new Set<string>();
 
@@ -74,9 +85,10 @@ export async function loadLocalScene(projectId: string): Promise<{ snapshot: str
   if (!rec) return null;
   if (rec.format > LOCAL_FORMAT) {
     blocked.add(projectId);
-    setStatus("blocked", "Dieser Stand stammt aus einer neueren Programmversion und wird nicht überschrieben.");
+    setStatus(projectId, "blocked", "Dieser Stand stammt aus einer neueren Programmversion und wird nicht überschrieben.");
     throw new Error("PIXUNA_FORMAT_NEWER");
   }
+  if (!localStates.has(projectId)) setStatus(projectId, "saved", undefined, rec.savedAt);
   return { snapshot: JSON.stringify(stripLegacyRaster(JSON.parse(rec.sceneJson))) };
 }
 
@@ -87,6 +99,7 @@ const chainByProject = new Map<string, Promise<void>>();
 /** Gebündelt je Projekt: nur der neueste Stand wird geschrieben; true = bestätigt gespeichert. */
 export function saveLocalScene(projectId: string, snap: string, revision: number, legacyKey: string): Promise<boolean> {
   if (blocked.has(projectId)) return Promise.resolve(false);
+  setStatus(projectId, "saving");
   return new Promise<boolean>((resolve) => {
     const prev = pendingByProject.get(projectId);
     if (prev) { prev.snap = snap; prev.revision = revision; prev.legacyKey = legacyKey; prev.waiters.push(resolve); return; }
@@ -102,7 +115,7 @@ export function saveLocalScene(projectId: string, snap: string, revision: number
 }
 
 async function writeJob(projectId: string, job: Job): Promise<boolean> {
-  setStatus("saving");
+  setStatus(projectId, "saving");
   try {
     const sceneJson = JSON.stringify(stripLegacyRaster(JSON.parse(job.snap)));
     if (available()) {
@@ -117,16 +130,16 @@ async function writeJob(projectId: string, job: Job): Promise<boolean> {
         st.put({ projectId, format: LOCAL_FORMAT, revision: job.revision, savedAt: Date.now(), sceneJson });
       };
       await done(tx);
-      if (!ok) { blocked.add(projectId); setStatus("blocked", "Neuerer Stand vorhanden – wird nicht überschrieben."); return false; }
+      if (!ok) { blocked.add(projectId); setStatus(projectId, "blocked", "Neuerer Stand vorhanden – wird nicht überschrieben."); return false; }
       try { localStorage.setItem(job.legacyKey, sceneJson); } catch { /* Fallback optional */ }
     } else {
       localStorage.setItem(job.legacyKey, sceneJson);
     }
-    setStatus("saved");
+    setStatus(projectId, pendingByProject.has(projectId) ? "saving" : "saved", undefined, Date.now());
     return true;
   } catch (e) {
     console.error("Lokales Speichern fehlgeschlagen:", e);
-    setStatus(isQuotaError(e) ? "quota" : "error", isQuotaError(e) ? "Gerätespeicher voll." : String((e as any)?.message ?? e));
+    setStatus(projectId, isQuotaError(e) ? "quota" : "error", isQuotaError(e) ? "Gerätespeicher voll." : String((e as any)?.message ?? e));
     return false;
   }
 }
