@@ -45,16 +45,16 @@ export function ScrollEdgeHints({ target, axis }: { target: HTMLElement | null; 
   }, [target, axis]);
   const r = s.rect;
   if (!r || (!s.a && !s.b) || document.body.dataset.phone === "1") return null;
-  const T = 22;
-  const base: React.CSSProperties = { position: "fixed", pointerEvents: "none", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", color: "hsl(var(--accent-gold))", transition: "opacity 150ms" };
-  const bg = (dir: string) => `linear-gradient(${dir}, hsl(var(--surface-card)) 35%, hsl(var(--surface-card) / 0))`;
+  const T = 46;
+  const base: React.CSSProperties = { position: "fixed", pointerEvents: "none", zIndex: 40, display: "flex", alignItems: "center", justifyContent: "center", color: "hsl(var(--accent-gold))", transition: "opacity 150ms", filter: "drop-shadow(0 1px 1px hsl(var(--ink) / 0.35))" };
+  const bg = (dir: string) => `linear-gradient(${dir}, hsl(var(--surface-card)) 0%, hsl(var(--surface-card) / 0.92) 40%, hsl(var(--accent-gold) / 0.10) 75%, hsl(var(--surface-card) / 0))`;
   const hint = (side: "a" | "b") => {
     if (axis === "x") {
       const st: React.CSSProperties = { ...base, top: r.top, height: r.height, width: T, left: side === "a" ? r.left : r.right - T, background: bg(side === "a" ? "to right" : "to left") };
-      return <div key={side} aria-hidden="true" style={st}>{side === "a" ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}</div>;
+      return <div key={side} aria-hidden="true" style={st}>{side === "a" ? <ChevronLeft size={20} strokeWidth={2.6} /> : <ChevronRight size={20} strokeWidth={2.6} />}</div>;
     }
-    const st: React.CSSProperties = { ...base, left: r.left, width: r.width, height: T - 6, top: side === "a" ? r.top : r.bottom - (T - 6), background: bg(side === "a" ? "to bottom" : "to top") };
-    return <div key={side} aria-hidden="true" style={st}>{side === "a" ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</div>;
+    const st: React.CSSProperties = { ...base, left: r.left, width: r.width, height: 34, top: side === "a" ? r.top : r.bottom - 34, background: bg(side === "a" ? "to bottom" : "to top") };
+    return <div key={side} aria-hidden="true" style={st}>{side === "a" ? <ChevronUp size={19} strokeWidth={2.6} /> : <ChevronDown size={19} strokeWidth={2.6} />}</div>;
   };
   return createPortal(<>{s.a && hint("a")}{s.b && hint("b")}</>, document.body);
 }

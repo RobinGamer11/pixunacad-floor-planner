@@ -7,7 +7,7 @@ import { DragScrollDiv } from "@/components/DragScrollDiv";
 import { useDragScroll } from "@/hooks/use-drag-scroll";
 import { CadApp } from "@/cad/CadApp";
 import { ToolIds, PointEditAction } from "@/cad/constants";
-import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon, Boxes, Axe } from "lucide-react";
+import { MousePointer2, Minus, Square, ChevronLeft, ChevronRight, Undo2, Redo2, Spline, RectangleHorizontal, Circle, Ruler, Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Pipette, Pencil, Trash2, Download, Upload, Plus, FileImage, FileText, Maximize2, Ruler as RulerIcon, Eraser, Construction, BrickWall, PaintBucket, Grid3x3, DoorOpen, AppWindow, Move, RotateCw, PanelRightOpen, PanelRightClose, PanelLeftOpen, Crosshair, Scaling, Check, Scissors, Anchor as AnchorIcon, SquareDashed, BoxSelect, FlipHorizontal2, FolderOpen, Settings as SettingsIcon, Layers as LayersIcon, Scan, Frame, Bold as BoldIcon, Italic as ItalicIcon, Underline as UnderlineIcon, Strikethrough as StrikethroughIcon, Table as TableIcon, SquareDashedMousePointer, Pentagon, Boxes, Axe } from "lucide-react";
 import type { HatchDrawMode } from "@/cad/HatchTool";
 import type { PolygonDrawMode } from "@/cad/PolygonTool";
 import { PolygonModeSelect, PolygonSettingsPanel } from "@/components/cad/PolygonSettingsPanel";
@@ -485,6 +485,8 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
+  const [exportLeftOpen, setExportLeftOpen] = useState<boolean>(true);
+  useEffect(() => { const t = setTimeout(() => appRef.current?.resize(), 30); return () => clearTimeout(t); }, [exportLeftOpen]);
   const phoneLayout = usePhoneLayout();
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
   // Handy-Bedienfenster: dieselbe rechte Leiste, nur Reiter von außen gewählt (kein zweites DOM).
@@ -1705,7 +1707,13 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
       </aside>
 
       {/* Export: Seitenleiste direkt nach der CAD-Werkzeugleiste (gleiches Layout). */}
-      {exportMode && cadApp && !presenting && <ExportSidebar app={cadApp} projectId={projectId} />}
+      {exportMode && cadApp && !presenting && (exportLeftOpen ? <ExportSidebar app={cadApp} projectId={projectId} onCollapse={phoneLayout ? undefined : () => setExportLeftOpen(false)} /> : (
+        <div className="export-sidebar-collapsed w-7 shrink-0 border-r flex items-start justify-center pt-3" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+          <button onClick={() => setExportLeftOpen(true)} title="Export-Fenster einblenden" aria-label="Export-Fenster einblenden" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted">
+            <PanelLeftOpen size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+          </button>
+        </div>
+      ))}
 
       {/* Canvas Area */}
       <div ref={containerRef} className="relative flex-1 min-w-0 h-full overflow-hidden">
@@ -2174,7 +2182,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
 
         {/* Ebenen-Button oben links: runder Button mit Icon + Anzahl. */}
-        {!presenting && (
+        {!presenting && !(phoneLayout && !exportMode) && (
           <CanvasFabBar>
             {phoneLayout ? <PhoneSelectionButton app={appRef.current} /> : <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />}
             <StackOrderButtons getApp={getStackApp} />

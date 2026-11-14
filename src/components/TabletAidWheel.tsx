@@ -105,7 +105,7 @@ export function TabletAidWheel() {
     };
   }, [size, totalHeight, scale]);
 
-  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+  const [home, setHome] = useState<{ x: number; y: number }>(() => {
     let stored: { x: number; y: number } | null = null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -123,34 +123,25 @@ export function TabletAidWheel() {
     };
   });
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pos)); } catch {}
-  }, [pos]);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(home)); } catch {}
+  }, [home]);
+  // Angezeigte Lage = gewählte Lage, nur vorübergehend in den freien Bereich geklemmt.
+  // Schließt sich ein Bedienfenster, kehrt das Rad so an seinen Ursprungsplatz zurück.
+  const pos = clamp(home);
   useEffect(() => {
-    const reset = () => { const { h } = visibleViewport(); setPos(clamp({ x: 16, y: h - totalHeight * scale - 24 })); };
+    const reset = () => { const { h } = visibleViewport(); setHome(clamp({ x: 16, y: h - totalHeight * scale - 24 })); };
     window.addEventListener("pixuna-wheel-reset-pos", reset);
     return () => window.removeEventListener("pixuna-wheel-reset-pos", reset);
   }, [clamp, scale]);
   // Größe / sichtbarer Bereich geändert → Position nachführen.
-  useEffect(() => { setPos((p) => { const c = clamp(p); return c.x === p.x && c.y === p.y ? p : c; }); }, [clamp, vpTick]);
 
   // Beim Einblenden sowie bei Größen-/Orientierungswechsel sofort einpassen.
   useEffect(() => {
-    const fit = () => setPos((p) => {
-      const c = clamp(p);
-      return c.x === p.x && c.y === p.y ? p : c;
-    });
-    fit();
-    window.addEventListener("resize", fit);
+    const fit = () => setVpTick((t) => t + 1);
     window.addEventListener("orientationchange", fit);
-    window.visualViewport?.addEventListener("resize", fit);
     window.visualViewport?.addEventListener("scroll", fit);
-    return () => {
-      window.removeEventListener("resize", fit);
-      window.removeEventListener("orientationchange", fit);
-      window.visualViewport?.removeEventListener("resize", fit);
-      window.visualViewport?.removeEventListener("scroll", fit);
-    };
-  }, [clamp]);
+    return () => { window.removeEventListener("orientationchange", fit); window.visualViewport?.removeEventListener("scroll", fit); };
+  }, []);
 
   // Solange das Rad sichtbar ist: Tablet-Commit-Gate aktivieren, damit reale
   // Stift-/Finger-Kontakte in Zeichenwerkzeugen NICHT sofort einen Punkt setzen.
@@ -194,7 +185,7 @@ export function TabletAidWheel() {
   const onDragMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d || d.pointerId !== e.pointerId) return;
-    setPos(clamp({ x: d.ox + (e.clientX - d.startX), y: d.oy + (e.clientY - d.startY) }));
+    setHome(clamp({ x: d.ox + (e.clientX - d.startX), y: d.oy + (e.clientY - d.startY) }));
   };
   const onDragEnd = (e: React.PointerEvent) => {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
