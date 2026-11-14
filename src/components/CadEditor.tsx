@@ -2182,9 +2182,9 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         <div ref={textEditorElRef} className="hidden absolute z-40 outline-none" />
 
         {/* Ebenen-Button oben links: runder Button mit Icon + Anzahl. */}
-        {!presenting && !(phoneLayout && !exportMode) && (
+        {!presenting && !phoneLayout && (
           <CanvasFabBar>
-            {phoneLayout ? <PhoneSelectionButton app={appRef.current} /> : <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />}
+            {<LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />}
             <StackOrderButtons getApp={getStackApp} />
             <CommentModeButton disabled={!projectId} />
           </CanvasFabBar>

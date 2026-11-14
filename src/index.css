@@ -1723,7 +1723,7 @@ body[data-phone="1"] .w3d-panel-bar { display: none !important; }
 .workspace-save-pending { color: hsl(var(--accent-gold)); background: hsl(var(--surface-muted)); }
 .workspace-save-badge { position: absolute; right: 2px; bottom: 2px; border-radius: 50%; background: hsl(var(--surface-card)); }
 .workspace-save-badge svg { width: 12px; height: 12px; }
-.phone-mode-group { background: hsl(var(--surface-muted)); }
+.phone-mode-group { background: hsl(var(--ink) / 0.16); }
 .phone-mode-button[aria-pressed="true"], .phone-action-tile[aria-pressed="true"], .phone-edit-toggle[aria-pressed="true"], .phone-canvas-fab[aria-pressed="true"] {
   background: hsl(var(--accent-gold) / .2); color: hsl(var(--accent-gold)); border-color: hsl(var(--accent-gold));
 }
@@ -1750,3 +1750,6 @@ body[data-phone="1"][data-phone-export="1"] .export-sidebar {
 /* Handy 3D: Bedienknöpfe wieder direkt am oberen Rand. */
 body[data-phone="1"] .w3d-multi { top: 12px; }
 body[data-phone="1"] .w3d-right-tools { top: 12px; }
+
+.phone-export-fab { height: 48px; padding: 0 12px; gap: 2px; border-width: 2px; border-color: hsl(var(--accent-gold)); color: hsl(var(--accent-gold)); box-shadow: 0 2px 10px hsl(var(--accent-gold) / .35); }
+.phone-export-fab svg:first-child { width: 15px !important; height: 15px !important; }

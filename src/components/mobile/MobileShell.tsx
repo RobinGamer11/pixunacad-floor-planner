@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Undo2, Redo2, Copy, ClipboardPaste, CopyPlus, Trash2, X, FileStack, Wrench, SlidersHorizontal,
   Layers, MoreHorizontal, Pencil, MousePointerSquareDashed, BringToFront, SendToBack, Crosshair, Presentation,
-  HelpCircle, Tablet, RotateCcw, Move, Eye, EyeOff, FileText, DraftingCompass, Box, Printer,
+  HelpCircle, Tablet, RotateCcw, Move, Eye, EyeOff, FileText, DraftingCompass, Box, Printer, Plus,
 } from "lucide-react";
 import type { CadApp } from "@/cad/CadApp";
 import { phonePanelStore, usePhonePanel, readWheelScale, writeWheelScale, resetWheelPosition, wheelScaleToPercent, wheelPercentToScale, type PhonePanel } from "@/lib/phoneLayout";
@@ -254,9 +254,12 @@ export function MobileShell(p: MobileShellProps) {
       )}
 
       {p.mode === "export" && (
-        <div {...shield} className="phone-cad-actions fixed left-3 z-[65] flex items-center gap-2" style={{ top: `calc(${headerH + 12}px + env(safe-area-inset-top, 0px))` }}>
-          <Button variant="outline" size="icon" className="phone-canvas-fab shrink-0" aria-label="Exportfenster" title="Exportfenster" aria-pressed={exportOpen}
-            onClick={() => { phonePanelStore.set(null); setExportOpen(v => !v); }}><Printer /></Button>
+        <div {...shield} className="phone-cad-actions fixed inset-x-3 z-[65] flex items-center gap-2 overflow-x-auto" style={{ top: `calc(${headerH + 12}px + env(safe-area-inset-top, 0px))` }}>
+          <Button variant="outline" className="phone-canvas-fab phone-export-fab shrink-0" aria-label="Exportfenster" title="Exportfenster" aria-pressed={exportOpen}
+            onClick={() => { phonePanelStore.set(null); setExportOpen(v => !v); }}><Plus /><Printer /></Button>
+          <PhoneSelectionButton app={p.app} />
+          <StackOrderButtons getApp={() => p.app as any} />
+          <CommentModeButton disabled={!p.projectId} />
         </div>
       )}
 
