@@ -66,3 +66,4 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Handylayout: Erkennung nur `src/lib/phoneLayout.ts`; die vorhandenen Leisten werden per CSS (`body[data-phone-panel]`) zum Bedienfenster – kein zweites DOM; die Handy-Werkzeugkacheln lösen nur die vorhandenen Leistenknöpfe aus, damit CadApp, Auswahl und Undo beim Öffnen/Drehen erhalten bleiben.
 - Workspace save feedback combines project-keyed local persistence acknowledgements and existing cloud source reports; neither a clean local state nor live mode alone proves cloud success.
 - Help visibility is session-only and starts off on project entry; changing CAD/3D/Export preserves it without changing project data.
+- Tablet aid wheel persists only the user-chosen position; open phone panels clamp the displayed position transiently so the wheel returns home after closing.

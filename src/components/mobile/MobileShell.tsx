@@ -10,6 +10,10 @@ import { phonePanelStore, usePhonePanel, readWheelScale, writeWheelScale, resetW
 
 import { Button } from "@/components/ui/button";
 import { WorkspaceSaveStatus } from "@/components/workspace/WorkspaceSaveStatus";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CommentModeButton } from "@/components/comments/CommentLayerUi";
+import { StackOrderButtons } from "@/components/cad/StackOrderButtons";
+import { PhoneSelectionButton } from "@/components/mobile/PhoneSelectionButton";
 
 type Mode = "cad" | "3d" | "export";
 export interface MobileShellProps {
@@ -179,8 +183,8 @@ export function MobileShell(p: MobileShellProps) {
   const showEdit = editOpen || p.canDelete || p.multiPasteActive;
   const navItems: { id: Exclude<PhonePanel, null>; label: string; Icon: any }[] = [
     { id: "pages", label: "Seiten", Icon: FileStack },
-    { id: "tools", label: "Werkzeuge", Icon: Wrench },
     { id: "props", label: "Eigenschaften", Icon: SlidersHorizontal },
+    { id: "tools", label: "Werkzeuge", Icon: Wrench },
     { id: "layers", label: "Ebenen", Icon: Layers },
     { id: "more", label: "Mehr", Icon: MoreHorizontal },
   ];
@@ -196,17 +200,17 @@ export function MobileShell(p: MobileShellProps) {
           <IconBtn label="Rückgängig" disabled={!p.canUndo} onClick={p.onUndo}><Undo2 size={17} /></IconBtn>
           <IconBtn label="Wiederholen" disabled={!p.canRedo} onClick={p.onRedo}><Redo2 size={17} /></IconBtn>
           <WorkspaceSaveStatus key={p.projectId} projectId={p.projectId} />
-          <Button variant="outline" aria-label="Bearbeiten" aria-pressed={showEdit} className="phone-edit-toggle px-2" onClick={() => setEditOpen(v => !v)}><Pencil /><span className="hidden min-[440px]:inline">Bearbeiten</span></Button>
+          {p.mode !== "cad" && <Button variant="outline" aria-label="Bearbeiten" aria-pressed={showEdit} className="phone-edit-toggle px-2" onClick={() => setEditOpen(v => !v)}><Pencil /><span className="hidden min-[440px]:inline">Bearbeiten</span></Button>}
         </div>
         <div className="phone-mode-group mx-2 mb-1.5 grid grid-cols-3 gap-1 rounded-md p-1">
           {(["cad", "3d", "export"] as Mode[]).map(m => {
             const Icon = m === "cad" ? DraftingCompass : m === "3d" ? Box : Printer;
-            return <Button key={m} variant="ghost" aria-pressed={p.mode === m} onClick={() => go(m)} className="phone-mode-button h-9 gap-1 px-1 text-xs"><Icon />{m === "cad" ? "CAD" : m === "3d" ? "3D" : "Export"}</Button>;
+            return <Button key={m} variant="ghost" aria-pressed={p.mode === m} onClick={() => go(m)} className="phone-mode-button h-9 gap-1 px-1 text-xs border"><Icon />{m === "cad" ? "CAD" : m === "3d" ? "3D" : "Export"}</Button>;
           })}
         </div>
       </header>
 
-      {showEdit && p.mode !== "3d" && (
+      {showEdit && p.mode === "export" && (
         <div {...shield} className="phone-editbar fixed left-1/2 z-[80] flex max-w-[calc(100vw-112px)] -translate-x-1/2 items-center gap-1 rounded-lg border p-1 shadow-lg"
           style={{ top: `calc(${headerH + 8}px + env(safe-area-inset-top, 0px))`, background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
           <IconBtn label="Kopieren" disabled={!p.canCopy} onClick={p.onCopy}><Copy size={16} /></IconBtn>
@@ -246,9 +250,26 @@ export function MobileShell(p: MobileShellProps) {
         </div>
       )}
 
-      <div {...shield} className="phone-center-control fixed right-3 z-[65]" style={{ top: `calc(${headerH + 12}px + env(safe-area-inset-top, 0px))` }}>
-        <Button variant="outline" size="icon" className="phone-canvas-fab" aria-label="Ansicht zentrieren" title="Ansicht zentrieren" onClick={p.onCenterView}><Crosshair /></Button>
-      </div>
+      {p.mode === "cad" && (
+        <div {...shield} className="phone-cad-actions fixed inset-x-3 z-[65] flex items-center gap-2 overflow-x-auto" style={{ top: `calc(${headerH + 12}px + env(safe-area-inset-top, 0px))` }}>
+          <CommentModeButton disabled={!p.projectId} />
+          <PhoneSelectionButton app={p.app} />
+          <StackOrderButtons getApp={() => p.app as any} />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="phone-canvas-fab shrink-0" aria-label="Kopieren und Einfügen" title="Kopieren und Einfügen" aria-pressed={p.multiPasteActive}><Copy /></Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="z-[100] w-auto space-y-1 p-1" onPointerDown={e => e.stopPropagation()}>
+              <Button variant="ghost" className="w-full justify-start" disabled={!p.canCopy} onClick={p.onCopy}><Copy />Kopieren</Button>
+              <Button variant="ghost" className="w-full justify-start" disabled={!p.canPaste} onClick={p.onPaste}><ClipboardPaste />Einfügen</Button>
+              <Button variant="ghost" className="w-full justify-start" aria-pressed={p.multiPasteActive} disabled={!p.canPaste && !p.multiPasteActive}
+                onClick={p.multiPasteActive ? p.onStopMultiPaste : p.onMultiPaste}><CopyPlus />{p.multiPasteActive ? "Mehrfach einfügen beenden" : "Mehrfach einfügen"}</Button>
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon" className="phone-canvas-fab shrink-0" aria-label="Auswahl löschen" title="Auswahl löschen" disabled={!p.canDelete} onClick={p.onDelete}><Trash2 /></Button>
+          <Button variant="outline" size="icon" className="phone-canvas-fab ml-auto shrink-0" aria-label="Ansicht zentrieren" title="Ansicht zentrieren" onClick={p.onCenterView}><Crosshair /></Button>
+        </div>
+      )}
       <nav {...shield} className="phone-bottom-nav fixed inset-x-0 bottom-0 z-[78] grid border-t"
         style={{ gridTemplateColumns: `repeat(${availableNav.length}, 1fr)`, height: `calc(${NAV_H}px + env(safe-area-inset-bottom, 0px))`, paddingBottom: "env(safe-area-inset-bottom, 0px)", background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
         {availableNav.map(({ id, label, Icon }) => {

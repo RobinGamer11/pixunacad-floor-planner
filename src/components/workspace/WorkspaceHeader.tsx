@@ -166,8 +166,8 @@ export function WorkspaceHeader({
         )}
 
 
-        <div className="ml-2 flex items-center gap-1 rounded-md p-0.5 shrink-0"
-             style={{ background: "hsl(var(--surface-muted))" }}>
+        <div className="ml-2 flex items-center gap-1 rounded-lg border p-1 shrink-0" role="group" aria-label="Bereich wählen"
+             style={{ background: "hsl(var(--surface-muted))", borderColor: "hsl(var(--hairline))" }}>
 
           <ModeButton
             icon={<DraftingCompass size={13} />}
@@ -175,11 +175,9 @@ export function WorkspaceHeader({
             active={mode === "cad"}
             onClick={goCad}
           />
-          <ModeDivider />
           <ModeButton icon={<Box size={13} />} label="3D" active={mode === "3d"} onClick={go3d} />
           {showExportTab && (
             <>
-              <ModeDivider />
               <ModeButton
                 icon={<Printer size={13} />}
                 label="Export"
@@ -353,10 +351,14 @@ function ModeButton({
   return (
     <button
       onClick={onClick}
-      className="h-7 px-2.5 rounded-[5px] flex items-center gap-1.5 text-[11px] font-medium transition-colors shrink-0"
+      type="button"
+      aria-pressed={active}
+      className="workspace-mode-button h-7 px-3 rounded-md border flex items-center gap-1.5 text-[11.5px] font-semibold transition-colors shrink-0"
       style={{
-        background: active ? "hsl(var(--accent-gold))" : "transparent",
-        color: active ? "hsl(var(--surface))" : "hsl(var(--ink-soft))",
+        background: active ? "hsl(var(--accent-gold))" : "hsl(var(--surface-card))",
+        color: active ? "hsl(var(--surface))" : "hsl(var(--ink))",
+        borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+        boxShadow: active ? "0 1px 3px hsl(var(--accent-gold) / 0.45)" : "0 1px 1px hsl(var(--ink) / 0.08)",
       }}
     >
       {icon}
@@ -365,12 +367,3 @@ function ModeButton({
   );
 }
 
-function ModeDivider() {
-  return (
-    <span
-      aria-hidden
-      className="mx-0.5 inline-block h-4 w-px"
-      style={{ background: "hsl(var(--hairline))" }}
-    />
-  );
-}

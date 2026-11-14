@@ -7,7 +7,7 @@ import {
 } from "@/cad/planTree";
 import { OverlayMode } from "@/cad/SheetManager";
 import { usePlanUi, formatLabel } from "./useExportApp";
-import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, FilePlus, Download, Check, Minus, GripVertical, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Folder, FolderPlus, FilePlus, Download, Check, Minus, GripVertical, Trash2, PanelLeftClose } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { getLocalCollapsed, setLocalCollapsed } from "@/lib/exportLocalState";
 
@@ -17,7 +17,7 @@ import { getLocalCollapsed, setLocalCollapsed } from "@/lib/exportLocalState";
  * `app.mutatePlans` → genau ein Verlaufsschritt. Die Exportauswahl ist
  * temporärer UI-Zustand und wird nie gespeichert.
  */
-export function ExportSidebar({ app, projectId }: { app: CadApp; projectId?: string }) {
+export function ExportSidebar({ app, projectId, onCollapse }: { app: CadApp; projectId?: string; onCollapse?: () => void }) {
   usePlanUi(app);
   const pm = app.planManager;
   const plans = pm.list();
@@ -224,7 +224,14 @@ export function ExportSidebar({ app, projectId }: { app: CadApp; projectId?: str
       style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
     >
       <div className="p-2 space-y-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--ink-soft))" }}>Export</div>
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em]" style={{ color: "hsl(var(--ink-soft))" }}>Export</div>
+          {onCollapse && (
+            <button type="button" onClick={onCollapse} title="Einklappen" aria-label="Export-Fenster einklappen" className="h-7 w-7 rounded-md flex items-center justify-center hover:bg-muted">
+              <PanelLeftClose size={14} className="text-muted-foreground" />
+            </button>
+          )}
+        </div>
         {selecting ? (
           <div className="space-y-2">
             <div className="text-[11px] text-muted-foreground">Seiten oder Ordner antippen, um sie auszuwählen.</div>

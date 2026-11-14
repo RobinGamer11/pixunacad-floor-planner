@@ -1735,3 +1735,8 @@ body[data-phone="1"] .w3d-panel-bar { display: none !important; }
 body[data-phone="1"] .w3d-left-tools > button { display: none; }
 body[data-phone="1"] .w3d-right-tools { top: 64px; }
 body[data-phone="1"] .w3d-panel { pointer-events: auto; }
+
+.workspace-mode-button[aria-pressed="false"]:hover { border-color: hsl(var(--accent-gold) / .6); color: hsl(var(--accent-gold)); }
+.phone-mode-button { border-color: hsl(var(--hairline)); background: hsl(var(--surface-card)); }
+.phone-cad-actions { scrollbar-width: none; padding-bottom: 2px; }
+.phone-cad-actions > * { flex-shrink: 0; }

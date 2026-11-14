@@ -12,3 +12,11 @@
 - [x] Bedienfenster zuverlässig schließen und Ziehzustand zurücksetzen
 - [x] Regeltests: 23 bestanden; isolierte Browserprüfung CAD/3D/Export (keine angemeldete Projektabnahme)
 - [ ] Angemeldete Projektabnahme inklusive echter lokaler/Cloud-Speicherung: Projektzugriff im Browser führt zu /login, keine nutzbare Testsitzung verfügbar
+
+## Export-Leiste, Scrollhinweise, Handy-Symbole (Basis 945b12cb)
+- [x] Export-Fenster links ein-/ausklappbar (gleiches Symbol wie rechts)
+- [x] Scrollhinweise breiter/deutlicher
+- [x] Handy: Hilfsrad kehrt nach Fensterschließen an Ursprungsplatz zurück
+- [x] Handy: Zentrieren nur in CAD; Reihenfolge Infobox, Auswahl, Vorder/Hintergrund, Kopieren, Löschen, Zentrieren
+- [x] Handy: Eigenschaften links neben Werkzeuge (Werkzeuge mittig)
+- [x] Kopf: CAD/3D/Export deutlicher als Knöpfe
