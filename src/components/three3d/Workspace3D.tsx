@@ -84,6 +84,11 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [dossierMsg, setDossierMsg] = useState<string | null>(null);
   const restoredCam = useRef(false);
   const viewer = useRef<Viewer3DHandle>(null);
+  useEffect(() => {
+    const center = () => viewer.current?.fitAll();
+    window.addEventListener("pixuna-3d-center", center);
+    return () => window.removeEventListener("pixuna-3d-center", center);
+  }, []);
   const [items, setItems] = useState<Derived3D[]>([]);
   const [issues, setIssues] = useState<RelationIssue[]>([]);
   const [tick, setTick] = useState(0);

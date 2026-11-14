@@ -44,8 +44,8 @@ const emit = () => subs.forEach((f) => f());
 export const phonePanelStore = {
   get: () => panel,
   getSnap: () => snap,
-  set(p: PhonePanel) { if (p === panel) return; panel = p; emit(); },
-  toggle(p: Exclude<PhonePanel, null>) { panel = panel === p ? null : p; emit(); },
+  set(p: PhonePanel) { if (p === panel) return; if (!p || !panel) snap = "half"; panel = p; emit(); },
+  toggle(p: Exclude<PhonePanel, null>) { this.set(panel === p ? null : p); },
   setSnap(s: PhoneSnap) { if (s === snap) return; snap = s; emit(); },
   subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; },
 };

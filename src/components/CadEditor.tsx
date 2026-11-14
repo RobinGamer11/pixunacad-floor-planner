@@ -73,6 +73,8 @@ import { ExportSidebar } from "@/components/export/ExportSidebar";
 import { ExportPageSettings } from "@/components/export/ExportPageSettings";
 import { SpreadHandles } from "@/components/export/SpreadHandles";
 import { phonePanelStore } from "@/lib/phoneLayout";
+import { usePhoneLayout } from "@/lib/phoneLayout";
+import { PhoneSelectionButton } from "@/components/mobile/PhoneSelectionButton";
 
 
 /** Maßeingabe (Meter) im Stil der übrigen Werkzeuge: Beschriftung, gerahmtes Feld, Einheit. */
@@ -482,6 +484,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     : undefined;
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true);
   const [rightOpen, setRightOpen] = useState<boolean>(true);
+  const phoneLayout = usePhoneLayout();
   const [rightTab, setRightTab] = useState<"settings" | "sheets" | "layers">("settings");
   // Handy-Bedienfenster: dieselbe rechte Leiste, nur Reiter von außen gewählt (kein zweites DOM).
   useEffect(() => phonePanelStore.subscribe(() => {
@@ -2167,7 +2170,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         {/* Ebenen-Button oben links: runder Button mit Icon + Anzahl. */}
         {!presenting && (
           <CanvasFabBar>
-            <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />
+            {phoneLayout ? <PhoneSelectionButton app={appRef.current} /> : <LayerFab bare count={layerCount} onClick={() => { setRightOpen(true); setRightTab("layers"); }} />}
             <StackOrderButtons getApp={getStackApp} />
             <CommentModeButton disabled={!projectId} />
           </CanvasFabBar>
