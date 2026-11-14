@@ -175,11 +175,9 @@ export function WorkspaceHeader({
             active={mode === "cad"}
             onClick={goCad}
           />
-          <ModeDivider />
           <ModeButton icon={<Box size={13} />} label="3D" active={mode === "3d"} onClick={go3d} />
           {showExportTab && (
             <>
-              <ModeDivider />
               <ModeButton
                 icon={<Printer size={13} />}
                 label="Export"
@@ -369,13 +367,3 @@ function ModeButton({
   );
 }
 
-function ModeDivider() {
-  return null;
-  return (
-    <span
-      aria-hidden
-      className="mx-0.5 inline-block h-4 w-px"
-      style={{ background: "hsl(var(--hairline))" }}
-    />
-  );
-}
