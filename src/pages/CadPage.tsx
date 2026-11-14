@@ -79,9 +79,16 @@ const CadPage = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const [tabletAidOn, setTabletAidOn] = useState<boolean>(() => {
-    try { return localStorage.getItem("pixuna.tabletAid") === "1"; } catch { return false; }
+    try {
+      const v = localStorage.getItem("pixuna.tabletAid");
+      if (v === "1" || v === "0") return v === "1";
+      // Ohne gespeicherte Wahl: nur auf Touch-Geräten ohne Maus/Tastatur an.
+      return !window.matchMedia?.("(any-pointer: fine)").matches && navigator.maxTouchPoints > 0;
+    } catch { return false; }
   });
+  const tabletAidTouched = useRef(false);
   useEffect(() => {
+    if (!tabletAidTouched.current) { tabletAidTouched.current = true; return; }
     try { localStorage.setItem("pixuna.tabletAid", tabletAidOn ? "1" : "0"); } catch {}
   }, [tabletAidOn]);
   // Hilfe ist ein Sitzungszustand, gespeicherte Altwerte öffnen sie nie automatisch.
