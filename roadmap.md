@@ -20,3 +20,11 @@
 - [x] Handy: Zentrieren nur in CAD; Reihenfolge Infobox, Auswahl, Vorder/Hintergrund, Kopieren, Löschen, Zentrieren
 - [x] Handy: Eigenschaften links neben Werkzeuge (Werkzeuge mittig)
 - [x] Kopf: CAD/3D/Export deutlicher als Knöpfe
+
+## Kopfzeile, Scrollhinweise, Handy-Export, 3D-Ränder
+- [x] Gerätespeicher-Hinweis unten links entfernt; Cloudsymbol im Kopf (Desktop/Tablet)
+- [x] Präsentieren auf Tablet nur Symbol
+- [x] Scrollhinweise dunkler Verlauf
+- [x] Modusrahmen heller, Buttons dunkler
+- [x] Handy-Export: Exportfenster-Symbolbutton oben links
+- [x] 3D: Mehrfachauswahl/Blätter oben am Rand; Kopiersymbol oben rechts am Handy raus

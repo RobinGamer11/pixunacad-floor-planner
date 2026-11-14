@@ -74,6 +74,9 @@ export function MobileShell(p: MobileShellProps) {
   const [panel, snap] = usePhonePanel();
   const vp = useViewport();
   const [editOpen, setEditOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  useEffect(() => { if (p.mode !== "export" || panel) setExportOpen(false); }, [p.mode, panel]);
+  useEffect(() => { if (exportOpen) document.body.dataset.phoneExport = "1"; else delete document.body.dataset.phoneExport; return () => { delete document.body.dataset.phoneExport; }; }, [exportOpen]);
   const [dragH, setDragH] = useState<number | null>(null);
   const landscape = window.innerWidth > window.innerHeight;
   const headerH = 92;
@@ -200,7 +203,7 @@ export function MobileShell(p: MobileShellProps) {
           <IconBtn label="Rückgängig" disabled={!p.canUndo} onClick={p.onUndo}><Undo2 size={17} /></IconBtn>
           <IconBtn label="Wiederholen" disabled={!p.canRedo} onClick={p.onRedo}><Redo2 size={17} /></IconBtn>
           <WorkspaceSaveStatus key={p.projectId} projectId={p.projectId} />
-          {p.mode !== "cad" && <Button variant="outline" aria-label="Bearbeiten" aria-pressed={showEdit} className="phone-edit-toggle px-2" onClick={() => setEditOpen(v => !v)}><Pencil /><span className="hidden min-[440px]:inline">Bearbeiten</span></Button>}
+          {p.mode === "export" && <Button variant="outline" aria-label="Bearbeiten" aria-pressed={showEdit} className="phone-edit-toggle px-2" onClick={() => setEditOpen(v => !v)}><Pencil /><span className="hidden min-[440px]:inline">Bearbeiten</span></Button>}
         </div>
         <div className="phone-mode-group mx-2 mb-1.5 grid grid-cols-3 gap-1 rounded-md p-1">
           {(["cad", "3d", "export"] as Mode[]).map(m => {
@@ -247,6 +250,13 @@ export function MobileShell(p: MobileShellProps) {
         <div {...shield} data-phone-scroll="more" className="phone-sheet-body fixed inset-x-0 z-[75] overflow-y-auto overscroll-contain px-3 pb-4 text-sm"
           style={{ bottom: "var(--phone-sheet-bottom)", height: "calc(var(--phone-sheet-h) - 48px)", background: "hsl(var(--surface-card))" }}>
           <MoreContent {...p} />
+        </div>
+      )}
+
+      {p.mode === "export" && (
+        <div {...shield} className="phone-cad-actions fixed left-3 z-[65] flex items-center gap-2" style={{ top: `calc(${headerH + 12}px + env(safe-area-inset-top, 0px))` }}>
+          <Button variant="outline" size="icon" className="phone-canvas-fab shrink-0" aria-label="Exportfenster" title="Exportfenster" aria-pressed={exportOpen}
+            onClick={() => { phonePanelStore.set(null); setExportOpen(v => !v); }}><Printer /></Button>
         </div>
       )}
 
