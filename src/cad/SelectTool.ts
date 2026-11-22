@@ -3192,13 +3192,11 @@ export class SelectTool {
         if (input.clicked) {
           input.clicked = false;
           input.doubleClicked = false;
-          if (this._pasteBtnHit(input.mouse.sx, input.mouse.sy) || !input.keys?.shift) {
-            this.groupAnchorActive = false;
-            this._groupAnchorDx = 0;
-            this._groupAnchorDy = 0;
-            this.app.commitHistorySnapshot();
-            if (!this.pasteFloatActive) this._clearTransformGuides();
-          }
+          this.groupAnchorActive = false;
+          this._groupAnchorDx = 0;
+          this._groupAnchorDy = 0;
+          this.app.commitHistorySnapshot();
+          if (!this.pasteFloatActive) this._clearTransformGuides();
         }
         this.snap = this._lastGroupSnap;
         return;
@@ -3284,6 +3282,7 @@ export class SelectTool {
           this.app.commitHistorySnapshot();
           if (!this.pasteFloatActive) this._clearTransformGuides();
           input.clicked = false;
+          input.doubleClicked = false;
         }
         this.snap = this._lastGroupSnap;
         return;

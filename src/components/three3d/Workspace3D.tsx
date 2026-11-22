@@ -36,7 +36,7 @@ import { sheetParticipatesIn3D, sheetElevationM } from "@/cad/SheetManager";
 import type { Viewer3DHandle } from "./Viewer3D";
 import { projectStore, useProject } from "@/lib/projectStore";
 import { DEFAULT_PRESETS, PRESET_OPTIONS, type RenderPresets } from "@/cad/three3d/dossier";
-import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Settings } from "lucide-react";
+import { Camera, FileDown, FileJson, ChevronDown, Grid3x3, Layers, Maximize2, Pencil, Trash2, FileText, Settings, X } from "lucide-react";
 import { Joystick3D } from "./Joystick3D";
 import { loadSens, saveSens, speedFactor, stickFactor, type Sens3D } from "./sensitivity";
 import { PatternToggle3D } from "./PatternToggle3D";
@@ -96,8 +96,9 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
   const [refs3D,setRefs3D]=useState<ObjectRef3D[]>([]);
   const selectedKeys3D=useMemo(()=>refs3D.map(refKey3D),[refs3D]);
   const [panelOpen,setPanelOpen]=useState(true);
+  const [sticksCollapsed,setSticksCollapsed]=useState(false);
   useEffect(()=>phonePanelStore.subscribe(()=>{ const p=phonePanelStore.get(); if(p==="props") setPanelOpen(true); if(p==="pages") setOpen("sheets"); else setOpen(o=>o==="sheets"&&document.body.dataset.phone==="1"?null:o); }),[]);
-  useEffect(()=>{const on=(e:Event)=>{const d=(e as CustomEvent).detail; if(d==="dossier"||d==="sheets") setOpen(d);}; window.addEventListener("pixuna-3d-open",on); return()=>window.removeEventListener("pixuna-3d-open",on);},[]);
+  useEffect(()=>{const on=(e:Event)=>{const d=(e as CustomEvent).detail; if(d==="dossier"||d==="sheets") setOpen(o=>o===d?null:d);}; window.addEventListener("pixuna-3d-open",on); return()=>window.removeEventListener("pixuna-3d-open",on);},[]);
   const [multiSelect,setMultiSelect]=useState(false);
   // „Manuell bewegen“ ist eine lokale Geräte-Einstellung und gilt für jede Auswahl.
   const [manualOn,setManualOnRaw]=useState<boolean>(()=>{try{return localStorage.getItem("pixuna.3d.manualOn")!=="0";}catch{return true;}});
@@ -319,7 +320,15 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
           <button className={`${btn} bg-card flex items-center gap-1.5`} onClick={() => setOpen(open === "dossier" ? null : "dossier")}>
             <FileText size={14} /> Render-Dossier <ChevronDown size={13} className={open === "dossier" ? "rotate-180" : ""} />
           </button>
-          {open === "dossier" && <div className="mt-1.5 rounded-lg border bg-card p-3 shadow-lg space-y-2 max-h-[70vh] overflow-y-auto" style={{ borderColor: "hsl(var(--hairline))" }}>        <section className="pt-2 border-t space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
+          {open === "dossier" && <div className="mt-1.5 rounded-lg border bg-card p-3 shadow-lg space-y-2 max-h-[70vh] overflow-y-auto" style={{ borderColor: "hsl(var(--hairline))" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold flex items-center gap-1.5"><FileText size={13} /> Render-Dossier</span>
+              <button type="button" aria-label="Render-Dossier schließen" title="Schließen" onClick={() => setOpen(null)}
+                className="grid h-7 w-7 place-items-center rounded border hover:bg-muted" style={{ borderColor: "hsl(var(--hairline))" }}>
+                <X size={14} />
+              </button>
+            </div>
+            <section className="pt-2 border-t space-y-2" style={{ borderColor: "hsl(var(--hairline))" }}>
           
           <div className="flex gap-1">
             {(["3d", "2d"] as const).map(v => (
@@ -430,14 +439,37 @@ export function Workspace3D({ app, projectId, onEditInCad, helpOn = false, table
           </div>
         </div>
         {tabletAidOn && (
+          sticksCollapsed ? (
+            <button
+              type="button"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setSticksCollapsed(false)}
+              title="Joysticks öffnen"
+              aria-label="Joysticks öffnen"
+              className="fixed grid place-items-center rounded-full border text-[10px] font-semibold"
+              style={{
+                left: 12,
+                bottom: "calc(var(--phone-bottom-reserve, 0px) + 68px + env(safe-area-inset-bottom, 0px))",
+                width: 48,
+                height: 48,
+                zIndex: 2147482000,
+                background: "hsl(var(--overlay-ink) / 0.86)",
+                color: "hsl(var(--accent-gold))",
+                borderColor: "hsl(var(--accent-gold) / 0.5)",
+                touchAction: "none",
+              }}
+            >Sticks</button>
+          ) : (
           <>
             <Joystick3D label="Laufen" size={stickSize} storageKey="pixuna.3d.stick.move"
               defaultPos={() => ({ x: window.innerWidth - 300 - 260, y: window.innerHeight - 190 })}
               onChange={(x, y) => viewer.current?.setStick("move", x, y)} />
             <Joystick3D label="Blick" size={stickSize} onVertical={(d, on) => viewer.current?.move(d, on)} storageKey="pixuna.3d.stick.look"
               defaultPos={() => ({ x: window.innerWidth - 300 - 135, y: window.innerHeight - 190 })}
+              onCollapse={() => setSticksCollapsed(true)}
               onChange={(x, y) => viewer.current?.setStick("look", x, y)} />
           </>
+          )
         )}
         {/* Bedienungshilfe unten mittig */}
         {helpOn && (

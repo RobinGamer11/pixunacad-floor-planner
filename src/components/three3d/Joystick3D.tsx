@@ -12,18 +12,21 @@ function clampPos(p: { x: number; y: number }, w0: number, h0: number) {
   return { x: Math.min(Math.max(m, p.x), Math.max(m, w - w0 - m)), y: Math.min(Math.max(m, p.y), Math.max(m, h - h0 - m)) };
 }
 
-export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112, onVertical }: {
+export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112, onVertical, onCollapse }: {
   label: string; storageKey: string; defaultPos: () => { x: number; y: number }; onChange: (x: number, y: number) => void;
   size?: number;
   /** Optional: Hoch/Runter-Knöpfe rechts an der Rundung (Halten = bewegen). */
   onVertical?: (dir: "u" | "d", on: boolean) => void;
+  /** Optional: Einklapp-Knopf rechts am Joystick im Hilfsrad-Design. */
+  onCollapse?: () => void;
 }) {
   // Alles (Griff, Hoch/Runter, Schrift, Symbole) skaliert mit der Joystick-Größe.
   const k = size / 112;
   const SIZE = size, KNOB = Math.round(size * 0.4);
   const GAP = Math.round(6 * k), VBW = Math.round(30 * k), GRIP_H = Math.round(34 * k), GRIP_W = Math.round(68 * k);
   const SIDE = onVertical ? GAP + VBW : 0;
-  const W = SIZE + SIDE, H = SIZE + GRIP_H - 8;
+  const COLLAPSE_W = onCollapse ? 28 : 0;
+  const W = SIZE + SIDE + COLLAPSE_W, H = SIZE + GRIP_H - 8;
   const max = (SIZE - KNOB) / 2;
   const [p, setP] = useState({ x: 0, y: 0 });
   const [pos, setPos] = useState(() => {
@@ -60,7 +63,7 @@ export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112
   );
 
   return (
-    <div className="fixed z-[60] select-none" style={{ left: pos.x, top: pos.y, width: W, height: H, touchAction: "none" }}>
+    <div className="fixed select-none" style={{ left: pos.x, top: pos.y, width: W, height: H, zIndex: 2147482000, touchAction: "none" }}>
       <div
         className="relative rounded-full border shadow-sm"
         style={{ width: SIZE, height: SIZE, background: "hsl(var(--surface-card) / 0.92)", borderColor: "hsl(var(--hairline))", touchAction: "none" }}
@@ -82,6 +85,27 @@ export function Joystick3D({ label, storageKey, defaultPos, onChange, size = 112
         <div className="absolute flex flex-col" style={{ left: SIZE + GAP, top: 6 * k, gap: 4 * k }}>
           {vBtn("u")}{vBtn("d")}
         </div>
+      )}
+      {onCollapse && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => { e.stopPropagation(); onCollapse(); }}
+          title="Joysticks einklappen"
+          aria-label="Joysticks einklappen"
+          className="absolute grid place-items-center rounded-full text-[13px] font-semibold"
+          style={{
+            left: SIZE + SIDE + 4,
+            top: Math.max(0, SIZE - 28),
+            width: 24,
+            height: 24,
+            background: "hsl(var(--overlay-ink) / 0.92)",
+            color: "hsl(var(--accent-gold))",
+            border: "1px solid hsl(var(--accent-gold) / 0.55)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.32)",
+            touchAction: "none",
+          }}
+        >–</button>
       )}
       {/* Griff: folgt der Rundung unten, verschiebt nur den Joystick */}
       <div
