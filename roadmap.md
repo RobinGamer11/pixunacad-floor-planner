@@ -1,4 +1,13 @@
 # Roadmap – Export/Muster-Auftrag (Basis bdffd521)
+## Kontogetrennte Speicherung und Projektöffnung (Basis 0f623ecd)
+- [x] Lokale Kontotrennung einschließlich CAD, offener Änderungen und Abgleichsstände; unklare Altbestände erhalten
+- [x] Einstellungs-Allowlist und sichere einmalige Altübernahme
+- [x] Konfliktsichere Metadaten-Sicherung und Cloud-Projektindex mit Fehlerzuständen
+- [x] Verbindliche Sicherungsergebnisse und Speicheranzeige
+- [x] Gemeinsame Projektbereitschaft, reale Ladephasen und Illustration; keine Ersatzdaten bei Ladefehlern
+- [x] 57 Regeltests, echte IndexedDB-Browserprüfung, Ladeansicht Desktop/Handy, Vorschau-Build; Bericht in docs/project-storage-verification.md
+- [ ] Angemeldete Cloud-Abnahme auf zwei Geräten: kein nutzbarer externer Testaccount verfügbar
+
 - [x] 1. 2D-Muster beim Herauszoomen glätten (hatchPatterns.ts)
 - [x] 2. Export-Nahzoom (20 mm ≈ 400 px)
 - [x] 3. Export-Einstellungen: „Zeichnung platzieren“ + „Seite einrichten“

@@ -13,13 +13,13 @@ export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string
   useCloudProjectLifecycle(projectId);
   const cloud = useProjectSyncState(projectId);
   const local = useSyncExternalStore(subscribeLocalProjectSaveState, () => getLocalProjectSaveState(projectId));
-  const state = workspaceSaveStatus(local, cloud);
+  const state = workspaceSaveStatus(local, cloud, projectId);
   const [decision, setDecision] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const run = async (fn: () => Promise<unknown>) => {
     setBusy(true); setActionError(null);
-    try { await fn(); } catch { setActionError("Die Aktion konnte nicht abgeschlossen werden. Bitte erneut versuchen."); }
+    try { await fn(); } catch (error) { setActionError(error instanceof Error ? error.message : "Die Aktion konnte nicht abgeschlossen werden. Bitte erneut versuchen."); }
     finally { setBusy(false); }
   };
   const date = (at: number | null) => at ? new Date(at).toLocaleString("de-DE") : "Noch nicht bestätigt";
@@ -39,8 +39,7 @@ export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string
         {actionError && <p role="alert" className="text-xs text-destructive">{actionError}</p>}
         {projectId && <div className="flex flex-wrap gap-2">
           {cloud.conflict || cloud.updateAvailable ? <Button size="sm" variant="outline" onClick={() => setDecision(true)}>Stand wählen</Button> : <Button size="sm" disabled={busy || cloud.saving} onClick={() => void run(async () => {
-            if (cloud.mode === "off") { const result = await registerProjectInCloud(projectId); if (!result.ok) toast({ title: "Nur auf diesem Gerät", description: result.message, variant: "destructive" }); }
-            else await saveProjectToCloud(projectId);
+            await saveProjectToCloud(projectId);
           })}><CloudUpload />In Cloud sichern</Button>}
           {cloud.mode !== "off" && <Button size="sm" variant="outline" disabled={busy || cloud.saving} onClick={() => void run(() => refreshProjectFromCloud(projectId))}><RefreshCw />Aktualisieren</Button>}
         </div>}

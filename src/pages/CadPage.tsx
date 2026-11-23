@@ -25,6 +25,8 @@ const CadPage = () => {
   const [canPaste, setCanPaste] = useState(false);
   const [multiPaste, setMultiPaste] = useState(false);
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
+  const [projectReady, setProjectReady] = useState(false);
+  useEffect(() => { setProjectReady(false); }, [projectId]);
   const phone = usePhoneLayout();
   // Export ist derselbe CAD-Bereich (dieselbe Engine/Verlauf) mit Exportseite aktiv.
   const view3d = location.pathname.endsWith("/3d");
@@ -32,7 +34,7 @@ const CadPage = () => {
   const [draftHistory,setDraftHistory]=useState(false);
   useEffect(()=>{if(!view3d||!cadApp){setDraftHistory(false);return;}const iv=window.setInterval(()=>setDraftHistory(!!state3D(cadApp).draftActive),100);return()=>window.clearInterval(iv);},[view3d,cadApp]);
   useEffect(() => {
-    if (!cadApp) return;
+    if (!cadApp || !projectReady) return;
     // Geöffnete Exportseite ist lokaler Bedienzustand pro Gerät (nie Verlauf/Cloud).
     const ensurePage = () => {
       if (!exportView) return;
@@ -40,21 +42,19 @@ const CadPage = () => {
       const stored = getLocalActivePage(projectId);
       const pick = (stored && cadApp.planManager.getById(stored)) ? stored : cadApp.planManager.list()[0]?.id;
       if (pick) { cadApp.setActivePlanId(pick); return; }
-      // Keine Exportseite vorhanden: nach kurzer Wartezeit (Cloud-Stand) eine A4-Seite anlegen.
-      if (!createTimer) createTimer = window.setTimeout(() => {
-        if (cadApp.planManager.list().length > 0) { ensurePage(); return; }
+      // A confirmed empty project may create its first page, never a loading intermediate.
+      if (!cadApp.planManager.list().length) {
         let id = "";
         cadApp.mutatePlans(() => { id = cadApp.planManager.createPlan({ formatKey: "a4", name: "Seite 1" }).id; });
         if (id) cadApp.setActivePlanId(id);
-      }, 1500);
+      }
     };
-    let createTimer = 0;
     if (exportView) ensurePage();
     else if (cadApp.activePlanId) cadApp.setActivePlanId(null);
     const off = cadApp.onPlanUiChange(ensurePage);
     const t = window.setTimeout(() => cadApp.resize(), 0);
-    return () => { off(); window.clearTimeout(t); if (createTimer) window.clearTimeout(createTimer); };
-  }, [cadApp, exportView, projectId]);
+    return () => { off(); window.clearTimeout(t); };
+  }, [cadApp, exportView, projectId, projectReady]);
 
   const doCopy = () => {
     const ok = editorRef.current?.copySelection() ?? false;
@@ -188,7 +188,9 @@ const CadPage = () => {
         style={phone && !presenting ? { marginBottom: "calc(58px + env(safe-area-inset-bottom, 0px))" } : undefined}
       >
         <CadEditor
+          key={projectId}
           ref={editorRef}
+          onProjectReady={setProjectReady}
           onAppReady={setCadApp}
           projectId={projectId}
           mode={exportView ? "export" : "cad"}

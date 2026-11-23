@@ -91,6 +91,8 @@ import { AuroraBackground } from "@/components/AuroraBackground";
 import { RangeCalendar, type CalEntry } from "@/components/calendar/RangeCalendar";
 import { SectionHeading } from "@/components/layout/SectionHeading";
 import { projectThumbnailSrc, thumbnailErrorFallback } from "@/lib/projectMeta";
+import { projectAccessStore, useProjectAccessState } from "@/lib/projectAccess";
+import { Button } from "@/components/ui/button";
 
 const Pixuna = () => (
   <span className="font-semibold tracking-tight text-base">
@@ -112,6 +114,8 @@ const TAB_HEADINGS: Record<Tab, { title: string; subtitle: string }> = {
 
 
 export default function ProjectsHome() {
+  const cloudIndex = useProjectAccessState();
+  useEffect(() => { void projectAccessStore.reload(); }, []);
   const projects = useProjects();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"projects" | "templates">("projects");
@@ -403,6 +407,9 @@ export default function ProjectsHome() {
       style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))" }}
     >
       {/* ============= TOP HEADER ============= */}
+      {projectStore.getLocalDirectoryError() && <div role="alert" className="p-3 text-center text-sm text-destructive">{projectStore.getLocalDirectoryError()}</div>}
+      {cloudIndex.error && <div role="alert" className="flex items-center justify-center flex-wrap gap-2 p-2 bg-muted text-sm"><span>{cloudIndex.error}</span><Button size="sm" variant="outline" onClick={() => void projectAccessStore.reload()}>Wiederholen</Button></div>}
+      {cloudIndex.loading && <div role="status" className="p-2 text-center text-xs text-muted-foreground">Projektliste wird aktualisiert …</div>}
       <header
         ref={headerScrollRef}
         className="h-16 shrink-0 flex items-center gap-2 sm:gap-4 px-3 sm:px-6 border-b overflow-x-auto no-scrollbar touch-pan-x"
@@ -2629,9 +2636,7 @@ function ProfileEditor({
         <button
           onClick={async () => {
             await signOut();
-            // Ein Neuladen verhindert, dass Daten des vorherigen Kontos im
-            // Arbeitsspeicher sichtbar bleiben.
-            window.location.assign("/login");
+            // AuthProvider restarts only after a successful local flush and logout.
           }}
           className="mt-3 h-9 w-full rounded-md border text-sm flex items-center justify-center gap-2 hover:bg-muted"
           style={{ borderColor: "hsl(var(--hairline))" }}

@@ -1191,6 +1191,7 @@ export class CadApp {
     this._lastSnapshot = this._snapHistory();
     this._isRestoring = false;
   }
+  restoreOpeningSnapshot(snapshot: string) { this._restoreScene(snapshot); }
 
   private _initHistory() {
     this._lastSnapshot = this._snapHistory();

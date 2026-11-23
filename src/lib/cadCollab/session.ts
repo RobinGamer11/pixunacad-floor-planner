@@ -27,6 +27,10 @@ import {
 } from "@/lib/cloudBaseline";
 import { registerProjectSyncSource, reportProjectSyncSource } from "@/lib/projectSync";
 import { decideOpen, loadSeenSeq, saveSeenSeq, writeSafetyCopy } from "@/lib/cloudProjectState";
+import { accountGeneration, currentAccount, sessionIsCurrent } from "@/lib/accountStorage";
+import { hydrateSharedProject } from "@/lib/sharedProjectSync";
+import { projectStore } from "@/lib/projectStore";
+import { directoryCadSnapshot } from "@/lib/directoryCadSnapshot";
 import { applyLibraryOp } from "./applyLibraryOps";
 import { applyOpToScene } from "./applyOps";
 import { diffSceneIndexes, indexSnapshot, type SceneIndex } from "./sceneDiff";
@@ -76,6 +80,7 @@ export type CollabMode = "off" | "local" | "standby" | "live";
 
 /** Minimale Sicht auf die CAD-Anwendung – kein Zugriff auf Interna der Werkzeuge. */
 export interface CollabCadApp {
+  restoreOpeningSnapshot?(snapshot: string): void;
   scenesById: Map<string, unknown>;
   activeSheetId: string;
   renderer?: { render(): void };
@@ -126,6 +131,8 @@ export interface CollabSessionOptions {
 
 export class CadCollabSession {
   private opts: CollabSessionOptions;
+  private owner = currentAccount();
+  private epoch = accountGeneration();
   /** Dauerhafte, minimale Anwesenheitsverbindung (erkennt einen Beitritt). */
   private presence: RealtimeChannel | null = null;
   /** Nur im Live-Betrieb: Objektänderungen, Sperren und Vorschauen. */
@@ -184,6 +191,18 @@ export class CadCollabSession {
     const access = projectAccessStore.accessFor(projectId);
     if (!access.cloud || access.role === null) return; // rein lokales Projekt
     this.baseKey = baselineKey("cad", projectId);
+    let restoreError: string | null = null;
+    // Authenticated old project_documents are fallback only; never replace local scenes.
+    try {
+      if (await hydrateSharedProject(projectId)) {
+        if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) return;
+        const snapshot = directoryCadSnapshot(projectStore.getState().projects.find(p => p.id === projectId));
+        if (snapshot) this.opts.app.restoreOpeningSnapshot?.(snapshot);
+      }
+    } catch (error) {
+      restoreError = error instanceof Error ? error.message : "Der bisherige Projektstand konnte nicht geprüft werden.";
+    }
+    if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) return;
     this.cloudHashes = loadBaseline(this.baseKey);
     this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
     this.unregisterSync = registerProjectSyncSource(projectId, "cad", {
@@ -195,11 +214,13 @@ export class CadCollabSession {
 
     this.mode = projectAccessStore.otherMemberCount(projectId) === 0 ? "local" : "standby";
     this.setStatus({ mode: this.mode });
-    this.report({ mode: this.mode });
+    this.report({ mode: this.mode, ready: false });
+    if (restoreError) { this.report({ error: restoreError }); return; }
 
     // Beim Öffnen den Cloudstand prüfen. Eigene offene Arbeit wird nie
     // überschrieben, lokaler Leerstand nie in die Cloud gedrückt.
     await this.refreshFromCloud();
+    if (this.destroyed) return;
     if (this.mode === "standby") this.connectPresence();
     else this.policyTimer = window.setInterval(() => this.syncPolicy(), 10_000);
   }
@@ -292,6 +313,7 @@ export class CadCollabSession {
   }
 
   private report(partial: Parameters<typeof reportProjectSyncSource>[2]) {
+    if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) return;
     if (!this.baseKey) return;
     reportProjectSyncSource(this.opts.projectId, "cad", partial);
   }
@@ -346,9 +368,10 @@ export class CadCollabSession {
         ...(!this.conflict && decision !== "updateAvailable" && decision !== "deviceOnly" && this.pendingOps().length === 0 ? { lastSavedAt: Date.now() } : {}),
       });
       this.refreshDirty();
+      this.report({ ready: !this.conflict && decision !== "updateAvailable" });
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
-      this.report({ error: "Der Cloudstand konnte nicht überprüft werden." });
+      this.report({ ready: false, error: "Der Cloudstand konnte nicht überprüft werden." });
     } finally {
       this.refreshing = false;
     }
@@ -391,11 +414,12 @@ export class CadCollabSession {
       this.replaceWithRemote(state);
       this.lastSeq = latestSeq;
       saveSeenSeq(this.baseKey, latestSeq);
-      this.report({ conflict: false, updateAvailable: false, deviceOnly: false, error: null, lastSavedAt: Date.now() });
+      this.report({ ready: true, conflict: false, updateAvailable: false, deviceOnly: false, error: null, lastSavedAt: Date.now() });
       this.refreshDirty();
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
       this.report({ error: "Der Cloudstand konnte nicht geladen werden." });
+      throw error;
     }
   }
 
@@ -411,6 +435,7 @@ export class CadCollabSession {
     if (snapshot) writeSafetyCopy("cad", projectId, snapshot);
     try {
       const state = await fetchObjectState(projectId);
+      if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) return;
       this.revisions = new Map(state.map((op) => [`${op.sheetId}|${op.objectId}`, op.objectVersion]));
       this.revisionsLoaded = true;
       this.cloudHashes = new Map();
@@ -424,6 +449,7 @@ export class CadCollabSession {
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
       this.report({ error: "Der Gerätestand konnte nicht übernommen werden." });
+      throw error;
     }
   }
 
@@ -432,13 +458,15 @@ export class CadCollabSession {
    * Ein vollständiger Projekt-Schnappschuss wird nie geschrieben.
    */
   async saveToCloud(): Promise<void> {
-    if (this.destroyed || this.mode === "off" || this.mode === "live" || this.saving) return;
+    if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) throw new Error("Kontositzung beendet.");
+    if (this.mode === "off" || this.saving || this.refreshing) throw new Error("Speicherquelle noch nicht bereit.");
+    if (this.mode === "live") { if (this.pendingOps().length) throw new Error("Live-Übertragung noch nicht bestätigt."); return; }
     const { projectId } = this.opts;
-    if (!projectAccessStore.canEdit(projectId)) return;
+    if (!projectAccessStore.canEdit(projectId)) throw new Error("Keine Schreibberechtigung.");
     // Bei abweichenden Ständen nie automatisch mischen – erst ausdrücklich wählen.
-    if (this.conflict) { this.report({ conflict: true }); return; }
+    if (this.conflict) { this.report({ conflict: true }); throw new Error("Geräte- und Cloudstand weichen ab."); }
     const ops = this.pendingOps();
-    if (ops.length === 0) { this.report({ dirty: false, error: null }); return; }
+    if (ops.length === 0) { this.report({ ready: true, dirty: false, error: null, lastSavedAt: Date.now() }); return; }
     this.saving = true;
     this.report({ saving: true, error: null });
     try {
@@ -454,7 +482,7 @@ export class CadCollabSession {
       this.lastIndex = indexSnapshot(this.opts.app.serializeForCollab());
       try { saveSeenSeq(this.baseKey, await fetchLatestSeq(projectId)); } catch { /* beim nächsten Abgleich */ }
       this.report({
-        saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null,
+        ready: true, saving: false, dirty: this.pendingOps().length > 0, lastSavedAt: Date.now(), error: null,
         deviceOnly: false, updateAvailable: false,
       });
     } catch (error) {
@@ -467,6 +495,7 @@ export class CadCollabSession {
           ? "Die Cloud-Sicherung ist für dieses Projekt noch nicht eingerichtet."
           : "Die Cloud-Sicherung ist fehlgeschlagen. Deine Arbeit ist lokal gespeichert.",
       });
+      throw error;
     } finally {
       this.saving = false;
     }
@@ -655,10 +684,16 @@ export class CadCollabSession {
     const key = `${op.sheetId}|${op.objectId}`;
     const base = this.revisions.get(key) ?? 0;
     const result = await writeObject(this.opts.projectId, op, base);
+    if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) throw new Error("Kontositzung beendet.");
     this.revisions.set(key, result.revision);
     if (result.accepted) {
       this.noteCloudObject(op, op.changeType === "delete" ? null : op.payload);
       return;
+    }
+    if (this.mode !== "live") {
+      this.conflict = true;
+      this.report({ conflict: true, ready: false });
+      throw new Error("Konkurrierende Objektänderung – lokale Arbeit bleibt erhalten.");
     }
     this.noteCloudObject(op, result.deleted ? null : result.payload);
     // Konflikt: ausschließlich dieses eine Objekt wird auf den gültigen
@@ -721,6 +756,7 @@ export class CadCollabSession {
   }
 
   private applyRemoteOps(ops: CadObjectOp[]) {
+    if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) return;
     if (ops.length === 0) return;
     this.applyingRemote = true;
     let changed = false;

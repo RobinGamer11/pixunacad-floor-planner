@@ -23,7 +23,7 @@ export function registerProjectInCloud(projectId: string) {
 export function useCloudProjectLifecycle(projectId: string | undefined) {
   useEffect(() => {
     if (!projectId) return;
-    void registerProjectInCloud(projectId);
+    // Registration is explicit in saveProjectToCloud; local opening must not upload.
 
     let last = Date.now();
     const onReturn = () => {

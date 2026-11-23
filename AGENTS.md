@@ -56,6 +56,7 @@ Lovable-Strukturen erhalten, Code in Lovable ladbar, keine Codex-Sonderversion.
 - Benutzerhandlung = `CadApp.runAction` → 1 Undo, Fehler = volle Rücknahme.
 
 ## Speicher
+- Account storage isolates all local keys and CAD jobs; unowned legacy data stays untouched. Names use dirty compare-and-set baselines. Opening waits for local load, cloud decision and first render, preventing stale-session writes and false readiness.
 - Gezeichnetes nur Vektor (Pixel nur in Importen). Lokaler Stand nur via `cad/persist/localScenePersist.ts`, Anhänge nur via `lib/storageQuota.ts` (Grenzen = SQL v2).
 - Auswahlfilter-Eigenschaften nur via `registerFilterProperty` (`cad/selectionFilter.ts`); Treffer in `marqueeSelectedIds`, Werte lokal.
 

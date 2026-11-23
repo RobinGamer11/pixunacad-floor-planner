@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { workspaceSaveStatus } from "./workspaceSaveStatus";
 import { getProjectSyncState, registerProjectSyncSource, reportProjectSyncSource } from "./projectSync";
 import { getLocalProjectSaveState, saveLocalScene } from "@/cad/persist/localScenePersist";
+import { activateAccount } from "./accountStorage";
 
 const local = { status: "saved" as const, savedAt: 100 };
 const cloud = { mode: "local" as const, dirty: false, saving: false, error: null, lastSavedAt: 100, conflict: false, updateAvailable: false, deviceOnly: false };
@@ -20,6 +21,7 @@ describe("Gemeinsamer Speicherstatus", () => {
     expect(getProjectSyncState("status-B").lastSavedAt).toBeNull(); off();
   });
   it("ordnet auch lokale Speicherfehler nur dem betroffenen Projekt zu", async () => {
+    activateAccount("test-status");
     await saveLocalScene("invalid-status-A", "invalid-json", 1, "test-local");
     expect(getLocalProjectSaveState("invalid-status-A").status).toBe("error");
     expect(getLocalProjectSaveState("status-B").status).toBe("idle");

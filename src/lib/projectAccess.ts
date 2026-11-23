@@ -19,6 +19,7 @@
 import { useSyncExternalStore } from "react";
 import { getNetworkClient, isMissingSchemaError } from "@/lib/networkClient";
 import { supabase as authClient } from "@/lib/supabase";
+import { accountGeneration, sessionIsCurrent } from "./accountStorage";
 
 export type ProjectRole = "owner" | "admin" | "member" | "viewer";
 
@@ -118,6 +119,7 @@ function localAccessFor(projectId: string): ProjectAccess {
 /* ------------------------------------------------------------------ Store */
 
 interface AccessState {
+  error: string | null;
   loading: boolean;
   /** Gemeinsame Datenbasis erreichbar (Migration eingespielt & angemeldet). */
   ready: boolean;
@@ -133,6 +135,7 @@ interface AccessState {
 }
 
 let state: AccessState = {
+  error: null,
   loading: true,
   ready: false,
   schemaMissing: false,
@@ -181,13 +184,16 @@ async function loadAccess(): Promise<void> {
     return;
   }
   const myId = session.user.id;
+  const epoch = accountGeneration();
+  state = { ...state, loading: true, error: null }; emit();
   try {
     // `deleted_at` kommt aus 20260926120000_project_trash.sql. Fehlt die
     // Spalte noch, ohne Papierkorbstatus weiterarbeiten.
     const loadOwned = async () => {
-      const withTrash = await client.from("network_projects").select("id,owner_id,name,deleted_at");
+      const withTrash = await client.from("network_projects").select("id,owner_id,name,deleted_at,updated_at");
       if (!withTrash.error) return withTrash;
-      return client.from("network_projects").select("id,owner_id,name");
+      if (withTrash.error.code !== "42703") return withTrash;
+      return client.from("network_projects").select("id,owner_id,name,updated_at");
     };
     const [{ data: owned, error: ownedErr }, { data: memberships, error: memberErr }] = await Promise.all([
       loadOwned(),
@@ -195,6 +201,7 @@ async function loadAccess(): Promise<void> {
     ]);
     if (ownedErr) throw ownedErr;
     if (memberErr) throw memberErr;
+    if (!sessionIsCurrent(myId, epoch)) return;
 
     const byProject = new Map<string, ProjectAccess>();
     // Wer außer mir gehört zu welchem Projekt? Daraus ergibt sich, ob
@@ -244,18 +251,22 @@ async function loadAccess(): Promise<void> {
       if (shared !== access.shared) byProject.set(projectId, { ...access, shared });
     }
 
-    state = { loading: false, ready: true, schemaMissing: false, myId, byProject, otherMembersByProject, namesByProject, deletedAtByProject };
+    state = { loading: false, ready: true, schemaMissing: false, error: null, myId, byProject, otherMembersByProject, namesByProject, deletedAtByProject };
+    const { reconcileProjectName } = await import("./projectMetadata");
+    if (!sessionIsCurrent(myId, epoch)) return;
+    for (const row of (owned ?? []) as { id: string; name: string; updated_at: string; deleted_at?: string }[]) {
+      if (byProject.get(row.id)?.role && !row.deleted_at) reconcileProjectName(row.id, row.name, row.updated_at);
+    }
     emit();
   } catch (error) {
+    if (!sessionIsCurrent(myId, epoch)) return;
     state = {
+      ...state,
       loading: false,
       ready: false,
+      error: "Projektliste konnte nicht aktualisiert werden",
       schemaMissing: isMissingSchemaError(error),
       myId,
-      byProject: new Map(),
-      otherMembersByProject: new Map(),
-      namesByProject: new Map(),
-      deletedAtByProject: new Map(),
     };
     emit();
   }

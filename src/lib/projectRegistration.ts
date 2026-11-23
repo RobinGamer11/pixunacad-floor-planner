@@ -17,6 +17,8 @@
 import { getNetworkClient, isMissingSchemaError, networkConfigured } from "@/lib/networkClient";
 import { supabase as authClient } from "@/lib/supabase";
 import { projectAccessStore } from "@/lib/projectAccess";
+import { accountGeneration, sessionIsCurrent } from "./accountStorage";
+import { writeMetadata } from "./projectMetadataState";
 
 export interface EnsureProjectResult {
   ok: boolean;
@@ -52,6 +54,7 @@ async function run(projectId: string, name: string | undefined): Promise<EnsureP
   const session = authClient.getSession();
   if (!client) return fail("Die gemeinsame Datenbasis ist nicht erreichbar.");
   if (!session) return fail("Bitte zuerst anmelden, um Kommentare zu speichern.");
+  const epoch = accountGeneration();
 
   try {
     // 1) Ist das Projekt serverseitig bereits bekannt (und für mich sichtbar)?
@@ -61,6 +64,7 @@ async function run(projectId: string, name: string | undefined): Promise<EnsureP
       .eq("id", projectId)
       .maybeSingle();
     if (selErr && !isMissingSchemaError(selErr)) throw selErr;
+    if (!sessionIsCurrent(session.user.id, epoch)) return fail("Kontositzung wurde gewechselt.");
     if (existing) {
       verified.add(projectId);
       await projectAccessStore.reload();
@@ -68,11 +72,13 @@ async function run(projectId: string, name: string | undefined): Promise<EnsureP
     }
 
     // 2) Noch unbekannt → als eigenes Projekt anmelden (ohne Owner-Wechsel).
-    const { error: insErr } = await client.from("network_projects").insert({
+    const { data: inserted, error: insErr } = await client.from("network_projects").insert({
       id: projectId,
       owner_id: session.user.id,
       name: name?.trim() || "Projekt",
-    });
+    }).select("name,updated_at").single();
+    if (!sessionIsCurrent(session.user.id, epoch)) return fail("Kontositzung wurde gewechselt.");
+    if (!insErr && inserted) writeMetadata(projectId, { name: inserted.name, updatedAt: inserted.updated_at, dirty: false });
     if (insErr) {
       // 23505 = Datensatz existiert bereits, gehört aber jemand anderem.
       if ((insErr as { code?: string }).code === "23505") {

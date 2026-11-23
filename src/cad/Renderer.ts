@@ -815,6 +815,11 @@ export class Renderer {
     return null;
   }
 
+  cachePreparedImage(src: string, image: HTMLImageElement) {
+    this._docImageCache.set(src, image);
+    this._stampImageCache.set(src, image);
+  }
+
   private _documentsBackToFront(): DocumentObject[] {
     const order = this.labels.list();
     const rank = new Map(order.map((g, i) => [g.id, i]));

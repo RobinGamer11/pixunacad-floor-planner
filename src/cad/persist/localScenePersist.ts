@@ -6,6 +6,7 @@
  * - Warteschlange je Projekt: ein Wechsel A → B verdrängt nie den ungespeicherten Stand von A.
  * - Frühere Pixelinhalte (`rasterManifest`, `rasterLayersByKey`) werden beim Laden verworfen.
  */
+import { accountRecordKey, currentAccount, scopedStorageKey } from "@/lib/accountStorage";
 const DB_NAME = "pixuna-project-local";
 const PROJECTS = "projects";
 const LEGACY_BLOBS = "blobs";
@@ -23,7 +24,7 @@ export interface LocalProjectSaveState { status: LocalSaveStatus; detail?: strin
 const localStates = new Map<string, LocalProjectSaveState>();
 const projectListeners = new Set<() => void>();
 const EMPTY_LOCAL: LocalProjectSaveState = { status: "idle", savedAt: null };
-export const getLocalProjectSaveState = (projectId?: string): LocalProjectSaveState => projectId ? localStates.get(projectId) ?? EMPTY_LOCAL : EMPTY_LOCAL;
+export const getLocalProjectSaveState = (projectId?: string): LocalProjectSaveState => projectId && currentAccount() ? localStates.get(accountRecordKey(currentAccount() ?? "", projectId)) ?? EMPTY_LOCAL : EMPTY_LOCAL;
 export function subscribeLocalProjectSaveState(fn: () => void) { projectListeners.add(fn); return () => { projectListeners.delete(fn); }; }
 function setStatus(projectId: string, s: LocalSaveStatus, detail?: string, savedAt?: number) {
   status = s;
@@ -48,10 +49,7 @@ function open(): Promise<IDBDatabase> {
       };
       req.onsuccess = () => {
         const db = req.result;
-        // Frühere Pixelkacheln freigeben (werden nicht mehr verwendet).
-        if (db.objectStoreNames.contains(LEGACY_BLOBS)) {
-          try { db.transaction(LEGACY_BLOBS, "readwrite").objectStore(LEGACY_BLOBS).clear(); } catch { /* optional */ }
-        }
+        // Unowned legacy stores are retained verbatim, never deleted on opening.
         resolve(db);
       };
       req.onerror = () => { dbPromise = null; reject(req.error); };
@@ -75,20 +73,29 @@ export function stripLegacyRaster(data: any): any {
 }
 
 export async function loadLocalScene(projectId: string): Promise<{ snapshot: string } | null> {
-  if (!available()) return null;
+  const owner = currentAccount();
+  if (!owner) throw new Error("Bitte zuerst anmelden.");
+  const recordId = accountRecordKey(owner, projectId);
+  const fallback = () => {
+    const snapshot = localStorage.getItem(scopedStorageKey(owner, `pixuna.cad.${projectId}`));
+    if (!snapshot) return null;
+    setStatus(recordId, "saved");
+    return { snapshot: JSON.stringify(stripLegacyRaster(JSON.parse(snapshot))) };
+  };
+  if (!available()) return fallback();
   const db = await open();
   const rec = await new Promise<LocalProjectRecord | undefined>((resolve, reject) => {
-    const req = db.transaction(PROJECTS, "readonly").objectStore(PROJECTS).get(projectId);
+    const req = db.transaction(PROJECTS, "readonly").objectStore(PROJECTS).get(recordId);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
-  if (!rec) return null;
+  if (!rec) return fallback();
   if (rec.format > LOCAL_FORMAT) {
-    blocked.add(projectId);
-    setStatus(projectId, "blocked", "Dieser Stand stammt aus einer neueren Programmversion und wird nicht überschrieben.");
+    blocked.add(recordId);
+    setStatus(recordId, "blocked", "Dieser Stand stammt aus einer neueren Programmversion und wird nicht überschrieben.");
     throw new Error("PIXUNA_FORMAT_NEWER");
   }
-  if (!localStates.has(projectId)) setStatus(projectId, "saved", undefined, rec.savedAt);
+  if (!localStates.has(recordId)) setStatus(recordId, "saved", undefined, rec.savedAt);
   return { snapshot: JSON.stringify(stripLegacyRaster(JSON.parse(rec.sceneJson))) };
 }
 
@@ -98,6 +105,11 @@ const chainByProject = new Map<string, Promise<void>>();
 
 /** Gebündelt je Projekt: nur der neueste Stand wird geschrieben; true = bestätigt gespeichert. */
 export function saveLocalScene(projectId: string, snap: string, revision: number, legacyKey: string): Promise<boolean> {
+  const owner = currentAccount();
+  if (!owner) return Promise.resolve(false);
+  // Capture before any await: pending jobs always finish in the original account.
+  projectId = accountRecordKey(owner, projectId);
+  legacyKey = scopedStorageKey(owner, legacyKey);
   if (blocked.has(projectId)) return Promise.resolve(false);
   setStatus(projectId, "saving");
   return new Promise<boolean>((resolve) => {
@@ -112,6 +124,13 @@ export function saveLocalScene(projectId: string, snap: string, revision: number
     });
     chainByProject.set(projectId, chain);
   });
+}
+
+export async function flushLocalSceneWrites(): Promise<void> {
+  await Promise.all([...chainByProject.values()]);
+  if ([...localStates.values()].some(s => ["quota", "error", "blocked"].includes(s.status))) {
+    throw new Error("Lokale Speicherung nicht abgeschlossen. Bitte Speicherstatus prüfen; deine vorhandenen Daten bleiben erhalten.");
+  }
 }
 
 async function writeJob(projectId: string, job: Job): Promise<boolean> {

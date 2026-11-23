@@ -2,6 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --preparation-bg: 225 12% 13%;
+  --preparation-ink: 45 20% 94%;
+  --preparation-muted: 225 8% 66%;
+  --preparation-track: 225 10% 22%;
+  --preparation-gold: 40 69% 58%;
+  --preparation-grid: 225 10% 25%;
+}
+.project-preparation {
+  position: fixed; inset: 0; z-index: 2147483500; overflow-y: auto;
+  background: hsl(var(--preparation-bg)); color: hsl(var(--preparation-ink));
+  background-image: linear-gradient(hsl(var(--preparation-grid) / .22) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--preparation-grid) / .22) 1px, transparent 1px);
+  background-size: 44px 44px; text-align: center;
+}
+.project-preparation-content { width: min(100%, 1024px); min-height: 100dvh; margin: auto; padding: 24px 24px 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.project-preparation-brand { font-size: 17px; margin-bottom: 8px; color: hsl(var(--preparation-muted)); }
+.project-preparation-complete { animation: preparation-exit .18s ease-out forwards; pointer-events: none; }
+@keyframes preparation-exit { from { opacity: 1; } to { opacity: 0; } }
+.project-preparation-brand span { color: hsl(var(--preparation-gold)); }
+.project-preparation-image { width: min(100%, 840px); height: min(43dvh, 450px); object-fit: contain; margin-bottom: 12px; }
+.project-preparation-name { margin: 10px 0 20px; color: hsl(var(--preparation-muted)); max-width: 100%; overflow-wrap: anywhere; }
+.project-preparation-progress { width: min(100%, 640px); position: relative; padding-right: 64px; }
+.project-preparation-progress progress { display: block; appearance: none; border: none; width: 100%; height: 16px; border-radius: 8px; overflow: hidden; background: hsl(var(--preparation-track)); }
+.project-preparation-progress progress::-webkit-progress-bar { background: hsl(var(--preparation-track)); }
+.project-preparation-progress progress::-webkit-progress-value { background: hsl(var(--preparation-gold)); box-shadow: 0 0 12px hsl(var(--preparation-gold) / .4); transition: width .25s ease; }
+.project-preparation-progress progress::-moz-progress-bar { background: hsl(var(--preparation-gold)); }
+.project-preparation-progress > span { position: absolute; right: 0; top: -3px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.project-preparation-status { margin: 16px 0; font-size: 14px; max-width: 620px; }
+.project-preparation-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 20px; font-size: 11px; color: hsl(var(--preparation-muted)); }
+.project-preparation-steps li { display: flex; align-items: center; gap: 6px; }
+.project-preparation-steps li[data-state="active"], .project-preparation-steps li[data-state="done"] { color: hsl(var(--preparation-gold)); }
+@media (max-width: 600px) { .project-preparation-content { padding: 18px 16px 28px; } .project-preparation-image { height: 28dvh; } .project-preparation-steps { flex-direction: column; align-items: flex-start; } }
+@media (prefers-reduced-motion: reduce) { .project-preparation *, .project-preparation progress::-webkit-progress-value { transition: none; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .project-preparation-complete { animation-duration: .001s; } }
+
 @layer base {
   :root {
     /* Refined slate / indigo palette — professional, modern */

@@ -2,6 +2,8 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { captureSettings, mergeWorkspace, type WorkspacePayload } from "@/lib/workspaceStorage";
+import { accountGeneration, sessionIsCurrent } from "@/lib/accountStorage";
+import { importLegacyWorkspace } from "./legacyWorkspaceImport";
 
 /**
  * Kontoweite Sicherung persönlicher Einstellungen.
@@ -55,6 +57,7 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
     }
 
     let active = true;
+    const epoch = accountGeneration();
     const hydrationKey = `pixuna.workspace.hydrated.${session.user.id}`;
 
     const hydrate = async () => {
@@ -71,7 +74,11 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
         }
 
         const remote = await supabase.getWorkspace();
+        if (!active || !sessionIsCurrent(session.user.id, epoch)) return;
         if (remote?.payload && typeof remote.payload === "object") {
+          if (remote.user_id !== session.user.id) throw new Error("Kontosicherung konnte nicht eindeutig zugeordnet werden.");
+          await importLegacyWorkspace(remote.payload as WorkspacePayload, session.user.id);
+          if (!active || !sessionIsCurrent(session.user.id, epoch)) return;
           // Vorhandene Stände (auch der frühere Komplettabzug) werden
           // übernommen, aber niemals lokale Daten gelöscht.
           const changed = mergeWorkspace(remote.payload as WorkspacePayload);
@@ -105,6 +112,7 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session || !ready || !canSync) return;
+    const epoch = accountGeneration();
 
     const sync = async () => {
       if (saving.current) return;
@@ -116,6 +124,7 @@ export function WorkspaceSyncProvider({ children }: { children: ReactNode }) {
       saving.current = true;
       try {
         await supabase.saveWorkspace(snapshot);
+        if (!sessionIsCurrent(session.user.id, epoch)) return;
         lastSnapshot.current = serialized;
         retryDelay.current = MIN_RETRY_MS;
         retryAt.current = 0;

@@ -94,7 +94,7 @@ export function mergeWorkspace(payload: WorkspacePayload): boolean {
   const incoming = payload?.localStorage ?? {};
   let changed = false;
   Object.entries(incoming).forEach(([key, value]) => {
-    if (!isWorkspaceKey(key)) return;
+    if (!isSettingsKey(key) || typeof value !== "string" || value.length > MAX_SETTING_BYTES) return;
     if (window.localStorage.getItem(key) === value) return;
     window.localStorage.setItem(key, value);
     changed = true;

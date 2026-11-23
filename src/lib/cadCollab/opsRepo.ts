@@ -66,7 +66,7 @@ export async function writeObject(
   baseRevision: number,
 ): Promise<WriteResult> {
   const client = getNetworkClient();
-  if (!client) return { accepted: false, revision: baseRevision, payload: op.payload, deleted: false };
+  if (!client) throw new Error("Cloud nicht erreichbar.");
   const { data, error } = await client.rpc("cad_write_object", {
     _project_id: projectId,
     _sheet_id: op.sheetId,
@@ -80,7 +80,7 @@ export async function writeObject(
   const row = (Array.isArray(data) ? data[0] : data) as
     | { accepted: boolean; revision: number | string; payload: Record<string, unknown> | null; deleted: boolean }
     | undefined;
-  if (!row) return { accepted: true, revision: baseRevision + 1, payload: op.payload, deleted: false };
+  if (!row) throw new Error("Keine Speicherbestätigung empfangen.");
   return {
     accepted: Boolean(row.accepted),
     revision: Number(row.revision ?? 0),
@@ -107,7 +107,7 @@ export async function fetchOpsSince(projectId: string, sinceSeq: number): Promis
 /** Höchste bekannte Reihenfolge-Nummer (Startpunkt nach dem Laden). */
 export async function fetchLatestSeq(projectId: string): Promise<number> {
   const client = getNetworkClient();
-  if (!client) return 0;
+  if (!client) throw new Error("Cloud nicht erreichbar.");
   const { data, error } = await client
     .from("cad_object_ops")
     .select("seq")
@@ -210,13 +210,17 @@ export async function releaseObjectLock(projectId: string, sheetId: string, obje
  */
 export async function fetchObjectState(projectId: string): Promise<CadObjectOp[]> {
   const client = getNetworkClient();
-  if (!client) return [];
-  const { data, error } = await client
-    .from("cad_object_state")
-    .select("sheet_id,object_id,object_kind,payload,deleted,revision,updated_at")
-    .eq("project_id", projectId)
-    .limit(20000);
-  if (error) throw error;
+  if (!client) throw new Error("Cloud nicht erreichbar.");
+  const data: Record<string, unknown>[] = [];
+  // PostgREST caps individual responses; a truncated page is never a complete drawing.
+  for (let offset = 0; ; offset += 1000) {
+    const page = await client.from("cad_object_state")
+      .select("sheet_id,object_id,object_kind,payload,deleted,revision,updated_at")
+      .eq("project_id", projectId).order("sheet_id").order("object_id").range(offset, offset + 999);
+    if (page.error) throw page.error;
+    data.push(...(page.data ?? []));
+    if ((page.data?.length ?? 0) < 1000) break;
+  }
   return ((data ?? []) as {
     sheet_id: string; object_id: string; object_kind: string;
     payload: Record<string, unknown> | null; deleted: boolean;

@@ -6,6 +6,8 @@ import { useSyncExternalStore } from "react";
 import { parseScaleDen } from "./paper";
 import { stripLegacyMappe } from "./legacyMappeMigration";
 import { migrateProjectState, stampVersion, PROJECT_STATE_KIND } from "./persistence";
+import { markNameChanged } from "./projectMetadataState";
+import { registerLocalFlusher } from "./accountStorage";
 
 export type PageFormat = "A3-quer" | "A4-hoch" | "A4-quer" | "A3-hoch" | "frei";
 export type ElementKind =
@@ -303,6 +305,7 @@ const DEFAULT_PROFILE: UserProfile = {
   status: "online",
 };
 
+let localDirectoryError: string | null = null;
 let state: State = load();
 const listeners = new Set<() => void>();
 
@@ -325,7 +328,7 @@ function load(): State {
       }
     }
   } catch {
-    /* ignore */
+    localDirectoryError = "Das lokale Projektverzeichnis konnte nicht gelesen werden. Der vorhandene Stand bleibt erhalten.";
   }
   return {
     projects: demoProjects().map(migrateProject),
@@ -389,6 +392,7 @@ function migrateProject(p: Project): Project {
 
 
 function persistState(candidate: State) {
+  if (localDirectoryError) return false;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stampVersion(PROJECT_STATE_KIND, { ...candidate })));
     return true;
@@ -571,6 +575,8 @@ function commitProjectUiProjects(projects: Project[]) {
 
 
 export const projectStore = {
+  getLocalDirectoryError: () => localDirectoryError,
+  flushLocal: () => persistState(state),
   getState: () => state,
   subscribe: (fn: () => void) => {
     listeners.add(fn);
@@ -668,6 +674,8 @@ export const projectStore = {
     return id;
   },
   updateProject: (id: string, patch: Partial<Project>) => {
+    const previous = state.projects.find(p => p.id === id);
+    if (previous && canWriteProject(id) && typeof patch.name === "string" && patch.name !== previous.name) markNameChanged(id, previous.name);
     setState((s) => ({
       projects: s.projects.map((p) =>
         p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p
@@ -1258,6 +1266,7 @@ export const projectStore = {
     setState((s) => ({ profile: { ...s.profile, ...patch } }));
   },
 };
+registerLocalFlusher(async () => { if (!persistState(state)) throw new Error(localDirectoryError ?? "Projektverzeichnis konnte nicht gespeichert werden. Bitte Speicherstatus prüfen."); });
 
 function bySortIndex(a: { sortIndex?: number }, b: { sortIndex?: number }) {
   return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);

@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
-import { clearWorkspaceStorage } from "@/lib/workspaceStorage";
+import { activateAccount, currentAccount, flushAccountWrites } from "@/lib/accountStorage";
 import { supabase, SupabaseSession } from "@/lib/supabase";
+import { toast } from "@/hooks/use-toast";
 
 type AuthContextValue = {
   session: SupabaseSession | null;
@@ -18,7 +19,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     const unsubscribe = supabase.onAuthStateChange((nextSession) => {
-      if (active) setSession(nextSession);
+      if (!active) return;
+      const nextId = nextSession?.user.id ?? null;
+      if (nextId !== currentAccount()) {
+        // A full document restart discards every module cache and old async callback.
+        activateAccount(null);
+        window.location.reload();
+        return;
+      }
+      setSession(nextSession);
     });
 
     void supabase.restoreSession()
@@ -36,10 +45,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     configured: supabase.isConfigured,
     signOut: async () => {
-      // Verhindert, dass der nächste Account auf diesem Gerät Daten des
-      // vorherigen Accounts sieht, bevor sein Cloud-Stand geladen ist.
+      // Flush locally, never force a cloud upload. On failure keep this session open.
+      try { await flushAccountWrites(); } catch (error) {
+        toast({ title: "Abmelden angehalten", description: error instanceof Error ? error.message : "Lokale Speicherung nicht abgeschlossen. Vorhandene Daten bleiben erhalten.", variant: "destructive" });
+        return;
+      }
       await supabase.signOut();
-      clearWorkspaceStorage();
     },
   }), [loading, session]);
 

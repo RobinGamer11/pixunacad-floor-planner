@@ -18,6 +18,8 @@ import { projectStore } from "@/lib/projectStore";
 import { projectAccessStore } from "@/lib/projectAccess";
 import { baselineKey, hasBaseline } from "@/lib/cloudBaseline";
 import { loadProjectDocument } from "@/lib/projectDocuments";
+import { loadLocalScene } from "@/cad/persist/localScenePersist";
+import { accountGeneration, currentAccount, sessionIsCurrent } from "./accountStorage";
 
 export type SharedSyncEvent =
   | { type: "loaded"; projectId: string }
@@ -64,12 +66,18 @@ export async function hydrateSharedProject(projectId: string): Promise<boolean> 
   }
   if (cloudDeletedAt) return false;
   if (hasBaseline(baselineKey("cad", projectId))) return false;
+  const owner = currentAccount(), epoch = accountGeneration();
+  // Old whole-project documents are restoration only, never a replacement for local work.
+  if (localProject?.sheets.some(s => s.sceneJson) || await loadLocalScene(projectId)) return false;
+  if (!sessionIsCurrent(owner, epoch)) return false;
   try {
     const doc = await loadProjectDocument(projectId);
+    if (!sessionIsCurrent(owner, epoch)) return false;
     if (!doc) return false;
     const remote = doc.payload?.project;
     if (!isPlausibleProject(remote)) return false;
-    projectStore.applySharedProject(remote);
+    const current = projectStore.getState().projects.find(p => p.id === projectId);
+    projectStore.applySharedProject({ ...remote, name: current?.name ?? remote.name });
     emit({ type: "loaded", projectId });
     return true;
   } catch (error) {
@@ -78,7 +86,7 @@ export async function hydrateSharedProject(projectId: string): Promise<boolean> 
       projectId,
       message: error instanceof Error ? error.message : "Gemeinsamer Stand konnte nicht geladen werden.",
     });
-    return false;
+    throw error;
   }
 }
 

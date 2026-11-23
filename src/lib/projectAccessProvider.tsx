@@ -102,8 +102,9 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
         const op = pending[id]?.op;
         if (op === "delete" || op === "purge") return;
         if (projectStore.getState().projects.find((p) => p.id === id)?.deletedAt) return;
+        // Home loads metadata only; drawings are requested by the opened editor.
+        projectStore.ensureCloudStub(id, st.namesByProject.get(id) ?? "Projekt");
         hydrated.add(id);
-        void hydrateSharedProject(id);
       });
     };
     const offAccess = projectAccessStore.subscribe(hydrateAll);
@@ -127,10 +128,14 @@ export function ProjectAccessProvider({ children }: { children: ReactNode }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "network_projects" }, refresh)
       .subscribe();
     const poll = window.setInterval(refresh, 60_000);
+    let lastFocus = 0;
+    const onFocus = () => { if (Date.now() - lastFocus < 15000) return; lastFocus = Date.now(); refresh(); };
+    window.addEventListener("focus", onFocus);
 
     return () => {
       window.clearTimeout(debounce);
       window.clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
       offBlocked();
       offSync();
       offAccess();

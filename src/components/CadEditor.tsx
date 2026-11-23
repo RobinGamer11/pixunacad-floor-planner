@@ -1,6 +1,15 @@
 import { ScrollEdgeHints } from "@/components/ScrollEdgeHints";
 import { toast } from "@/hooks/use-toast";
 import { saveLocalScene, loadLocalScene, getLocalProjectSaveState, subscribeLocalProjectSaveState } from "@/cad/persist/localScenePersist";
+import { flushLocalSceneWrites } from "@/cad/persist/localScenePersist";
+import { registerLocalFlusher, accountGeneration, currentAccount, sessionIsCurrent } from "@/lib/accountStorage";
+import { useProjectAccessState, projectAccessStore } from "@/lib/projectAccess";
+import { useProjectSyncState, resolveProjectConflict } from "@/lib/projectSync";
+import { INITIAL_OPENING, advanceOpening, type ProjectOpeningState } from "@/lib/projectOpening";
+import { ProjectLoadingScreen } from "@/components/workspace/ProjectLoadingScreen";
+import { prepareProjectResources } from "@/lib/prepareProjectResources";
+import { hydrateSharedProject } from "@/lib/sharedProjectSync";
+import { directoryCadSnapshot } from "@/lib/directoryCadSnapshot";
 import { TrashIcon } from "@/lib/trashIcon";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import { DragScrollDiv } from "@/components/DragScrollDiv";
@@ -192,12 +201,13 @@ interface CadEditorProps {
   helpOn?: boolean;
   /** Liefert die CAD-Engine an übergeordnete Bereiche (z. B. Export) – dieselbe Instanz, kein Duplikat. */
   onAppReady?: (app: CadApp | null) => void;
+  onProjectReady?: (ready: boolean) => void;
   /** "export": Export-Seitenleiste links + Reiter „Seiteneinstellungen“ statt „Seiten“. */
   mode?: "cad" | "export";
   /** Export: „CAD-Blatt bearbeiten“ wechselt bewusst in den CAD-Bereich. */
   onOpenSourceSheet?: (sheetId: string) => void;
 }
-const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true, onAppReady, mode = "cad", onOpenSourceSheet }, ref) => {
+const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId, onHistoryChange, onZoomChange, onCanDeleteChange, onMultiPasteChange, presenting, helpOn = true, onAppReady, onProjectReady, mode = "cad", onOpenSourceSheet }, ref) => {
   const exportMode = mode === "export";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -358,8 +368,44 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
   const onAppReadyRef = useRef(onAppReady);
   onAppReadyRef.current = onAppReady;
   const [cadApp, setCadApp] = useState<CadApp | null>(null);
+  const [localReady, setLocalReady] = useState(false);
+  const [opening, setOpening] = useState<ProjectOpeningState>(INITIAL_OPENING);
+  const openingReady = useRef(false);
+  const accessState = useProjectAccessState();
+  const cloudState = useProjectSyncState(projectId);
+  const [openLocal, setOpenLocal] = useState(false);
   // Objektbasierte Live-Zusammenarbeit (nur bei geteilten Projekten aktiv).
-  const collab = useCadCollab(cadApp, projectId);
+  const collab = useCadCollab(cadApp, projectId, localReady && accessState.ready && !openLocal);
+
+  useEffect(() => {
+    if (!cadApp || !localReady || openingReady.current) return;
+    const access = projectAccessStore.accessFor(projectId);
+    if (!openLocal && accessState.error) { setOpening(s => ({ ...s, error: accessState.error })); return; }
+    if (!openLocal && !accessState.ready) return;
+    if (!openLocal && access.cloud) {
+      if (cloudState.conflict || cloudState.updateAvailable) { setOpening(s => ({ ...s, conflict: true })); return; }
+      if (cloudState.error) { setOpening(s => ({ ...s, error: cloudState.error })); return; }
+      if (!cloudState.ready) return;
+    }
+    let active = true;
+    const owner = currentAccount(), epoch = accountGeneration();
+    const valid = () => active && sessionIsCurrent(owner, epoch);
+    setOpening(s => advanceOpening({ ...s, error: null, conflict: false }, "resources", { offline: openLocal }));
+    void (async () => {
+      try {
+        await prepareProjectResources(cadApp, (done, total) => { if (valid()) setOpening(s => ({ ...s, progress: Math.max(s.progress, Math.min(94, 70 + Math.floor(done / total * 24))) })); });
+        if (!valid()) return;
+        setOpening(s => advanceOpening(s, "view"));
+        cadApp.resize(); cadApp.renderer.render();
+        await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        if (!valid()) return;
+        openingReady.current = true;
+        setOpening(s => advanceOpening(s, "ready"));
+        onProjectReady?.(true);
+      } catch (error) { if (valid()) setOpening(s => ({ ...s, error: error instanceof Error ? error.message : "Die erste Ansicht konnte nicht aufgebaut werden." })); }
+    })();
+    return () => { active = false; };
+  }, [cadApp, localReady, accessState.ready, accessState.error, cloudState.ready, cloudState.error, cloudState.conflict, cloudState.updateAvailable, openLocal, projectId]);
 
   React.useImperativeHandle(ref, () => ({
     undo: () => appRef.current?.undo(),
@@ -946,7 +992,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     let initialLoading = true;
     const persist = () => {
       try {
-        if (initialLoading) return;
+        if (initialLoading || !openingReady.current) return;
         // Revisionsprüfung VOR der teuren Serialisierung.
         const rev = (app as any).contentRevision ?? 0;
         if (rev === lastPersistRev || rev === inFlightRev) return;
@@ -1026,33 +1072,32 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         }
       } catch (e) { console.error("CAD persist failed:", e); }
     };
-    try {
-      const saved = localStorage.getItem(persistKey);
-      if (saved) (app as any)._restoreScene?.(saved);
-    } catch (e) { console.error("CAD restore failed:", e); }
     // Maßgeblicher lokaler Stand (Format 2) liegt in IndexedDB.
     {
-      const revAtStart = (app as any).contentRevision;
+      const owner = currentAccount(), epoch = accountGeneration();
+      let alive = true;
       setProjectLoading(true);
       // Tastenkürzel (Rückgängig, Löschen …) während des Ladens abfangen.
-      const blockKeys = (e: KeyboardEvent) => { if (initialLoading && !(e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable]")) { e.stopImmediatePropagation(); e.preventDefault(); } };
+      const blockKeys = (e: KeyboardEvent) => { if (!openingReady.current && !(e.target as HTMLElement)?.closest?.("input,textarea,[contenteditable]")) { e.stopImmediatePropagation(); e.preventDefault(); } };
       window.addEventListener("keydown", blockKeys, true);
-      const unlock = () => { initialLoading = false; setProjectLoading(false); window.removeEventListener("keydown", blockKeys, true); };
-      loadLocalScene(projectId ?? "default").then((res) => {
-        unlock();
-        if ((app as any)._destroyed) return;
-        if (!res) return;
-        // Hat der Nutzer inzwischen gezeichnet, nichts überschreiben.
-        if ((app as any).contentRevision !== revAtStart) return;
-        (app as any)._restoreScene?.(res.snapshot);
-        lastPersistRev = (app as any).contentRevision;
-        try { app.renderer?.render(); } catch {}
-      }).catch((e) => {
-        // Höhere Formatversion: Projekt bleibt gesperrt (initialLoading bleibt true → kein Überschreiben).
-        if (String(e?.message).includes("PIXUNA_FORMAT_NEWER")) { setProjectLoading(false); window.removeEventListener("keydown", blockKeys, true); return; }
-        unlock();
-        console.error("Lokaler Stand nicht lesbar:", e);
+      setOpening(s => advanceOpening(s, "local"));
+      void (async () => {
+        const res = await loadLocalScene(projectId ?? "default");
+        if (!alive || !sessionIsCurrent(owner, epoch) || (app as any)._destroyed) return;
+        const project = projectStore.getState().projects.find(p => p.id === projectId);
+        if (!project) throw new Error("Projekt nicht gefunden oder Zugriff noch nicht bestätigt. Bitte die Projektliste erneut laden.");
+        const snapshot = res?.snapshot ?? directoryCadSnapshot(project);
+        if (snapshot) app.restoreOpeningSnapshot(snapshot);
+        lastPersistRev = snapshot ? (app as any).contentRevision : -1;
+        initialLoading = false;
+        setLocalReady(true);
+        setOpening(s => advanceOpening(s, "cloud", { localAvailable: !!snapshot }));
+      })().catch((e) => {
+        if (!alive || !sessionIsCurrent(owner, epoch)) return;
+        setOpening(s => ({ ...s, error: e instanceof Error ? e.message : "Lokaler Stand nicht lesbar." }));
       });
+      // Closing the editor cancels late local reads and removes the keyboard gate.
+      app.canvas.addEventListener("pixuna-opening-cancel", () => { alive = false; window.removeEventListener("keydown", blockKeys, true); }, { once: true });
     }
     let previousSaveState = getLocalProjectSaveState(projectId);
     const offSaveStatus = subscribeLocalProjectSaveState(() => {
@@ -1066,6 +1111,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     app.onHistoryChange = (u, r) => { setCanUndo(u); setCanRedo(r); onHistoryChange?.(u, r); persist(); };
     // Periodischer Fallback (Sheet-Renames etc. pushen keine History).
     const persistTimer = window.setInterval(persist, 4000);
+    const offFlusher = registerLocalFlusher(async () => { persist(); await flushLocalSceneWrites(); });
     app.hatchTool.onDrawModeChange = (m) => setHatchDrawMode(m);
     setHatchDrawMode(app.hatchTool.drawMode);
     app.documentTool.onPhaseChange = () => {
@@ -1161,13 +1207,15 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
     return () => {
       window.removeEventListener("resize", onResize);
       window.clearInterval(persistTimer); offSaveStatus();
+      offFlusher();
+      app.canvas.dispatchEvent(new Event("pixuna-opening-cancel"));
       try { persist(); } catch {}
       app.destroy();
       appRef.current = null;
       setCadApp(null);
       onAppReadyRef.current?.(null);
     };
-  }, []);
+  }, [projectId]);
 
   // Resize canvas when sidebar collapses/expands
   useEffect(() => {
@@ -2193,11 +2241,11 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
-        {projectLoading && (
-          <div className="absolute inset-0 z-[45] flex items-center justify-center bg-background/40 cursor-wait" onPointerDownCapture={(e) => e.stopPropagation()}>
-            <div className="rounded-full border border-border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground">Projekt wird geladen …</div>
-          </div>
-        )}
+        {projectLoading && <ProjectLoadingScreen state={opening} name={projectStore.getState().projects.find(p => p.id === projectId)?.name} onFinished={() => setProjectLoading(false)}
+          onRetry={() => window.location.reload()} onHome={() => window.location.assign("/")}
+          onLocal={() => { if (opening.localAvailable) { setOpenLocal(true); setOpening(s => ({ ...s, error: null, conflict: false, offline: true })); } }}
+          onCloud={() => { if (projectId) void resolveProjectConflict(projectId, "cloud").catch(error => setOpening(s => ({ ...s, error: error instanceof Error ? error.message : "Cloudstand konnte nicht geladen werden." }))); }}
+          onDevice={() => { if (projectId) void resolveProjectConflict(projectId, "device").catch(error => setOpening(s => ({ ...s, error: error instanceof Error ? error.message : "Gerätestand konnte nicht übernommen werden." }))); }} />}
         {exportMode && cadApp && !presenting && <SpreadHandles app={cadApp} />}
 
         {/* Tabellen-Objekte (DOM-Overlay über dem Canvas) */}

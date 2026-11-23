@@ -38,7 +38,7 @@ function selectionObjectId(selection: unknown): string | null {
   return null;
 }
 
-export function useCadCollab(app: CadApp | null, projectId: string | undefined) {
+export function useCadCollab(app: CadApp | null, projectId: string | undefined, localReady = true) {
   const { session: authSession } = useAuth();
   // Startet neu, sobald ein Projekt in der Cloud registriert wurde.
   const cloudRegistered = useProjectAccess(projectId).cloud;
@@ -47,7 +47,7 @@ export function useCadCollab(app: CadApp | null, projectId: string | undefined) 
 
   useEffect(() => {
     const userId = authSession?.user?.id;
-    if (!app || !projectId || !userId) return;
+    if (!app || !projectId || !userId || !localReady) return;
     const access = projectAccessStore.accessFor(projectId);
     if (!access.cloud) return; // rein persönliches Projekt: unverändert lokal
 
@@ -183,7 +183,7 @@ export function useCadCollab(app: CadApp | null, projectId: string | undefined) 
       sessionRef.current = null;
       setStatus(EMPTY);
     };
-  }, [app, projectId, authSession, cloudRegistered]);
+  }, [app, projectId, authSession, cloudRegistered, localReady]);
 
   return { status, session: sessionRef };
 }
