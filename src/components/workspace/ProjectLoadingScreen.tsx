@@ -1,18 +1,52 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Circle, Loader2, RefreshCw, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ProjectOpeningState } from "@/lib/projectOpening";
+import { MIN_OPENING_DISPLAY_MS, remainingOpeningDisplayMs, type ProjectOpeningState } from "@/lib/projectOpening";
 const phases = ["access", "local", "cloud", "resources", "view"];
 const labels = ["Projekt und Zugriff vorbereiten", "Lokalen Stand laden", "Cloudstand prüfen", "Zeichnung und Ressourcen vorbereiten", "Erste Ansicht fertigstellen"];
 
-export function ProjectLoadingScreen({ state, name, onRetry, onHome, onLocal, onCloud, onDevice, onFinished }: {
-  state: ProjectOpeningState; name?: string; onRetry: () => void; onHome: () => void;
+export function ProjectLoadingScreen({ state, name, minDisplayMs = MIN_OPENING_DISPLAY_MS, onRetry, onHome, onLocal, onCloud, onDevice, onFinished }: {
+  state: ProjectOpeningState; name?: string; minDisplayMs?: number; onRetry: () => void; onHome: () => void;
   onLocal: () => void; onCloud: () => void; onDevice: () => void;
   onFinished?: () => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [canExit, setCanExit] = useState(false);
+  const startedAtRef = useRef<number>(Date.now());
+  const finishedRef = useRef(false);
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
+
+  const finishOnce = () => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    onFinishedRef.current?.();
+  };
+
+  useEffect(() => {
+    if (state.phase !== "ready" || state.error || state.conflict) {
+      setCanExit(false);
+      return;
+    }
+    const remaining = remainingOpeningDisplayMs(startedAtRef.current, Date.now(), minDisplayMs);
+    if (remaining <= 0) {
+      setCanExit(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setCanExit(true), remaining);
+    return () => window.clearTimeout(timer);
+  }, [state.phase, state.error, state.conflict, minDisplayMs]);
+
+  useEffect(() => {
+    if (!canExit || state.phase !== "ready" || state.error || state.conflict) return;
+    const reduced = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const fallbackMs = reduced ? 0 : 220;
+    const timer = window.setTimeout(finishOnce, fallbackMs);
+    return () => window.clearTimeout(timer);
+  }, [canExit, state.phase, state.error, state.conflict]);
+
   const active = phases.indexOf(state.phase);
-  return <section className={`project-preparation ${state.phase === "ready" ? "project-preparation-complete" : ""}`} onAnimationEnd={event => { if (event.target === event.currentTarget && state.phase === "ready") onFinished?.(); }} aria-label="Projekt wird vorbereitet" aria-busy={state.phase !== "ready" && !state.error && !state.conflict}>
+  return <section className={`project-preparation ${canExit && state.phase === "ready" ? "project-preparation-complete" : ""}`} onAnimationEnd={event => { if (event.target === event.currentTarget && canExit && state.phase === "ready") finishOnce(); }} aria-label="Projekt wird vorbereitet" aria-busy={(!canExit || state.phase !== "ready") && !state.error && !state.conflict}>
     <div className="project-preparation-content">
       <div className="project-preparation-brand">Pixuna<span>CAD</span></div>
       {!imageFailed && <img className="project-preparation-image" src="/project-preparation.webp" alt="Goldener Grundriss mit teilweise aufgebauten Wänden, Bäumen, Wegen und Wasserfläche" onError={() => setImageFailed(true)} />}

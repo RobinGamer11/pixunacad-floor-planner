@@ -139,6 +139,11 @@ export function getProjectSyncState(projectId: string | undefined): ProjectSyncS
   return combined.get(projectId) ?? EMPTY;
 }
 
+export function getRegisteredSyncSourceKeys(projectId: string | undefined): string[] {
+  if (!projectId) return [];
+  return [...(sources.get(projectId)?.keys() ?? [])];
+}
+
 /** Manuelle Sicherung: überträgt nur die geänderten Objekte je Quelle. */
 export async function saveProjectToCloud(projectId: string): Promise<void> {
   const { flushAccountWrites } = await import("./accountStorage");
@@ -171,6 +176,8 @@ export async function saveProjectToCloud(projectId: string): Promise<void> {
 
 /** Cloudstand prüfen (Öffnen, Rückkehr in die App, Button „Aus Cloud aktualisieren“). */
 export async function refreshProjectFromCloud(projectId: string): Promise<void> {
+  const { projectAccessStore } = await import("./projectAccess");
+  await projectAccessStore.reload();
   const entries = [...(sources.get(projectId)?.values() ?? [])];
   for (const entry of entries) await entry.source.refresh?.();
 }

@@ -232,6 +232,15 @@ export const financeStore = {
     s.projectNote = note;
     write(projectId, s);
   },
+  /** Übernimmt einen vollständigen Finanzstand (z. B. aus der Cloud). */
+  replaceState(projectId: string, next: FinanceState) {
+    write(projectId, {
+      nodes: (next.nodes ?? []).map((n) => ({ ...n, enabled: n.enabled !== false })),
+      positions: next.positions ?? [],
+      projectEstimate: typeof next.projectEstimate === "number" ? next.projectEstimate : 0,
+      projectNote: next.projectNote ?? "",
+    });
+  },
 };
 
 // ---------------------------------------------------------------- Auswertung

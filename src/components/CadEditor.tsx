@@ -401,7 +401,6 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
         if (!valid()) return;
         openingReady.current = true;
         setOpening(s => advanceOpening(s, "ready"));
-        onProjectReady?.(true);
       } catch (error) { if (valid()) setOpening(s => ({ ...s, error: error instanceof Error ? error.message : "Die erste Ansicht konnte nicht aufgebaut werden." })); }
     })();
     return () => { active = false; };
@@ -2241,7 +2240,7 @@ const CadEditor = React.forwardRef<CadEditorHandle, CadEditorProps>(({ projectId
 
         {/* Canvas */}
         <canvas ref={canvasRef} data-cad-canvas className="block w-full h-full" />
-        {projectLoading && <ProjectLoadingScreen state={opening} name={projectStore.getState().projects.find(p => p.id === projectId)?.name} onFinished={() => setProjectLoading(false)}
+        {projectLoading && <ProjectLoadingScreen key={projectId ?? "default"} state={opening} name={projectStore.getState().projects.find(p => p.id === projectId)?.name} onFinished={() => { setProjectLoading(false); onProjectReady?.(true); }}
           onRetry={() => window.location.reload()} onHome={() => window.location.assign("/")}
           onLocal={() => { if (opening.localAvailable) { setOpenLocal(true); setOpening(s => ({ ...s, error: null, conflict: false, offline: true })); } }}
           onCloud={() => { if (projectId) void resolveProjectConflict(projectId, "cloud").catch(error => setOpening(s => ({ ...s, error: error instanceof Error ? error.message : "Cloudstand konnte nicht geladen werden." }))); }}

@@ -1,4 +1,7 @@
 import { registerProjectInCloud } from "@/lib/useCloudProjectLifecycle";
+import { WorkspaceSaveStatus } from "@/components/workspace/WorkspaceSaveStatus";
+import { useHomeProjectSync, refreshHomeProjectFromCloud, checkCloudCadHead } from "@/lib/homeProjectSync";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LegalMenuPopover } from "@/components/legal/LegalMenu";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -240,6 +243,49 @@ export default function ProjectsHome() {
 
   const selected =
     visibleProjects.find((p) => p.id === selectedId) ?? visibleProjects[0];
+  useHomeProjectSync(selected?.id);
+
+  const [cloudRefreshing, setCloudRefreshing] = useState(false);
+  const [cloudRefreshFeedback, setCloudRefreshFeedback] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const cloudRefreshInflight = useRef<Promise<void> | null>(null);
+
+  const handleGlobalCloudRefresh = () => {
+    if (cloudRefreshInflight.current) return cloudRefreshInflight.current;
+    setCloudRefreshing(true);
+    setCloudRefreshFeedback(null);
+    const run = (async () => {
+      try {
+        await projectAccessStore.reload();
+        const accState = projectAccessStore.getState();
+        if (accState.error) throw new Error(accState.error);
+        accState.byProject.forEach((access, id) => {
+          if (!access.cloud || access.role === null) return;
+          const deletedAt = accState.deletedAtByProject.get(id);
+          const exists = projectStore.getState().projects.some((p) => p.id === id);
+          if (!exists) {
+            const name = accState.namesByProject.get(id) ?? "Projekt";
+            projectStore.ensureCloudStub(id, name);
+          }
+          if (deletedAt) projectStore.applyCloudTrash(id, deletedAt);
+        });
+        if (selected?.id) {
+          await refreshHomeProjectFromCloud(selected.id);
+          await checkCloudCadHead(selected.id);
+        }
+        setCloudRefreshFeedback({ kind: "ok", text: "Aktualisiert" });
+      } catch (err) {
+        setCloudRefreshFeedback({
+          kind: "error",
+          text: err instanceof Error ? err.message : "Aktualisierung aus der Cloud fehlgeschlagen.",
+        });
+      } finally {
+        setCloudRefreshing(false);
+        cloudRefreshInflight.current = null;
+      }
+    })();
+    cloudRefreshInflight.current = run;
+    return run;
+  };
 
   const allTasks = useMemo(
     () =>
@@ -741,6 +787,38 @@ export default function ProjectsHome() {
                 <FolderPlus size={14} style={{ color: "hsl(var(--accent-gold))" }} />
                 + Ordner
               </button>
+              <button
+                type="button"
+                onClick={() => void handleGlobalCloudRefresh()}
+                disabled={cloudRefreshing}
+                title="Projektliste und gespeicherte Projektinformationen aktualisieren"
+                className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-md border text-xs font-semibold transition disabled:cursor-default disabled:opacity-60"
+                style={{
+                  background: "rgba(255,255,255,0.05)",
+                  borderColor: "rgba(255,255,255,0.14)",
+                  color: "#E6E8EB",
+                }}
+              >
+                <RefreshCw size={14} className={cloudRefreshing ? "animate-spin" : ""} style={{ color: "hsl(var(--accent-gold))" }} />
+                {cloudRefreshing ? "Wird aktualisiert …" : "Aus Cloud aktualisieren"}
+              </button>
+              {cloudRefreshFeedback && (
+                <div
+                  role={cloudRefreshFeedback.kind === "error" ? "alert" : "status"}
+                  className="mt-1.5 flex items-center justify-between gap-2 rounded px-2 py-1 text-[11px]"
+                  style={{
+                    background: cloudRefreshFeedback.kind === "error" ? "rgba(239,68,68,0.14)" : "rgba(255,255,255,0.06)",
+                    color: cloudRefreshFeedback.kind === "error" ? "#FCA5A5" : "#C9D1D9",
+                  }}
+                >
+                  <span className="truncate">{cloudRefreshFeedback.text}</span>
+                  {cloudRefreshFeedback.kind === "error" && (
+                    <button type="button" onClick={() => void handleGlobalCloudRefresh()} className="underline shrink-0">
+                      Erneut
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {folders.length > 0 && (
@@ -1267,6 +1345,7 @@ export default function ProjectsHome() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <WorkspaceSaveStatus projectId={selected.id} />
                   {selected.isTemplate && (
                     <button
                       onClick={() => {
