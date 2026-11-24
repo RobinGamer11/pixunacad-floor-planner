@@ -17,22 +17,22 @@ create policy "project_home_state_select"
   on public.project_home_state
   for select
   to authenticated
-  using (public.project_can_read(project_id));
+  using (public.project_role_of(project_id, auth.uid()) is not null);
 
 drop policy if exists "project_home_state_insert" on public.project_home_state;
 create policy "project_home_state_insert"
   on public.project_home_state
   for insert
   to authenticated
-  with check (public.project_can_edit(project_id));
+  with check (public.project_can_edit(project_id, auth.uid()));
 
 drop policy if exists "project_home_state_update" on public.project_home_state;
 create policy "project_home_state_update"
   on public.project_home_state
   for update
   to authenticated
-  using (public.project_can_edit(project_id))
-  with check (public.project_can_edit(project_id));
+  using (public.project_can_edit(project_id, auth.uid()))
+  with check (public.project_can_edit(project_id, auth.uid()));
 
 grant select, insert, update on public.project_home_state to authenticated;
 
@@ -56,7 +56,7 @@ declare
   v_next bigint;
   v_now timestamptz := now();
 begin
-  if auth.uid() is null or not public.project_can_edit(_project_id) then
+  if auth.uid() is null or not public.project_can_edit(_project_id, auth.uid()) then
     raise exception 'PIXUNA_FORBIDDEN: Keine Schreibberechtigung für dieses Projekt.';
   end if;
 
