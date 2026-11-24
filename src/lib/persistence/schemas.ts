@@ -232,7 +232,7 @@ export const FINANCE_KIND = "finance-state";
 
 defineSchema({
   kind: FINANCE_KIND,
-  current: 1,
+  current: 2,
   steps: [
     {
       to: 1,
@@ -244,6 +244,41 @@ defineSchema({
         fill(s, "projectNote", "");
         mapArray(s, "nodes", (n) => { if (n.enabled === undefined) n.enabled = true; });
         mapArray(s, "positions", (p) => { fill(p, "note", ""); fill(p, "amount", 0); });
+        return s;
+      },
+    },
+    {
+      to: 2,
+      up: (s: any) => {
+        if (!isObj(s)) return s;
+        fill(s, "perspective", "client");
+        fill(s, "taxDisplay", "gross");
+        fill(s, "currency", "EUR");
+        if (s.budgetAmount === undefined) s.budgetAmount = null;
+        fill(s, "budgetBasis", "gross");
+        if (s.costBudgetAmount === undefined) s.costBudgetAmount = null;
+        fill(s, "costBudgetBasis", "gross");
+        fill(s, "payments", []);
+        mapArray(s, "nodes", (n) => {
+          if (n.enabled === undefined) n.enabled = true;
+          if (n.type === "action" && n.direction === undefined) n.direction = "expense";
+          if (n.partner === undefined) n.partner = "";
+          if (n.manualForecast === undefined) n.manualForecast = null;
+          if (n.budgetAmount === undefined) n.budgetAmount = null;
+          if (n.budgetBasis === undefined) n.budgetBasis = "gross";
+        });
+        mapArray(s, "positions", (p) => {
+          fill(p, "note", "");
+          fill(p, "amount", 0);
+          if (p.amountBasis === undefined) p.amountBasis = "gross";
+          if (p.taxRate === undefined) p.taxRate = null;
+          if (p.status === undefined) {
+            p.status = p.type === "supplement" ? "approved" : "open";
+          }
+          if (p.type === "invoice" && p.invoiceKind === undefined) {
+            p.invoiceKind = "single";
+          }
+        });
         return s;
       },
     },

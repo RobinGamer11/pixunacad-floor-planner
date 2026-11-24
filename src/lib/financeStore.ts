@@ -6,8 +6,13 @@
 //          └─ Aktion (z. B. "Tiefbau Müller GmbH")  → enthält Positionen
 
 export type FinanceNodeType = "overview" | "action";
-export type FinancePositionType = "offer" | "invoice" | "supplement";
+export type FinancePositionType = "offer" | "order" | "invoice" | "credit" | "supplement";
 export type SupplementKind = "plus" | "minus";
+export type FinancePerspective = "client" | "contractor";
+export type FinanceDirection = "expense" | "income";
+export type TaxBasis = "net" | "gross";
+export type PositionStatus = "open" | "approved" | "rejected" | "cancelled";
+export type InvoiceKind = "single" | "partial" | "final_cumulative";
 
 export interface FinanceNode {
   id: string;
@@ -21,6 +26,15 @@ export interface FinanceNode {
   /** Ausgeschaltete Knoten fließen nicht in übergeordnete Summen ein. */
   enabled: boolean;
   order: number;
+  /** Vorgangsrichtung (Ausgabe / Einnahme). */
+  direction?: FinanceDirection;
+  /** Auftraggeber, Auftragnehmer oder Geschäftspartner. */
+  partner?: string;
+  /** Bewusst manuell festgelegte Gesamtprognose (ersetzt automatischen Vorschlag). */
+  manualForecast?: number | null;
+  /** Optionales Bereichsbudget (nur für Bereiche). */
+  budgetAmount?: number | null;
+  budgetBasis?: TaxBasis;
 }
 
 export interface FinancePosition {
@@ -36,6 +50,27 @@ export interface FinancePosition {
   order: number;
   /** Gesetzt, wenn zu dieser Position eine Vorlage in der Projektmappe existiert. */
   hasTemplate?: boolean;
+  /** Netto- oder Bruttobasis des gespeicherten Betrags. */
+  amountBasis?: TaxBasis;
+  /** Steuersatz in Prozent (z. B. 19, 7, 0) oder null = unbekannt. */
+  taxRate?: number | null;
+  /** Status des Belegs (offen, bestätigt/beauftragt, abgelehnt, storniert). */
+  status?: PositionStatus;
+  /** Rechnungsart zur Vermeidung von Doppelzählung bei Abschlags-/Schlussrechnungen. */
+  invoiceKind?: InvoiceKind;
+  /** Fälligkeitsdatum (YYYY-MM-DD) für Zahlungsstatus. */
+  dueDate?: string;
+}
+
+export interface FinancePayment {
+  id: string;
+  nodeId: string;
+  /** Optional: direkt zugeordnete Rechnung. */
+  invoiceId?: string | null;
+  date: string; // YYYY-MM-DD
+  amount: number; // tatsächlich gezahlter/erhaltener Betrag (immer positiv)
+  reference: string;
+  note: string;
 }
 
 export interface FinanceState {
@@ -44,6 +79,20 @@ export interface FinanceState {
   /** Kostenschätzung auf Projektebene. */
   projectEstimate: number;
   projectNote: string;
+  /** Projektperspektive: Auftraggeber oder Auftragnehmer. */
+  perspective?: FinancePerspective;
+  /** Gewählte Anzeigebasis (Netto / Brutto). */
+  taxDisplay?: TaxBasis;
+  /** Projektwährung (Standard EUR). */
+  currency?: string;
+  /** Projektbudget (null = noch nicht festgelegt, nicht 0 €). */
+  budgetAmount?: number | null;
+  budgetBasis?: TaxBasis;
+  /** Optionales Kostenbudget in der Auftragnehmer-Perspektive. */
+  costBudgetAmount?: number | null;
+  costBudgetBasis?: TaxBasis;
+  /** Erfasste Zahlungen und Teilzahlungen. */
+  payments?: FinancePayment[];
 }
 
 import { migrateFinanceState, stampVersion, FINANCE_KIND } from "./persistence";
@@ -53,23 +102,64 @@ const KEY = (projectId: string) => `pixuna.finance.v2.${projectId}`;
 const uid = () => `f-${Math.random().toString(36).slice(2, 10)}`;
 
 function emptyState(): FinanceState {
-  return { nodes: [], positions: [], projectEstimate: 0, projectNote: "" };
+  return {
+    nodes: [],
+    positions: [],
+    projectEstimate: 0,
+    projectNote: "",
+    perspective: "client",
+    taxDisplay: "gross",
+    currency: "EUR",
+    budgetAmount: null,
+    budgetBasis: "gross",
+    costBudgetAmount: null,
+    costBudgetBasis: "gross",
+    payments: [],
+  };
 }
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
+function normalizeState(raw: Partial<FinanceState> | null | undefined): FinanceState {
+  const parsed = raw ? (migrateFinanceState({ ...raw }) as Partial<FinanceState>) : {};
+  return {
+    nodes: (parsed.nodes ?? []).map((n) => ({
+      ...n,
+      enabled: n.enabled !== false,
+      direction: n.direction ?? (n.type === "action" ? "expense" : undefined),
+      partner: n.partner ?? "",
+      manualForecast: typeof n.manualForecast === "number" ? n.manualForecast : null,
+      budgetAmount: typeof n.budgetAmount === "number" ? n.budgetAmount : null,
+      budgetBasis: n.budgetBasis ?? "gross",
+    })),
+    positions: (parsed.positions ?? []).map((p) => ({
+      ...p,
+      note: p.note ?? "",
+      amount: typeof p.amount === "number" && Number.isFinite(p.amount) ? p.amount : 0,
+      amountBasis: p.amountBasis ?? "gross",
+      taxRate: typeof p.taxRate === "number" && Number.isFinite(p.taxRate) ? p.taxRate : null,
+      status: p.status ?? (p.type === "supplement" ? "approved" : "open"),
+      invoiceKind: p.type === "invoice" ? (p.invoiceKind ?? "single") : p.invoiceKind,
+    })),
+    projectEstimate: typeof parsed.projectEstimate === "number" ? parsed.projectEstimate : 0,
+    projectNote: parsed.projectNote ?? "",
+    perspective: parsed.perspective === "contractor" ? "contractor" : "client",
+    taxDisplay: parsed.taxDisplay === "net" ? "net" : "gross",
+    currency: parsed.currency || "EUR",
+    budgetAmount: typeof parsed.budgetAmount === "number" && Number.isFinite(parsed.budgetAmount) ? parsed.budgetAmount : null,
+    budgetBasis: parsed.budgetBasis === "net" ? "net" : "gross",
+    costBudgetAmount: typeof parsed.costBudgetAmount === "number" && Number.isFinite(parsed.costBudgetAmount) ? parsed.costBudgetAmount : null,
+    costBudgetBasis: parsed.costBudgetBasis === "net" ? "net" : "gross",
+    payments: Array.isArray(parsed.payments) ? parsed.payments : [],
+  };
+}
+
 function read(projectId: string): FinanceState {
   try {
     const raw = localStorage.getItem(KEY(projectId));
     if (!raw) return emptyState();
-    const parsed = migrateFinanceState(JSON.parse(raw)) as Partial<FinanceState>;
-    return {
-      nodes: (parsed.nodes ?? []).map((n) => ({ ...n, enabled: n.enabled !== false })),
-      positions: parsed.positions ?? [],
-      projectEstimate: typeof parsed.projectEstimate === "number" ? parsed.projectEstimate : 0,
-      projectNote: parsed.projectNote ?? "",
-    };
+    return normalizeState(JSON.parse(raw));
   } catch {
     return emptyState();
   }
@@ -96,18 +186,28 @@ export const financeStore = {
   },
 
   // ---------- Knoten ----------
-  addNode(projectId: string, type: FinanceNodeType, parentId: string | null): FinanceNode {
+  addNode(
+    projectId: string,
+    type: FinanceNodeType,
+    parentId: string | null,
+    opts?: { name?: string; direction?: FinanceDirection; partner?: string },
+  ): FinanceNode {
     const s = read(projectId);
     const siblings = s.nodes.filter((n) => n.parentId === parentId);
     const node: FinanceNode = {
       id: uid(),
       type,
       parentId,
-      name: type === "overview" ? "Neuer Ordner" : "Neue Anlage",
+      name: opts?.name?.trim() || (type === "overview" ? "Neuer Bereich" : "Neuer Vorgang"),
       note: "",
       estimate: 0,
       enabled: true,
       order: nextOrder(siblings),
+      direction: type === "action" ? (opts?.direction ?? "expense") : undefined,
+      partner: opts?.partner ?? "",
+      manualForecast: null,
+      budgetAmount: null,
+      budgetBasis: s.taxDisplay ?? "gross",
     };
     s.nodes = [...s.nodes, node];
     write(projectId, s);
@@ -164,6 +264,7 @@ export const financeStore = {
     }
     s.nodes = s.nodes.filter((n) => !ids.has(n.id));
     s.positions = s.positions.filter((p) => !ids.has(p.nodeId));
+    s.payments = (s.payments ?? []).filter((pay) => !ids.has(pay.nodeId));
     write(projectId, s);
   },
   moveNode(projectId: string, id: string, dir: -1 | 1) {
@@ -181,19 +282,29 @@ export const financeStore = {
   },
 
   // ---------- Positionen ----------
-  addPosition(projectId: string, nodeId: string, type: FinancePositionType): FinancePosition {
+  addPosition(
+    projectId: string,
+    nodeId: string,
+    type: FinancePositionType,
+    opts?: Partial<FinancePosition>,
+  ): FinancePosition {
     const s = read(projectId);
     const own = s.positions.filter((p) => p.nodeId === nodeId);
     const pos: FinancePosition = {
       id: uid(),
       nodeId,
       type,
-      supplementKind: type === "supplement" ? "plus" : undefined,
+      supplementKind: type === "supplement" ? (opts?.supplementKind ?? "plus") : undefined,
       date: new Date().toISOString().slice(0, 10),
       number: "",
       amount: 0,
       note: "",
       order: nextOrder(own),
+      amountBasis: s.taxDisplay ?? "gross",
+      taxRate: 19,
+      status: type === "order" ? "approved" : "open",
+      invoiceKind: type === "invoice" ? "single" : undefined,
+      ...opts,
     };
     s.positions = [...s.positions, pos];
     write(projectId, s);
@@ -232,14 +343,72 @@ export const financeStore = {
     s.projectNote = note;
     write(projectId, s);
   },
+  setPerspective(projectId: string, perspective: FinancePerspective) {
+    const s = read(projectId);
+    s.perspective = perspective;
+    write(projectId, s);
+  },
+  setTaxDisplay(projectId: string, taxDisplay: TaxBasis) {
+    const s = read(projectId);
+    s.taxDisplay = taxDisplay;
+    write(projectId, s);
+  },
+  setBudget(projectId: string, amount: number | null, basis: TaxBasis, kind: "project" | "cost" = "project") {
+    const s = read(projectId);
+    if (kind === "cost") {
+      s.costBudgetAmount = amount;
+      s.costBudgetBasis = basis;
+    } else {
+      s.budgetAmount = amount;
+      s.budgetBasis = basis;
+    }
+    write(projectId, s);
+  },
+  addPayment(projectId: string, payment: Omit<FinancePayment, "id">): FinancePayment {
+    const s = read(projectId);
+    const item: FinancePayment = { id: uid(), ...payment };
+    s.payments = [...(s.payments ?? []), item];
+    write(projectId, s);
+    return item;
+  },
+  updatePayment(projectId: string, id: string, patch: Partial<FinancePayment>) {
+    const s = read(projectId);
+    s.payments = (s.payments ?? []).map((p) => (p.id === id ? { ...p, ...patch } : p));
+    write(projectId, s);
+  },
+  deletePayment(projectId: string, id: string) {
+    const s = read(projectId);
+    s.payments = (s.payments ?? []).filter((p) => p.id !== id);
+    write(projectId, s);
+  },
+  acceptOfferAsOrder(projectId: string, offerId: string): FinancePosition | null {
+    const s = read(projectId);
+    const offer = s.positions.find((p) => p.id === offerId && p.type === "offer");
+    if (!offer) return null;
+    const own = s.positions.filter((p) => p.nodeId === offer.nodeId);
+    const order: FinancePosition = {
+      id: uid(),
+      nodeId: offer.nodeId,
+      type: "order",
+      date: new Date().toISOString().slice(0, 10),
+      number: offer.number ? `AUF-${offer.number}` : "",
+      amount: offer.amount,
+      note: offer.note ? `Beauftragt aus Angebot: ${offer.note}` : "Beauftragt aus Angebot",
+      order: nextOrder(own),
+      amountBasis: offer.amountBasis ?? "gross",
+      taxRate: offer.taxRate ?? null,
+      status: "approved",
+    };
+    s.positions = [
+      ...s.positions.map((p) => (p.id === offerId ? { ...p, status: "approved" as PositionStatus } : p)),
+      order,
+    ];
+    write(projectId, s);
+    return order;
+  },
   /** Übernimmt einen vollständigen Finanzstand (z. B. aus der Cloud). */
   replaceState(projectId: string, next: FinanceState) {
-    write(projectId, {
-      nodes: (next.nodes ?? []).map((n) => ({ ...n, enabled: n.enabled !== false })),
-      positions: next.positions ?? [],
-      projectEstimate: typeof next.projectEstimate === "number" ? next.projectEstimate : 0,
-      projectNote: next.projectNote ?? "",
-    });
+    write(projectId, normalizeState(next));
   },
 };
 

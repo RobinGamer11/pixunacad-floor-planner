@@ -1,49 +1,31 @@
 /**
- * Zentrale Finanzen-Oberfläche (projektbezogen).
- *
- * Wird im Reiter „Finanzen“ der Projektstartseite angezeigt und verwendet
- * ausschließlich den bestehenden financeStore – es gibt keine zweite
- * Datenhaltung. Angebote, Rechnungen und Nachträge können nur noch als
- * erhaltene Belege erfasst werden; ein Erzeugen eigener Dokumente entfällt.
+ * Überarbeitete Finanzen-Oberfläche (projektbezogen).
+ * Unterstützt Auftraggeber- und Auftragnehmer-Perspektive auf derselben Datengrundlage
+ * (financeStore + homeProjectSync), ohne Doppelzählung und responsiv für Desktop, Tablet und Handy.
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { exportElementToA4Pdf } from "@/lib/financePdfExport";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  financeStore, childrenOf, positionsOf, nodeTotals, projectTotals, actionTotals,
-  control, formatEur, formatPct, positionTotals,
-  type FinanceNode, type FinanceState, type FinanceTotals, type FinancePosition,
-  type FinancePositionType,
-} from "@/lib/financeStore";
-import { FinanceSummaryCard } from "@/components/finance/FinanceSummaryCard";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { FinancePositionsTable } from "@/components/finance/FinancePositionsTable";
-import {
-  Plus, PanelLeftClose, PanelLeftOpen, ChevronRight, ChevronDown,
-  Folder, Building2, ArrowRight, ToggleLeft, ToggleRight, Home, Trash2, Search, X,
-  MoreVertical, Copy, Pencil, FileDown, ListTree,
+  Plus, Folder, Home, FileDown, PanelLeftClose, PanelLeftOpen,
+  ChevronRight, Trash2, Search, X, AlertTriangle, Layers,
 } from "lucide-react";
+import {
+  financeStore, childrenOf,
+  type FinanceDirection, type FinanceNode, type FinancePerspective, type FinanceState, type TaxBasis,
+} from "@/lib/financeStore";
+import {
+  collectEnabledActionNodes, computeProcessSummary, computeScopeSummary, formatMoney,
+} from "@/lib/financeMath";
+import { exportFinanceReportPdf } from "@/lib/financePdfExport";
+import { FinanceBudgetModal } from "./FinanceBudgetModal";
+import { FinanceComparisonCards, type ComparisonFilter } from "./FinanceComparisonCards";
+import { FinanceProcessDetail } from "./FinanceProcessDetail";
 
-/** Filterbare Positionsarten (mehrfach kombinierbar). */
-type FilterKey = "offer" | "invoice" | "plus" | "minus";
-const FILTER_CHIPS: [FilterKey, string][] = [
-  ["offer", "Angebots-Nr."],
-  ["invoice", "Rechnungs-Nr."],
-  ["plus", "Mehrnachträge"],
-  ["minus", "Mindernachträge"],
-];
-const FILTER_LABEL: Record<FilterKey, string> = {
-  offer: "Angebot",
-  invoice: "Rechnung",
-  plus: "Mehrnachtrag",
-  minus: "Mindernachtrag",
-};
-const keyOf = (p: { type: string; supplementKind?: string }): FilterKey =>
-  p.type === "supplement" ? ((p.supplementKind ?? "plus") as FilterKey) : (p.type as FilterKey);
+type FinanceTab = "overview" | "primary" | "secondary";
 
 function useFinance(projectId?: string): FinanceState {
   const [state, setState] = useState<FinanceState>(() =>
-    projectId ? financeStore.get(projectId) : { nodes: [], positions: [], projectEstimate: 0, projectNote: "" });
+    projectId ? financeStore.get(projectId) : { nodes: [], positions: [], projectEstimate: 0, projectNote: "" },
+  );
   useEffect(() => {
     if (!projectId) return;
     setState(financeStore.get(projectId));
@@ -55,925 +37,606 @@ function useFinance(projectId?: string): FinanceState {
 
 export function FinanceWorkspace({ projectId, projectName }: { projectId: string; projectName?: string }) {
   const state = useFinance(projectId);
-  const pid = projectId;
+  const perspective: FinancePerspective = state.perspective ?? "client";
+  const taxDisplay: TaxBasis = state.taxDisplay ?? "gross";
+  const currency = state.currency || "EUR";
+  const fmt = (v: number) => formatMoney(v, currency);
 
-  /** null = Projektknoten. Beim Projektwechsel immer zurücksetzen. */
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [leftOpen, setLeftOpen] = useState(true);
-  /** Struktur als seitliches Panel auf Tablet und Handy. */
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [scopeId, setScopeId] = useState<string | null>(null);
+  const [activeProcessId, setActiveProcessId] = useState<string | null>(null);
+  const [tab, setTab] = useState<FinanceTab>("overview");
+  const [listFilter, setListFilter] = useState<ComparisonFilter>("all");
+  const [query, setQuery] = useState("");
+  const [areasOpen, setAreasOpen] = useState(true);
+  const [mobileAreasOpen, setMobileAreasOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const [budgetModal, setBudgetModal] = useState<{ open: boolean; kind: "project" | "cost" }>({
+    open: false,
+    kind: "project",
+  });
+
   useEffect(() => {
-    setSelectedId(null);
-    setExpanded({});
-    setMobileNavOpen(false);
+    setScopeId(null);
+    setActiveProcessId(null);
+    setTab("overview");
+    setListFilter("all");
+    setQuery("");
   }, [projectId]);
 
-  const selected = useMemo(
-    () => (selectedId ? state.nodes.find((n) => n.id === selectedId) ?? null : null),
-    [state.nodes, selectedId],
+  const summary = useMemo(
+    () => computeScopeSummary(state, scopeId, taxDisplay),
+    [state, scopeId, taxDisplay],
   );
 
-  /* ---- Filter (Strukturspalte, Treffer im obersten Projektordner) ---- */
-  const [filterQuery, setFilterQuery] = useState("");
-  const [filterTypes, setFilterTypes] = useState<FilterKey[]>([]);
-  const filterActive = filterQuery.trim() !== "" || filterTypes.length > 0;
-  useEffect(() => { if (filterActive) setSelectedId(null); }, [filterActive, filterQuery, filterTypes]);
+  const activeProcess = useMemo(
+    () => (activeProcessId ? state.nodes.find((n) => n.id === activeProcessId && n.type === "action") ?? null : null),
+    [state.nodes, activeProcessId],
+  );
 
-  const filterHits = useMemo(() => {
-    if (!filterActive) return [];
-    const q = filterQuery.trim().toLowerCase();
-    const nodeById = new Map(state.nodes.map((n) => [n.id, n]));
-    const pathOf = (nodeId: string): string => {
-      const parts: string[] = [];
-      let cur = nodeById.get(nodeId);
-      while (cur) { parts.unshift(cur.name); cur = cur.parentId ? nodeById.get(cur.parentId) : undefined; }
-      return parts.join(" › ");
-    };
-    const hits: { pos: typeof state.positions[number]; label: string; path: string; nodeId: string }[] = [];
-    for (const node of state.nodes) {
-      const counters: Record<string, number> = {};
-      for (const p of positionsOf(state, node.id)) {
-        const k = keyOf(p);
-        counters[k] = (counters[k] ?? 0) + 1;
-        const label = `${FILTER_LABEL[k]} ${String(counters[k]).padStart(2, "0")}`;
-        if (filterTypes.length > 0 && !filterTypes.includes(k)) continue;
-        if (q) {
-          const hay = [label, p.number, p.note, node.name, node.note].join(" ").toLowerCase();
-          if (!hay.includes(q)) continue;
+  const areaNodes = useMemo(
+    () => state.nodes.filter((n) => n.type === "overview").sort((a, b) => a.order - b.order),
+    [state.nodes],
+  );
+
+  const scopedProcesses = useMemo(() => {
+    const list = collectEnabledActionNodes(state, scopeId);
+    const q = query.trim().toLowerCase();
+    return list
+      .map((node) => ({ node, summary: computeProcessSummary(state, node, taxDisplay) }))
+      .filter(({ node, summary: p }) => {
+        if (tab === "primary") {
+          if (perspective === "client" && p.direction !== "expense") return false;
+          if (perspective === "contractor" && p.direction !== "income") return false;
+        } else if (tab === "secondary") {
+          if (perspective === "client" && p.direction !== "income") return false;
+          if (perspective === "contractor" && p.direction !== "expense") return false;
         }
-        hits.push({ pos: p, label, path: pathOf(node.id), nodeId: node.id });
-      }
-    }
-    return hits;
-  }, [state, filterActive, filterQuery, filterTypes]);
+        if (listFilter === "expenses" && p.direction !== "expense") return false;
+        if (listFilter === "incomes" && p.direction !== "income") return false;
+        if (listFilter === "open_invoices" && p.openInvoiceAmount <= 0) return false;
+        if (listFilter === "unbilled_orders" && p.remainingOrderAmount <= 0) return false;
+        if (q) {
+          const hay = [node.name, node.partner ?? "", node.note].join(" ").toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+  }, [state, scopeId, taxDisplay, tab, perspective, listFilter, query]);
 
-  /* ---- PDF-Export des Detailbereichs (DIN A4) ---- */
-  const exportRef = useRef<HTMLDivElement | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const handleExport = async () => {
-    const el = exportRef.current;
-    if (!el || exporting) return;
+  const handleCreateProcess = (direction?: FinanceDirection) => {
+    const dir: FinanceDirection = direction ?? (
+      tab === "secondary"
+        ? (perspective === "client" ? "income" : "expense")
+        : (perspective === "contractor" ? "income" : "expense")
+    );
+    const node = financeStore.addNode(projectId, "action", scopeId, {
+      name: dir === "income" ? "Neuer Einnahmen-Vorgang" : "Neuer Ausgaben-Vorgang",
+      direction: dir,
+    });
+    setActiveProcessId(node.id);
+  };
+
+  const handleCreateArea = () => {
+    const area = financeStore.addNode(projectId, "overview", null, { name: "Neuer Bereich" });
+    setScopeId(area.id);
+    setActiveProcessId(null);
+    setMobileAreasOpen(false);
+  };
+
+  const handleFilterJump = (filter: ComparisonFilter) => {
+    setListFilter(filter);
+    if (filter === "incomes") {
+      setTab(perspective === "client" ? "secondary" : "primary");
+    } else if (filter === "expenses") {
+      setTab(perspective === "client" ? "primary" : "secondary");
+    } else {
+      setTab("primary");
+    }
+    setActiveProcessId(null);
+  };
+
+  const handleExportPdf = async () => {
+    if (exporting) return;
     setExporting(true);
-    el.classList.add("finance-exporting");
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
-      const title = selected?.name ?? projectName ?? "Finanzen";
-      await exportElementToA4Pdf(el, `${title}.pdf`);
-    } catch (e) {
-      console.error("Finanz-Export fehlgeschlagen", e);
+      await exportFinanceReportPdf(state, scopeId, projectName ?? "Projekt");
     } finally {
-      el.classList.remove("finance-exporting");
       setExporting(false);
     }
   };
 
-  const toggleExpand = (id: string) =>
-    setExpanded((e) => ({ ...e, [id]: !(e[id] ?? true) }));
+  const tabLabels: Record<FinanceTab, string> = perspective === "client"
+    ? { overview: "Überblick", primary: "Aufträge & Rechnungen", secondary: "Einnahmen" }
+    : { overview: "Überblick", primary: "Aufträge & Einnahmen", secondary: "Kosten & Ausgaben" };
 
-  const addNode = (type: "overview" | "action") => {
-    let parent: string | null = null;
-    if (selected) parent = selected.type === "overview" ? selected.id : selected.parentId;
-    const node = financeStore.addNode(pid, type, parent);
-    if (parent) setExpanded((e) => ({ ...e, [parent!]: true }));
-    setSelectedId(node.id);
-    // Auf Tablet und Handy klappt der Strukturbaum sofort auf.
-    setMobileNavOpen(true);
-  };
+  const kpiCards = perspective === "client"
+    ? [
+        {
+          id: "budget",
+          label: "Budget",
+          value: summary.budgetAmount !== null ? fmt(summary.budgetAmount) : "Noch nicht festgelegt",
+          sub: summary.budgetAmount !== null
+            ? `Basis: ${summary.budgetBasis === "net" ? "Netto" : "Brutto"}`
+            : "Kein Budget hinterlegt",
+          action: summary.budgetAmount === null ? "+ Budget festlegen" : "Budget ändern",
+          onAction: () => setBudgetModal({ open: true, kind: "project" }),
+          onClick: () => setBudgetModal({ open: true, kind: "project" }),
+        },
+        {
+          id: "orders",
+          label: "Aufträge vergeben",
+          value: fmt(summary.expense.orderTotal),
+          sub: summary.expense.remainingOrderAmount > 0
+            ? `${fmt(summary.expense.remainingOrderAmount)} noch nicht abgerechnet`
+            : "Bestätigte Aufträge inkl. Nachträge",
+          onClick: () => handleFilterJump("unbilled_orders"),
+        },
+        {
+          id: "invoices",
+          label: "Rechnungen erhalten",
+          value: fmt(summary.expense.invoicedTotal),
+          sub: `${fmt(summary.expense.paidTotal)} bereits bezahlt`,
+          onClick: () => handleFilterJump("expenses"),
+        },
+        {
+          id: "open",
+          label: "Noch zu bezahlen",
+          value: fmt(summary.expense.openInvoiceAmount),
+          sub: summary.expense.overdueAmount > 0
+            ? `${fmt(summary.expense.overdueAmount)} überfällig`
+            : "Offene erhaltene Rechnungen",
+          tone: summary.expense.overdueAmount > 0 ? "red" : undefined,
+          onClick: () => handleFilterJump("open_invoices"),
+        },
+      ]
+    : [
+        {
+          id: "inc-orders",
+          label: "Aufträge erhalten",
+          value: fmt(summary.income.orderTotal),
+          sub: summary.income.remainingOrderAmount > 0
+            ? `${fmt(summary.income.remainingOrderAmount)} noch nicht abgerechnet`
+            : "Bestätigte Kundenaufträge",
+          onClick: () => handleFilterJump("incomes"),
+        },
+        {
+          id: "inc-invoices",
+          label: "Rechnungen gestellt",
+          value: fmt(summary.income.invoicedTotal),
+          sub: `${fmt(summary.income.openInvoiceAmount)} Zahlung offen`,
+          onClick: () => handleFilterJump("incomes"),
+        },
+        {
+          id: "inc-paid",
+          label: "Zahlungen erhalten",
+          value: fmt(summary.income.paidTotal),
+          sub: "Tatsächlich eingegangenes Geld",
+          onClick: () => handleFilterJump("incomes"),
+        },
+        {
+          id: "surplus",
+          label: "Voraussichtlicher Überschuss",
+          value: fmt(summary.expectedSurplus),
+          sub: "Projektprognose (kein steuerlicher Gewinn)",
+          tone: summary.expectedSurplus < 0 ? "red" : undefined,
+          onClick: () => handleFilterJump("all"),
+        },
+      ];
 
-  const openNode = (id: string | null) => { setSelectedId(id); setMobileNavOpen(false); };
-
-  const renderTree = (parentId: string | null, depth: number): React.ReactNode =>
-    childrenOf(state, parentId).map((n) => {
-      const kids = childrenOf(state, n.id);
-      const open = expanded[n.id] ?? true;
-      const active = selectedId === n.id;
-      return (
-        <div key={n.id}>
-          <div
-            onClick={() => openNode(n.id)}
-            className={`group flex items-center gap-1 px-2 py-2 rounded-md cursor-pointer text-[13px] min-h-[44px] ${active ? "font-semibold" : ""}`}
-            style={{
-              paddingLeft: 8 + depth * 14,
-              background: active ? "hsl(var(--accent-gold) / 0.18)" : undefined,
-              border: active ? "2px solid hsl(var(--accent-gold))" : "2px solid transparent",
-              boxShadow: active ? "inset 3px 0 0 hsl(var(--accent-gold))" : undefined,
-              color: active ? "hsl(var(--accent-gold))" : undefined,
-              opacity: n.enabled ? 1 : 0.45,
-            }}
-          >
-            {kids.length > 0 ? (
-              <button onClick={(e) => { e.stopPropagation(); toggleExpand(n.id); }}
-                className="h-8 w-8 -ml-1 flex items-center justify-center shrink-0">
-                {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              </button>
-            ) : <span className="h-8 w-8 -ml-1 shrink-0" />}
-            {n.type === "overview"
-              ? <Folder size={14} style={{ color: "hsl(var(--accent-gold))" }} />
-              : <Building2 size={14} style={{ color: active ? "hsl(var(--accent-gold))" : "hsl(var(--ink-soft))" }} />}
-            <span className="truncate flex-1">{n.name}</span>
-            <NodeMenu
-              projectId={pid}
-              node={n}
-              compact
-              onDeleted={() => setSelectedId((cur) => (cur === n.id ? null : cur))}
-              onDuplicated={(id) => openNode(id)}
-            />
-          </div>
-          {open && kids.length > 0 && renderTree(n.id, depth + 1)}
-        </div>
-      );
-    });
-
-  /** Strukturspalte – auf großen Bildschirmen fest, sonst als Panel. */
-  const structureFor = (showAdd: boolean, showHeader = true) => (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden"
-         style={{ background: "hsl(var(--surface-card))" }}>
-      {showHeader && (
-      <div className="flex items-center gap-1 px-3 py-2 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-[11px] font-semibold uppercase tracking-wider flex-1"
-             style={{ color: "hsl(var(--ink-soft))" }}>Struktur</div>
-        <button onClick={() => { setLeftOpen(false); setMobileNavOpen(false); }}
-          className="h-11 w-11 rounded flex items-center justify-center hover:bg-muted" title="Struktur einklappen">
-          <PanelLeftClose size={16} />
-        </button>
-      </div>
-      )}
-
-
-      {showAdd && (
-      <div className="flex flex-col gap-2 px-3 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <button onClick={() => addNode("overview")}
-          className="w-full h-12 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2"
-          style={{
-            borderColor: "hsl(var(--accent-gold))",
-            background: "hsl(var(--accent-gold) / 0.12)",
-            color: "hsl(var(--accent-gold))",
-          }}>
-          <Plus size={18} /> Ordner
-        </button>
-        <button onClick={() => addNode("action")}
-          className="w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-          style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
-          <Plus size={18} /> Anlage
-        </button>
-      </div>
-      )}
-
-
-      <div className="px-3 py-2 border-b space-y-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="flex items-center gap-1.5 h-11 rounded-md border px-2"
-             style={{ borderColor: "hsl(var(--hairline))" }}>
-          <Search size={13} style={{ color: "hsl(var(--ink-soft))" }} />
-          <input value={filterQuery} onChange={(e) => setFilterQuery(e.target.value)}
-            placeholder="Nr., Name, Notiz…"
-            className="flex-1 min-w-0 bg-transparent text-[13px] outline-none" />
-          {filterActive && (
-            <button title="Filter zurücksetzen" className="h-9 w-9 flex items-center justify-center"
-              onClick={() => { setFilterQuery(""); setFilterTypes([]); }}>
-              <X size={14} style={{ color: "hsl(var(--ink-soft))" }} />
+  const renderAreaList = (onPick?: () => void) => (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => { setScopeId(null); setActiveProcessId(null); onPick?.(); }}
+        className="w-full min-h-[42px] px-3 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors text-left"
+        style={{
+          background: scopeId === null ? "hsl(var(--accent-gold) / 0.14)" : "transparent",
+          color: scopeId === null ? "hsl(var(--accent-gold))" : undefined,
+        }}
+      >
+        <Home size={15} />
+        <span className="truncate">Gesamtes Projekt</span>
+      </button>
+      {areaNodes.map((area) => {
+        const active = scopeId === area.id;
+        return (
+          <div key={area.id} className="group flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => { setScopeId(area.id); setActiveProcessId(null); onPick?.(); }}
+              className="flex-1 min-w-0 min-h-[42px] px-3 rounded-lg flex items-center gap-2 text-sm transition-colors text-left"
+              style={{
+                background: active ? "hsl(var(--accent-gold) / 0.14)" : "transparent",
+                color: active ? "hsl(var(--accent-gold))" : undefined,
+              }}
+            >
+              <Folder size={15} className="shrink-0" />
+              <span className="truncate">{area.name}</span>
             </button>
-          )}
+            <button
+              type="button"
+              aria-label="Bereich löschen"
+              onClick={() => {
+                if (scopeId === area.id) setScopeId(null);
+                financeStore.deleteNode(projectId, area.id);
+              }}
+              className="h-8 w-8 rounded-lg flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-muted shrink-0"
+              style={{ color: "hsl(var(--ink-soft))" }}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={handleCreateArea}
+        className="w-full min-h-[42px] mt-2 px-3 rounded-lg border border-dashed text-xs font-medium flex items-center gap-1.5 hover:border-[hsl(var(--accent-gold))]"
+        style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}
+      >
+        <Plus size={14} /> Neuer Bereich
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* 1. Projektperspektive + Netto/Brutto + PDF */}
+      <div
+        className="rounded-xl border p-4 space-y-3"
+        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>
+              Projektperspektive
+            </div>
+            <p className="text-xs sm:text-sm mt-0.5" style={{ color: "hsl(var(--ink-soft))" }}>
+              {perspective === "client"
+                ? "Behalte Budget, vergebene Aufträge und Zahlungen im Blick."
+                : "Vergleiche deine Aufträge und Einnahmen mit deinen Projektkosten."}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="inline-flex rounded-lg border p-0.5"
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+            >
+              {(["gross", "net"] as TaxBasis[]).map((b) => {
+                const active = taxDisplay === b;
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => financeStore.setTaxDisplay(projectId, b)}
+                    className="min-h-[36px] px-3 rounded-md text-xs font-semibold transition-colors"
+                    style={{
+                      background: active ? "hsl(var(--accent-gold))" : "transparent",
+                      color: active ? "#111" : "hsl(var(--ink-soft))",
+                    }}
+                  >
+                    {b === "gross" ? "Brutto" : "Netto"}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              disabled={exporting}
+              className="min-h-[40px] px-3 rounded-lg border text-xs font-semibold flex items-center gap-1.5 hover:border-[hsl(var(--accent-gold))]"
+              style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
+            >
+              <FileDown size={15} style={{ color: "hsl(var(--accent-gold))" }} />
+              {exporting ? "Exportiere …" : "PDF-Bericht"}
+            </button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-1">
-          {FILTER_CHIPS.map(([key, label]) => {
-            const on = filterTypes.includes(key);
+
+        <div className="grid grid-cols-2 gap-2.5">
+          {(["client", "contractor"] as FinancePerspective[]).map((p) => {
+            const active = perspective === p;
             return (
-              <button key={key}
-                onClick={() => setFilterTypes((t) => on ? t.filter((x) => x !== key) : [...t, key])}
-                className="h-9 px-3 rounded-full border text-[11px] font-medium"
+              <button
+                key={p}
+                type="button"
+                onClick={() => { financeStore.setPerspective(projectId, p); setTab("overview"); setListFilter("all"); }}
+                className="min-h-[48px] px-4 rounded-xl border text-sm sm:text-base font-semibold transition-colors"
                 style={{
-                  borderColor: on ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
-                  background: on ? "hsl(var(--accent-gold) / 0.14)" : undefined,
-                }}>
-                {label}
+                  borderColor: active ? "hsl(var(--accent-gold))" : "hsl(var(--hairline))",
+                  background: active ? "hsl(var(--accent-gold) / 0.16)" : "hsl(var(--surface))",
+                  color: active ? "hsl(var(--accent-gold))" : undefined,
+                }}
+              >
+                {p === "client" ? "Auftraggeber" : "Auftragnehmer"}
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto py-1 px-1">
-        <div onClick={() => openNode(null)}
-          className="flex items-center gap-1.5 px-2 py-2 rounded-md cursor-pointer text-[13px] font-semibold min-h-[44px]"
-          style={{ background: selectedId === null ? "hsl(var(--surface-muted))" : undefined }}>
-          <Home size={14} style={{ color: "hsl(var(--accent-gold))" }} />
-          <span className="truncate">{projectName ?? "Projekt"}</span>
+      {/* Hinweis bei fehlenden Steuerangaben im Netto-Modus */}
+      {(summary.expense.hasMissingTax || summary.income.hasMissingTax) && (
+        <div
+          className="rounded-xl border px-4 py-2.5 text-xs flex items-center gap-2"
+          style={{ borderColor: "hsl(34 92% 52% / 0.5)", background: "hsl(34 92% 52% / 0.08)", color: "hsl(34 92% 62%)" }}
+        >
+          <AlertTriangle size={15} className="shrink-0" />
+          Einzelne Belege enthalten keine Steuersatz-Angabe und werden mit ihrem gespeicherten Betrag ausgewiesen.
         </div>
-        {renderTree(null, 1)}
-      </div>
-    </div>
-  );
+      )}
 
-  return (
-    <div className="flex min-h-[60vh] w-full min-w-0 flex-col overflow-hidden rounded-xl border"
-         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-app))" }}>
-      <div className="flex min-h-0 flex-1">
-        {leftOpen && (
-          <aside className="hidden lg:flex w-[280px] shrink-0 min-h-0 flex-col border-r overflow-hidden"
-                 style={{ borderColor: "hsl(var(--hairline))" }}>
-            {structureFor(true)}
+      {/* Mobile Bereichsauswahl */}
+      <div className="lg:hidden flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setMobileAreasOpen((v) => !v)}
+          className="min-h-[44px] flex-1 px-3.5 rounded-xl border text-sm font-medium flex items-center justify-between"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+        >
+          <span className="flex items-center gap-2 truncate">
+            <Layers size={15} style={{ color: "hsl(var(--accent-gold))" }} />
+            Bereich: {summary.scopeName}
+          </span>
+          <ChevronRight size={16} className={mobileAreasOpen ? "rotate-90 transition-transform" : "transition-transform"} />
+        </button>
+      </div>
+      {mobileAreasOpen && (
+        <div
+          className="lg:hidden rounded-xl border p-3"
+          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+        >
+          {renderAreaList(() => setMobileAreasOpen(false))}
+        </div>
+      )}
+
+      {/* Hauptlayout: Bereiche links (Desktop) + Inhalt rechts */}
+      <div className="flex flex-col lg:flex-row gap-4 items-start">
+        {areasOpen && (
+          <aside
+            className="hidden lg:block w-60 shrink-0 rounded-xl border p-3"
+            style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+          >
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>
+                Bereiche
+              </span>
+              <button
+                type="button"
+                onClick={() => setAreasOpen(false)}
+                title="Bereiche einklappen"
+                className="h-7 w-7 rounded flex items-center justify-center hover:bg-muted"
+              >
+                <PanelLeftClose size={15} />
+              </button>
+            </div>
+            {renderAreaList()}
           </aside>
         )}
 
-        <section className="flex-1 min-w-0 min-h-0 overflow-auto">
-          {/* Tablet und Handy: große Anlege-Knöpfe über der Struktur */}
-          <div className="lg:hidden grid grid-cols-2 gap-2 px-3 pt-3">
-            <button onClick={() => addNode("overview")}
-              className="h-12 rounded-lg border-2 text-sm font-semibold flex items-center justify-center gap-2"
-              style={{
-                borderColor: "hsl(var(--accent-gold))",
-                background: "hsl(var(--accent-gold) / 0.12)",
-                color: "hsl(var(--accent-gold))",
-              }}>
-              <Plus size={18} /> Ordner
-            </button>
-            <button onClick={() => addNode("action")}
-              className="h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-              style={{ background: "hsl(var(--ink))", color: "hsl(var(--surface))" }}>
-              <Plus size={18} /> Anlage
-            </button>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 border-b"
-               style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}>
-            <button onClick={() => setMobileNavOpen((v) => !v)}
-              aria-expanded={mobileNavOpen}
-              className="lg:hidden order-first basis-full h-14 rounded-xl border-2 flex items-center gap-2 px-4 text-sm font-semibold"
-              style={{
-                borderColor: "hsl(var(--accent-gold))",
-                background: "hsl(var(--accent-gold) / 0.12)",
-                color: "hsl(var(--accent-gold))",
-              }}>
-              <ListTree size={20} />
-              <span className="flex-1 text-left">Strukturbaum</span>
-              {mobileNavOpen ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
-            </button>
-            {!leftOpen && (
-              <button onClick={() => setLeftOpen(true)}
-                className="hidden lg:flex h-11 w-11 rounded items-center justify-center hover:bg-muted" title="Struktur einblenden">
-                <PanelLeftOpen size={16} />
-              </button>
-            )}
-            <div className="text-[11px] font-semibold uppercase tracking-wider"
-                 style={{ color: "hsl(var(--ink-soft))" }}>
-              {selected ? (selected.type === "action" ? "Anlage" : "Ordner") : "Projekt"}
-            </div>
-            {selected && <span className="text-sm font-medium truncate max-w-[200px] sm:max-w-[280px]">{selected.name}</span>}
-            {selected && (
-              <NodeMenu
-                projectId={pid}
-                node={selected}
-                onDeleted={() => setSelectedId(null)}
-                onDuplicated={(id) => setSelectedId(id)}
-              />
-            )}
-            <div className="flex-1" />
-            <button onClick={handleExport} disabled={exporting}
-              className="h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium disabled:opacity-50"
-              style={{ borderColor: "hsl(var(--hairline))" }} title="Als PDF (DIN A4) exportieren">
-              <FileDown size={16} /> <span className="hidden sm:inline">PDF</span>
-            </button>
-            {selected && (
-              <button
-                onClick={() => {
-                  if (!window.confirm(`\u201e${selected.name}\u201c wirklich löschen?`)) return;
-                  financeStore.deleteNode(pid, selected.id);
-                  setSelectedId(null);
-                }}
-                className="h-11 min-w-[44px] px-3 rounded-md border flex items-center gap-1.5 text-[12px] font-medium"
-                style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--destructive))" }}
-                title="Auswahl löschen">
-                <Trash2 size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* Struktur klappt unterhalb des Kopfes auf (Tablet und Handy) */}
-          {mobileNavOpen && (
-            <div className="lg:hidden border-b max-h-[70vh] overflow-auto"
-                 style={{ borderColor: "hsl(var(--hairline))" }}>
-              {structureFor(false, false)}
-            </div>
-          )}
-
-          <div ref={exportRef} className="p-3 sm:p-4 space-y-4" style={{ background: "hsl(var(--surface-app))" }}>
-            {filterActive && (
-              <FilterResults hits={filterHits} onOpen={(id) => { setFilterQuery(""); setFilterTypes([]); setSelectedId(id); }} />
-            )}
-            {!selected && !filterActive && (
-              <ProjectView projectId={pid} state={state} projectName={projectName ?? "Projekt"}
-                           onSelect={setSelectedId} />
-            )}
-            {selected?.type === "overview" && (
-              <OverviewView projectId={pid} state={state} node={selected} onSelect={setSelectedId} />
-            )}
-            {selected?.type === "action" && (
-              <ActionView projectId={pid} state={state} node={selected} />
-            )}
-          </div>
-        </section>
-      </div>
-
-    </div>
-  );
-}
-
-
-/* -------------------------------------------------- Drei-Punkte-Menü (Knoten) */
-
-const NodeMenu: React.FC<{
-  projectId: string;
-  node: FinanceNode;
-  compact?: boolean;
-  onDeleted: () => void;
-  onDuplicated: (id: string) => void;
-}> = ({ projectId, node, compact, onDeleted, onDuplicated }) => {
-  const [open, setOpen] = useState(false);
-  const label = node.type === "overview" ? "Ordner" : "Anlage";
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  const item = (icon: React.ReactNode, text: string, run: () => void, danger?: boolean) => (
-    <button
-      onClick={(e) => { e.stopPropagation(); setOpen(false); run(); }}
-      className="w-full flex items-center gap-2.5 px-3 h-12 text-[14px] rounded-lg border text-left hover:bg-muted"
-      style={{
-        borderColor: "hsl(var(--hairline))",
-        color: danger ? "hsl(var(--destructive))" : undefined,
-      }}>
-      {icon}{text}
-    </button>
-  );
-
-  return (
-    <div className="shrink-0" data-export-hide>
-      <button
-        title={`${label} verwalten`}
-        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-        className={`h-8 w-8 rounded flex items-center justify-center hover:bg-muted ${compact ? "opacity-60 group-hover:opacity-100" : "opacity-70 hover:opacity-100"}`}
-        style={{ color: "hsl(var(--ink-soft))" }}>
-        <MoreVertical size={16} />
-      </button>
-      {open && createPortal(
-        <div
-          className="fixed inset-0 z-[1400] flex items-center justify-center p-4"
-          style={{ background: "hsl(0 0% 0% / 0.55)" }}
-          onPointerDown={(e) => { e.stopPropagation(); setOpen(false); }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div
-            className="w-full max-w-[360px] rounded-2xl border p-4 shadow-2xl space-y-2"
-            style={{ background: "hsl(var(--surface-card))", borderColor: "hsl(var(--hairline))" }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-2 pb-1">
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-wider"
-                     style={{ color: "hsl(var(--ink-soft))" }}>{label}</div>
-                <div className="truncate text-[15px] font-semibold">{node.name}</div>
-              </div>
-              <button onClick={() => setOpen(false)}
-                className="h-9 w-9 rounded-lg flex items-center justify-center hover:bg-muted"
-                title="Schließen">
-                <X size={18} />
-              </button>
-            </div>
-            {item(<Pencil size={15} />, `${label} umbenennen`, () => {
-              const name = window.prompt(`${label} umbenennen`, node.name);
-              if (name && name.trim()) financeStore.updateNode(projectId, node.id, { name: name.trim() });
-            })}
-            {item(<Copy size={15} />, `${label} duplizieren`, () => {
-              const copy = financeStore.duplicateNode(projectId, node.id);
-              if (copy) onDuplicated(copy.id);
-            })}
-            {item(<Trash2 size={15} />, `${label} löschen`, () => {
-              if (!window.confirm(`\u201e${node.name}\u201c wirklich löschen?`)) return;
-              financeStore.deleteNode(projectId, node.id);
-              onDeleted();
-            }, true)}
-          </div>
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-};
-
-/* ----------------------------------------------------------------- Aktion */
-
-const ActionView: React.FC<{ projectId: string; state: FinanceState; node: FinanceNode }> =
-({ projectId, state, node }) => {
-  const totals = actionTotals(state, node);
-  const positions = positionsOf(state, node.id);
-  const invoiceDetails = positions.filter((p) => p.type === "invoice" || p.type === "supplement");
-  const isInvoiceLike = (p: FinancePosition) => p.type === "invoice" || p.type === "supplement";
-  const archived = positions.filter((p) => !p.hasTemplate);
-  const created = positions.filter((p) => p.hasTemplate);
-  const archivedInvoices = archived.filter(isInvoiceLike);
-  const createdInvoices = created.filter(isInvoiceLike);
-
-  const hasSplit = archived.length > 0 || created.length > 0;
-
-  return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <input value={node.name}
-          onChange={(e) => financeStore.updateNode(projectId, node.id, { name: e.target.value })}
-          placeholder="Name der Aktion / des Unternehmens"
-          className="w-full bg-transparent text-xl font-semibold outline-none" />
-        <textarea value={node.note} rows={2}
-          onChange={(e) => financeStore.updateNode(projectId, node.id, { note: e.target.value })}
-          placeholder="Notiz..."
-          className="w-full bg-transparent text-sm outline-none resize-y border rounded-lg px-3 py-1.5"
-          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }} />
-      </div>
-
-      {/* Übersichten ganz oben – getrennt nach erhaltenen und angelegten Belegen. */}
-      {!hasSplit && (
-        <FinanceSummaryCard
-          totals={totals}
-          subtitle={node.name}
-          invoiceDetails={invoiceDetails}
-          onEstimateChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })}
-        />
-      )}
-
-      {hasSplit && (
-        <div className="space-y-2">
-          <EstimateRow value={node.estimate || 0}
-            onChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })} />
-          {archived.length > 0 && (
-            <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
-              title="Erhaltene Belege" subtitle={node.name}
-              invoiceDetails={archivedInvoices} background={ARCHIVE_BG} />
-          )}
-          {created.length > 0 && (
-            <FinanceSummaryCard totals={positionTotals(created)} hideEstimate
-              title="Angelegte Belege" subtitle={node.name}
-              invoiceDetails={createdInvoices} background={CREATED_BG} />
-          )}
-        </div>
-      )}
-
-      {/* Erhalten = bestehende Belege erfassen; darunter das Anlegen neuer Belege */}
-      <div className="space-y-1.5" data-export-hide>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          {([["offer", "Angebot"], ["invoice", "Rechnung"], ["supplement", "Nachtrag"]] as const).map(([t, label]) => (
-            <button key={t} onClick={() => financeStore.addPosition(projectId, node.id, t)}
-              className="h-14 px-4 rounded-xl border-2 text-[15px] font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors"
-              style={{
-                borderColor: "hsl(var(--accent-gold))",
-                background: "hsl(var(--accent-gold) / 0.14)",
-                color: "hsl(var(--accent-gold))",
-              }}>
-              <Plus size={20} /> {label} erhalten
-            </button>
-          ))}
-        </div>
-      </div>
-
-
-      {/* Erhaltene Belege – nur Tabelle, Übersicht steht oben */}
-      {archived.length > 0 && (
-        <div className="space-y-1.5 rounded-xl p-2.5" style={{ background: ARCHIVE_BG }}>
-          <div className="text-[11px] font-semibold uppercase tracking-wider"
-               style={{ color: "hsl(var(--ink-soft))" }}>Erhaltene Belege</div>
-          <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={archived}
-            emptyHint="Noch keine erhaltenen Belege." />
-        </div>
-      )}
-
-      {/* Angelegte Belege (Vorlagen in der Projektmappe) */}
-      {created.length > 0 && (
-        <div className="space-y-1.5 rounded-xl p-2.5" style={{ background: CREATED_BG }}>
-          <div className="text-[11px] font-semibold uppercase tracking-wider"
-               style={{ color: "hsl(var(--ink-soft))" }}>Angelegte Belege</div>
-          <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={created}
-            background="hsl(var(--surface-card))"
-            emptyHint="Noch keine angelegten Belege." />
-        </div>
-      )}
-
-      {positions.length === 0 && (
-        <FinancePositionsTable projectId={projectId} nodeId={node.id} positions={[]} />
-      )}
-    </div>
-  );
-};
-
-/** Kompakte Zeile zur Pflege der Kostenschätzung (wenn die Übersicht geteilt ist). */
-const EstimateRow: React.FC<{ value: number; onChange: (v: number) => void }> = ({ value, onChange }) => {
-  const [draft, setDraft] = useState<string | null>(null);
-  return (
-    <div className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[13px]"
-         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-      <span className="text-[11px] font-semibold uppercase tracking-wider"
-            style={{ color: "hsl(var(--ink-soft))" }}>Kostenschätzung</span>
-      {draft === null ? (
-        <button className="font-semibold" onClick={() => setDraft(String(value || ""))}>
-          {formatEur(value)}
-        </button>
-      ) : (
-        <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => { onChange(parseEurLocal(draft)); setDraft(null); }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { onChange(parseEurLocal(draft)); setDraft(null); }
-            if (e.key === "Escape") setDraft(null);
-          }}
-          className="bg-transparent border rounded px-2 py-0.5 font-semibold outline-none"
-          style={{ borderColor: "hsl(var(--hairline))" }} />
-      )}
-    </div>
-  );
-};
-
-const parseEurLocal = (v: string): number => {
-  const n = parseFloat(v.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-};
-
-/** Hintergründe zur Unterscheidung erhaltener und angelegter Belege. */
-const ARCHIVE_BG = "hsl(var(--surface-muted))";
-const CREATED_BG = "hsl(var(--accent-gold) / 0.10)";
-
-/* --------------------------------------------------------------- Übersicht */
-
-/** Sammelt alle Positionen unterhalb eines Knotens (aktive Zweige, rekursiv). */
-function collectPositions(state: FinanceState, parentId: string | null): FinancePosition[] {
-  const out: FinancePosition[] = [];
-  const walk = (id: string | null) => {
-    for (const kid of childrenOf(state, id)) {
-      if (!kid.enabled) continue;
-      if (kid.type === "action") out.push(...positionsOf(state, kid.id));
-      else walk(kid.id);
-    }
-  };
-  walk(parentId);
-  return out;
-}
-
-/** Getrennte Übersichten für erhaltene und angelegte Belege. */
-const SplitSummaries: React.FC<{
-  state: FinanceState; parentId: string | null; subtitle: string;
-  estimate: number; onEstimateChange: (v: number) => void; fallback: FinanceTotals;
-}> = ({ state, parentId, subtitle, estimate, onEstimateChange, fallback }) => {
-  const all = collectPositions(state, parentId);
-  const archived = all.filter((p) => !p.hasTemplate);
-  const created = all.filter((p) => p.hasTemplate);
-  const isInvoiceLike = (p: FinancePosition) => p.type === "invoice" || p.type === "supplement";
-
-  if (archived.length === 0 && created.length === 0) {
-    return <FinanceSummaryCard totals={fallback} subtitle={subtitle} onEstimateChange={onEstimateChange} />;
-  }
-  return (
-    <div className="space-y-2">
-      <EstimateRow value={estimate} onChange={onEstimateChange} />
-      {archived.length > 0 && (
-        <FinanceSummaryCard totals={positionTotals(archived)} hideEstimate
-          title="Erhaltene Belege" subtitle={subtitle}
-          invoiceDetails={archived.filter(isInvoiceLike)} background={ARCHIVE_BG} />
-      )}
-      {created.length > 0 && (
-        <FinanceSummaryCard totals={positionTotals(created)} hideEstimate
-          title="Angelegte Belege" subtitle={subtitle}
-          invoiceDetails={created.filter(isInvoiceLike)} background={CREATED_BG} />
-      )}
-    </div>
-  );
-};
-
-const OverviewView: React.FC<{ projectId: string; state: FinanceState; node: FinanceNode; onSelect: (id: string) => void }> =
-({ projectId, state, node, onSelect }) => {
-  const totals = nodeTotals(state, node);
-  const kids = childrenOf(state, node.id);
-  return (
-    <>
-      <div className="space-y-2">
-        <input value={node.name}
-          onChange={(e) => financeStore.updateNode(projectId, node.id, { name: e.target.value })}
-          placeholder="Name der Übersicht"
-          className="w-full bg-transparent text-2xl font-semibold outline-none" />
-        <textarea value={node.note} rows={2}
-          onChange={(e) => financeStore.updateNode(projectId, node.id, { note: e.target.value })}
-          placeholder="Notiz..."
-          className="w-full bg-transparent text-sm outline-none resize-y border rounded-lg px-3 py-2"
-          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }} />
-      </div>
-
-      <SplitSummaries state={state} parentId={node.id} subtitle={node.name}
-        estimate={totals.estimate} fallback={totals}
-        onEstimateChange={(v) => financeStore.updateNode(projectId, node.id, { estimate: v })} />
-
-      <ChildList projectId={projectId} state={state} nodes={kids} onSelect={onSelect} />
-    </>
-  );
-};
-
-/* ----------------------------------------------------------------- Projekt */
-
-const ProjectView: React.FC<{ projectId: string; state: FinanceState; projectName: string; onSelect: (id: string) => void }> =
-({ projectId, state, projectName, onSelect }) => {
-  const totals = projectTotals(state);
-  const roots = childrenOf(state, null);
-  return (
-    <>
-      <div className="space-y-2">
-        <div className="text-2xl font-semibold">{projectName}</div>
-        <textarea value={state.projectNote} rows={2}
-          onChange={(e) => financeStore.setProjectNote(projectId, e.target.value)}
-          placeholder="Notiz..."
-          className="w-full bg-transparent text-sm outline-none resize-y border rounded-lg px-3 py-2"
-          style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }} />
-      </div>
-
-      <SplitSummaries state={state} parentId={null} subtitle="Gesamtes Projekt"
-        estimate={totals.estimate} fallback={totals}
-        onEstimateChange={(v) => financeStore.setProjectEstimate(projectId, v)} />
-
-      <ChildList projectId={projectId} state={state} nodes={roots} onSelect={onSelect} deep />
-    </>
-  );
-};
-
-
-/* ------------------------------------------------- Liste untergeordneter Knoten */
-
-/**
- * Handy und Tablet: Ordner und Anlagen zeigen nur Name und Betrag.
- * Ein Tippen öffnet ein Fenster mit den gegliederten Einzelheiten.
- */
-const MobileNodeList: React.FC<{
-  projectId: string; state: FinanceState; nodes: FinanceNode[]; onSelect: (id: string) => void;
-}> = ({ projectId, state, nodes, onSelect }) => {
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const detail = detailId ? nodes.find((n) => n.id === detailId) ?? null : null;
-  const dt = detail ? nodeTotals(state, detail) : null;
-
-  return (
-    <div className="space-y-2">
-      {nodes.map((n) => {
-        const t = nodeTotals(state, n);
-        return (
-          <button key={n.id} onClick={() => setDetailId(n.id)}
-            className="w-full flex items-center gap-2 rounded-xl border px-3 py-3 text-left"
-            style={{
-              borderColor: "hsl(var(--hairline))",
-              background: "hsl(var(--surface-card))",
-              opacity: n.enabled ? 1 : 0.45,
-            }}>
-            {n.type === "overview"
-              ? <Folder size={16} style={{ color: "hsl(var(--accent-gold))" }} />
-              : <Building2 size={16} style={{ color: "hsl(var(--ink-soft))" }} />}
-            <span className="flex-1 min-w-0 truncate text-sm font-medium">{n.name}</span>
-            <span className="tabular-nums text-sm font-semibold">{formatEur(t.invoices)}</span>
-            <ChevronRight size={16} style={{ color: "hsl(var(--ink-soft))" }} />
-          </button>
-        );
-      })}
-
-      {detail && dt && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-             style={{ background: "rgba(0,0,0,0.45)" }} onClick={() => setDetailId(null)}>
-          <div onClick={(e) => e.stopPropagation()}
-               className="w-full sm:max-w-md max-h-[85vh] overflow-auto rounded-t-2xl sm:rounded-2xl border p-4 space-y-3"
-               style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>
-                  {detail.type === "overview" ? "Ordner" : "Anlage"}
-                </div>
-                <div className="text-lg font-semibold truncate">{detail.name}</div>
-              </div>
-              <button onClick={() => setDetailId(null)} className="h-11 w-11 rounded-md flex items-center justify-center">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-1.5 text-sm">
-              <DetailRow label="Kostenschätzung" value={formatEur(dt.estimate)} />
-              <DetailRow label="Angebote" value={formatEur(dt.offers)} />
-              <DetailRow label="Rechnungen" value={formatEur(dt.invoices)} />
-              <DetailRow label="Kontrolle Angebote" value={formatPct(control(dt.estimate, dt.offers).pct)} />
-              <DetailRow label="Kontrolle Rechnungen" value={formatPct(control(dt.estimate, dt.invoices).pct)} />
-            </div>
-
-            {detail.note && (
-              <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{detail.note}</div>
-            )}
-
+        <div className="flex-1 min-w-0 w-full space-y-5">
+          {!areasOpen && (
             <button
-              onClick={() => financeStore.updateNode(projectId, detail.id, { enabled: !detail.enabled })}
-              className="w-full h-11 rounded-lg border text-sm font-medium flex items-center justify-center gap-2"
-              style={{ borderColor: "hsl(var(--hairline))" }}>
-              {detail.enabled
-                ? <><ToggleRight size={18} style={{ color: "hsl(var(--accent-gold))" }} /> Wird berücksichtigt</>
-                : <><ToggleLeft size={18} /> Wird nicht berücksichtigt</>}
+              type="button"
+              onClick={() => setAreasOpen(true)}
+              className="hidden lg:inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border hover:border-[hsl(var(--accent-gold))]"
+              style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}
+            >
+              <PanelLeftOpen size={14} /> Bereiche anzeigen ({summary.scopeName})
             </button>
+          )}
 
-            <button onClick={() => { setDetailId(null); onSelect(detail.id); }}
-              className="w-full h-12 rounded-lg text-sm font-semibold flex items-center justify-center gap-2"
-              style={{ background: "hsl(var(--accent-gold))", color: "hsl(var(--surface))" }}>
-              Öffnen <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const DetailRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex items-center gap-2 border-b pb-1.5" style={{ borderColor: "hsl(var(--hairline))" }}>
-    <span className="flex-1" style={{ color: "hsl(var(--ink-soft))" }}>{label}</span>
-    <span className="tabular-nums font-medium">{value}</span>
-  </div>
-);
-
-
-const ChildList: React.FC<{
-  projectId: string; state: FinanceState; nodes: FinanceNode[];
-  onSelect: (id: string) => void; deep?: boolean;
-}> = ({ projectId, state, nodes, onSelect }) => {
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const isMobile = useIsMobile();
-  if (nodes.length === 0) {
-    return (
-      <div className="rounded-xl border px-4 py-6 text-xs"
-           style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
-        Noch keine Einträge. Lege links „+ Ordner" oder „+ Anlegen" an.
-      </div>
-    );
-  }
-  if (isMobile) {
-    return <MobileNodeList projectId={projectId} state={state} nodes={nodes} onSelect={onSelect} />;
-  }
-  return (
-    <div className="rounded-xl border overflow-hidden"
-         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-      <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
-           style={{ gridTemplateColumns: "28px 1.6fr 1fr 1fr 1fr 1.2fr 32px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
-        <span /><span>Bezeichnung</span><span>Schätzung</span><span>Angebote</span>
-        <span>Rechnungen</span><span>Kontrolle (Ang./Re.)</span><span />
-      </div>
-      {nodes.map((n) => {
-        const t: FinanceTotals = nodeTotals(state, n);
-        const cO = control(t.estimate, t.offers);
-        const cI = control(t.estimate, t.invoices);
-        const kids = childrenOf(state, n.id);
-        // Anlagen (Aktionen) lassen sich ebenfalls aufklappen — dort erscheinen
-        // die Belege getrennt nach „erhalten" und „angelegt".
-        const nodePositions = n.type === "action" ? positionsOf(state, n.id) : [];
-        const canExpand = kids.length > 0 || nodePositions.length > 0;
-        const isOpen = !!open[n.id];
-        return (
-          <div key={n.id} {...(n.enabled ? {} : { "data-export-hide": true })}>
-            <div className="grid items-center px-3 py-2 border-b text-sm"
-                 style={{ gridTemplateColumns: "28px 1.6fr 1fr 1fr 1fr 1.2fr 32px", borderColor: "hsl(var(--hairline))", opacity: n.enabled ? 1 : 0.45 }}>
-              <button data-export-hide title={n.enabled ? "Wird berücksichtigt" : "Wird nicht berücksichtigt"}
-                onClick={() => financeStore.updateNode(projectId, n.id, { enabled: !n.enabled })}>
-                {n.enabled ? <ToggleRight size={16} style={{ color: "hsl(var(--accent-gold))" }} /> : <ToggleLeft size={16} />}
-              </button>
-              <button
-                className="flex items-center gap-1.5 min-w-0 text-left"
-                title={canExpand ? "Unterpunkte ein-/ausklappen" : "Öffnen"}
-                onClick={() => canExpand
-                  ? setOpen((o) => ({ ...o, [n.id]: !o[n.id] }))
-                  : onSelect(n.id)}>
-                {canExpand
-                  ? (isOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />)
-                  : <span className="w-[13px]" />}
-                {n.type === "overview" ? <Folder size={14} /> : <Building2 size={14} />}
-                <span className="truncate font-medium">{n.name}</span>
-              </button>
-              <span className="tabular-nums">{formatEur(t.estimate)}</span>
-              <span className="tabular-nums" style={{ color: "hsl(24 95% 50%)" }}>{formatEur(t.offers)}</span>
-              <span className="tabular-nums">{formatEur(t.invoices)}</span>
-              <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
-                {formatPct(cO.pct)} / {formatPct(cI.pct)}
-              </span>
-              <button data-export-hide onClick={() => onSelect(n.id)}
-                className="h-7 w-7 rounded-md border-2 flex items-center justify-center"
-                style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.14)" }}
-                title={n.type === "overview" ? "Übersicht öffnen" : "Aktion öffnen (bearbeiten)"}>
-                <ArrowRight size={14} style={{ color: "hsl(var(--accent-gold))" }} />
-              </button>
-
-            </div>
-            {isOpen && kids.length > 0 && (
-              <div className="pl-6 border-b" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
-                <ChildList projectId={projectId} state={state} nodes={kids} onSelect={onSelect} deep />
+          {activeProcess ? (
+            <FinanceProcessDetail
+              projectId={projectId}
+              state={state}
+              node={activeProcess}
+              onBack={() => setActiveProcessId(null)}
+            />
+          ) : (
+            <>
+              {/* 2. Vier Kennzahlenkarten */}
+              <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                {kpiCards.map((card) => (
+                  <div
+                    key={card.id}
+                    onClick={card.onClick}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") card.onClick(); }}
+                    className="rounded-xl border p-4 cursor-pointer transition-colors hover:border-[hsl(var(--accent-gold)/0.6)] flex flex-col justify-between gap-2"
+                    style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                  >
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>
+                        {card.label}
+                      </div>
+                      <div
+                        className="text-lg sm:text-xl font-bold mt-1.5 break-words"
+                        style={{ color: card.tone === "red" ? "hsl(var(--destructive))" : undefined }}
+                      >
+                        {card.value}
+                      </div>
+                      <div className="text-xs mt-1" style={{ color: "hsl(var(--ink-soft))" }}>
+                        {card.sub}
+                      </div>
+                    </div>
+                    {card.action && card.onAction && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); card.onAction!(); }}
+                        className="mt-1 min-h-[38px] px-3 rounded-lg text-xs font-semibold self-start"
+                        style={{ background: "hsl(var(--accent-gold))", color: "#111" }}
+                      >
+                        {card.action}
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
-            {isOpen && nodePositions.length > 0 && (
-              <div className="pl-6 pr-3 py-2 border-b space-y-2"
-                   style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-muted))" }}>
-                <PositionMiniList title="Erhaltene Belege" background={ARCHIVE_BG}
-                  positions={nodePositions.filter((p) => !p.hasTemplate)} />
-                <PositionMiniList title="Angelegte Belege" background={CREATED_BG}
-                  positions={nodePositions.filter((p) => !!p.hasTemplate)} />
+
+              {/* 3. Reiter + Hauptaktion */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div
+                  className="inline-flex flex-wrap rounded-xl border p-1 gap-1"
+                  style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                >
+                  {(["overview", "primary", "secondary"] as FinanceTab[]).map((t) => {
+                    const active = tab === t;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => { setTab(t); setListFilter("all"); }}
+                        className="min-h-[40px] px-3.5 rounded-lg text-xs sm:text-sm font-semibold transition-colors"
+                        style={{
+                          background: active ? "hsl(var(--accent-gold))" : "transparent",
+                          color: active ? "#111" : "hsl(var(--ink-soft))",
+                        }}
+                      >
+                        {tabLabels[t]}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleCreateProcess()}
+                  className="min-h-[44px] px-4 rounded-xl text-sm font-semibold flex items-center gap-1.5"
+                  style={{ background: "hsl(var(--accent-gold))", color: "#111" }}
+                >
+                  <Plus size={16} /> Vorgang anlegen
+                </button>
               </div>
-            )}
-          </div>
-        );
-      })}
+
+              {/* 4. Reiter-Inhalt */}
+              {tab === "overview" ? (
+                <div className="space-y-4">
+                  <FinanceComparisonCards
+                    summary={summary}
+                    perspective={perspective}
+                    onSelectFilter={handleFilterJump}
+                    onOpenBudget={(kind) => setBudgetModal({ open: true, kind })}
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(var(--ink-soft))" }} />
+                      <input
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Vorgang oder Geschäftspartner suchen …"
+                        className="w-full h-11 rounded-xl border pl-9 pr-8 text-sm outline-none focus:border-[hsl(var(--accent-gold))]"
+                        style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                      />
+                      {query && (
+                        <button
+                          type="button"
+                          onClick={() => setQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                    {listFilter !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => setListFilter("all")}
+                        className="min-h-[44px] px-3 rounded-xl border text-xs font-medium flex items-center gap-1"
+                        style={{ borderColor: "hsl(var(--accent-gold))", color: "hsl(var(--accent-gold))" }}
+                      >
+                        Filter zurücksetzen <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {scopedProcesses.length === 0 ? (
+                    <div
+                      className="rounded-xl border p-8 text-center space-y-3"
+                      style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                    >
+                      <p className="text-sm" style={{ color: "hsl(var(--ink-soft))" }}>
+                        Noch keine Vorgänge in diesem Bereich.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateProcess()}
+                        className="min-h-[44px] px-4 rounded-xl text-sm font-semibold inline-flex items-center gap-1.5"
+                        style={{ background: "hsl(var(--accent-gold))", color: "#111" }}
+                      >
+                        <Plus size={16} /> Ersten Vorgang anlegen
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {scopedProcesses.map(({ node, summary: p }) => (
+                        <div
+                          key={node.id}
+                          onClick={() => setActiveProcessId(node.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setActiveProcessId(node.id); }}
+                          className="rounded-xl border p-4 cursor-pointer transition-colors hover:border-[hsl(var(--accent-gold)/0.6)] flex flex-col md:flex-row md:items-center justify-between gap-3"
+                          style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}
+                        >
+                          <div className="min-w-0">
+                            <div className="font-semibold text-sm sm:text-base truncate">
+                              {node.name}
+                              {node.partner && (
+                                <span className="font-normal" style={{ color: "hsl(var(--ink-soft))" }}>
+                                  {" · "}{node.partner}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs mt-1 flex flex-wrap gap-x-4 gap-y-1" style={{ color: "hsl(var(--ink-soft))" }}>
+                              <span>Beauftragt: <strong className="text-foreground">{fmt(p.orderTotal)}</strong></span>
+                              <span>Berechnet: <strong className="text-foreground">{fmt(p.invoicedTotal)}</strong></span>
+                              <span>{p.direction === "income" ? "Erhalten" : "Bezahlt"}: <strong className="text-foreground">{fmt(p.paidTotal)}</strong></span>
+                              {p.openInvoiceAmount > 0 && (
+                                <span style={{ color: p.overdueAmount > 0 ? "hsl(var(--destructive))" : "hsl(34 92% 52%)" }}>
+                                  Offen: {fmt(p.openInvoiceAmount)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs px-2.5 py-1 rounded-lg border" style={{ borderColor: "hsl(var(--hairline))" }}>
+                              Erwartet: {fmt(p.expectedTotal)}
+                            </span>
+                            <ChevronRight size={18} style={{ color: "hsl(var(--ink-soft))" }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <FinanceBudgetModal
+        open={budgetModal.open}
+        title={budgetModal.kind === "cost" ? "Kostenbudget festlegen" : "Projektbudget festlegen"}
+        subtitle={
+          budgetModal.kind === "cost"
+            ? "Optionales Zielbudget für deine eigenen Projektkosten."
+            : "Kein Budget ist ein eigener Zustand und wird nicht als 0 € gewertet."
+        }
+        initialAmount={budgetModal.kind === "cost" ? summary.costBudgetAmount : summary.budgetAmount}
+        initialBasis={budgetModal.kind === "cost" ? summary.costBudgetBasis : summary.budgetBasis}
+        currency={currency}
+        onSave={(amount, basis) => financeStore.setBudget(projectId, amount, basis, budgetModal.kind)}
+        onClose={() => setBudgetModal((m) => ({ ...m, open: false }))}
+      />
     </div>
   );
-};
-
-/** Kompakte, schreibgeschützte Belegliste beim Aufklappen einer Anlage. */
-const POSITION_KIND_LABEL: Record<FinancePositionType, string> = {
-  offer: "Angebot",
-  invoice: "Rechnung",
-  supplement: "Nachtrag",
-};
-
-const PositionMiniList: React.FC<{
-  title: string; background: string; positions: FinancePosition[];
-}> = ({ title, background, positions }) => {
-  if (positions.length === 0) return null;
-  const sum = positions.reduce(
-    (s, p) => s + (p.type === "supplement" && p.supplementKind === "minus" ? -(p.amount || 0) : (p.amount || 0)),
-    0,
-  );
-  return (
-    <div className="rounded-lg px-2.5 py-2 space-y-1" style={{ background }}>
-      <div className="flex items-center gap-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider flex-1"
-             style={{ color: "hsl(var(--ink-soft))" }}>{title}</div>
-        <div className="text-[11px] font-semibold tabular-nums">{formatEur(sum)}</div>
-      </div>
-      {positions.map((p) => (
-        <div key={p.id} className="grid items-center gap-2 text-[11px]"
-             style={{ gridTemplateColumns: "1.1fr 1fr 0.9fr 1fr" }}>
-          <span>{POSITION_KIND_LABEL[p.type]}{p.type === "supplement" && p.supplementKind === "minus" ? " (−)" : ""}</span>
-          <span className="truncate" style={{ color: "hsl(var(--ink-soft))" }}>{p.number || "—"}</span>
-          <span style={{ color: "hsl(var(--ink-soft))" }}>{p.date || ""}</span>
-          <span className="tabular-nums text-right font-medium">{formatEur(p.amount || 0)}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-/* ------------------------------------------------------- Filter-Trefferliste */
-
-const FilterResults: React.FC<{
-  hits: { pos: FinancePosition; label: string; path: string; nodeId: string }[];
-  onOpen: (nodeId: string) => void;
-}> = ({ hits, onOpen }) => {
-  const sum = hits.reduce(
-    (s, h) => s + (h.pos.type === "supplement" && h.pos.supplementKind === "minus" ? -(h.pos.amount || 0) : (h.pos.amount || 0)),
-    0,
-  );
-  return (
-    <div className="rounded-xl border overflow-hidden"
-         style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-      <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: "hsl(var(--hairline))" }}>
-        <div className="text-sm font-semibold flex-1">Filterergebnis</div>
-        <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
-          {hits.length} {hits.length === 1 ? "Position" : "Positionen"} · {formatEur(sum)}
-        </div>
-      </div>
-
-      <div className="grid items-center px-3 py-2 border-b text-[11px] font-semibold uppercase tracking-wider"
-           style={{ gridTemplateColumns: "1.2fr 1.6fr 1fr 1.2fr 1fr 32px", borderColor: "hsl(var(--hairline))", color: "hsl(var(--ink-soft))" }}>
-        <span>Typ</span><span>Ordner</span><span>Datum</span><span>Nummer</span><span>Betrag</span><span />
-      </div>
-
-      {hits.length === 0 ? (
-        <div className="px-4 py-6 text-xs" style={{ color: "hsl(var(--ink-soft))" }}>
-          Keine Positionen gefunden.
-        </div>
-      ) : hits.map((h) => {
-        const isMinus = h.pos.type === "supplement" && h.pos.supplementKind === "minus";
-        const isPlus = h.pos.type === "supplement" && h.pos.supplementKind === "plus";
-        return (
-          <div key={h.pos.id} className="grid items-center px-3 py-2 border-b text-sm"
-               style={{ gridTemplateColumns: "1.2fr 1.6fr 1fr 1.2fr 1fr 32px", borderColor: "hsl(var(--hairline))" }}>
-            <span className="font-medium truncate">{h.label}</span>
-            <span className="truncate text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{h.path}</span>
-            <span className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{h.pos.date}</span>
-            <span className="text-xs truncate" style={{ color: "hsl(var(--ink-soft))" }}>{h.pos.number}</span>
-            <span className="tabular-nums font-medium"
-                  style={{ color: isPlus ? "hsl(24 95% 50%)" : isMinus ? "hsl(142 70% 34%)" : undefined }}>
-              {isMinus ? "−" : ""}{formatEur(h.pos.amount)}
-            </span>
-            <button data-export-hide onClick={() => onOpen(h.nodeId)}
-              className="h-7 w-7 rounded-md border-2 flex items-center justify-center"
-              style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--accent-gold) / 0.14)" }}
-              title="Aktion öffnen (bearbeiten)">
-              <ArrowRight size={14} style={{ color: "hsl(var(--accent-gold))" }} />
-            </button>
-
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+}

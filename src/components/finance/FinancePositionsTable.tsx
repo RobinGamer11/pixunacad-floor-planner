@@ -19,13 +19,17 @@ interface Props {
 
 const TYPE_LABEL: Record<FinancePositionType, string> = {
   offer: "Angebot",
+  order: "Auftrag",
   invoice: "Rechnung",
+  credit: "Gutschrift",
   supplement: "Nachtrag",
 };
 
 const NUMBER_PLACEHOLDER: Record<FinancePositionType, string> = {
   offer: "z. B. ANG-2024-1001",
+  order: "z. B. AUF-2024-1501",
   invoice: "z. B. RE-2024-2001",
+  credit: "z. B. GS-2024-2501",
   supplement: "z. B. NT-2024-3001",
 };
 
