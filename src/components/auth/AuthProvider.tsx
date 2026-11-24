@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { Context, createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { activateAccount, currentAccount, flushAccountWrites } from "@/lib/accountStorage";
 import { supabase, SupabaseSession } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
@@ -10,7 +10,11 @@ type AuthContextValue = {
   signOut: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AUTH_CONTEXT_KEY = "__pixuna_auth_context__";
+const globalScope = globalThis as Record<string, unknown>;
+const AuthContext: Context<AuthContextValue | null> =
+  (globalScope[AUTH_CONTEXT_KEY] as Context<AuthContextValue | null> | undefined) ??
+  ((globalScope[AUTH_CONTEXT_KEY] = createContext<AuthContextValue | null>(null)) as Context<AuthContextValue | null>);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SupabaseSession | null>(supabase.getSession());
