@@ -26,13 +26,73 @@ export function getNetworkClient(): SupabaseClient | null {
   if (client) return client;
   client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    // Token stammt aus der bestehenden Sitzung des Auth-Clients.
+    // Token wird zentral geprüft und bei Bedarf rechtzeitig erneuert.
     accessToken: async () => {
-      const session = authClient.getSession() ?? (await authClient.restoreSession());
+      const session = await authClient.ensureValidSession();
       return session?.accessToken ?? null;
     },
   });
   return client;
+}
+
+/** True, wenn der Fehler auf eine abgelaufene oder ungültige Anmeldung hinweist (z. B. 401 / PGRST303). */
+export function isAuthExpiredError(error: unknown): boolean {
+  const err = error as { code?: string; status?: number; message?: string } | null;
+  if (!err) return false;
+  if (err.status === 401 || err.code === "PGRST303") return true;
+  const msg = (err.message ?? "").toLowerCase();
+  return (
+    msg.includes("jwt expired") ||
+    msg.includes("invalid jwt") ||
+    msg.includes("pgrst303") ||
+    msg.includes("sitzung ist abgelaufen") ||
+    msg.includes("anmeldung ist abgelaufen")
+  );
+}
+
+export type CloudErrorKind = "auth" | "offline" | "forbidden" | "schema" | "db";
+
+/** Ordnet Cloud-Fehler verständlich nach Ursache ein statt sie pauschal zu verstecken. */
+export function classifyCloudError(error: unknown, fallback = "Datenbankfehler beim Laden."): { kind: CloudErrorKind; message: string } {
+  const err = error as { code?: string; status?: number; message?: string } | null;
+  const msg = String(err?.message ?? (typeof error === "string" ? error : "")).trim();
+  const low = msg.toLowerCase();
+
+  if (isAuthExpiredError(error)) {
+    return { kind: "auth", message: "Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an." };
+  }
+  if (
+    (typeof navigator !== "undefined" && navigator.onLine === false) ||
+    low.includes("failed to fetch") ||
+    low.includes("networkerror") ||
+    low.includes("load failed") ||
+    low.includes("offline")
+  ) {
+    return { kind: "offline", message: "Offline – Cloud derzeit nicht erreichbar." };
+  }
+  if (err?.status === 403 || err?.code === "42501" || low.includes("permission denied") || low.includes("forbidden")) {
+    return { kind: "forbidden", message: "Keine Berechtigung für diesen Zugriff." };
+  }
+  if (isMissingSchemaError(error)) {
+    return { kind: "schema", message: "Cloud-Datenbank ist noch nicht vollständig eingerichtet." };
+  }
+  return { kind: "db", message: msg || fallback };
+}
+
+/**
+ * Wiederholt eine fehlgeschlagene Leseanfrage höchstens einmal, wenn ein
+ * abgelaufenes Token die Ursache war und die Erneuerung gelingt.
+ * Niemals für Schreibanfragen verwenden.
+ */
+export async function withAuthRetry<T>(readFn: () => Promise<T>): Promise<T> {
+  try {
+    return await readFn();
+  } catch (err) {
+    if (!isAuthExpiredError(err)) throw err;
+    const refreshed = await authClient.ensureValidSession({ forceRefresh: true });
+    if (!refreshed) throw new Error("Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.");
+    return await readFn();
+  }
 }
 
 /** True, wenn der Fehler darauf hindeutet, dass die Netzwerktabellen fehlen. */

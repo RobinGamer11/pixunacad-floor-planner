@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Hand, Move, Search, X } from "lucide-react";
 import type { FileNode } from "@/lib/projectStore";
+import { resolveProjectFileDataUrl, resolveProjectFileUrl } from "@/lib/projectFileStorage";
 
 function isPdfNode(node: FileNode) {
   return node.mimeType === "application/pdf" || node.name.toLowerCase().endsWith(".pdf");
@@ -22,11 +23,18 @@ export function DocumentViewer({ node, onClose }: { node: FileNode; onClose: () 
   const pinchRef = useRef<{ dist: number; cx: number; cy: number } | null>(null);
 
   useEffect(() => {
-    if (!isPdfNode(node)) { setSrc(node.dataUrl ?? ""); return; }
     let cancelled = false;
+    if (!isPdfNode(node)) {
+      if (node.dataUrl) { setSrc(node.dataUrl); return; }
+      void resolveProjectFileUrl(node).then((url) => {
+        if (!cancelled && url) setSrc(url);
+      }).catch(() => {});
+      return () => { cancelled = true; };
+    }
     (async () => {
       try {
-        const raw = node.dataUrl ?? "";
+        const raw = (await resolveProjectFileDataUrl(node)) ?? "";
+        if (!raw) return;
         const base64 = raw.includes(",") ? raw.slice(raw.indexOf(",") + 1) : raw;
         const { renderPdfPageToCanvas } = await import("@/cad/documentImport");
         const canvas = await renderPdfPageToCanvas(base64, 0, 2000);

@@ -1,6 +1,6 @@
 import { registerProjectInCloud } from "@/lib/useCloudProjectLifecycle";
 import { WorkspaceSaveStatus } from "@/components/workspace/WorkspaceSaveStatus";
-import { useHomeProjectSync, refreshHomeProjectFromCloud, checkCloudCadHead } from "@/lib/homeProjectSync";
+import { useHomeProjectSync, refreshAllHomeProjectsFromCloud, checkCloudCadHead } from "@/lib/homeProjectSync";
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LegalMenuPopover } from "@/components/legal/LegalMenu";
@@ -268,8 +268,21 @@ export default function ProjectsHome() {
           }
           if (deletedAt) projectStore.applyCloudTrash(id, deletedAt);
         });
-        if (selected?.id) {
-          await refreshHomeProjectFromCloud(selected.id);
+        const activeCloudIds: string[] = [];
+        accState.byProject.forEach((access, id) => {
+          if (!access.cloud || access.role === null) return;
+          if (accState.deletedAtByProject.get(id)) return;
+          activeCloudIds.push(id);
+        });
+        if (activeCloudIds.length > 0) {
+          const { ok, failed } = await refreshAllHomeProjectsFromCloud(activeCloudIds, 4);
+          if (failed.length > 0) {
+            setCloudRefreshFeedback({
+              kind: "error",
+              text: `${ok.length} von ${activeCloudIds.length} Projekten aktualisiert (${failed.length} Fehler: ${failed[0]?.error ?? "unbekannt"}).`,
+            });
+            return;
+          }
           await checkCloudCadHead(selected.id);
         }
         setCloudRefreshFeedback({ kind: "ok", text: "Aktualisiert" });

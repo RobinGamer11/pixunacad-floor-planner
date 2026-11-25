@@ -75,9 +75,27 @@ function messageFromResponse(status: number, body: unknown): string {
   return `Supabase-Anfrage fehlgeschlagen (${status}).`;
 }
 
+class SupabaseHttpError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "SupabaseHttpError";
+    this.status = status;
+  }
+}
+
+function isPermanentAuthFailure(err: unknown): boolean {
+  if (err instanceof SupabaseHttpError) {
+    return err.status === 400 || err.status === 401 || err.status === 403;
+  }
+  return false;
+}
+
 class PixunaSupabaseClient {
   private session: SupabaseSession | null = readStoredSession();
   private listeners = new Set<(session: SupabaseSession | null) => void>();
+  private refreshInflight: Promise<SupabaseSession | null> | null = null;
+  private authEpoch = 0;
 
   readonly isConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 
@@ -109,6 +127,9 @@ class PixunaSupabaseClient {
   }
 
   private setSession(session: SupabaseSession | null) {
+    if (!session || this.session?.user.id !== session.user.id) {
+      this.authEpoch += 1;
+    }
     this.session = session;
     this.persistSession(session);
     this.notify();
@@ -136,7 +157,7 @@ class PixunaSupabaseClient {
     } catch {
       body = text;
     }
-    if (!response.ok) throw new Error(messageFromResponse(response.status, body));
+    if (!response.ok) throw new SupabaseHttpError(response.status, messageFromResponse(response.status, body));
     return body as T;
   }
 
@@ -188,27 +209,55 @@ class PixunaSupabaseClient {
       // Ein fehlerhafter Bestätigungs- oder Recovery-Link wird unten wie eine
       // regulär abgelaufene Sitzung behandelt.
     }
+    return this.ensureValidSession();
+  }
+
+  /**
+   * Stellt zentral eine gültige Sitzung bereit und erneuert ablaufende Tokens
+   * rechtzeitig. Gleichzeitige Aufrufe teilen sich dieselbe laufende Erneuerung.
+   * Vorübergehende Netzwerkfehler löschen die lokale Sitzung nicht.
+   */
+  async ensureValidSession(opts?: { forceRefresh?: boolean }): Promise<SupabaseSession | null> {
+    if (!this.isConfigured) return null;
     const stored = this.session ?? readStoredSession();
     if (!stored) return null;
 
     // Ein Token wird vorsorglich eine Minute vor Ablauf erneuert.
-    if (stored.expiresAt > Date.now() + 60_000) {
+    if (!opts?.forceRefresh && stored.expiresAt > Date.now() + 60_000) {
       this.session = stored;
       return stored;
     }
 
-    try {
-      const response = await this.request<AuthResponse>("/auth/v1/token?grant_type=refresh_token", {
-        method: "POST",
-        body: JSON.stringify({ refresh_token: stored.refreshToken }),
-      });
-      const refreshed = this.sessionFromResponse(response, stored.persistent);
-      this.setSession(refreshed);
-      return refreshed;
-    } catch {
-      this.setSession(null);
-      return null;
-    }
+    if (this.refreshInflight) return this.refreshInflight;
+
+    const startEpoch = this.authEpoch;
+    const startUserId = stored.user.id;
+    const run = (async (): Promise<SupabaseSession | null> => {
+      try {
+        const response = await this.request<AuthResponse>("/auth/v1/token?grant_type=refresh_token", {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: stored.refreshToken }),
+        });
+        if (this.authEpoch !== startEpoch || this.session?.user.id !== startUserId) {
+          return null;
+        }
+        const refreshed = this.sessionFromResponse(response, stored.persistent);
+        this.setSession(refreshed);
+        return refreshed;
+      } catch (err) {
+        if (this.authEpoch !== startEpoch) return null;
+        if (isPermanentAuthFailure(err)) {
+          this.setSession(null);
+          return null;
+        }
+        // Vorübergehender Netzwerkfehler: lokale Sitzung behalten, nicht abmelden.
+        return stored;
+      } finally {
+        this.refreshInflight = null;
+      }
+    })();
+    this.refreshInflight = run;
+    return run;
   }
 
   async signInWithPassword(email: string, password: string, persistent = true): Promise<SupabaseSession> {
@@ -285,10 +334,7 @@ class PixunaSupabaseClient {
   }
 
   private async authenticatedRequest<T>(path: string, init: RequestInit = {}) {
-    let session = this.session ?? await this.restoreSession();
-    if (session && session.expiresAt <= Date.now() + 60_000) {
-      session = await this.restoreSession();
-    }
+    const session = await this.ensureValidSession();
     if (!session) throw new Error("Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.");
     return this.request<T>(path, init, session.accessToken);
   }

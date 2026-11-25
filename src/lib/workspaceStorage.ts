@@ -60,10 +60,11 @@ const SETTINGS_KEYS = new Set([
   "pixuna.penOnly",
   "pixuna.tabletAid",
   "pixuna.tabletAid.pos",
+  "pixuna.personal.projectLayout",
 ]);
 const SETTINGS_PREFIXES = ["pixuna.finance.tplfav."];
 /** Sicherheitsnetz gegen unerwartet große Einzelwerte. */
-const MAX_SETTING_BYTES = 8 * 1024;
+const MAX_SETTING_BYTES = 32 * 1024;
 
 export function isSettingsKey(key: string) {
   return SETTINGS_KEYS.has(key) || SETTINGS_PREFIXES.some((p) => key.startsWith(p));

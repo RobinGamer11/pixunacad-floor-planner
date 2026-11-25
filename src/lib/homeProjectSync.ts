@@ -1,7 +1,10 @@
 import { useEffect } from "react";
-import { getNetworkClient, isMissingSchemaError } from "./networkClient";
+import { classifyCloudError, getNetworkClient, isMissingSchemaError, withAuthRetry } from "./networkClient";
 import { projectStore, type Project, type FileNode } from "./projectStore";
-import { financeStore, type FinanceState } from "./financeStore";
+import { financeStore, onFinanceWriteError, type FinanceState } from "./financeStore";
+import { timelineStore, type TlState } from "./timelineStore";
+import { syncProjectPeriod } from "./projectPeriodSync";
+import { syncPendingProjectFiles } from "./projectFileStorage";
 import { projectAccessStore } from "./projectAccess";
 import { registerProjectSyncSource, reportProjectSyncSource, type ProjectSyncMode } from "./projectSync";
 import { accountGeneration, currentAccount, sessionIsCurrent } from "./accountStorage";
@@ -23,6 +26,10 @@ export interface HomeProjectPayload {
     favorite?: boolean;
     folderId?: string | null;
     sortIndex?: number;
+    createdAtIso?: string;
+    erstelltAm?: string;
+    isTemplate?: boolean;
+    thumbnail?: string;
   };
   overview: {
     konzept?: string;
@@ -33,8 +40,16 @@ export interface HomeProjectPayload {
   };
   tasks: Project["tasks"];
   events: Project["events"];
+  timeline?: TlState;
   files: Omit<FileNode, "dataUrl">[];
   finance: FinanceState;
+}
+
+export interface HomeDirtyAreas {
+  details?: boolean;
+  organization?: boolean;
+  finance?: boolean;
+  documents?: boolean;
 }
 
 export interface HomeSyncMeta {
@@ -42,6 +57,8 @@ export interface HomeSyncMeta {
   lastSavedAt: number | null;
   localSavedAt: number | null;
   dirty: boolean;
+  dirtyAreas?: HomeDirtyAreas;
+  localWriteError?: string | null;
   conflict: boolean;
   updateAvailable: boolean;
   cadRemoteHead?: number;
@@ -60,7 +77,14 @@ export function readHomeMeta(projectId: string): HomeSyncMeta {
 }
 
 function writeHomeMeta(projectId: string, meta: HomeSyncMeta) {
-  try { localStorage.setItem(META_KEY(projectId), JSON.stringify(meta)); } catch {}
+  try {
+    localStorage.setItem(META_KEY(projectId), JSON.stringify(meta));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Lokaler Speicher voll.";
+    if (!meta.localWriteError) {
+      try { localStorage.setItem(META_KEY(projectId), JSON.stringify({ ...meta, localWriteError: msg })); } catch {}
+    }
+  }
 }
 
 /** Extrahiert alle cloudfähigen Startseiteninhalte ohne CAD-Blätter und ohne Base64-Dateisammlungen. */
@@ -68,6 +92,9 @@ export function buildHomePayload(projectId: string): HomeProjectPayload | null {
   const p = projectStore.getState().projects.find((x) => x.id === projectId);
   if (!p) return null;
   const files = (p.files ?? []).map(({ dataUrl: _omit, ...rest }) => rest);
+  const safeThumbnail = p.thumbnail && (!p.thumbnail.startsWith("data:") || p.thumbnail.length <= 64 * 1024)
+    ? p.thumbnail
+    : undefined;
   return {
     details: {
       ort: p.ort,
@@ -84,6 +111,10 @@ export function buildHomePayload(projectId: string): HomeProjectPayload | null {
       favorite: p.favorite,
       folderId: p.folderId,
       sortIndex: p.sortIndex,
+      createdAtIso: p.createdAtIso,
+      erstelltAm: p.erstelltAm,
+      isTemplate: p.isTemplate,
+      thumbnail: safeThumbnail,
     },
     overview: {
       konzept: p.konzept,
@@ -94,6 +125,7 @@ export function buildHomePayload(projectId: string): HomeProjectPayload | null {
     },
     tasks: p.tasks ?? [],
     events: p.events ?? [],
+    timeline: timelineStore.getState(projectId),
     files,
     finance: financeStore.get(projectId),
   };
@@ -132,11 +164,52 @@ export function applyHomePayload(projectId: string, payload: Partial<HomeProject
     if (payload.finance) {
       financeStore.replaceState(projectId, payload.finance);
     }
+    if (payload.timeline) {
+      const incomingHasData =
+        (Array.isArray(payload.timeline.items) && payload.timeline.items.length > 0) ||
+        Boolean(payload.timeline.period?.start || payload.timeline.period?.end);
+      if (incomingHasData || !timelineStore.hasLocalData(projectId)) {
+        timelineStore.replaceState(projectId, payload.timeline);
+      }
+    }
+    if (
+      (payload.details?.projektStart || payload.details?.projektEnde) &&
+      !payload.timeline?.period?.start &&
+      !payload.timeline?.period?.end
+    ) {
+      syncProjectPeriod(projectId, payload.details.projektStart, payload.details.projektEnde);
+    }
     lastFingerprintByProject.set(projectId, payloadFingerprint(projectId));
   } finally {
     applyingCloud = false;
   }
 }
+
+// Globale Beobachtung der Organisationsdaten – markiert jedes geänderte Projekt sofort
+// als lokal geändert, auch wenn es in der linken Projektliste nicht ausgewählt ist.
+timelineStore.subscribeAll((changedProjectId) => {
+  if (applyingCloud) return;
+  editSeqByProject.set(changedProjectId, (editSeqByProject.get(changedProjectId) ?? 0) + 1);
+  const meta = readHomeMeta(changedProjectId);
+  writeHomeMeta(changedProjectId, {
+    ...meta,
+    dirty: true,
+    dirtyAreas: { ...meta.dirtyAreas, organization: true },
+    localSavedAt: Date.now(),
+    localWriteError: null,
+  });
+  lastFingerprintByProject.set(changedProjectId, payloadFingerprint(changedProjectId));
+  publishState(changedProjectId);
+});
+
+const handleLocalWriteError = (projectId: string, error: string | null) => {
+  const meta = readHomeMeta(projectId);
+  if ((meta.localWriteError ?? null) === error) return;
+  writeHomeMeta(projectId, { ...meta, localWriteError: error });
+  publishState(projectId);
+};
+timelineStore.onWriteError(handleLocalWriteError);
+onFinanceWriteError(handleLocalWriteError);
 
 function syncModeFor(projectId: string): ProjectSyncMode {
   const access = projectAccessStore.accessFor(projectId);
@@ -189,16 +262,21 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
   if (!client) throw new Error("Cloud nicht erreichbar.");
   if (!projectAccessStore.accessFor(projectId).cloud) return;
   const owner = currentAccount(), epoch = accountGeneration();
-  const { data, error } = await client
-    .from("project_home_state")
-    .select("revision,payload,updated_at")
-    .eq("project_id", projectId)
-    .maybeSingle();
+  const data = await withAuthRetry(async () => {
+    const res = await client
+      .from("project_home_state")
+      .select("revision,payload,updated_at")
+      .eq("project_id", projectId)
+      .maybeSingle();
+    if (res.error) throw res.error;
+    return res.data;
+  }).catch((err) => {
+    if (isMissingSchemaError(err)) {
+      throw new Error("Datenbank-Migration für Startseiteninhalte (`project_home_state`) fehlt noch.");
+    }
+    throw new Error(classifyCloudError(err, "Startseiteninhalte konnten nicht geladen werden.").message);
+  });
   if (!sessionIsCurrent(owner, epoch)) return;
-  if (error) {
-    if (isMissingSchemaError(error)) return;
-    throw new Error(error.message);
-  }
   if (!data) {
     await checkCloudCadHead(projectId);
     publishState(projectId);
@@ -218,6 +296,7 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
         baseRevision: remoteRev,
         lastSavedAt: Number.isFinite(remoteTime) ? remoteTime : Date.now(),
         dirty: false,
+        dirtyAreas: {},
         conflict: false,
         updateAvailable: false,
       });
@@ -227,19 +306,52 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
   publishState(projectId);
 }
 
+/**
+ * Aktualisiert die Startseiten- und Organisationsinhalte mehrerer Projekte mit begrenzter Parallelität,
+ * ohne CAD-Editoren zu starten oder Zeichnungen herunterzuladen.
+ */
+export async function refreshAllHomeProjectsFromCloud(
+  projectIds: string[],
+  concurrency = 4,
+): Promise<{ ok: string[]; failed: Array<{ projectId: string; error: string }> }> {
+  const ok: string[] = [];
+  const failed: Array<{ projectId: string; error: string }> = [];
+  const queue = [...new Set(projectIds)];
+  const workers = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    while (queue.length > 0) {
+      const id = queue.shift();
+      if (!id) break;
+      try {
+        await refreshHomeProjectFromCloud(id);
+        ok.push(id);
+      } catch (err) {
+        failed.push({ projectId: id, error: err instanceof Error ? err.message : "Aktualisierung fehlgeschlagen." });
+      }
+    }
+  });
+  await Promise.all(workers);
+  return { ok, failed };
+}
+
 async function saveHomeProject(projectId: string): Promise<void> {
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("Offline – Cloud-Sicherung nicht möglich.");
   if (!projectAccessStore.canEdit(projectId)) throw new Error("Keine Schreibberechtigung für dieses Projekt.");
   const client = getNetworkClient();
   if (!client) throw new Error("Cloud nicht erreichbar.");
-  const payload = buildHomePayload(projectId);
-  if (!payload) throw new Error("Projekt nicht verfügbar.");
   const owner = currentAccount(), epoch = accountGeneration();
   const meta = readHomeMeta(projectId);
   if (meta.conflict) throw new Error("Geräte- und Cloudstand weichen ab. Bitte zuerst einen Stand wählen.");
   const startSeq = editSeqByProject.get(projectId) ?? 0;
   publishState(projectId, { saving: true, error: null });
   try {
+    // Ausstehende Projektdateien zuerst quotengeprüft in Storage hochladen.
+    const fileSync = await syncPendingProjectFiles(projectId);
+    if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt.");
+    if (fileSync.failed.length > 0) {
+      throw new Error(`Datei-Upload fehlgeschlagen: ${fileSync.failed.join("; ")}`);
+    }
+    const payload = buildHomePayload(projectId);
+    if (!payload) throw new Error("Projekt nicht verfügbar.");
     const { data, error } = await client.rpc("save_project_home_state", {
       _project_id: projectId,
       _payload: payload,
@@ -266,12 +378,13 @@ async function saveHomeProject(projectId: string): Promise<void> {
       baseRevision: Number(row.revision ?? meta.baseRevision + 1),
       lastSavedAt: Number.isFinite(savedAt) ? savedAt : Date.now(),
       dirty: changedDuringSave,
+      dirtyAreas: changedDuringSave ? meta.dirtyAreas : {},
       conflict: false,
       updateAvailable: false,
     });
     publishState(projectId, { saving: false, error: null });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Startseiteninhalte konnten nicht gesichert werden.";
+    const msg = classifyCloudError(err, "Startseiteninhalte konnten nicht gesichert werden.").message;
     publishState(projectId, { saving: false, error: msg });
     throw err;
   }
@@ -343,12 +456,35 @@ export function ensureHomeProjectSyncSource(projectId: string): () => void {
       lastFingerprintByProject.set(projectId, nextFp);
       editSeqByProject.set(projectId, (editSeqByProject.get(projectId) ?? 0) + 1);
       const meta = readHomeMeta(projectId);
-      writeHomeMeta(projectId, { ...meta, dirty: true, localSavedAt: Date.now() });
+      writeHomeMeta(projectId, {
+        ...meta,
+        dirty: true,
+        dirtyAreas: { ...meta.dirtyAreas, details: true },
+        localSavedAt: Date.now(),
+        localWriteError: null,
+      });
       publishState(projectId);
     }
   };
   const unsubProject = projectStore.subscribe(checkChange);
-  const unsubFinance = financeStore.subscribe(checkChange);
+  const unsubFinance = financeStore.subscribe(() => {
+    if (applyingCloud) return;
+    const nextFp = payloadFingerprint(projectId);
+    const prevFp = lastFingerprintByProject.get(projectId);
+    if (prevFp !== undefined && nextFp !== prevFp) {
+      lastFingerprintByProject.set(projectId, nextFp);
+      editSeqByProject.set(projectId, (editSeqByProject.get(projectId) ?? 0) + 1);
+      const meta = readHomeMeta(projectId);
+      writeHomeMeta(projectId, {
+        ...meta,
+        dirty: true,
+        dirtyAreas: { ...meta.dirtyAreas, finance: true },
+        localSavedAt: Date.now(),
+        localWriteError: null,
+      });
+      publishState(projectId);
+    }
+  });
   const unsubAccess = projectAccessStore.subscribe(() => publishState(projectId));
   publishState(projectId);
   const cleanup = () => {

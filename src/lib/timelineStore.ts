@@ -99,6 +99,11 @@ export function priorityRadius(percent: number | undefined): number {
 const KEY = (projectId: string) => `pixuna.board02.${projectId}`;
 const HISTORY_LIMIT = 100;
 
+type GlobalTimelineListener = (projectId: string) => void;
+type LocalWriteErrorListener = (projectId: string, error: string | null) => void;
+const globalListeners = new Set<GlobalTimelineListener>();
+const writeErrorListeners = new Set<LocalWriteErrorListener>();
+
 function normPriorities(list: unknown): TlPriority[] {
   const arr = Array.isArray(list) ? list : [];
   const out = arr.map((raw) => {
@@ -161,8 +166,15 @@ function getState(projectId: string): TlState {
 }
 function persist(projectId: string, next: TlState) {
   cache.set(projectId, next);
-  try { localStorage.setItem(KEY(projectId), JSON.stringify(next)); } catch {}
+  try {
+    localStorage.setItem(KEY(projectId), JSON.stringify(next));
+    writeErrorListeners.forEach((fn) => fn(projectId, null));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Lokaler Speicher voll – Organisationsdaten konnten nicht gesichert werden.";
+    writeErrorListeners.forEach((fn) => fn(projectId, msg));
+  }
   listeners.get(projectId)?.forEach((fn) => fn());
+  globalListeners.forEach((fn) => fn(projectId));
 }
 function commit(projectId: string, next: TlState) {
   const h = getHistory(projectId);
@@ -185,6 +197,51 @@ const plusDays = (n: number) => new Date(Date.now() + n * 86400000).toISOString(
 export const timelineStore = {
   getState,
   subscribe,
+  subscribeAll(fn: GlobalTimelineListener): () => void {
+    globalListeners.add(fn);
+    return () => { globalListeners.delete(fn); };
+  },
+  onWriteError(fn: LocalWriteErrorListener): () => void {
+    writeErrorListeners.add(fn);
+    return () => { writeErrorListeners.delete(fn); };
+  },
+  hasLocalData(projectId: string): boolean {
+    try {
+      const raw = localStorage.getItem(KEY(projectId));
+      if (!raw) return false;
+      const p = JSON.parse(raw) as Partial<TlState>;
+      return Boolean((p.items && p.items.length > 0) || p.period?.start || p.period?.end);
+    } catch {
+      return false;
+    }
+  },
+  /** Übernimmt einen vollständigen Organisationsstand (z. B. aus der Cloud) unter Erhalt aller IDs. */
+  replaceState(projectId: string, incoming: Partial<TlState>) {
+    const cats = incoming.categories?.length ? [...incoming.categories] : [...DEFAULT_CATEGORIES];
+    if (!cats.some((c) => c.id === QUICK_CATEGORY_ID)) cats.unshift(DEFAULT_CATEGORIES[0]);
+    const normalized: TlState = {
+      categories: cats,
+      priorities: normPriorities(incoming.priorities),
+      statuses: incoming.statuses?.length ? [...incoming.statuses] : [...DEFAULT_STATUSES],
+      period: incoming.period ? { ...incoming.period } : {},
+      items: Array.isArray(incoming.items)
+        ? incoming.items.map((i) => ({
+            ...i,
+            statusId: i.statusId ?? (i.done ? "done" : "open"),
+            assignees: Array.isArray(i.assignees) ? [...i.assignees] : [],
+          }))
+        : [],
+    };
+    cache.set(projectId, normalized);
+    try {
+      localStorage.setItem(KEY(projectId), JSON.stringify(normalized));
+      writeErrorListeners.forEach((fn) => fn(projectId, null));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Lokaler Speicher voll – Organisationsdaten konnten nicht gesichert werden.";
+      writeErrorListeners.forEach((fn) => fn(projectId, msg));
+    }
+    listeners.get(projectId)?.forEach((fn) => fn());
+  },
   /** Legt beim ersten Öffnen eines Projekts den Default-Termin „Projektverlauf" an. */
   ensureDefaults(projectId: string) {
     const s = getState(projectId);

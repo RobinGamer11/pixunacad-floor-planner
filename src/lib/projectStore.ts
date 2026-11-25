@@ -205,6 +205,11 @@ export interface FileNode {
   dataUrl?: string;
   mimeType?: string;
   sizeBytes?: number;
+  /** Dauerhafte Cloud-Storage-Referenz nach bestätigtem Upload. */
+  storageBucket?: string;
+  storagePath?: string;
+  storageAssetId?: string;
+  cloudSynced?: boolean;
 }
 
 export interface ProjectSettings {
@@ -967,6 +972,14 @@ export const projectStore = {
         : p
     );
     return commitDocumentProjects(projects) ? id : undefined;
+  },
+  updateFileNode: (projectId: string, fileId: string, patch: Partial<FileNode>) => {
+    const projects = state.projects.map((p) => {
+      if (p.id !== projectId) return p;
+      const files = (p.files ?? []).map((f) => (f.id === fileId ? { ...f, ...patch } : f));
+      return { ...p, files, updatedAt: new Date().toISOString() };
+    });
+    return commitDocumentProjects(projects);
   },
   renameNode: (projectId: string, kind: "files" | "photos", nodeId: string, name: string) => {
     const projects = state.projects.map((p) =>

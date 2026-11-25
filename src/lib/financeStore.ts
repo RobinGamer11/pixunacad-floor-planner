@@ -120,6 +120,12 @@ function emptyState(): FinanceState {
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
+const writeErrorListeners = new Set<(projectId: string, error: string | null) => void>();
+
+export function onFinanceWriteError(fn: (projectId: string, error: string | null) => void) {
+  writeErrorListeners.add(fn);
+  return () => { writeErrorListeners.delete(fn); };
+}
 
 function normalizeState(raw: Partial<FinanceState> | null | undefined): FinanceState {
   const parsed = raw ? (migrateFinanceState({ ...raw }) as Partial<FinanceState>) : {};
@@ -168,7 +174,11 @@ function read(projectId: string): FinanceState {
 function write(projectId: string, state: FinanceState) {
   try {
     localStorage.setItem(KEY(projectId), JSON.stringify(stampVersion(FINANCE_KIND, { ...state })));
-  } catch {}
+    writeErrorListeners.forEach((fn) => fn(projectId, null));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Lokaler Speicher voll – Finanzdaten konnten nicht gesichert werden.";
+    writeErrorListeners.forEach((fn) => fn(projectId, msg));
+  }
   listeners.forEach((l) => l());
 }
 

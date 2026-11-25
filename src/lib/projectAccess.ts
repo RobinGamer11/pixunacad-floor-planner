@@ -17,7 +17,7 @@
  * bisher volle Rechte.
  */
 import { useSyncExternalStore } from "react";
-import { getNetworkClient, isMissingSchemaError } from "@/lib/networkClient";
+import { classifyCloudError, getNetworkClient, isMissingSchemaError, withAuthRetry } from "@/lib/networkClient";
 import { supabase as authClient } from "@/lib/supabase";
 import { accountGeneration, sessionIsCurrent } from "./accountStorage";
 
@@ -177,9 +177,17 @@ let inflight: Promise<void> | null = null;
 
 async function loadAccess(): Promise<void> {
   const client = getNetworkClient();
-  const session = authClient.getSession();
+  const hadSession = Boolean(authClient.getSession());
+  const session = await authClient.ensureValidSession();
   if (!client || !session) {
-    state = { ...state, loading: false, ready: false, myId: session?.user.id ?? null, byProject: new Map() };
+    state = {
+      ...state,
+      loading: false,
+      ready: false,
+      error: hadSession && !session ? "Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an." : null,
+      myId: session?.user.id ?? null,
+      byProject: new Map(),
+    };
     emit();
     return;
   }
@@ -195,12 +203,15 @@ async function loadAccess(): Promise<void> {
       if (withTrash.error.code !== "42703") return withTrash;
       return client.from("network_projects").select("id,owner_id,name,updated_at");
     };
-    const [{ data: owned, error: ownedErr }, { data: memberships, error: memberErr }] = await Promise.all([
-      loadOwned(),
-      client.from("project_members").select("project_id,user_id,role,permissions"),
-    ]);
-    if (ownedErr) throw ownedErr;
-    if (memberErr) throw memberErr;
+    const { owned, memberships } = await withAuthRetry(async () => {
+      const [{ data: ownedData, error: ownedErr }, { data: memberData, error: memberErr }] = await Promise.all([
+        loadOwned(),
+        client.from("project_members").select("project_id,user_id,role,permissions"),
+      ]);
+      if (ownedErr) throw ownedErr;
+      if (memberErr) throw memberErr;
+      return { owned: ownedData, memberships: memberData };
+    });
     if (!sessionIsCurrent(myId, epoch)) return;
 
     const byProject = new Map<string, ProjectAccess>();
@@ -260,12 +271,13 @@ async function loadAccess(): Promise<void> {
     emit();
   } catch (error) {
     if (!sessionIsCurrent(myId, epoch)) return;
+    const classified = classifyCloudError(error, "Projektliste konnte nicht aktualisiert werden.");
     state = {
       ...state,
       loading: false,
       ready: false,
-      error: "Projektliste konnte nicht aktualisiert werden",
-      schemaMissing: isMissingSchemaError(error),
+      error: classified.message,
+      schemaMissing: classified.kind === "schema" || isMissingSchemaError(error),
       myId,
     };
     emit();
