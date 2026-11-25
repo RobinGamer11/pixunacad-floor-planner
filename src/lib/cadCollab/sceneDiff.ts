@@ -87,7 +87,7 @@ export function indexSnapshot(snapshot: string | null | undefined): SceneIndex {
   for (const kind of CAD_STRUCTURE_KINDS) {
     let list = data[kind];
     // Transparenzpausen (planId → Zustand) und Verbund-Layouts (spreadId → Layout) liegen als Record vor.
-    if ((kind === "planOverlays" || kind === "spreadLayouts") && list && typeof list === "object" && !Array.isArray(list)) {
+    if ((kind === "planOverlays" || kind === "spreadLayouts" || kind === "sheetOverlays") && list && typeof list === "object" && !Array.isArray(list)) {
       list = Object.entries(list as Record<string, Record<string, unknown>>).map(([id, st]) => ({ ...st, id }));
     }
     const byId = new Map<string, string>();

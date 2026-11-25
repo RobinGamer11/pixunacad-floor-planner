@@ -81,6 +81,16 @@ const KIND_OPS: Record<CadSceneKind, KindOps> = {
     remove: (s, id) => { const o = anyScene(s).getInfoBoxById?.(id); if (o) anyScene(s).removeInfoBox?.(o); },
     rebuild: () => { /* keine ID-Zuordnung */ },
   },
+  infoBoxCategories: {
+    field: "infoBoxCategories",
+    remove: (s, id) => {
+      const list = anyScene(s).infoBoxCategories;
+      if (Array.isArray(list)) {
+        anyScene(s).infoBoxCategories = list.filter((c: { id?: string }) => c?.id !== id);
+      }
+    },
+    rebuild: () => { /* Kategorien haben keine separate ID-Map */ },
+  },
 };
 
 /**

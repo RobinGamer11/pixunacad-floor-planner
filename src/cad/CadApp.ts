@@ -1393,8 +1393,16 @@ export class CadApp {
     return this.scenesById.get(sheetId) ?? null;
   }
 
-  applyCollabStructure(kind: "sheets" | "labels" | "plans" | "planFolders" | "planOverlays" | "spreadLayouts", list: Record<string, unknown>[]) {
+  applyCollabStructure(kind: "sheets" | "labels" | "plans" | "planFolders" | "planOverlays" | "spreadLayouts" | "sheetOverlays", list: Record<string, unknown>[]) {
     if (this._destroyed) return;
+    if (kind === "sheetOverlays") {
+      const rec: Record<string, any> = {};
+      for (const { id, ...st } of list as any[]) rec[id] = st;
+      this.sheetOverlayStore.restore(rec);
+      this.bumpContentRevision();
+      this.renderer?.render?.();
+      return;
+    }
     if (kind === "plans" || kind === "planFolders" || kind === "planOverlays" || kind === "spreadLayouts") {
       if (kind === "plans") this.planManager.restore(list as any, this.planManager.listFolders());
       else if (kind === "planFolders") this.planManager.restore(this.planManager.toJSON(), list as any);

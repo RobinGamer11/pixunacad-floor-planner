@@ -172,6 +172,18 @@ export async function saveProjectToCloud(projectId: string): Promise<void> {
     await entry.source.save();
     if (entry.state.error || entry.state.conflict || !entry.state.lastSavedAt) throw new Error(entry.state.error ?? "Cloud-Sicherung nicht bestätigt.");
   }
+  // Tab-übergreifendes Sichern: auch ausstehende Bereiche sichern, deren Ansicht gerade nicht geöffnet ist.
+  const registeredKeys = new Set(sources.get(projectId)?.keys() ?? []);
+  if (!registeredKeys.has("home")) {
+    const { readHomeMeta, saveHomeProjectDirect } = await import("./homeProjectSync");
+    if (readHomeMeta(projectId).dirty) {
+      await saveHomeProjectDirect(projectId);
+    }
+  }
+  if (!registeredKeys.has("cad")) {
+    const { syncLocalCadToCloud } = await import("./cadCollab/headlessCadSync");
+    await syncLocalCadToCloud(projectId);
+  }
 }
 
 /** Cloudstand prüfen (Öffnen, Rückkehr in die App, Button „Aus Cloud aktualisieren“). */

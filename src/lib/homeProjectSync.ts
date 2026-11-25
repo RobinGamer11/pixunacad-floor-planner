@@ -59,6 +59,7 @@ export interface HomeSyncMeta {
   dirty: boolean;
   dirtyAreas?: HomeDirtyAreas;
   localWriteError?: string | null;
+  loadStatus?: "not_loaded" | "empty" | "local_only" | "in_sync" | "conflict" | "error";
   conflict: boolean;
   updateAvailable: boolean;
   cadRemoteHead?: number;
@@ -85,6 +86,17 @@ function writeHomeMeta(projectId: string, meta: HomeSyncMeta) {
       try { localStorage.setItem(META_KEY(projectId), JSON.stringify({ ...meta, localWriteError: msg })); } catch {}
     }
   }
+}
+
+function hasLocalHomeContent(projectId: string): boolean {
+  const p = projectStore.getState().projects.find((x) => x.id === projectId);
+  if (!p) return false;
+  if (timelineStore.hasLocalData(projectId)) return true;
+  if ((p.files?.length ?? 0) > 0) return true;
+  if ((p.konzept ?? "").trim().length > 0) return true;
+  const fin = financeStore.get(projectId);
+  if ((fin.nodes?.length ?? 0) > 0 || (fin.positions?.length ?? 0) > 0) return true;
+  return false;
 }
 
 /** Extrahiert alle cloudfähigen Startseiteninhalte ohne CAD-Blätter und ohne Base64-Dateisammlungen. */
@@ -278,6 +290,9 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
   });
   if (!sessionIsCurrent(owner, epoch)) return;
   if (!data) {
+    const meta = readHomeMeta(projectId);
+    const loadStatus = hasLocalHomeContent(projectId) ? "local_only" : "empty";
+    writeHomeMeta(projectId, { ...meta, loadStatus });
     await checkCloudCadHead(projectId);
     publishState(projectId);
     return;
@@ -287,8 +302,9 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
   const remoteTime = (data as { updated_at?: string }).updated_at ? Date.parse(String((data as { updated_at?: string }).updated_at)) : Date.now();
   const meta = readHomeMeta(projectId);
   if (remoteRev > meta.baseRevision) {
-    if (meta.dirty) {
-      writeHomeMeta(projectId, { ...meta, conflict: true, updateAvailable: true });
+    const firstLoadWithLocalData = meta.baseRevision === 0 && meta.lastSavedAt === null && hasLocalHomeContent(projectId);
+    if (meta.dirty || firstLoadWithLocalData) {
+      writeHomeMeta(projectId, { ...meta, conflict: true, updateAvailable: true, loadStatus: "conflict" });
     } else {
       applyHomePayload(projectId, remotePayload);
       writeHomeMeta(projectId, {
@@ -297,10 +313,13 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
         lastSavedAt: Number.isFinite(remoteTime) ? remoteTime : Date.now(),
         dirty: false,
         dirtyAreas: {},
+        loadStatus: "in_sync",
         conflict: false,
         updateAvailable: false,
       });
     }
+  } else if (meta.loadStatus !== "in_sync") {
+    writeHomeMeta(projectId, { ...meta, loadStatus: "in_sync" });
   }
   await checkCloudCadHead(projectId);
   publishState(projectId);
@@ -333,7 +352,7 @@ export async function refreshAllHomeProjectsFromCloud(
   return { ok, failed };
 }
 
-async function saveHomeProject(projectId: string): Promise<void> {
+export async function saveHomeProjectDirect(projectId: string): Promise<void> {
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("Offline – Cloud-Sicherung nicht möglich.");
   if (!projectAccessStore.canEdit(projectId)) throw new Error("Keine Schreibberechtigung für dieses Projekt.");
   const client = getNetworkClient();
@@ -379,6 +398,7 @@ async function saveHomeProject(projectId: string): Promise<void> {
       lastSavedAt: Number.isFinite(savedAt) ? savedAt : Date.now(),
       dirty: changedDuringSave,
       dirtyAreas: changedDuringSave ? meta.dirtyAreas : {},
+      loadStatus: "in_sync",
       conflict: false,
       updateAvailable: false,
     });
@@ -423,13 +443,17 @@ async function keepDeviceHomeProject(projectId: string): Promise<void> {
   if (!client) throw new Error("Cloud nicht erreichbar.");
   const localPayload = buildHomePayload(projectId);
   if (localPayload) {
-    try { localStorage.setItem(BACKUP_KEY(projectId), JSON.stringify({ at: Date.now(), payload: localPayload })); } catch {}
+    try {
+      localStorage.setItem(BACKUP_KEY(projectId), JSON.stringify({ at: Date.now(), payload: localPayload }));
+    } catch {
+      throw new Error("Lokale Sicherheitskopie konnte nicht gespeichert werden (Gerätespeicher voll). Abgebrochen.");
+    }
   }
   const { data, error } = await client.from("project_home_state").select("revision").eq("project_id", projectId).maybeSingle();
   if (error && !isMissingSchemaError(error)) throw new Error(error.message);
   const currentRev = Number((data as { revision?: number } | null)?.revision ?? 0);
   writeHomeMeta(projectId, { ...readHomeMeta(projectId), baseRevision: currentRev, conflict: false, updateAvailable: false, dirty: true });
-  await saveHomeProject(projectId);
+  await saveHomeProjectDirect(projectId);
 }
 
 const activeRegistrations = new Map<string, () => void>();
@@ -443,7 +467,7 @@ export function ensureHomeProjectSyncSource(projectId: string): () => void {
   }
   lastFingerprintByProject.set(projectId, payloadFingerprint(projectId));
   const unregister = registerProjectSyncSource(projectId, "home", {
-    save: () => saveHomeProject(projectId),
+    save: () => saveHomeProjectDirect(projectId),
     refresh: () => refreshHomeProjectFromCloud(projectId),
     loadCloud: () => loadCloudHomeProject(projectId),
     keepDevice: () => keepDeviceHomeProject(projectId),
@@ -503,6 +527,11 @@ export function useHomeProjectSync(projectId: string | undefined) {
   useEffect(() => {
     if (!projectId) return;
     const cleanup = ensureHomeProjectSyncSource(projectId);
+    const access = projectAccessStore.accessFor(projectId);
+    const meta = readHomeMeta(projectId);
+    if (access.cloud && (!meta.loadStatus || meta.loadStatus === "not_loaded") && meta.lastSavedAt === null) {
+      void refreshHomeProjectFromCloud(projectId).catch(() => {});
+    }
     return () => { cleanup(); };
   }, [projectId]);
 }

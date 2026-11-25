@@ -21,6 +21,7 @@ export const CAD_OBJECT_KINDS = [
   "doors",
   "stairs",
   "infoBoxes",
+  "infoBoxCategories",
 ] as const;
 
 /** Objektarten, die direkt in einer Zeichenszene liegen. */
@@ -47,7 +48,7 @@ export function isLibraryKind(kind: string): kind is CadLibraryKind {
  * weiteren Blättern auf einem zweiten Gerät verloren.
  */
 export const CAD_STRUCTURE_SHEET_ID = "__structure__";
-export const CAD_STRUCTURE_KINDS = ["sheets", "labels", "plans", "planFolders", "planOverlays", "spreadLayouts"] as const;
+export const CAD_STRUCTURE_KINDS = ["sheets", "labels", "plans", "planFolders", "planOverlays", "spreadLayouts", "sheetOverlays"] as const;
 export type CadStructureKind = (typeof CAD_STRUCTURE_KINDS)[number];
 
 export function isStructureKind(kind: string): kind is CadStructureKind {
