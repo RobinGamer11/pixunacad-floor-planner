@@ -77,12 +77,12 @@ describe("Paket 1: Cloud-Auth, Organisation, Dokumente & Status", () => {
     expect((payload?.files[0] as Record<string, unknown>)?.dataUrl).toBeUndefined();
   });
 
-  it("überschreibt bestehende lokale Organisationsdaten nicht durch einen leeren Cloudstand", () => {
+  it("schützt bestehende lokale Organisationsdaten bei fehlendem Cloudfeld", () => {
     const pid = "p-cloud-pkg1-protect";
     projectStore.ensureCloudStub(pid, "Lokal geschützt");
     timelineStore.addItem(pid, "task", { title: "Lokale Aufgabe", startDate: "2026-11-28" });
     applyHomePayload(pid, {
-      timeline: { categories: [], priorities: [], statuses: [], items: [], period: {} },
+      details: { ort: "Hamburg" },
     });
     expect(timelineStore.getState(pid).items.some((i) => i.title === "Lokale Aufgabe")).toBe(true);
   });

@@ -203,6 +203,8 @@ export interface FileNode {
   parentId: string | null;
   /** Nur für Dateien: Base64-DataURL (Achtung: localStorage-Limit ~5MB gesamt). */
   dataUrl?: string;
+  /** Confirmed account-scoped IndexedDB copy, not a file payload. */
+  localBlob?: boolean;
   mimeType?: string;
   sizeBytes?: number;
   /** Dauerhafte Cloud-Storage-Referenz nach bestätigtem Upload. */
@@ -311,9 +313,10 @@ const DEFAULT_PROFILE: UserProfile = {
 };
 
 let localDirectoryError: string | null = null;
+const PERSONAL_LAYOUT_KEY = "pixuna.personal.projectLayout";
 let state: State = load();
 const listeners = new Set<() => void>();
-const PERSONAL_LAYOUT_KEY = "pixuna.personal.projectLayout";
+const writeListeners = new Set<(projectId: string, error: string | null, fields?: string[]) => void>();
 
 interface PersonalProjectLayout {
   folders: ProjectFolder[];
@@ -331,26 +334,36 @@ function readPersonalLayout(): PersonalProjectLayout | null {
       items: parsed.items && typeof parsed.items === "object" ? parsed.items : {},
     };
   } catch {
+    localDirectoryError = "Persönliche Projektanordnung konnte nicht gelesen werden.";
     return null;
   }
 }
 
 function writePersonalLayout(candidate: State): void {
   try {
-    const items: PersonalProjectLayout["items"] = {};
+    const items: PersonalProjectLayout["items"] = { ...(readPersonalLayout()?.items ?? {}) };
     for (const p of candidate.projects) {
       const entry: { folderId?: string | null; sortIndex?: number; favorite?: boolean } = {};
       if (p.folderId !== undefined) entry.folderId = p.folderId;
       if (p.sortIndex !== undefined) entry.sortIndex = p.sortIndex;
       if (p.favorite !== undefined) entry.favorite = p.favorite;
-      if (Object.keys(entry).length > 0) items[p.id] = entry;
+      items[p.id] = entry;
     }
     const payload: PersonalProjectLayout = {
       folders: candidate.folders ?? [],
       items,
     };
     localStorage.setItem(PERSONAL_LAYOUT_KEY, JSON.stringify(payload));
-  } catch {}
+  } catch {
+    throw new Error("Persönliche Projektanordnung konnte nicht gespeichert werden.");
+  }
+}
+
+function withPersonalLayout(p: Project): Project {
+  const layout = readPersonalLayout();
+  if (!layout) return p;
+  const item = layout.items[p.id] ?? {};
+  return { ...p, folderId: item.folderId ?? null, sortIndex: item.sortIndex, favorite: item.favorite ?? false };
 }
 
 function load(): State {
@@ -367,16 +380,9 @@ function load(): State {
           .filter((p: Project) => !p.deletedAt || new Date(p.deletedAt).getTime() > cutoff)
           .map(migrateProject)
           .map((p: Project) => {
-            const item = personalLayout?.items?.[p.id];
-            if (!item) return p;
-            return {
-              ...p,
-              folderId: item.folderId !== undefined ? item.folderId : p.folderId,
-              sortIndex: item.sortIndex !== undefined ? item.sortIndex : p.sortIndex,
-              favorite: item.favorite !== undefined ? item.favorite : p.favorite,
-            };
+            return personalLayout ? withPersonalLayout(p) : p;
           });
-        const folders = personalLayout && (personalLayout.folders.length > 0 || !Array.isArray(parsed.folders) || parsed.folders.length === 0)
+        const folders = personalLayout
           ? personalLayout.folders
           : (Array.isArray(parsed.folders) ? parsed.folders : []);
         return {
@@ -456,18 +462,21 @@ function persistState(candidate: State) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stampVersion(PROJECT_STATE_KIND, { ...candidate })));
     writePersonalLayout(candidate);
     return true;
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Projektverzeichnis konnte nicht gespeichert werden.";
+    candidate.projects.forEach(p => writeListeners.forEach(fn => fn(p.id, message)));
     return false;
   }
 }
 
 function persist() {
-  persistState(state);
+  return persistState(state);
 }
 
 function emit(shouldPersist = true) {
-  if (shouldPersist) persist();
+  const saved = !shouldPersist || persist();
   listeners.forEach((fn) => fn());
+  return saved;
 }
 
 /* ---------- Undo / Redo ----------
@@ -604,7 +613,10 @@ function setState(updater: (s: State) => Partial<State>, alreadyPersisted = fals
     }
     if (anyChange) notifyHistory();
   }
-  emit(!alreadyPersisted);
+  const saved = emit(!alreadyPersisted);
+  for (const p of state.projects) {
+    if (!_systemWrite && p !== prevById.get(p.id)) writeListeners.forEach(fn => fn(p.id, saved ? null : "Projektverzeichnis konnte nicht gespeichert werden.", Object.keys(p).filter(k => JSON.stringify((p as unknown as Record<string, unknown>)[k]) !== JSON.stringify((prevById.get(p.id) as unknown as Record<string, unknown> | undefined)?.[k]))));
+  }
 }
 
 /**
@@ -635,8 +647,27 @@ function commitProjectUiProjects(projects: Project[]) {
 
 
 export const projectStore = {
+  onWrite: (fn: (projectId: string, error: string | null, fields?: string[]) => void) => {
+    writeListeners.add(fn);
+    return () => { writeListeners.delete(fn); };
+  },
+  applyPersonalLayout: () => {
+    const layout = readPersonalLayout();
+    if (!layout) return;
+    state = { ...state, folders: layout.folders, projects: state.projects.map(withPersonalLayout) };
+    listeners.forEach(fn => fn());
+  },
+  hasDocumentReference: (projectId: string, fileId: string) => {
+    const hasFile = (p: Project) => p.id === projectId && p.files?.some(f => f.id === fileId);
+    const h = history.get(projectId);
+    return state.projects.some(hasFile) || !!h?.past.some(hasFile) || !!h?.future.some(hasFile);
+  },
   getLocalDirectoryError: () => localDirectoryError,
-  flushLocal: () => persistState(state),
+  flushLocal: () => {
+    const saved = persistState(state);
+    if (saved) state.projects.forEach(p => writeListeners.forEach(fn => fn(p.id, null)));
+    return saved;
+  },
   getState: () => state,
   subscribe: (fn: () => void) => {
     listeners.add(fn);
@@ -671,12 +702,12 @@ export const projectStore = {
           projects: exists
             ? s.projects.map((p) => {
                 if (p.id !== incoming.id) return p;
-                const next = migrateProject(incoming);
+                const next = withPersonalLayout(migrateProject(incoming));
                 // Papierkorbstatus nie durch einen Cloud-Stand aufheben –
                 // nur applyCloudTrash(id, null) nach bewusster Wiederherstellung.
                 return p.deletedAt ? { ...next, deletedAt: p.deletedAt } : next;
               })
-            : [migrateProject(incoming), ...s.projects],
+            : [withPersonalLayout(migrateProject(incoming)), ...s.projects],
         };
       });
     } finally {
@@ -709,7 +740,7 @@ export const projectStore = {
     const prevSuspend = _suspendHistory;
     _suspendHistory = true;
     try {
-      setState((s) => ({ projects: [...s.projects, { ...migrateProject(stub), sortIndex: nextTopIndex(s.projects, null) }] }));
+      setState((s) => ({ projects: [...s.projects, withPersonalLayout({ ...migrateProject(stub), sortIndex: nextTopIndex(s.projects, null) })] }));
     } finally {
       _suspendHistory = prevSuspend;
       _systemWrite = false;
@@ -1008,9 +1039,9 @@ export const projectStore = {
     projectId: string,
     kind: "files" | "photos",
     parentId: string | null,
-    file: { name: string; dataUrl: string; mimeType: string; sizeBytes: number }
+    file: { id?: string; name: string; dataUrl?: string; localBlob?: boolean; mimeType: string; sizeBytes: number }
   ) => {
-    const id = `n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const id = file.id ?? `n-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     const node: FileNode = {
       id,
       kind: "file",
@@ -1018,6 +1049,7 @@ export const projectStore = {
       createdAt: new Date().toISOString(),
       parentId,
       dataUrl: file.dataUrl,
+      localBlob: file.localBlob,
       mimeType: file.mimeType,
       sizeBytes: file.sizeBytes,
     };
@@ -1334,7 +1366,7 @@ export const projectStore = {
     setState((s) => ({ profile: { ...s.profile, ...patch } }));
   },
 };
-registerLocalFlusher(async () => { if (!persistState(state)) throw new Error(localDirectoryError ?? "Projektverzeichnis konnte nicht gespeichert werden. Bitte Speicherstatus prüfen."); });
+registerLocalFlusher(async () => { if (!projectStore.flushLocal()) throw new Error(localDirectoryError ?? "Projektverzeichnis konnte nicht gespeichert werden. Bitte Speicherstatus prüfen."); });
 
 function bySortIndex(a: { sortIndex?: number }, b: { sortIndex?: number }) {
   return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);

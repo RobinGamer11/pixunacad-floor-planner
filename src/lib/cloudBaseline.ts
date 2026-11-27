@@ -33,7 +33,7 @@ export function loadBaseline(key: string): BaselineHashes {
     if (!raw) return out;
     const parsed = JSON.parse(raw) as Record<string, string>;
     Object.entries(parsed).forEach(([k, v]) => { if (typeof v === "string") out.set(k, v); });
-  } catch { /* beschädigter Merkzettel: gilt als „nichts gesichert“ */ }
+  } catch { /* Invalid baseline is not evidence of a confirmed state. */ }
   return out;
 }
 
@@ -46,5 +46,15 @@ export function saveBaseline(key: string, hashes: BaselineHashes): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(Object.fromEntries(hashes)));
-  } catch { /* der Merkzettel ist entbehrlich – lokale Arbeit geht weiter */ }
+  } catch { throw new Error("Bestätigte CAD-Ausgangsbasis konnte lokal nicht gespeichert werden."); }
+}
+
+/** Strict validation for background uploads; interactive opening can instead offer conflict resolution. */
+export function validateBaseline(key: string): void {
+  const raw = window.localStorage.getItem(key);
+  if (raw === null) return;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object" || Object.entries(parsed).some(([k, v]) => k.split(BASELINE_SEP).length !== 3 || typeof v !== "string")) throw new Error();
+  } catch { throw new Error("Beschädigte CAD-Ausgangsbasis. Bitte Zeichnung öffnen und Stand wählen."); }
 }

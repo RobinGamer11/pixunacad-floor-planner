@@ -3,7 +3,10 @@ import { saveProjectToCloud, registerProjectSyncSource, reportProjectSyncSource 
 vi.mock("./projectRegistration", () => ({ ensureSharedProject: async () => ({ ok: true }) }));
 vi.mock("./projectStore", () => ({ projectStore: { getState: () => ({ projects: [{ id: "save-test", name: "Mustervorlage" }] }) } }));
 vi.mock("./projectMetadata", () => ({ saveProjectMetadata: async () => {} }));
-vi.mock("./accountStorage", () => ({ flushAccountWrites: async () => {} }));
+vi.mock("./accountStorage", () => ({ flushAccountWrites: async () => {}, currentAccount: () => "source-test", accountGeneration: () => 1, sessionIsCurrent: () => true }));
+vi.mock("./homeProjectSync", () => ({ readHomeMeta: () => ({ dirty: false, conflict: false, lastSavedAt: null }), saveHomeProjectDirect: async () => {}, refreshHomeProjectFromCloud: async () => {} }));
+const headless = vi.hoisted(() => vi.fn(async () => ({ pushed: 0 })));
+vi.mock("./cadCollab/headlessCadSync", () => ({ syncLocalCadToCloud: headless }));
 beforeEach(() => { vi.useRealTimers(); });
 describe("Verbindliches Cloud-Sicherungsresultat", () => {
   it("does not report a loading source as success", async () => {
@@ -25,10 +28,8 @@ describe("Verbindliches Cloud-Sicherungsresultat", () => {
     reportProjectSyncSource("save-test", "cad", { ready: true, lastSavedAt: 123 });
     await expect(saveProjectToCloud("save-test")).resolves.toBeUndefined(); off();
   });
-  it("does not succeed without a content source", async () => {
-    vi.useFakeTimers();
-    const outcome = expect(saveProjectToCloud("missing-source")).rejects.toThrow("Keine verfügbare Speicherquelle");
-    await vi.advanceTimersByTimeAsync(8000);
-    await outcome;
+  it("saves unopened areas through the same complete save path", async () => {
+    await expect(saveProjectToCloud("missing-source")).resolves.toBeUndefined();
+    expect(headless).toHaveBeenCalledWith("missing-source");
   });
 });

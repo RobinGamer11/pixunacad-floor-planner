@@ -19,6 +19,7 @@
 import { useSyncExternalStore } from "react";
 import { readMetadata, subscribeMetadata } from "./projectMetadataState";
 import { readHomeMeta } from "./homeProjectSync";
+import { accountGeneration, currentAccount, sessionIsCurrent } from "./accountStorage";
 
 export type ProjectSyncMode = "off" | "local" | "standby" | "live";
 
@@ -69,54 +70,45 @@ const EMPTY: ProjectSyncState = {
 };
 
 const sources = new Map<string, Map<string, SourceEntry>>();
+const retained = new Map<string, Map<string, ProjectSyncState>>();
 const combined = new Map<string, ProjectSyncState>();
 const listeners = new Set<() => void>();
 
 const MODE_RANK: Record<ProjectSyncMode, number> = { off: 0, local: 1, standby: 2, live: 3 };
 
+let knownIdentity = "";
+function checkIdentity() {
+  const key = `${currentAccount()}:${accountGeneration()}`;
+  if (knownIdentity !== key) { knownIdentity = key; sources.clear(); retained.clear(); combined.clear(); }
+}
+const stateKey = (id: string) => `pixuna.sync.sources.${id}`;
 function recompute(projectId: string) {
-  const entries = [...(sources.get(projectId)?.values() ?? [])];
-  if (entries.length === 0) {
-    combined.delete(projectId);
-  } else {
-    let mode: ProjectSyncMode = "off";
-    let dirty = false;
-    let saving = false;
-    let error: string | null = null;
-    let lastSavedAt: number | null = null;
-    let conflict = false;
-    let updateAvailable = false;
-    let deviceOnly = false;
-    let ready = true;
-    for (const entry of entries) {
-      if (MODE_RANK[entry.state.mode] > MODE_RANK[mode]) mode = entry.state.mode;
-      dirty = dirty || entry.state.dirty;
-      saving = saving || entry.state.saving;
-      error = error ?? entry.state.error;
-      conflict = conflict || entry.state.conflict;
-      updateAvailable = updateAvailable || entry.state.updateAvailable;
-      deviceOnly = deviceOnly || entry.state.deviceOnly;
-      ready = ready && entry.state.ready === true;
-      if (entry.state.lastSavedAt) lastSavedAt = Math.max(lastSavedAt ?? 0, entry.state.lastSavedAt);
-    }
-    const metadata = readMetadata(projectId);
-    const homeMeta = readHomeMeta(projectId);
-    const hasHomeSource = sources.get(projectId)?.has("home") ?? false;
-    const extraHomeDirty = !hasHomeSource && homeMeta.dirty;
-    const extraHomeConflict = !hasHomeSource && homeMeta.conflict;
-    combined.set(projectId, {
-      mode,
-      dirty: dirty || !!metadata?.dirty || extraHomeDirty,
-      saving,
-      error,
-      lastSavedAt,
-      conflict: conflict || !!metadata?.conflict || extraHomeConflict,
-      updateAvailable: updateAvailable || (!hasHomeSource && homeMeta.updateAvailable),
-      deviceOnly,
-      ready,
-    });
+  checkIdentity();
+  const active = sources.get(projectId) ?? new Map<string, SourceEntry>();
+  let inactive = retained.get(projectId);
+  if (!inactive) {
+    try { inactive = new Map(Object.entries(JSON.parse(localStorage.getItem(stateKey(projectId)) ?? "{}"))); }
+    catch { inactive = new Map(); }
+    retained.set(projectId, inactive);
   }
-  listeners.forEach((fn) => fn());
+  const states = new Map(inactive);
+  active.forEach((entry, key) => states.set(key, entry.state));
+  const home = readHomeMeta(projectId), metadata = readMetadata(projectId);
+  let mode: ProjectSyncMode = "off", dirty = home.dirty || !!metadata?.dirty, saving = false;
+  let error = home.localWriteError || Object.values(home.areaErrors ?? {}).find(Boolean) || home.cloudError || null;
+  let lastSavedAt: number | null = home.lastSavedAt, conflict = home.conflict || !!metadata?.conflict;
+  let updateAvailable = home.updateAvailable || !!home.cadUpdateAvailable, deviceOnly = false, ready = true;
+  states.forEach(state => {
+    if (MODE_RANK[state.mode] > MODE_RANK[mode]) mode = state.mode;
+    dirty ||= state.dirty; saving ||= state.saving; error ||= state.error;
+    conflict ||= state.conflict; updateAvailable ||= state.updateAvailable; deviceOnly ||= state.deviceOnly;
+    ready &&= state.ready === true;
+    if (state.lastSavedAt !== null) lastSavedAt = lastSavedAt === null ? state.lastSavedAt : Math.min(lastSavedAt, state.lastSavedAt);
+  });
+  combined.set(projectId, { mode, dirty, saving, error, lastSavedAt, conflict, updateAvailable, deviceOnly, ready });
+  try { localStorage.setItem(stateKey(projectId), JSON.stringify(Object.fromEntries([...states].map(([key, state]) => [key, { ...state, saving: false }])))); }
+  catch { /* In-memory states/errors remain authoritative if browser storage is full. */ }
+  listeners.forEach(fn => fn());
 }
 
 /** Meldet eine Quelle (CAD/Export) an. */
@@ -125,12 +117,19 @@ export function registerProjectSyncSource(
   key: string,
   source: ProjectSyncSource,
 ): () => void {
+  checkIdentity();
   let byKey = sources.get(projectId);
   if (!byKey) { byKey = new Map(); sources.set(projectId, byKey); }
-  byKey.set(key, { source, state: { ...EMPTY } });
+  byKey.set(key, { source, state: { ...EMPTY, ...retained.get(projectId)?.get(key) } });
   recompute(projectId);
   return () => {
     const map = sources.get(projectId);
+    const entry = map?.get(key);
+    if (entry) {
+      let states = retained.get(projectId);
+      if (!states) { states = new Map(); retained.set(projectId, states); }
+      states.set(key, { ...entry.state, saving: false });
+    }
     map?.delete(key);
     if (map && map.size === 0) sources.delete(projectId);
     recompute(projectId);
@@ -143,68 +142,93 @@ export function reportProjectSyncSource(
   key: string,
   partial: Partial<ProjectSyncState>,
 ) {
+  checkIdentity();
   const entry = sources.get(projectId)?.get(key);
-  if (!entry) return;
-  entry.state = { ...entry.state, ...partial };
+  if (entry) entry.state = { ...entry.state, ...partial };
+  else {
+    let states = retained.get(projectId);
+    if (!states) { states = new Map(); retained.set(projectId, states); }
+    states.set(key, { ...EMPTY, ...states.get(key), ...partial });
+  }
   recompute(projectId);
 }
 
 export function getProjectSyncState(projectId: string | undefined): ProjectSyncState {
+  checkIdentity();
   if (!projectId) return EMPTY;
+  if (!combined.has(projectId)) recompute(projectId);
   return combined.get(projectId) ?? EMPTY;
 }
 
+export function getProjectAreaSyncState(projectId: string, key: string): ProjectSyncState | undefined {
+  getProjectSyncState(projectId);
+  return sources.get(projectId)?.get(key)?.state ?? retained.get(projectId)?.get(key);
+}
+
 export function getRegisteredSyncSourceKeys(projectId: string | undefined): string[] {
+  checkIdentity();
   if (!projectId) return [];
   return [...(sources.get(projectId)?.keys() ?? [])];
 }
 
 /** Manuelle Sicherung: überträgt nur die geänderten Objekte je Quelle. */
 export async function saveProjectToCloud(projectId: string): Promise<void> {
+  const owner = currentAccount(), epoch = accountGeneration();
+  const assertSession = () => { if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt."); };
   const { flushAccountWrites } = await import("./accountStorage");
   await flushAccountWrites();
+  assertSession();
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error("Offline – Cloud-Sicherung nicht möglich.");
   const { ensureSharedProject } = await import("./projectRegistration");
   const { projectStore } = await import("./projectStore");
   const project = projectStore.getState().projects.find(p => p.id === projectId);
   const registration = await ensureSharedProject(projectId, project?.name);
   if (!registration.ok) throw new Error(registration.message);
+  assertSession();
   const { saveProjectMetadata } = await import("./projectMetadata");
   await saveProjectMetadata(projectId);
-  if (!sources.get(projectId)?.size) {
-    // The registration mounts the existing CAD session on the next React pass.
-    await new Promise<void>((resolve, reject) => {
-      const check = () => { const entries = [...(sources.get(projectId)?.values() ?? [])]; if (entries.length && entries.every(entry => entry.state.ready || entry.state.error || entry.state.conflict)) { clearTimeout(timeout); listeners.delete(check); resolve(); } };
-      const timeout = setTimeout(() => { listeners.delete(check); reject(new Error("Keine verfügbare Speicherquelle. Bitte die Zeichnung öffnen und erneut versuchen.")); }, 8000);
-      listeners.add(check); check();
-    });
+  assertSession();
+  const registeredKeys = new Set(sources.get(projectId)?.keys() ?? []);
+  const { saveHomeProjectDirect, refreshHomeProjectFromCloud } = await import("./homeProjectSync");
+  if (!registeredKeys.has("home")) {
+    await refreshHomeProjectFromCloud(projectId);
+    assertSession();
+    await saveHomeProjectDirect(projectId);
   }
-  const entries = [...(sources.get(projectId)?.values() ?? [])];
-  if (!entries.length) throw new Error("Die Zeichnung ist noch nicht zum Sichern bereit. Bitte Projekt öffnen und erneut versuchen.");
-  for (const entry of entries) {
-    if (!entry.state.ready) throw new Error("Der Projektstand wird noch geladen oder muss geklärt werden.");
+  for (const entry of [...(sources.get(projectId)?.values() ?? [])]) {
+    assertSession();
+    // Home may be waiting for its first revision check; its save performs that check.
+    if (!entry.state.ready && entry !== sources.get(projectId)?.get("home")) throw new Error("Der Projektstand wird noch geladen oder muss geklärt werden.");
     if (entry.state.conflict || entry.state.updateAvailable) throw new Error("Geräte- und Cloudstand müssen zuerst abgeglichen werden.");
     await entry.source.save();
+    assertSession();
     if (entry.state.error || entry.state.conflict || !entry.state.lastSavedAt) throw new Error(entry.state.error ?? "Cloud-Sicherung nicht bestätigt.");
-  }
-  // Tab-übergreifendes Sichern: auch ausstehende Bereiche sichern, deren Ansicht gerade nicht geöffnet ist.
-  const registeredKeys = new Set(sources.get(projectId)?.keys() ?? []);
-  if (!registeredKeys.has("home")) {
-    const { readHomeMeta, saveHomeProjectDirect } = await import("./homeProjectSync");
-    if (readHomeMeta(projectId).dirty) {
-      await saveHomeProjectDirect(projectId);
-    }
   }
   if (!registeredKeys.has("cad")) {
     const { syncLocalCadToCloud } = await import("./cadCollab/headlessCadSync");
-    await syncLocalCadToCloud(projectId);
+    try {
+      await syncLocalCadToCloud(projectId);
+      assertSession();
+      reportProjectSyncSource(projectId, "cad", { ready: true, mode: "local", lastSavedAt: Date.now(), dirty: false, error: null });
+    } catch (err) {
+      if (sessionIsCurrent(owner, epoch)) reportProjectSyncSource(projectId, "cad", { ready: true, mode: "local", dirty: true, error: err instanceof Error ? err.message : "CAD-Sicherung fehlgeschlagen." });
+      throw err;
+    }
   }
+  recompute(projectId);
+  if (getProjectSyncState(projectId).dirty) throw new Error("Während der Sicherung sind weitere Änderungen entstanden. Bitte erneut sichern.");
+
 }
 
 /** Cloudstand prüfen (Öffnen, Rückkehr in die App, Button „Aus Cloud aktualisieren“). */
 export async function refreshProjectFromCloud(projectId: string): Promise<void> {
   const { projectAccessStore } = await import("./projectAccess");
+  const owner = currentAccount(), epoch = accountGeneration();
   await projectAccessStore.reload();
+  if (!sessionIsCurrent(owner, epoch)) return;
+  const { refreshHomeProjectFromCloud } = await import("./homeProjectSync");
+  if (!sources.get(projectId)?.has("home")) await refreshHomeProjectFromCloud(projectId);
+  if (!sessionIsCurrent(owner, epoch)) return;
   const entries = [...(sources.get(projectId)?.values() ?? [])];
   for (const entry of entries) await entry.source.refresh?.();
 }

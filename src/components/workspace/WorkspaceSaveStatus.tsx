@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
 import { Save, Info, AlertTriangle, Loader2, CloudUpload, RefreshCw } from "lucide-react";
 import { getLocalProjectSaveState, subscribeLocalProjectSaveState } from "@/cad/persist/localScenePersist";
-import { useProjectSyncState, saveProjectToCloud, refreshProjectFromCloud, resolveProjectConflict, getRegisteredSyncSourceKeys } from "@/lib/projectSync";
+import { useProjectSyncState, saveProjectToCloud, refreshProjectFromCloud, resolveProjectConflict, getRegisteredSyncSourceKeys, getProjectAreaSyncState } from "@/lib/projectSync";
 import { registerProjectInCloud, useCloudProjectLifecycle } from "@/lib/useCloudProjectLifecycle";
 import { workspaceSaveStatus } from "@/lib/workspaceSaveStatus";
 import { readHomeMeta } from "@/lib/homeProjectSync";
@@ -17,8 +17,10 @@ export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string
   const homeMeta = projectId ? readHomeMeta(projectId) : null;
   const sourceKeys = getRegisteredSyncSourceKeys(projectId);
   const homeOnly = sourceKeys.includes("home") && !sourceKeys.includes("cad");
-  const local = homeMeta?.localWriteError
-    ? { ...rawLocal, status: "error" as const, detail: homeMeta.localWriteError, savedAt: homeMeta.localSavedAt ?? rawLocal.savedAt }
+  const localError = homeMeta?.localWriteError || Object.values(homeMeta?.areaErrors ?? {}).find(Boolean);
+  const cadArea = projectId ? getProjectAreaSyncState(projectId, "cad") : undefined;
+  const local = localError
+    ? { ...rawLocal, status: "error" as const, detail: localError, savedAt: homeMeta?.localSavedAt ?? rawLocal.savedAt }
     : homeOnly && homeMeta?.localSavedAt
       ? { ...rawLocal, status: "saved" as const, savedAt: homeMeta.localSavedAt }
       : rawLocal;
@@ -28,7 +30,9 @@ export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string
   if (homeMeta?.dirtyAreas?.organization) pendingAreas.push("Organisation");
   if (homeMeta?.dirtyAreas?.finance) pendingAreas.push("Finanzen");
   if (homeMeta?.dirtyAreas?.documents) pendingAreas.push("Dokumente");
-  if (sourceKeys.includes("cad") && cloud.dirty) pendingAreas.push("CAD/Export");
+  if (cadArea?.dirty) pendingAreas.push("CAD/Export");
+  const areaNames = { details: "Projektangaben", organization: "Organisation", finance: "Finanzen", documents: "Dokumente" };
+  const areaErrors = Object.entries(homeMeta?.areaErrors ?? {}).filter(([, error]) => !!error);
   const [decision, setDecision] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -55,6 +59,8 @@ export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string
         {pendingAreas.length > 0 && (
           <p className="text-[11px] text-muted-foreground">Ausstehend: {pendingAreas.join(", ")}</p>
         )}
+        {areaErrors.map(([area, error]) => <p key={area} role="alert" className="text-xs text-destructive">{areaNames[area as keyof typeof areaNames]}: {error}</p>)}
+        {cadArea?.error && <p role="alert" className="text-xs text-destructive">CAD/Export: {cadArea.error}</p>}
         {actionError && <p role="alert" className="text-xs text-destructive">{actionError}</p>}
         {projectId && <div className="flex flex-wrap gap-2">
           {cloud.conflict || cloud.updateAvailable ? <Button size="sm" variant="outline" onClick={() => setDecision(true)}>Stand wählen</Button> : <Button size="sm" disabled={busy || cloud.saving} onClick={() => void run(async () => {

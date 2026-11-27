@@ -1,4 +1,13 @@
 # Roadmap – Export/Muster-Auftrag (Basis bdffd521)
+## Cloud-Abschluss (Basis 69cde11a)
+- [ ] Kontogetrennte Dokumentablage und bestätigte lokale Speicherung
+- [ ] Revisionsgebundene, serverseitig referenzgeprüfte Dateibereinigung
+- [ ] Persönliche Struktur beim Laden und bei Cloudplatzhaltern anwenden
+- [ ] Berechtigungsabhängiges Laden, Zusammenfassung und sichtbare Fehler
+- [ ] Dauerhafte Änderungen, Bereichsfehler und vollständige Sicherung
+- [ ] CAD-Baselines, Fehler und vollständige Wiederherstellung prüfen
+- [ ] Ablaufregressionen, saubere Installation und Abschlussnachweis
+- [ ] Angemeldete Zweigeräte-Abnahme und SQL-Anwendung: externe Sitzung/Cloudzugriff erforderlich
 ## Kontogetrennte Speicherung und Projektöffnung (Basis 0f623ecd)
 - [x] Lokale Kontotrennung einschließlich CAD, offener Änderungen und Abgleichsstände; unklare Altbestände erhalten
 - [x] Einstellungs-Allowlist und sichere einmalige Altübernahme

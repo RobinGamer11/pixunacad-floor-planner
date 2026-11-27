@@ -2,319 +2,260 @@ import { getNetworkClient, withAuthRetry } from "./networkClient";
 import { ATTACHMENT_BUCKET } from "./opsStore";
 import { quotaMessage, uploadWithQuota } from "./storageQuota";
 import { projectStore, type FileNode } from "./projectStore";
+import { accountGeneration, currentAccount, sessionIsCurrent } from "./accountStorage";
 
-const signedUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const objectUrlCache = new Map<string, string>();
+const pendingMemory = new Map<string, PendingStorageDeletion[]>();
 const BLOB_DB_NAME = "pixuna_document_blobs";
 const BLOB_STORE_NAME = "blobs";
-const PENDING_DELETE_KEY = (projectId: string) => `pixuna.pendingDocDeletes.${projectId}`;
-
-export interface PendingStorageDeletion {
-  storageBucket: string;
-  storagePath: string;
-  storageAssetId?: string;
+const PENDING_DELETE_KEY = (id: string) => `pixuna.pendingDocDeletes.${id}`;
+export interface PendingStorageDeletion { storageBucket: string; storagePath: string; storageAssetId?: string }
+function identity() {
+  const owner = currentAccount(), epoch = accountGeneration();
+  if (!owner) throw new Error("Keine aktive Anmeldung für die Dokumentablage.");
+  return { owner, epoch, check: () => { if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt."); } };
 }
-
+function blobKey(projectId: string, fileId: string, owner = currentAccount()): string {
+  if (!owner) throw new Error("Keine aktive Anmeldung für die Dokumentablage.");
+  return `${owner}:${projectId}:${fileId}`;
+}
 function openBlobDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     try {
       const req = indexedDB.open(BLOB_DB_NAME, 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(BLOB_STORE_NAME)) {
-          db.createObjectStore(BLOB_STORE_NAME);
-        }
-      };
+      req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(BLOB_STORE_NAME)) req.result.createObjectStore(BLOB_STORE_NAME); };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);
-    } catch {
-      resolve(null);
-    }
+      req.onblocked = () => resolve(null);
+    } catch { resolve(null); }
   });
 }
-
-function blobKey(projectId: string, fileId: string): string {
-  return `${projectId}:${fileId}`;
-}
-
-/** Speichert einen Dokumentinhalt dauerhaft als Blob in IndexedDB für Offline-Zugriff. */
 export async function saveLocalDocumentBlob(projectId: string, fileId: string, blob: Blob): Promise<boolean> {
+  const session = identity(), key = blobKey(projectId, fileId, session.owner);
   const db = await openBlobDb();
+  session.check();
   if (!db) return false;
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     try {
       const tx = db.transaction(BLOB_STORE_NAME, "readwrite");
-      tx.objectStore(BLOB_STORE_NAME).put(blob, blobKey(projectId, fileId));
-      tx.oncomplete = () => { db.close(); resolve(true); };
-      tx.onerror = () => { db.close(); resolve(false); };
-    } catch {
-      db.close();
-      resolve(false);
-    }
+      tx.objectStore(BLOB_STORE_NAME).put(blob, key);
+      tx.oncomplete = () => { db.close(); resolve(sessionIsCurrent(session.owner, session.epoch)); };
+      tx.onerror = tx.onabort = () => { db.close(); resolve(false); };
+    } catch { db.close(); resolve(false); }
   });
 }
-
-/** Liest einen lokal in IndexedDB gespeicherten Dokument-Blob. */
 export async function loadLocalDocumentBlob(projectId: string, fileId: string): Promise<Blob | null> {
+  const session = identity(), key = blobKey(projectId, fileId, session.owner);
   const db = await openBlobDb();
+  session.check();
   if (!db) return null;
-  return new Promise((resolve) => {
+  const blob = await new Promise<Blob | null>(resolve => {
     try {
       const tx = db.transaction(BLOB_STORE_NAME, "readonly");
-      const req = tx.objectStore(BLOB_STORE_NAME).get(blobKey(projectId, fileId));
-      req.onsuccess = () => { db.close(); resolve(req.result instanceof Blob ? req.result : null); };
-      req.onerror = () => { db.close(); resolve(null); };
-    } catch {
-      db.close();
-      resolve(null);
-    }
+      const req = tx.objectStore(BLOB_STORE_NAME).get(key);
+      let result: Blob | null = null;
+      req.onsuccess = () => { result = req.result instanceof Blob ? req.result : null; };
+      tx.oncomplete = () => { db.close(); resolve(result); };
+      tx.onerror = tx.onabort = () => { db.close(); resolve(null); };
+    } catch { db.close(); resolve(null); }
   });
+  session.check();
+  return blob;
 }
-
-/** Entfernt einen lokal gecachten Dokument-Blob aus IndexedDB. */
 export async function deleteLocalDocumentBlob(projectId: string, fileId: string): Promise<void> {
-  const key = blobKey(projectId, fileId);
-  const cachedUrl = objectUrlCache.get(key);
-  if (cachedUrl) {
-    try { URL.revokeObjectURL(cachedUrl); } catch {}
-    objectUrlCache.delete(key);
-  }
+  // Undo and other references may still need this blob. Keep it if it is referenced.
+  if (projectStore.hasDocumentReference(projectId, fileId)) return;
+  const session = identity(), key = blobKey(projectId, fileId, session.owner);
+  const url = objectUrlCache.get(key);
+  if (url) { URL.revokeObjectURL(url); objectUrlCache.delete(key); }
   const db = await openBlobDb();
-  if (!db) return;
-  await new Promise<void>((resolve) => {
+  session.check();
+  if (!db) throw new Error("Lokale Dokumentbereinigung konnte nicht gestartet werden.");
+  await new Promise<void>((resolve, reject) => {
     try {
       const tx = db.transaction(BLOB_STORE_NAME, "readwrite");
       tx.objectStore(BLOB_STORE_NAME).delete(key);
       tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); resolve(); };
-    } catch {
-      db.close();
-      resolve();
-    }
+      tx.onerror = tx.onabort = () => { db.close(); reject(new Error("Lokale Dokumentbereinigung fehlgeschlagen.")); };
+    } catch (err) { db.close(); reject(err); }
   });
+  session.check();
 }
-
 export function readPendingStorageDeletions(projectId: string): PendingStorageDeletion[] {
-  try {
-    const raw = localStorage.getItem(PENDING_DELETE_KEY(projectId));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const key = `${currentAccount()}:${projectId}`;
+  if (pendingMemory.has(key)) return [...(pendingMemory.get(key) ?? [])];
+  const raw = localStorage.getItem(PENDING_DELETE_KEY(projectId));
+  if (!raw) return [];
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) throw new Error("Dateibereinigung konnte nicht gelesen werden.");
+  return parsed;
 }
-
 function writePendingStorageDeletions(projectId: string, items: PendingStorageDeletion[]): void {
-  try {
-    if (items.length === 0) localStorage.removeItem(PENDING_DELETE_KEY(projectId));
-    else localStorage.setItem(PENDING_DELETE_KEY(projectId), JSON.stringify(items));
-  } catch {}
+  pendingMemory.set(`${currentAccount()}:${projectId}`, items);
+  if (!items.length) localStorage.removeItem(PENDING_DELETE_KEY(projectId));
+  else localStorage.setItem(PENDING_DELETE_KEY(projectId), JSON.stringify(items));
 }
-
-/**
- * Merkt eine gelöschte Cloud-Datei zur späteren Storage-Bereinigung vor.
- * Die physische Löschung erfolgt erst nach bestätigter Cloud-Sicherung des Projekts.
- */
 export function queuePendingStorageDeletion(projectId: string, node: FileNode): void {
   if (!node.storagePath) return;
-  const bucket = node.storageBucket || ATTACHMENT_BUCKET;
-  const current = readPendingStorageDeletions(projectId);
-  if (current.some((item) => item.storageBucket === bucket && item.storagePath === node.storagePath)) return;
-  writePendingStorageDeletions(projectId, [
-    ...current,
-    { storageBucket: bucket, storagePath: node.storagePath, storageAssetId: node.storageAssetId },
-  ]);
+  const current = readPendingStorageDeletions(projectId), bucket = node.storageBucket || ATTACHMENT_BUCKET;
+  if (current.some(i => i.storageBucket === bucket && i.storagePath === node.storagePath)) return;
+  writePendingStorageDeletions(projectId, [...current, { storageBucket: bucket, storagePath: node.storagePath, storageAssetId: node.storageAssetId }]);
 }
-
-/**
- * Führt vorgemerkte Storage-Löschungen erst nach bestätigter Cloud-Sicherung aus,
- * sofern keine verbleibende Projektdatei den Pfad noch referenziert.
- */
-export async function flushPendingStorageDeletions(projectId: string): Promise<{ deleted: number; failed: string[] }> {
-  const pending = readPendingStorageDeletions(projectId);
-  if (pending.length === 0) return { deleted: 0, failed: [] };
-  const project = projectStore.getState().projects.find((p) => p.id === projectId);
-  const activePaths = new Set((project?.files ?? []).map((f) => f.storagePath).filter(Boolean));
-  const remaining: PendingStorageDeletion[] = [];
-  const failed: string[] = [];
+export function deleteProjectDocumentNode(projectId: string, nodeId: string): boolean {
+  const before = projectStore.getState().projects.find(p => p.id === projectId)?.files ?? [];
+  if (!projectStore.deleteNode(projectId, "files", nodeId)) return false;
+  const after = new Set(projectStore.getState().projects.find(p => p.id === projectId)?.files?.map(f => f.id));
+  // Keep local blobs for Undo; queue every removed descendant, not just its folder.
+  for (const node of before) if (!after.has(node.id)) queuePendingStorageDeletion(projectId, node);
+  return true;
+}
+export async function flushPendingStorageDeletions(projectId: string, confirmed?: { revision: number; files: readonly Omit<FileNode, "dataUrl">[]; pending: PendingStorageDeletion[] }): Promise<{ deleted: number; failed: string[] }> {
+  // No acknowledgement means no deletion authorization.
+  if (!confirmed) return { deleted: 0, failed: [] };
+  const session = identity(), client = getNetworkClient();
+  if (!client) throw new Error("Cloud nicht erreichbar.");
+  const done = new Set<string>(), failed: string[] = [];
   let deleted = 0;
-  for (const item of pending) {
-    if (activePaths.has(item.storagePath)) continue;
+  const keyOf = (i: PendingStorageDeletion) => `${i.storageBucket}:${i.storagePath}`;
+  for (const item of confirmed.pending) {
+    session.check();
+    if (confirmed.files.some(f => (f.storageBucket || ATTACHMENT_BUCKET) === item.storageBucket && f.storagePath === item.storagePath)) { done.add(keyOf(item)); continue; }
     try {
-      await deleteProjectFileFromStorage({
-        id: "",
-        kind: "file",
-        name: item.storagePath,
-        parentId: null,
-        createdAt: "",
-        storageBucket: item.storageBucket,
-        storagePath: item.storagePath,
-        storageAssetId: item.storageAssetId,
-      });
-      deleted += 1;
-    } catch (err) {
-      remaining.push(item);
-      failed.push(err instanceof Error ? err.message : `Storage-Bereinigung fehlgeschlagen (${item.storagePath}).`);
-    }
+      const prepared = await client.rpc("storage_prepare_document_cleanup", { _project_id: projectId, _revision: confirmed.revision, _bucket: item.storageBucket, _path: item.storagePath });
+      session.check();
+      if (prepared.error) throw prepared.error;
+      if (!prepared.data) throw new Error("Datei wird noch durch einen bestätigten Cloudstand benötigt.");
+      const claim = await client.rpc("storage_claim_cleanup", { _project_id: projectId, _limit: 200 });
+      session.check();
+      if (claim.error) throw claim.error;
+      const row = (claim.data as { asset_id: string; bucket: string; path: string }[] | null)?.find(r => r.bucket === item.storageBucket && r.path === item.storagePath);
+      if (!row) {
+        const finished = await withAuthRetry(async () => {
+          const res = await client.from("storage_assets").select("status").eq("project_id", projectId)
+            .eq("bucket", item.storageBucket).eq("path", item.storagePath).maybeSingle();
+          if (res.error) throw res.error;
+          return res.data;
+        });
+        session.check();
+        if (finished?.status === "deleted") { done.add(keyOf(item)); continue; }
+        throw new Error("Dateibereinigung wurde nicht freigegeben.");
+      }
+      const removal = await client.storage.from(row.bucket).remove([row.path]);
+      session.check();
+      if (removal.error) throw removal.error;
+      const finalized = await client.rpc("storage_finalize_delete", { _asset_ids: [row.asset_id] });
+      session.check();
+      if (finalized.error) throw finalized.error;
+      if (Number(finalized.data) !== 1) throw new Error("Dateibereinigung noch nicht bestätigt.");
+      done.add(keyOf(item)); deleted++;
+    } catch (err) { session.check(); failed.push(err instanceof Error ? err.message : String((err as { message?: string })?.message ?? "Dateibereinigung fehlgeschlagen.")); }
   }
-  writePendingStorageDeletions(projectId, remaining);
+  session.check();
+  writePendingStorageDeletions(projectId, readPendingStorageDeletions(projectId).filter(i => !done.has(keyOf(i))));
   return { deleted, failed };
 }
-
 function dataUrlToBlob(dataUrl: string, fallbackMime?: string): Blob {
-  const comma = dataUrl.indexOf(",");
-  const header = comma >= 0 ? dataUrl.slice(0, comma) : "";
-  const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
-  const mimeMatch = header.match(/data:([^;]+)/i);
-  const mime = mimeMatch?.[1] || fallbackMime || "application/octet-stream";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return new Blob([bytes], { type: mime });
+  const comma = dataUrl.indexOf(","), header = comma >= 0 ? dataUrl.slice(0, comma) : "";
+  const binary = atob(comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl);
+  return new Blob([Uint8Array.from(binary, c => c.charCodeAt(0))], { type: header.match(/data:([^;]+)/i)?.[1] || fallbackMime || "application/octet-stream" });
 }
-
-function sanitizeFileName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 100) || "dokument";
+export async function importProjectDocument(projectId: string, parentId: string | null, file: Blob & { name: string }, mimeType = file.type): Promise<string> {
+  const session = identity(), id = `n-${crypto.randomUUID()}`;
+  if (!await saveLocalDocumentBlob(projectId, id, file)) throw new Error(`„${file.name}“ konnte nicht auf dem Gerät gespeichert werden. Bitte Gerätespeicher prüfen.`);
+  session.check();
+  const nodeId = projectStore.addFile(projectId, "files", parentId, { id, name: file.name, mimeType, sizeBytes: file.size, localBlob: true });
+  if (!nodeId) throw new Error(`„${file.name}“: Dateiangaben konnten nicht gespeichert werden; die lokale Dateikopie bleibt erhalten.`);
+  return nodeId;
 }
-
-/**
- * Lädt eine einzelne lokale Projektdatei über den quotengeprüften Storage-Weg hoch.
- * Gibt die aktualisierte Dateireferenz zurück (erst nach bestätigtem Upload).
- */
 export async function uploadProjectFileNode(projectId: string, node: FileNode): Promise<FileNode> {
-  if (node.kind !== "file") return node;
-  if (node.storagePath && node.cloudSynced) return node;
-  let blob: Blob | null = null;
-  if (node.dataUrl) {
-    blob = dataUrlToBlob(node.dataUrl, node.mimeType);
-  } else {
-    blob = await loadLocalDocumentBlob(projectId, node.id);
-  }
-  if (!blob) {
-    if (node.storagePath) return { ...node, cloudSynced: true };
-    throw new Error(`Datei „${node.name}“ hat keinen lokalen Inhalt zum Hochladen.`);
-  }
-  await saveLocalDocumentBlob(projectId, node.id, blob);
-  const path = `${projectId}/docs/${node.id}-${sanitizeFileName(node.name)}`;
+  const session = identity();
+  if (node.kind !== "file" || (node.storagePath && node.cloudSynced)) return node;
+  const blob = node.dataUrl ? dataUrlToBlob(node.dataUrl, node.mimeType) : await loadLocalDocumentBlob(projectId, node.id);
+  session.check();
+  if (!blob) { if (node.storagePath) return { ...node, cloudSynced: true }; throw new Error(`Datei „${node.name}“ hat keinen lokalen Inhalt zum Hochladen.`); }
+  if (!await saveLocalDocumentBlob(projectId, node.id, blob)) throw new Error(`„${node.name}“ konnte nicht auf dem Gerät gespeichert werden; bestehender Inhalt bleibt erhalten.`);
+  session.check();
+  const path = `${projectId}/docs/${node.id}-${node.name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 100) || "dokument"}`;
   try {
     const assetId = await uploadWithQuota(projectId, ATTACHMENT_BUCKET, path, blob, node.mimeType || blob.type || undefined);
-    return {
-      ...node,
-      storageBucket: ATTACHMENT_BUCKET,
-      storagePath: path,
-      storageAssetId: assetId,
-      cloudSynced: true,
-      sizeBytes: node.sizeBytes ?? blob.size,
-      mimeType: node.mimeType ?? (blob.type || undefined),
-    };
-  } catch (err) {
-    const q = quotaMessage(err);
-    throw new Error(q ? `${node.name}: ${q.text}` : `${node.name}: ${err instanceof Error ? err.message : "Upload fehlgeschlagen."}`);
-  }
+    session.check();
+    return { ...node, storageBucket: ATTACHMENT_BUCKET, storagePath: path, storageAssetId: assetId, cloudSynced: true, localBlob: true, sizeBytes: node.sizeBytes ?? blob.size, mimeType: node.mimeType ?? blob.type };
+  } catch (err) { const q = quotaMessage(err); throw new Error(q ? `${node.name}: ${q.text}` : `${node.name}: ${err instanceof Error ? err.message : "Upload fehlgeschlagen."}`); }
 }
-
-/**
- * Lädt alle ausstehenden lokalen Dateien eines Projekts vor der Cloud-Sicherung hoch.
- * Fehlgeschlagene Uploads behalten ihren lokalen Inhalt, damit sie wiederholt werden können.
- */
 export async function syncPendingProjectFiles(projectId: string): Promise<{ uploaded: number; failed: string[] }> {
-  const project = projectStore.getState().projects.find((p) => p.id === projectId);
-  if (!project) return { uploaded: 0, failed: [] };
-  const pending = (project.files ?? []).filter((f) => f.kind === "file" && (!f.storagePath || !f.cloudSynced));
-  if (!pending.length) return { uploaded: 0, failed: [] };
-
+  const session = identity();
+  const pending = projectStore.getState().projects.find(p => p.id === projectId)?.files?.filter(f => f.kind === "file" && (!f.storagePath || !f.cloudSynced)) ?? [];
   let uploaded = 0;
   const failed: string[] = [];
   for (const node of pending) {
     try {
       const updated = await uploadProjectFileNode(projectId, node);
-      const persisted = projectStore.updateFileNode(projectId, node.id, {
-        storageBucket: updated.storageBucket,
-        storagePath: updated.storagePath,
-        storageAssetId: updated.storageAssetId,
-        cloudSynced: true,
-        sizeBytes: updated.sizeBytes,
-        mimeType: updated.mimeType,
-        // Große Base64-Inhalte nach bestätigtem Cloud-Upload & IndexedDB-Ablage aus localStorage entlasten.
-        dataUrl: undefined,
-      });
-      if (!persisted) {
-        throw new Error(`Datei „${node.name}“ konnte lokal nicht aktualisiert werden.`);
-      }
-      uploaded += 1;
-    } catch (err) {
-      failed.push(err instanceof Error ? err.message : `${node.name}: Upload fehlgeschlagen.`);
-    }
+      session.check();
+      const current = projectStore.getState().projects.find(p => p.id === projectId)?.files?.find(f => f.id === node.id);
+      if (!current) { queuePendingStorageDeletion(projectId, updated); continue; }
+      if (current.dataUrl !== node.dataUrl || current.storagePath !== node.storagePath) throw new Error(`„${node.name}“ wurde während des Uploads geändert.`);
+      if (!projectStore.updateFileNode(projectId, node.id, { storageBucket: updated.storageBucket, storagePath: updated.storagePath, storageAssetId: updated.storageAssetId, cloudSynced: true, localBlob: updated.localBlob, sizeBytes: updated.sizeBytes, mimeType: updated.mimeType, dataUrl: updated.localBlob ? undefined : current.dataUrl })) throw new Error(`„${node.name}“ konnte lokal nicht aktualisiert werden.`);
+      uploaded++;
+    } catch (err) { session.check(); failed.push(err instanceof Error ? err.message : `${node.name}: Upload fehlgeschlagen.`); }
   }
   return { uploaded, failed };
 }
-
-/** Lädt eine Dokument-URL erst bei Bedarf (Vorschau oder Download). */
-export async function resolveProjectFileUrl(node: FileNode, projectId?: string): Promise<string | null> {
-  if (node.dataUrl) return node.dataUrl;
-  if (projectId) {
-    const key = blobKey(projectId, node.id);
-    const cachedObjUrl = objectUrlCache.get(key);
-    if (cachedObjUrl) return cachedObjUrl;
-    const localBlob = await loadLocalDocumentBlob(projectId, node.id);
-    if (localBlob && typeof URL !== "undefined" && typeof URL.createObjectURL === "function") {
-      const url = URL.createObjectURL(localBlob);
-      objectUrlCache.set(key, url);
-      return url;
-    }
-  }
+async function resolveBlob(node: FileNode, projectId: string): Promise<Blob | null> {
+  const session = identity();
+  const local = await loadLocalDocumentBlob(projectId, node.id);
+  if (local) return local;
   if (!node.storagePath) return null;
-  const bucket = node.storageBucket || ATTACHMENT_BUCKET;
-  const cacheKey = `${bucket}:${node.storagePath}`;
-  const cached = signedUrlCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now() + 15_000) return cached.url;
-
   const client = getNetworkClient();
-  if (!client) return null;
-  const signedUrl = await withAuthRetry(async () => {
-    const { data, error } = await client.storage.from(bucket).createSignedUrl(node.storagePath!, 300);
-    if (error) throw error;
-    return data?.signedUrl ?? null;
+  if (!client) throw new Error("Cloud nicht erreichbar.");
+  const path = node.storagePath;
+  const result = await withAuthRetry(async () => {
+    const res = await client.storage.from(node.storageBucket || ATTACHMENT_BUCKET).download(path);
+    if (res.error) throw res.error;
+    return res.data;
   });
-  if (signedUrl) {
-    signedUrlCache.set(cacheKey, { url: signedUrl, expiresAt: Date.now() + 280_000 });
-  }
-  return signedUrl;
+  session.check();
+  if (!result) return null;
+  if (!await saveLocalDocumentBlob(projectId, node.id, result)) throw new Error(`„${node.name}“ wurde geladen, konnte aber nicht offline gespeichert werden.`);
+  session.check();
+  return result;
 }
-
-/** Lädt den Inhalt einer Datei bei Bedarf als Base64-DataURL (z. B. für PDF-Vorschau). */
-export async function resolveProjectFileDataUrl(node: FileNode, projectId?: string): Promise<string | null> {
+export async function resolveProjectFileUrl(node: FileNode, projectId?: string): Promise<string | null> {
+  const session = identity();
   if (node.dataUrl) return node.dataUrl;
-  let blob: Blob | null = projectId ? await loadLocalDocumentBlob(projectId, node.id) : null;
-  if (!blob) {
-    const url = await resolveProjectFileUrl(node, projectId);
-    if (!url) return null;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Datei konnte nicht geladen werden (${res.status}).`);
-    blob = await res.blob();
-    if (projectId) {
-      void saveLocalDocumentBlob(projectId, node.id, blob);
-    }
-  }
-  return await new Promise<string>((resolve, reject) => {
+  if (!projectId) throw new Error("Projektzuordnung für Dokument fehlt.");
+  const key = `${blobKey(projectId, node.id, session.owner)}:${session.epoch}:${node.storagePath ?? "local"}`;
+  const cached = objectUrlCache.get(key);
+  if (cached) return cached;
+  const blob = await resolveBlob(node, projectId);
+  session.check();
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  objectUrlCache.set(key, url);
+  return url;
+}
+export async function resolveProjectFileDataUrl(node: FileNode, projectId?: string): Promise<string | null> {
+  const session = identity();
+  if (node.dataUrl) return node.dataUrl;
+  if (!projectId) throw new Error("Projektzuordnung für Dokument fehlt.");
+  const blob = await resolveBlob(node, projectId);
+  if (!blob) return null;
+  const result = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden."));
-    reader.readAsDataURL(blob!);
+    reader.readAsDataURL(blob);
   });
+  session.check();
+  return result;
 }
-
-/** Entfernt eine gespeicherte Projektdatei aus dem Cloud-Storage, wenn sie gelöscht wurde. */
-export async function deleteProjectFileFromStorage(node: FileNode): Promise<void> {
-  if (!node.storagePath) return;
-  const client = getNetworkClient();
-  if (!client) throw new Error("Cloud nicht erreichbar.");
-  const bucket = node.storageBucket || ATTACHMENT_BUCKET;
-  signedUrlCache.delete(`${bucket}:${node.storagePath}`);
-  const { error } = await client.storage.from(bucket).remove([node.storagePath]);
-  if (error) {
-    throw new Error(error.message || `Datei „${node.name}“ konnte nicht aus dem Cloud-Storage entfernt werden.`);
+export function releaseProjectFileUrl(projectId: string, fileId: string, resolvedUrl?: string): void {
+  const prefix = currentAccount() ? `${blobKey(projectId, fileId)}:` : "";
+  for (const [key, url] of objectUrlCache) if (resolvedUrl ? url === resolvedUrl : prefix && key.startsWith(prefix)) {
+    URL.revokeObjectURL(url); objectUrlCache.delete(key);
   }
+}
+/** Never authorizes deletion without a confirmed project revision. */
+export async function deleteProjectFileFromStorage(_node: FileNode): Promise<void> {
+  throw new Error("Dateibereinigung erfordert einen bestätigten Cloudstand.");
 }

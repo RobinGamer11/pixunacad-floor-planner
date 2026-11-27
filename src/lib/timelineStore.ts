@@ -1,3 +1,4 @@
+import { accountGeneration, accountRecordKey, currentAccount, registerLocalFlusher } from "./accountStorage";
 // Store für die Board-Oberfläche (Zeitstrahl & Projektnetz).
 // Persistiert projektbezogen in localStorage: pixuna.board02.<projectId>
 
@@ -155,21 +156,31 @@ const cache = new Map<string, TlState>();
 const history = new Map<string, HistoryEntry>();
 
 function getHistory(projectId: string): HistoryEntry {
+  checkAccount();
   let h = history.get(projectId);
   if (!h) { h = { past: [], future: [] }; history.set(projectId, h); }
   return h;
 }
+let cacheEpoch = accountGeneration();
+const failedWrites = new Map<string, TlState>();
+function checkAccount() {
+  if (cacheEpoch !== accountGeneration()) { cacheEpoch = accountGeneration(); cache.clear(); history.clear(); }
+}
 function getState(projectId: string): TlState {
+  checkAccount();
   let s = cache.get(projectId);
   if (!s) { s = loadState(projectId); cache.set(projectId, s); }
   return s;
 }
 function persist(projectId: string, next: TlState) {
+  checkAccount();
   cache.set(projectId, next);
   try {
     localStorage.setItem(KEY(projectId), JSON.stringify(next));
+    failedWrites.delete(accountRecordKey(currentAccount() ?? "", projectId));
     writeErrorListeners.forEach((fn) => fn(projectId, null));
   } catch (err) {
+    failedWrites.set(accountRecordKey(currentAccount() ?? "", projectId), next);
     const msg = err instanceof Error ? err.message : "Lokaler Speicher voll – Organisationsdaten konnten nicht gesichert werden.";
     writeErrorListeners.forEach((fn) => fn(projectId, msg));
   }
@@ -217,6 +228,7 @@ export const timelineStore = {
   },
   /** Übernimmt einen vollständigen Organisationsstand (z. B. aus der Cloud) unter Erhalt aller IDs. */
   replaceState(projectId: string, incoming: Partial<TlState>) {
+    checkAccount();
     const cats = incoming.categories?.length ? [...incoming.categories] : [...DEFAULT_CATEGORIES];
     if (!cats.some((c) => c.id === QUICK_CATEGORY_ID)) cats.unshift(DEFAULT_CATEGORIES[0]);
     const normalized: TlState = {
@@ -235,8 +247,10 @@ export const timelineStore = {
     cache.set(projectId, normalized);
     try {
       localStorage.setItem(KEY(projectId), JSON.stringify(normalized));
-      writeErrorListeners.forEach((fn) => fn(projectId, null));
+      failedWrites.delete(accountRecordKey(currentAccount() ?? "", projectId));
+    writeErrorListeners.forEach((fn) => fn(projectId, null));
     } catch (err) {
+      failedWrites.set(accountRecordKey(currentAccount() ?? "", projectId), normalized);
       const msg = err instanceof Error ? err.message : "Lokaler Speicher voll – Organisationsdaten konnten nicht gesichert werden.";
       writeErrorListeners.forEach((fn) => fn(projectId, msg));
     }
@@ -538,3 +552,12 @@ export function setBoardSurface(projectId: string | undefined, surface: BoardSur
   if (!projectId) return;
   try { localStorage.setItem(SURFACE_KEY(projectId), surface); } catch {}
 }
+
+registerLocalFlusher(async () => {
+  checkAccount();
+  const prefix = `${currentAccount() ?? ""}\u0001`;
+  for (const [key, state] of failedWrites) if (key.startsWith(prefix)) {
+    persist(key.slice(prefix.length), state);
+    if (failedWrites.has(key)) throw new Error("Organisationsdaten sind noch nicht auf dem Gerät gespeichert.");
+  }
+});

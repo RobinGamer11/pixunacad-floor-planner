@@ -4,12 +4,15 @@ import { saveProjectToCloud, getProjectSyncState } from "./projectSync";
 import { projectStore } from "./projectStore";
 import { financeStore } from "./financeStore";
 
+const identity = vi.hoisted(() => ({ generation: 1 }));
 const mockRpc = vi.fn();
 const mockFrom = vi.fn();
 
 vi.mock("./networkClient", () => ({
   getNetworkClient: () => ({ rpc: mockRpc, from: mockFrom }),
   isMissingSchemaError: () => false,
+  withAuthRetry: async (fn: () => Promise<unknown>) => fn(),
+  classifyCloudError: (err: Error) => ({ message: err.message }),
 }));
 vi.mock("./projectAccess", () => ({
   projectAccessStore: {
@@ -22,15 +25,18 @@ vi.mock("./projectAccess", () => ({
 vi.mock("./projectRegistration", () => ({
   ensureSharedProject: async () => ({ ok: true }),
 }));
+vi.mock("./cadCollab/headlessCadSync", () => ({ syncLocalCadToCloud: async () => ({ pushed: 0 }) }));
 vi.mock("./projectMetadata", () => ({
   saveProjectMetadata: async () => {},
 }));
 vi.mock("./accountStorage", () => ({
   flushAccountWrites: async () => {},
-  currentAccount: () => "user-1",
-  accountGeneration: () => 1,
+  activateAccount: () => {},
+  currentAccount: () => `user-${identity.generation}`,
+  accountGeneration: () => identity.generation,
   sessionIsCurrent: () => true,
   registerLocalFlusher: () => () => {},
+  accountRecordKey: (id: string, projectId: string) => `${id}\u0001${projectId}`,
 }));
 
 const memStorage = (() => {
@@ -50,9 +56,13 @@ if (typeof globalThis.localStorage === "undefined") {
 Object.defineProperty(globalThis, "navigator", { value: { onLine: true }, configurable: true });
 
 beforeEach(() => {
+  identity.generation++;
   localStorage.clear();
   mockRpc.mockReset();
   mockFrom.mockReset();
+  mockFrom.mockImplementation((table: string) => table === "project_home_state"
+    ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
+    : { select: () => ({ eq: () => ({ order: () => ({ limit: async () => ({ data: [], error: null }) }) }) }) });
   // Ensure project exists with a CAD sheet and a file with dataUrl
   projectStore.applySharedProject({
     id: "p-home-1",
@@ -63,7 +73,7 @@ beforeEach(() => {
     sheets: [{ id: "sheet-1", name: "EG", sceneJson: '{"walls":[1]}' } as never],
     tasks: [{ id: "t1", title: "Aufgabe 1", done: false }],
     events: [],
-    files: [{ id: "f1", kind: "file", name: "Plan.pdf", createdAt: "2026-11-24", parentId: null, dataUrl: "data:application/pdf;base64,AAA" }],
+    files: [{ id: "f1", kind: "file", name: "Plan.pdf", createdAt: "2026-11-24", parentId: null, storagePath: "p-home-1/docs/f1.pdf", cloudSynced: true }],
   });
   financeStore.replaceState("p-home-1", { nodes: [], positions: [], projectEstimate: 120000, projectNote: "Budget" });
 });

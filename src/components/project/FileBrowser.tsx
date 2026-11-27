@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { projectStore, type FileKind, type FileNode, type Project } from "@/lib/projectStore";
 import { DocumentViewer } from "@/components/project/DocumentViewer";
-import { deleteLocalDocumentBlob, queuePendingStorageDeletion, resolveProjectFileUrl, saveLocalDocumentBlob } from "@/lib/projectFileStorage";
+import { deleteProjectDocumentNode, importProjectDocument, resolveProjectFileUrl } from "@/lib/projectFileStorage";
 
 const DOCUMENT_DRAG_TYPE = "application/x-pixuna-document-node";
 const ACCEPTED_DOCUMENTS = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
@@ -349,29 +349,19 @@ export function FileBrowser({ project }: Props) {
     setRenameDraft("Neuer Ordner");
   };
 
-  const uploadDocuments = (fileList: FileList | null) => {
+  const uploadDocuments = async (fileList: FileList | null) => {
     if (!fileList) return;
     const files = Array.from(fileList);
     const rejected = files.filter((file) => !isAcceptedDocument(file));
 
     for (const file of files) {
       if (!isAcceptedDocument(file)) continue;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const nodeId = projectStore.addFile(project.id, "files", currentFolderId, {
-          name: file.name,
-          dataUrl: String(reader.result),
-          mimeType: documentMimeType(file),
-          sizeBytes: file.size,
-        });
-        if (!nodeId) {
-          window.alert(`„${file.name}“ konnte nicht dauerhaft gespeichert werden. Der verfügbare Browser-Speicher reicht nicht aus.`);
-          return;
-        }
-        void saveLocalDocumentBlob(project.id, nodeId, file);
+      try {
+        await importProjectDocument(project.id, currentFolderId, file, documentMimeType(file));
         projectStore.sealHistory(project.id);
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        window.alert(err instanceof Error ? err.message : "Datei konnte nicht gespeichert werden.");
+      }
     }
 
     if (rejected.length > 0) {
@@ -769,9 +759,11 @@ export function FileBrowser({ project }: Props) {
                       type="button"
                       onClick={() => {
                         if (window.confirm(`Ordner „${folder.name}“ und alle Inhalte löschen?`)) {
-                          const deleted = projectStore.deleteNode(project.id, "files", folder.id);
-                          if (deleted) projectStore.sealHistory(project.id);
-                          else showPersistenceError(`Der Ordner „${folder.name}“`);
+                          try {
+                            const deleted = deleteProjectDocumentNode(project.id, folder.id);
+                            if (deleted) projectStore.sealHistory(project.id);
+                            else showPersistenceError(`Der Ordner „${folder.name}“`);
+                          } catch (err) { window.alert(err instanceof Error ? err.message : "Dateibereinigung ausstehend."); }
                         }
                       }}
                       title="Löschen"
@@ -918,13 +910,11 @@ export function FileBrowser({ project }: Props) {
                         type="button"
                         onClick={() => {
                           if (window.confirm(`„${file.name}“ löschen?`)) {
-                            const deleted = projectStore.deleteNode(project.id, "files", file.id);
-                            if (deleted) {
-                              projectStore.sealHistory(project.id);
-                              queuePendingStorageDeletion(project.id, file);
-                              void deleteLocalDocumentBlob(project.id, file.id);
-                            }
-                            else showPersistenceError(`„${file.name}“`);
+                            try {
+                              const deleted = deleteProjectDocumentNode(project.id, file.id);
+                              if (deleted) projectStore.sealHistory(project.id);
+                              else showPersistenceError(`„${file.name}“`);
+                            } catch (err) { window.alert(err instanceof Error ? err.message : "Dateibereinigung ausstehend."); }
                           }
                         }}
                         className="hover:underline"

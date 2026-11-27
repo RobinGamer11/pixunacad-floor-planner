@@ -1,6 +1,6 @@
 import { loadLocalScene } from "@/cad/persist/localScenePersist";
 import { accountGeneration, currentAccount, sessionIsCurrent } from "@/lib/accountStorage";
-import { BASELINE_SEP, baselineKey, hasBaseline, hashText, loadBaseline, saveBaseline } from "@/lib/cloudBaseline";
+import { BASELINE_SEP, baselineKey, hasBaseline, hashText, loadBaseline, saveBaseline, validateBaseline } from "@/lib/cloudBaseline";
 import { classifyCloudError } from "@/lib/networkClient";
 import { fetchObjectState, isCollabSchemaMissing, writeObject } from "./opsRepo";
 import { indexSnapshot, type SceneIndex } from "./sceneDiff";
@@ -44,28 +44,34 @@ export async function syncLocalCadToCloud(projectId: string): Promise<{ pushed: 
   const owner = currentAccount();
   const epoch = accountGeneration();
   const local = await loadLocalScene(projectId);
-  if (!local?.snapshot) return { pushed: 0 };
+  if (!local?.snapshot) {
+    try { await fetchObjectState(projectId); }
+    catch (err) { throw new Error(classifyCloudError(err, "CAD-Cloudstand konnte nicht geprüft werden.").message); }
+    if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt.");
+    return { pushed: 0 };
+  }
   if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt.");
 
   const localIndex = indexSnapshot(local.snapshot);
-  if (localIndex.size === 0) return { pushed: 0 };
+  if (localIndex.size === 0) throw new Error("Lokaler CAD-Stand ist unvollständig oder beschädigt. Kein Upload durchgeführt.");
 
   const baseKey = baselineKey("cad", projectId);
   const baselineExists = hasBaseline(baseKey);
+  validateBaseline(baseKey);
   const baseline = loadBaseline(baseKey);
 
   let remoteOps: CadObjectOp[];
   try {
     remoteOps = await fetchObjectState(projectId);
   } catch (err) {
-    if (isCollabSchemaMissing(err)) return { pushed: 0 };
+    if (isCollabSchemaMissing(err)) throw new Error("Cloud-Einrichtung für CAD fehlt. Sicherung wurde nicht bestätigt.");
     throw new Error(classifyCloudError(err, "CAD-Cloudstand konnte nicht geprüft werden.").message);
   }
   if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt.");
 
   const { index: remoteIndex, revisions } = buildRemoteIndex(remoteOps);
 
-  if (!baselineExists && remoteIndex.size > 0) {
+  if (!baselineExists && remoteOps.length > 0) {
     throw new Error("CAD-Zeichnung weicht vom Cloudstand ab (keine gemeinsame Ausgangsbasis). Bitte Zeichnung öffnen und Stand wählen.");
   }
 
@@ -131,10 +137,20 @@ export async function syncLocalCadToCloud(projectId: string): Promise<{ pushed: 
     }
   }
 
+  const assertUnchanged = async () => {
+    const latest = await loadLocalScene(projectId);
+    if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt.");
+    if (latest?.snapshot !== local.snapshot) throw new Error("Während der CAD-Sicherung sind weitere Änderungen entstanden. Bitte erneut sichern.");
+  };
   if (ops.length === 0) {
-    if (nextBaseline.size !== baseline.size) saveBaseline(baseKey, nextBaseline);
+    saveBaseline(baseKey, nextBaseline);
+    await assertUnchanged();
     return { pushed: 0 };
   }
+  ops.sort((a, b) => {
+    const rank = (op: LocalObjectDiff) => op.sheetId === "__structure__" ? 2 : op.sheetId === "__library__" ? 1 : 0;
+    return rank(b) - rank(a);
+  });
 
   let pushed = 0;
   for (const op of ops) {
@@ -142,6 +158,7 @@ export async function syncLocalCadToCloud(projectId: string): Promise<{ pushed: 
     const key = `${op.sheetId}|${op.objectId}`;
     const expectedRev = revisions.get(key) ?? 0;
     const res = await writeObject(projectId, op, expectedRev);
+    if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt.");
     if (!res.accepted) {
       throw new Error("CAD-Zeichnung weicht vom Cloudstand ab. Bitte Zeichnung öffnen und Stand wählen.");
     }
@@ -153,7 +170,10 @@ export async function syncLocalCadToCloud(projectId: string): Promise<{ pushed: 
       nextBaseline.set(bKey, hashText(JSON.stringify(op.payload)));
     }
     pushed += 1;
+    // Each accepted operation advances the baseline, even if a later write fails.
+    saveBaseline(baseKey, nextBaseline);
   }
   saveBaseline(baseKey, nextBaseline);
+  await assertUnchanged();
   return { pushed };
 }

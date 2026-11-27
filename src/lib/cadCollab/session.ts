@@ -21,6 +21,7 @@ import {
   hasBaseline,
   hashText,
   loadBaseline,
+  validateBaseline,
   saveBaseline,
   BASELINE_SEP,
   type BaselineHashes,
@@ -341,8 +342,9 @@ export class CadCollabSession {
     this.refreshing = true;
     try {
       const { projectId } = this.opts;
+      validateBaseline(this.baseKey);
       const [state, latestSeq] = await Promise.all([fetchObjectState(projectId), fetchLatestSeq(projectId)]);
-      if (this.destroyed) return;
+      if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) return;
       const local = this.flatten(indexSnapshot(this.opts.app.serializeForCollab()));
       const decision = decideOpen({
         hasBaseline: hasBaseline(this.baseKey),
@@ -371,7 +373,9 @@ export class CadCollabSession {
       this.report({ ready: !this.conflict && decision !== "updateAvailable" });
     } catch (error) {
       this.setStatus({ unavailable: isCollabSchemaMissing(error) });
-      this.report({ ready: false, error: "Der Cloudstand konnte nicht überprüft werden." });
+      const invalidBaseline = error instanceof Error && error.message.includes("CAD-Ausgangsbasis");
+      this.conflict = invalidBaseline || this.conflict;
+      this.report({ ready: false, conflict: this.conflict, error: error instanceof Error ? error.message : "Der Cloudstand konnte nicht überprüft werden." });
     } finally {
       this.refreshing = false;
     }
@@ -410,7 +414,7 @@ export class CadCollabSession {
     try {
       const { projectId } = this.opts;
       const [state, latestSeq] = await Promise.all([fetchObjectState(projectId), fetchLatestSeq(projectId)]);
-      if (this.destroyed) return;
+      if (this.destroyed || !sessionIsCurrent(this.owner, this.epoch)) return;
       this.replaceWithRemote(state);
       this.lastSeq = latestSeq;
       saveSeenSeq(this.baseKey, latestSeq);
@@ -444,6 +448,7 @@ export class CadCollabSession {
         this.cloudHashes.set(this.keyOf(op.sheetId, op.objectKind, op.objectId), hashText(JSON.stringify(op.payload)));
       }
       this.conflict = false;
+      saveBaseline(this.baseKey, this.cloudHashes);
       this.report({ conflict: false, updateAvailable: false });
       await this.saveToCloud();
     } catch (error) {
@@ -465,6 +470,7 @@ export class CadCollabSession {
     if (!projectAccessStore.canEdit(projectId)) throw new Error("Keine Schreibberechtigung.");
     // Bei abweichenden Ständen nie automatisch mischen – erst ausdrücklich wählen.
     if (this.conflict) { this.report({ conflict: true }); throw new Error("Geräte- und Cloudstand weichen ab."); }
+    validateBaseline(this.baseKey);
     const ops = this.pendingOps();
     if (ops.length === 0) { this.report({ ready: true, dirty: false, error: null, lastSavedAt: Date.now() }); return; }
     this.saving = true;
@@ -688,6 +694,7 @@ export class CadCollabSession {
     this.revisions.set(key, result.revision);
     if (result.accepted) {
       this.noteCloudObject(op, op.changeType === "delete" ? null : op.payload);
+      saveBaseline(this.baseKey, this.cloudHashes);
       return;
     }
     if (this.mode !== "live") {

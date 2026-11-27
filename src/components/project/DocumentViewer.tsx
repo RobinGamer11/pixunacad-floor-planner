@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Hand, Move, Search, X } from "lucide-react";
 import type { FileNode } from "@/lib/projectStore";
-import { resolveProjectFileDataUrl, resolveProjectFileUrl } from "@/lib/projectFileStorage";
+import { resolveProjectFileDataUrl, resolveProjectFileUrl, releaseProjectFileUrl } from "@/lib/projectFileStorage";
 
 function isPdfNode(node: FileNode) {
   return node.mimeType === "application/pdf" || node.name.toLowerCase().endsWith(".pdf");
@@ -14,6 +14,7 @@ const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 /** Vollbild-Vorschau eines Dokuments mit Zoom (Rad/Pinch) und Pan (Rad-Taste/Finger). */
 export function DocumentViewer({ node, projectId, onClose }: { node: FileNode; projectId?: string; onClose: () => void }) {
   const [src, setSrc] = useState<string>(isPdfNode(node) ? "" : node.dataUrl ?? "");
+  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -24,24 +25,31 @@ export function DocumentViewer({ node, projectId, onClose }: { node: FileNode; p
 
   useEffect(() => {
     let cancelled = false;
+    let resolvedUrl: string | undefined;
+    setError(null);
+    setSrc("");
+    const cleanup = () => { cancelled = true; if (projectId && resolvedUrl) releaseProjectFileUrl(projectId, node.id, resolvedUrl); };
     if (!isPdfNode(node)) {
       if (node.dataUrl) { setSrc(node.dataUrl); return; }
       void resolveProjectFileUrl(node, projectId).then((url) => {
+        resolvedUrl = url ?? undefined;
+        if (cancelled && projectId && resolvedUrl) releaseProjectFileUrl(projectId, node.id, resolvedUrl);
         if (!cancelled && url) setSrc(url);
-      }).catch(() => {});
-      return () => { cancelled = true; };
+        if (!cancelled && !url) setError("Datei ist auf diesem Gerät nicht verfügbar.");
+      }).catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : "Datei konnte nicht geöffnet werden."); });
+      return cleanup;
     }
     (async () => {
       try {
         const raw = (await resolveProjectFileDataUrl(node, projectId)) ?? "";
-        if (!raw) return;
+        if (!raw) throw new Error("Datei ist auf diesem Gerät nicht verfügbar.");
         const base64 = raw.includes(",") ? raw.slice(raw.indexOf(",") + 1) : raw;
         const { renderPdfPageToCanvas } = await import("@/cad/documentImport");
         const canvas = await renderPdfPageToCanvas(base64, 0, 2000);
         if (!cancelled) setSrc(canvas.toDataURL("image/png"));
-      } catch { /* ignore */ }
+      } catch (err) { if (!cancelled) setError(err instanceof Error ? err.message : "Vorschau konnte nicht geladen werden."); }
     })();
-    return () => { cancelled = true; };
+    return cleanup;
   }, [node, projectId]);
 
   useEffect(() => {
@@ -74,7 +82,9 @@ export function DocumentViewer({ node, projectId, onClose }: { node: FileNode; p
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointersRef.current.size === 2) {
       const [a, b] = Array.from(pointersRef.current.values());
-      const rect = containerRef.current!.getBoundingClientRect();
+      const container = containerRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
       pinchRef.current = {
         dist: Math.hypot(a.x - b.x, a.y - b.y),
         cx: (a.x + b.x) / 2 - rect.left,
@@ -162,7 +172,7 @@ export function DocumentViewer({ node, projectId, onClose }: { node: FileNode; p
           {src ? (
             <img src={src} alt={node.name} draggable={false} className="max-w-none select-none" />
           ) : (
-            <div className="p-8 text-sm text-muted-foreground">Vorschau wird geladen…</div>
+            <div role={error ? "alert" : "status"} className="p-8 text-sm text-muted-foreground">{error ?? "Vorschau wird geladen…"}</div>
           )}
         </div>
 

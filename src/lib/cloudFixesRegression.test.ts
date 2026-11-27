@@ -1,18 +1,6 @@
-// @vitest-environment node
 import { describe, it, expect, beforeEach } from "vitest";
 
-const mem = new Map<string, string>();
-const storageStub = {
-  getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
-  setItem: (k: string, v: string) => { mem.set(k, String(v)); },
-  removeItem: (k: string) => { mem.delete(k); },
-  clear: () => { mem.clear(); },
-  key: (i: number) => Array.from(mem.keys())[i] ?? null,
-  get length() { return mem.size; },
-};
-(globalThis as any).localStorage = storageStub;
-(globalThis as any).window = { localStorage: storageStub };
-
+import { activateAccount } from "./accountStorage";
 import { Scene } from "@/cad/Scene";
 import { applyOpToScene } from "./cadCollab/applyOps";
 import {
@@ -26,6 +14,7 @@ import { applyHomePayload, buildHomePayload } from "./homeProjectSync";
 
 describe("Regression: Cloud-Korrekturen", () => {
   beforeEach(() => {
+    activateAccount("regression-account");
     localStorage.clear();
   });
 
@@ -145,6 +134,6 @@ describe("Regression: Cloud-Korrekturen", () => {
     const res = await flushPendingStorageDeletions(id);
     expect(res.deleted).toBe(0);
     expect(res.failed).toEqual([]);
-    expect(readPendingStorageDeletions(id)).toHaveLength(0);
+    expect(readPendingStorageDeletions(id)).toHaveLength(1);
   });
 });

@@ -4,10 +4,10 @@ import { projectStore, type Project, type FileNode } from "./projectStore";
 import { financeStore, onFinanceWriteError, type FinanceState } from "./financeStore";
 import { timelineStore, type TlState } from "./timelineStore";
 import { syncProjectPeriod } from "./projectPeriodSync";
-import { flushPendingStorageDeletions, syncPendingProjectFiles } from "./projectFileStorage";
+import { flushPendingStorageDeletions, readPendingStorageDeletions, syncPendingProjectFiles } from "./projectFileStorage";
 import { projectAccessStore } from "./projectAccess";
 import { registerProjectSyncSource, reportProjectSyncSource, type ProjectSyncMode } from "./projectSync";
-import { accountGeneration, currentAccount, sessionIsCurrent } from "./accountStorage";
+import { accountGeneration, currentAccount, registerLocalFlusher, sessionIsCurrent } from "./accountStorage";
 import { readMetadata } from "./projectMetadataState";
 
 export interface HomeProjectPayload {
@@ -59,6 +59,8 @@ export interface HomeSyncMeta {
   dirty: boolean;
   dirtyAreas?: HomeDirtyAreas;
   localWriteError?: string | null;
+  areaErrors?: Partial<Record<keyof HomeDirtyAreas, string | null>>;
+  cloudError?: string | null;
   loadStatus?: "not_loaded" | "empty" | "local_only" | "in_sync" | "conflict" | "error";
   conflict: boolean;
   updateAvailable: boolean;
@@ -69,7 +71,11 @@ export interface HomeSyncMeta {
 const META_KEY = (id: string) => `pixuna.homestate.meta.${id}`;
 const BACKUP_KEY = (id: string) => `pixuna.homestate.backup.${id}`;
 
+const metaMemory = new Map<string, HomeSyncMeta>();
+const metaIdentity = (id: string) => `${currentAccount()}:${id}`;
 export function readHomeMeta(projectId: string): HomeSyncMeta {
+  const cached = metaMemory.get(metaIdentity(projectId));
+  if (cached) return cached;
   try {
     const raw = localStorage.getItem(META_KEY(projectId));
     if (raw) return JSON.parse(raw) as HomeSyncMeta;
@@ -78,14 +84,10 @@ export function readHomeMeta(projectId: string): HomeSyncMeta {
 }
 
 function writeHomeMeta(projectId: string, meta: HomeSyncMeta) {
-  try {
-    localStorage.setItem(META_KEY(projectId), JSON.stringify(meta));
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Lokaler Speicher voll.";
-    if (!meta.localWriteError) {
-      try { localStorage.setItem(META_KEY(projectId), JSON.stringify({ ...meta, localWriteError: msg })); } catch {}
-    }
-  }
+  const key = metaIdentity(projectId);
+  metaMemory.set(key, meta);
+  try { localStorage.setItem(META_KEY(projectId), JSON.stringify(meta)); }
+  catch (err) { metaMemory.set(key, { ...meta, localWriteError: err instanceof Error ? err.message : "Lokaler Speicher voll." }); }
 }
 
 function hasLocalHomeContent(projectId: string): boolean {
@@ -93,9 +95,10 @@ function hasLocalHomeContent(projectId: string): boolean {
   if (!p) return false;
   if (timelineStore.hasLocalData(projectId)) return true;
   if ((p.files?.length ?? 0) > 0) return true;
-  if ((p.konzept ?? "").trim().length > 0) return true;
+  if ((p.konzept ?? "").trim().length > 0 || p.customFields?.length || p.tasks.length || p.events.length) return true;
+  if ([p.ort, p.bauherr, p.adrStrasse, p.projektStart, p.projektEnde].some(v => !!v)) return true;
   const fin = financeStore.get(projectId);
-  if ((fin.nodes?.length ?? 0) > 0 || (fin.positions?.length ?? 0) > 0) return true;
+  if ((fin.nodes?.length ?? 0) > 0 || (fin.positions?.length ?? 0) > 0 || fin.projectEstimate || fin.projectNote) return true;
   return false;
 }
 
@@ -103,7 +106,7 @@ function hasLocalHomeContent(projectId: string): boolean {
 export function buildHomePayload(projectId: string): HomeProjectPayload | null {
   const p = projectStore.getState().projects.find((x) => x.id === projectId);
   if (!p) return null;
-  const files = (p.files ?? []).map(({ dataUrl: _omit, ...rest }) => rest);
+  const files = (p.files ?? []).map(({ dataUrl: _omit, localBlob: _local, ...rest }) => rest);
   const safeThumbnail = p.thumbnail && (!p.thumbnail.startsWith("data:") || p.thumbnail.length <= 64 * 1024)
     ? p.thumbnail
     : undefined;
@@ -187,36 +190,43 @@ export function applyHomePayload(projectId: string, payload: Partial<HomeProject
     ) {
       syncProjectPeriod(projectId, payload.details.projektStart, payload.details.projektEnde);
     }
-    lastFingerprintByProject.set(projectId, payloadFingerprint(projectId));
+    const meta = readHomeMeta(projectId);
+    const error = meta.localWriteError || Object.values(meta.areaErrors ?? {}).find(Boolean);
+    if (error) throw new Error(`Cloudstand konnte nicht vollständig lokal gespeichert werden: ${error}`);
+    lastFingerprintByProject.set(metaIdentity(projectId), payloadFingerprint(projectId));
   } finally {
     applyingCloud = false;
   }
 }
 
-// Globale Beobachtung der Organisationsdaten – markiert jedes geänderte Projekt sofort
-// als lokal geändert, auch wenn es in der linken Projektliste nicht ausgewählt ist.
-timelineStore.subscribeAll((changedProjectId) => {
+/** Mutation observers live independently of the selected view. */
+function markArea(projectId: string, area: keyof HomeDirtyAreas, error?: string | null) {
   if (applyingCloud) return;
-  editSeqByProject.set(changedProjectId, (editSeqByProject.get(changedProjectId) ?? 0) + 1);
-  const meta = readHomeMeta(changedProjectId);
-  writeHomeMeta(changedProjectId, {
-    ...meta,
-    dirty: true,
-    dirtyAreas: { ...meta.dirtyAreas, organization: true },
-    localSavedAt: Date.now(),
-  });
-  lastFingerprintByProject.set(changedProjectId, payloadFingerprint(changedProjectId));
-  publishState(changedProjectId);
-});
-
-const handleLocalWriteError = (projectId: string, error: string | null) => {
+  editSeqByProject.set(projectId, (editSeqByProject.get(projectId) ?? 0) + 1);
   const meta = readHomeMeta(projectId);
-  if ((meta.localWriteError ?? null) === error) return;
-  writeHomeMeta(projectId, { ...meta, localWriteError: error });
+  writeHomeMeta(projectId, { ...meta, dirty: true, dirtyAreas: { ...meta.dirtyAreas, [area]: true },
+    areaErrors: { ...meta.areaErrors, ...(error !== undefined ? { [area]: error } : {}) },
+    localSavedAt: error || meta.areaErrors?.[area] || meta.localWriteError ? meta.localSavedAt : Date.now() });
   publishState(projectId);
-};
-timelineStore.onWriteError(handleLocalWriteError);
-onFinanceWriteError(handleLocalWriteError);
+}
+timelineStore.subscribeAll(id => markArea(id, "organization"));
+financeStore.subscribeAll(id => markArea(id, "finance"));
+projectStore.onWrite((id, error, fields) => {
+  if (applyingCloud) { if (error) handleAreaError(id, "details", error); return; }
+  const fingerprint = payloadFingerprint(id);
+  const identity = metaIdentity(id);
+  if (fingerprint !== lastFingerprintByProject.get(identity) || error) {
+    lastFingerprintByProject.set(identity, fingerprint);
+    markArea(id, fields?.includes("files") || fields?.includes("photos") ? "documents" : "details", error);
+  } else if (error === null) handleAreaError(id, "details", null);
+});
+function handleAreaError(projectId: string, area: keyof HomeDirtyAreas, error: string | null) {
+  const meta = readHomeMeta(projectId);
+  writeHomeMeta(projectId, { ...meta, areaErrors: { ...meta.areaErrors, [area]: error } });
+  publishState(projectId);
+}
+timelineStore.onWriteError((id, error) => handleAreaError(id, "organization", error));
+onFinanceWriteError((id, error) => handleAreaError(id, "finance", error));
 
 function syncModeFor(projectId: string): ProjectSyncMode {
   const access = projectAccessStore.accessFor(projectId);
@@ -228,12 +238,13 @@ function publishState(projectId: string, extra: Partial<{ saving: boolean; error
   const meta = readHomeMeta(projectId);
   const nameMeta = readMetadata(projectId);
   const mode = syncModeFor(projectId);
+  if (extra.error !== undefined) writeHomeMeta(projectId, { ...meta, cloudError: extra.error });
   reportProjectSyncSource(projectId, "home", {
-    ready: true,
+    ready: mode === "off" || (!!meta.loadStatus && meta.loadStatus !== "not_loaded" && meta.loadStatus !== "error"),
     mode,
     dirty: meta.dirty || !!nameMeta?.dirty,
     saving: extra.saving ?? false,
-    error: extra.error ?? null,
+    error: meta.localWriteError || Object.values(meta.areaErrors ?? {}).find(Boolean) || extra.error || (extra.error === null ? null : meta.cloudError) || null,
     lastSavedAt: meta.lastSavedAt,
     conflict: meta.conflict || !!nameMeta?.conflict,
     updateAvailable: meta.updateAvailable || !!meta.cadUpdateAvailable,
@@ -253,7 +264,8 @@ export async function checkCloudCadHead(projectId: string): Promise<void> {
       .eq("project_id", projectId)
       .order("seq", { ascending: false })
       .limit(1);
-    if (error || !sessionIsCurrent(owner, epoch)) return;
+    if (!sessionIsCurrent(owner, epoch)) return;
+    if (error) throw error;
     const head = Number((data as { seq?: number }[] | null)?.[0]?.seq ?? 0);
     const meta = readHomeMeta(projectId);
     const known = meta.cadRemoteHead ?? 0;
@@ -261,13 +273,15 @@ export async function checkCloudCadHead(projectId: string): Promise<void> {
       writeHomeMeta(projectId, { ...meta, cadRemoteHead: head, cadUpdateAvailable: known > 0 });
       publishState(projectId);
     }
-  } catch {}
+  } catch (err) {
+    if (sessionIsCurrent(owner, epoch)) throw new Error(classifyCloudError(err, "CAD-Cloudstand konnte nicht geprüft werden.").message);
+  }
 }
 
-export async function refreshHomeProjectFromCloud(projectId: string): Promise<void> {
+async function refreshHomeProjectOnce(projectId: string): Promise<void> {
   const client = getNetworkClient();
   if (!client) throw new Error("Cloud nicht erreichbar.");
-  if (!projectAccessStore.accessFor(projectId).cloud) return;
+  if (!projectAccessStore.accessFor(projectId).cloud) throw new Error("Cloudberechtigungen sind noch nicht geladen.");
   const owner = currentAccount(), epoch = accountGeneration();
   const data = await withAuthRetry(async () => {
     const res = await client
@@ -303,7 +317,7 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
     } else {
       applyHomePayload(projectId, remotePayload);
       writeHomeMeta(projectId, {
-        ...meta,
+        ...readHomeMeta(projectId),
         baseRevision: remoteRev,
         lastSavedAt: Number.isFinite(remoteTime) ? remoteTime : Date.now(),
         dirty: false,
@@ -318,6 +332,22 @@ export async function refreshHomeProjectFromCloud(projectId: string): Promise<vo
   }
   await checkCloudCadHead(projectId);
   publishState(projectId);
+}
+
+const pendingLoads = new Map<string, Promise<void>>();
+export function refreshHomeProjectFromCloud(projectId: string): Promise<void> {
+  const key = metaIdentity(projectId), owner = currentAccount(), epoch = accountGeneration();
+  const existing = pendingLoads.get(key);
+  if (existing) return existing;
+  const job = refreshHomeProjectOnce(projectId).catch(err => {
+    if (sessionIsCurrent(owner, epoch)) {
+      writeHomeMeta(projectId, { ...readHomeMeta(projectId), loadStatus: "error", cloudError: err instanceof Error ? err.message : "Cloudstand konnte nicht geladen werden." });
+      publishState(projectId);
+    }
+    throw err;
+  }).finally(() => { pendingLoads.delete(key); });
+  pendingLoads.set(key, job);
+  return job;
 }
 
 /**
@@ -337,6 +367,7 @@ export async function refreshAllHomeProjectsFromCloud(
       if (!id) break;
       try {
         await refreshHomeProjectFromCloud(id);
+        if (readHomeMeta(id).conflict) throw new Error("Lokale Änderungen geschützt; Projektstand muss abgeglichen werden.");
         ok.push(id);
       } catch (err) {
         failed.push({ projectId: id, error: err instanceof Error ? err.message : "Aktualisierung fehlgeschlagen." });
@@ -353,9 +384,11 @@ export async function saveHomeProjectDirect(projectId: string): Promise<void> {
   const client = getNetworkClient();
   if (!client) throw new Error("Cloud nicht erreichbar.");
   const owner = currentAccount(), epoch = accountGeneration();
+  if (!readHomeMeta(projectId).loadStatus || ["not_loaded", "error"].includes(readHomeMeta(projectId).loadStatus ?? "")) await refreshHomeProjectFromCloud(projectId);
+  if (!sessionIsCurrent(owner, epoch)) throw new Error("Kontositzung wurde gewechselt.");
   const meta = readHomeMeta(projectId);
+  if (meta.localWriteError || Object.values(meta.areaErrors ?? {}).some(Boolean)) throw new Error(meta.localWriteError || Object.values(meta.areaErrors ?? {}).find(Boolean) || "Lokale Speicherung fehlgeschlagen.");
   if (meta.conflict) throw new Error("Geräte- und Cloudstand weichen ab. Bitte zuerst einen Stand wählen.");
-  const startSeq = editSeqByProject.get(projectId) ?? 0;
   publishState(projectId, { saving: true, error: null });
   try {
     // Ausstehende Projektdateien zuerst quotengeprüft in Storage hochladen.
@@ -366,6 +399,8 @@ export async function saveHomeProjectDirect(projectId: string): Promise<void> {
     }
     const payload = buildHomePayload(projectId);
     if (!payload) throw new Error("Projekt nicht verfügbar.");
+    const acknowledgedSeq = editSeqByProject.get(projectId) ?? 0;
+    const pendingDeletes = readPendingStorageDeletions(projectId);
     const { data, error } = await client.rpc("save_project_home_state", {
       _project_id: projectId,
       _payload: payload,
@@ -385,19 +420,20 @@ export async function saveHomeProjectDirect(projectId: string): Promise<void> {
       publishState(projectId, { saving: false });
       throw new Error("Ein anderes Gerät hat Startseiteninhalte geändert. Bitte Stand wählen.");
     }
-    const changedDuringSave = (editSeqByProject.get(projectId) ?? 0) !== startSeq;
+    const changedDuringSave = (editSeqByProject.get(projectId) ?? 0) !== acknowledgedSeq;
     const savedAt = row.updated_at ? Date.parse(row.updated_at) : Date.now();
     writeHomeMeta(projectId, {
-      ...meta,
+      ...readHomeMeta(projectId),
       baseRevision: Number(row.revision ?? meta.baseRevision + 1),
       lastSavedAt: Number.isFinite(savedAt) ? savedAt : Date.now(),
       dirty: changedDuringSave,
-      dirtyAreas: changedDuringSave ? meta.dirtyAreas : {},
+      dirtyAreas: changedDuringSave ? readHomeMeta(projectId).dirtyAreas : {},
       loadStatus: "in_sync",
       conflict: false,
       updateAvailable: false,
     });
-    await flushPendingStorageDeletions(projectId);
+    const cleanup = await flushPendingStorageDeletions(projectId, { revision: Number(row.revision), files: payload.files, pending: pendingDeletes });
+    if (cleanup.failed.length) throw new Error(`Dateibereinigung ausstehend: ${cleanup.failed.join("; ")}`);
     publishState(projectId, { saving: false, error: null });
   } catch (err) {
     const msg = classifyCloudError(err, "Startseiteninhalte konnten nicht gesichert werden.").message;
@@ -446,7 +482,7 @@ async function keepDeviceHomeProject(projectId: string): Promise<void> {
     }
   }
   const { data, error } = await client.from("project_home_state").select("revision").eq("project_id", projectId).maybeSingle();
-  if (error && !isMissingSchemaError(error)) throw new Error(error.message);
+  if (error) throw new Error(classifyCloudError(error, "Cloudstand konnte nicht geprüft werden.").message);
   const currentRev = Number((data as { revision?: number } | null)?.revision ?? 0);
   writeHomeMeta(projectId, { ...readHomeMeta(projectId), baseRevision: currentRev, conflict: false, updateAvailable: false, dirty: true });
   await saveHomeProjectDirect(projectId);
@@ -461,53 +497,16 @@ export function ensureHomeProjectSyncSource(projectId: string): () => void {
     publishState(projectId);
     return existing;
   }
-  lastFingerprintByProject.set(projectId, payloadFingerprint(projectId));
+  lastFingerprintByProject.set(metaIdentity(projectId), payloadFingerprint(projectId));
   const unregister = registerProjectSyncSource(projectId, "home", {
     save: () => saveHomeProjectDirect(projectId),
     refresh: () => refreshHomeProjectFromCloud(projectId),
     loadCloud: () => loadCloudHomeProject(projectId),
     keepDevice: () => keepDeviceHomeProject(projectId),
   });
-  const checkChange = () => {
-    if (applyingCloud) return;
-    const nextFp = payloadFingerprint(projectId);
-    const prevFp = lastFingerprintByProject.get(projectId);
-    if (prevFp !== undefined && nextFp !== prevFp) {
-      lastFingerprintByProject.set(projectId, nextFp);
-      editSeqByProject.set(projectId, (editSeqByProject.get(projectId) ?? 0) + 1);
-      const meta = readHomeMeta(projectId);
-      writeHomeMeta(projectId, {
-        ...meta,
-        dirty: true,
-        dirtyAreas: { ...meta.dirtyAreas, details: true },
-        localSavedAt: Date.now(),
-      });
-      publishState(projectId);
-    }
-  };
-  const unsubProject = projectStore.subscribe(checkChange);
-  const unsubFinance = financeStore.subscribe(() => {
-    if (applyingCloud) return;
-    const nextFp = payloadFingerprint(projectId);
-    const prevFp = lastFingerprintByProject.get(projectId);
-    if (prevFp !== undefined && nextFp !== prevFp) {
-      lastFingerprintByProject.set(projectId, nextFp);
-      editSeqByProject.set(projectId, (editSeqByProject.get(projectId) ?? 0) + 1);
-      const meta = readHomeMeta(projectId);
-      writeHomeMeta(projectId, {
-        ...meta,
-        dirty: true,
-        dirtyAreas: { ...meta.dirtyAreas, finance: true },
-        localSavedAt: Date.now(),
-      });
-      publishState(projectId);
-    }
-  });
   const unsubAccess = projectAccessStore.subscribe(() => publishState(projectId));
   publishState(projectId);
   const cleanup = () => {
-    unsubProject();
-    unsubFinance();
     unsubAccess();
     unregister();
     activeRegistrations.delete(projectId);
@@ -521,11 +520,29 @@ export function useHomeProjectSync(projectId: string | undefined) {
   useEffect(() => {
     if (!projectId) return;
     const cleanup = ensureHomeProjectSyncSource(projectId);
-    const access = projectAccessStore.accessFor(projectId);
-    const meta = readHomeMeta(projectId);
-    if (access.cloud && (!meta.loadStatus || meta.loadStatus === "not_loaded") && meta.lastSavedAt === null) {
-      void refreshHomeProjectFromCloud(projectId).catch(() => {});
-    }
-    return () => { cleanup(); };
+    let active = true, requestedAccess = false;
+    const check = () => {
+      const cloud = projectAccessStore.accessFor(projectId).cloud;
+      if (!cloud) { requestedAccess = false; return; }
+      if (!active || requestedAccess) return;
+      requestedAccess = true;
+      // Always check revisions when selecting, including previously loaded projects.
+      void refreshHomeProjectFromCloud(projectId).catch(err => {
+        if (active) publishState(projectId, { error: err instanceof Error ? err.message : "Cloudstand konnte nicht geladen werden." });
+      });
+    };
+    const unsub = projectAccessStore.subscribe(check);
+    check();
+    return () => { active = false; unsub(); cleanup(); };
   }, [projectId]);
 }
+
+registerLocalFlusher(async () => {
+  const prefix = `${currentAccount()}:`;
+  for (const [key, meta] of metaMemory) if (key.startsWith(prefix) && meta.localWriteError) {
+    const id = key.slice(prefix.length);
+    writeHomeMeta(id, { ...meta, localWriteError: null });
+    if (readHomeMeta(id).localWriteError) throw new Error("Speicherstatus konnte nicht auf dem Gerät gesichert werden.");
+    publishState(id);
+  }
+});

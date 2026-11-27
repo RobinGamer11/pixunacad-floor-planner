@@ -1,3 +1,4 @@
+import { accountRecordKey, currentAccount, registerLocalFlusher } from "./accountStorage";
 // Store für die Finanzen-Oberfläche. Persistiert projektbezogen in localStorage.
 //
 // Struktur:
@@ -121,6 +122,7 @@ function emptyState(): FinanceState {
 type Listener = () => void;
 const listeners = new Set<Listener>();
 const writeErrorListeners = new Set<(projectId: string, error: string | null) => void>();
+const mutationListeners = new Set<(projectId: string) => void>();
 
 export function onFinanceWriteError(fn: (projectId: string, error: string | null) => void) {
   writeErrorListeners.add(fn);
@@ -161,7 +163,10 @@ function normalizeState(raw: Partial<FinanceState> | null | undefined): FinanceS
   };
 }
 
+const failedWrites = new Map<string, { projectId: string; state: FinanceState }>();
 function read(projectId: string): FinanceState {
+  const pending = failedWrites.get(accountRecordKey(currentAccount() ?? "", projectId));
+  if (pending) return pending.state;
   try {
     const raw = localStorage.getItem(KEY(projectId));
     if (!raw) return emptyState();
@@ -174,12 +179,15 @@ function read(projectId: string): FinanceState {
 function write(projectId: string, state: FinanceState) {
   try {
     localStorage.setItem(KEY(projectId), JSON.stringify(stampVersion(FINANCE_KIND, { ...state })));
+    failedWrites.delete(accountRecordKey(currentAccount() ?? "", projectId));
     writeErrorListeners.forEach((fn) => fn(projectId, null));
   } catch (err) {
+    failedWrites.set(accountRecordKey(currentAccount() ?? "", projectId), { projectId, state });
     const msg = err instanceof Error ? err.message : "Lokaler Speicher voll – Finanzdaten konnten nicht gesichert werden.";
     writeErrorListeners.forEach((fn) => fn(projectId, msg));
   }
   listeners.forEach((l) => l());
+  mutationListeners.forEach(fn => fn(projectId));
 }
 
 function nextOrder(items: { order: number }[]): number {
@@ -187,6 +195,10 @@ function nextOrder(items: { order: number }[]): number {
 }
 
 export const financeStore = {
+  subscribeAll(fn: (projectId: string) => void) {
+    mutationListeners.add(fn);
+    return () => { mutationListeners.delete(fn); };
+  },
   subscribe(fn: Listener) {
     listeners.add(fn);
     return () => listeners.delete(fn);
@@ -530,3 +542,11 @@ export function parseEur(v: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+
+registerLocalFlusher(async () => {
+  const prefix = `${currentAccount() ?? ""}\u0001`;
+  for (const [key, pending] of failedWrites) if (key.startsWith(prefix)) {
+    write(pending.projectId, pending.state);
+    if (failedWrites.has(key)) throw new Error("Finanzdaten sind noch nicht auf dem Gerät gespeichert.");
+  }
+});

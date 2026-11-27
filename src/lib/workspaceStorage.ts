@@ -1,6 +1,7 @@
 export type WorkspacePayload = {
   localStorage: Record<string, string>;
 };
+import { projectStore } from "./projectStore";
 
 /** Schlüssel der lokalen Projektliste (siehe projectStore). */
 const PROJECTS_KEY = "pixuna.projects.v3";
@@ -100,6 +101,7 @@ export function mergeWorkspace(payload: WorkspacePayload): boolean {
     window.localStorage.setItem(key, value);
     changed = true;
   });
+  if (incoming["pixuna.personal.projectLayout"] !== undefined) projectStore.applyPersonalLayout();
   return changed;
 }
 
