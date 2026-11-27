@@ -252,7 +252,17 @@ function appendSceneObjectsInner(scene: Scene, data: SerializedScene): void {
     if (!b || !isFinite(b.x) || !isFinite(b.y)) continue;
     (scene as any).createInfoBox?.({ ...b });
   }
-  (scene as any).infoBoxCategories = (data.infoBoxCategories || [])
-    .filter((c: any) => c && typeof c.id === "string" && typeof c.name === "string")
-    .map((c: any) => ({ id: c.id, name: c.name, color: typeof c.color === "string" ? c.color : "#c9a96e" }));
+  if (Array.isArray(data.infoBoxCategories)) {
+    const existing: any[] = Array.isArray((scene as any).infoBoxCategories) ? (scene as any).infoBoxCategories : [];
+    const byId = new Map<string, { id: string; name: string; color: string }>(
+      existing
+        .filter((c: any) => c && typeof c.id === "string" && typeof c.name === "string")
+        .map((c: any) => [c.id, c]),
+    );
+    for (const c of data.infoBoxCategories) {
+      if (!c || typeof c.id !== "string" || typeof c.name !== "string") continue;
+      byId.set(c.id, { id: c.id, name: c.name, color: typeof c.color === "string" ? c.color : "#c9a96e" });
+    }
+    (scene as any).infoBoxCategories = Array.from(byId.values());
+  }
 }

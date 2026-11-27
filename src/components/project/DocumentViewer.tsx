@@ -12,7 +12,7 @@ const MAX_ZOOM = 20;
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 /** Vollbild-Vorschau eines Dokuments mit Zoom (Rad/Pinch) und Pan (Rad-Taste/Finger). */
-export function DocumentViewer({ node, onClose }: { node: FileNode; onClose: () => void }) {
+export function DocumentViewer({ node, projectId, onClose }: { node: FileNode; projectId?: string; onClose: () => void }) {
   const [src, setSrc] = useState<string>(isPdfNode(node) ? "" : node.dataUrl ?? "");
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
   const viewRef = useRef(view);
@@ -26,14 +26,14 @@ export function DocumentViewer({ node, onClose }: { node: FileNode; onClose: () 
     let cancelled = false;
     if (!isPdfNode(node)) {
       if (node.dataUrl) { setSrc(node.dataUrl); return; }
-      void resolveProjectFileUrl(node).then((url) => {
+      void resolveProjectFileUrl(node, projectId).then((url) => {
         if (!cancelled && url) setSrc(url);
       }).catch(() => {});
       return () => { cancelled = true; };
     }
     (async () => {
       try {
-        const raw = (await resolveProjectFileDataUrl(node)) ?? "";
+        const raw = (await resolveProjectFileDataUrl(node, projectId)) ?? "";
         if (!raw) return;
         const base64 = raw.includes(",") ? raw.slice(raw.indexOf(",") + 1) : raw;
         const { renderPdfPageToCanvas } = await import("@/cad/documentImport");
@@ -42,7 +42,7 @@ export function DocumentViewer({ node, onClose }: { node: FileNode; onClose: () 
       } catch { /* ignore */ }
     })();
     return () => { cancelled = true; };
-  }, [node]);
+  }, [node, projectId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };

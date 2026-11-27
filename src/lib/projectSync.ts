@@ -18,6 +18,7 @@
  */
 import { useSyncExternalStore } from "react";
 import { readMetadata, subscribeMetadata } from "./projectMetadataState";
+import { readHomeMeta } from "./homeProjectSync";
 
 export type ProjectSyncMode = "off" | "local" | "standby" | "live";
 
@@ -99,7 +100,21 @@ function recompute(projectId: string) {
       if (entry.state.lastSavedAt) lastSavedAt = Math.max(lastSavedAt ?? 0, entry.state.lastSavedAt);
     }
     const metadata = readMetadata(projectId);
-    combined.set(projectId, { mode, dirty: dirty || !!metadata?.dirty, saving, error, lastSavedAt, conflict: conflict || !!metadata?.conflict, updateAvailable, deviceOnly, ready });
+    const homeMeta = readHomeMeta(projectId);
+    const hasHomeSource = sources.get(projectId)?.has("home") ?? false;
+    const extraHomeDirty = !hasHomeSource && homeMeta.dirty;
+    const extraHomeConflict = !hasHomeSource && homeMeta.conflict;
+    combined.set(projectId, {
+      mode,
+      dirty: dirty || !!metadata?.dirty || extraHomeDirty,
+      saving,
+      error,
+      lastSavedAt,
+      conflict: conflict || !!metadata?.conflict || extraHomeConflict,
+      updateAvailable: updateAvailable || (!hasHomeSource && homeMeta.updateAvailable),
+      deviceOnly,
+      ready,
+    });
   }
   listeners.forEach((fn) => fn());
 }

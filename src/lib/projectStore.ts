@@ -313,8 +313,48 @@ const DEFAULT_PROFILE: UserProfile = {
 let localDirectoryError: string | null = null;
 let state: State = load();
 const listeners = new Set<() => void>();
+const PERSONAL_LAYOUT_KEY = "pixuna.personal.projectLayout";
+
+interface PersonalProjectLayout {
+  folders: ProjectFolder[];
+  items: Record<string, { folderId?: string | null; sortIndex?: number; favorite?: boolean }>;
+}
+
+function readPersonalLayout(): PersonalProjectLayout | null {
+  try {
+    const raw = localStorage.getItem(PERSONAL_LAYOUT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PersonalProjectLayout>;
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+      items: parsed.items && typeof parsed.items === "object" ? parsed.items : {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writePersonalLayout(candidate: State): void {
+  try {
+    const items: PersonalProjectLayout["items"] = {};
+    for (const p of candidate.projects) {
+      const entry: { folderId?: string | null; sortIndex?: number; favorite?: boolean } = {};
+      if (p.folderId !== undefined) entry.folderId = p.folderId;
+      if (p.sortIndex !== undefined) entry.sortIndex = p.sortIndex;
+      if (p.favorite !== undefined) entry.favorite = p.favorite;
+      if (Object.keys(entry).length > 0) items[p.id] = entry;
+    }
+    const payload: PersonalProjectLayout = {
+      folders: candidate.folders ?? [],
+      items,
+    };
+    localStorage.setItem(PERSONAL_LAYOUT_KEY, JSON.stringify(payload));
+  } catch {}
+}
 
 function load(): State {
+  const personalLayout = readPersonalLayout();
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -323,11 +363,25 @@ function load(): State {
       // Auch eine bewusst leere Projektliste bleibt nach dem Neuladen leer.
       if (parsed && Array.isArray(parsed.projects)) {
         const cutoff = Date.now() - 30 * 86400000;
+        const projects = parsed.projects
+          .filter((p: Project) => !p.deletedAt || new Date(p.deletedAt).getTime() > cutoff)
+          .map(migrateProject)
+          .map((p: Project) => {
+            const item = personalLayout?.items?.[p.id];
+            if (!item) return p;
+            return {
+              ...p,
+              folderId: item.folderId !== undefined ? item.folderId : p.folderId,
+              sortIndex: item.sortIndex !== undefined ? item.sortIndex : p.sortIndex,
+              favorite: item.favorite !== undefined ? item.favorite : p.favorite,
+            };
+          });
+        const folders = personalLayout && (personalLayout.folders.length > 0 || !Array.isArray(parsed.folders) || parsed.folders.length === 0)
+          ? personalLayout.folders
+          : (Array.isArray(parsed.folders) ? parsed.folders : []);
         return {
-          projects: parsed.projects
-            .filter((p: Project) => !p.deletedAt || new Date(p.deletedAt).getTime() > cutoff)
-            .map(migrateProject),
-          folders: Array.isArray(parsed.folders) ? parsed.folders : [],
+          projects,
+          folders,
           profile: parsed.profile ? { ...DEFAULT_PROFILE, ...parsed.profile } : DEFAULT_PROFILE,
         };
       }
@@ -337,7 +391,7 @@ function load(): State {
   }
   return {
     projects: demoProjects().map(migrateProject),
-    folders: [],
+    folders: personalLayout?.folders ?? [],
     profile: DEFAULT_PROFILE,
   };
 }
@@ -400,6 +454,7 @@ function persistState(candidate: State) {
   if (localDirectoryError) return false;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stampVersion(PROJECT_STATE_KIND, { ...candidate })));
+    writePersonalLayout(candidate);
     return true;
   } catch {
     return false;

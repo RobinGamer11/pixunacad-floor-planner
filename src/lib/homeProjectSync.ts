@@ -4,7 +4,7 @@ import { projectStore, type Project, type FileNode } from "./projectStore";
 import { financeStore, onFinanceWriteError, type FinanceState } from "./financeStore";
 import { timelineStore, type TlState } from "./timelineStore";
 import { syncProjectPeriod } from "./projectPeriodSync";
-import { syncPendingProjectFiles } from "./projectFileStorage";
+import { flushPendingStorageDeletions, syncPendingProjectFiles } from "./projectFileStorage";
 import { projectAccessStore } from "./projectAccess";
 import { registerProjectSyncSource, reportProjectSyncSource, type ProjectSyncMode } from "./projectSync";
 import { accountGeneration, currentAccount, sessionIsCurrent } from "./accountStorage";
@@ -120,9 +120,6 @@ export function buildHomePayload(projectId: string): HomeProjectPayload | null {
       adrLand: p.adrLand,
       projektStart: p.projektStart,
       projektEnde: p.projektEnde,
-      favorite: p.favorite,
-      folderId: p.folderId,
-      sortIndex: p.sortIndex,
       createdAtIso: p.createdAtIso,
       erstelltAm: p.erstelltAm,
       isTemplate: p.isTemplate,
@@ -163,9 +160,13 @@ export function applyHomePayload(projectId: string, payload: Partial<HomeProject
     const mergedFiles: FileNode[] | undefined = Array.isArray(payload.files)
       ? payload.files.map((f) => ({ ...f, dataUrl: localDataUrls.get(f.id) }))
       : current.files;
+    const sharedDetails: Partial<HomeProjectPayload["details"]> = payload.details ? { ...payload.details } : {};
+    delete sharedDetails.favorite;
+    delete sharedDetails.folderId;
+    delete sharedDetails.sortIndex;
     projectStore.applySharedProject({
       ...current,
-      ...(payload.details ?? {}),
+      ...sharedDetails,
       ...(payload.overview ?? {}),
       tasks: Array.isArray(payload.tasks) ? payload.tasks : current.tasks,
       events: Array.isArray(payload.events) ? payload.events : current.events,
@@ -176,13 +177,8 @@ export function applyHomePayload(projectId: string, payload: Partial<HomeProject
     if (payload.finance) {
       financeStore.replaceState(projectId, payload.finance);
     }
-    if (payload.timeline) {
-      const incomingHasData =
-        (Array.isArray(payload.timeline.items) && payload.timeline.items.length > 0) ||
-        Boolean(payload.timeline.period?.start || payload.timeline.period?.end);
-      if (incomingHasData || !timelineStore.hasLocalData(projectId)) {
-        timelineStore.replaceState(projectId, payload.timeline);
-      }
+    if (payload.timeline && Array.isArray(payload.timeline.items)) {
+      timelineStore.replaceState(projectId, payload.timeline);
     }
     if (
       (payload.details?.projektStart || payload.details?.projektEnde) &&
@@ -208,7 +204,6 @@ timelineStore.subscribeAll((changedProjectId) => {
     dirty: true,
     dirtyAreas: { ...meta.dirtyAreas, organization: true },
     localSavedAt: Date.now(),
-    localWriteError: null,
   });
   lastFingerprintByProject.set(changedProjectId, payloadFingerprint(changedProjectId));
   publishState(changedProjectId);
@@ -402,6 +397,7 @@ export async function saveHomeProjectDirect(projectId: string): Promise<void> {
       conflict: false,
       updateAvailable: false,
     });
+    await flushPendingStorageDeletions(projectId);
     publishState(projectId, { saving: false, error: null });
   } catch (err) {
     const msg = classifyCloudError(err, "Startseiteninhalte konnten nicht gesichert werden.").message;
@@ -485,7 +481,6 @@ export function ensureHomeProjectSyncSource(projectId: string): () => void {
         dirty: true,
         dirtyAreas: { ...meta.dirtyAreas, details: true },
         localSavedAt: Date.now(),
-        localWriteError: null,
       });
       publishState(projectId);
     }
@@ -504,7 +499,6 @@ export function ensureHomeProjectSyncSource(projectId: string): () => void {
         dirty: true,
         dirtyAreas: { ...meta.dirtyAreas, finance: true },
         localSavedAt: Date.now(),
-        localWriteError: null,
       });
       publishState(projectId);
     }

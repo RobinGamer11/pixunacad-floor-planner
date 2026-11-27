@@ -117,7 +117,8 @@ export function applyOpToScene(
 
   const list = anyScene(scene)[ops.field] as unknown[] | undefined;
   const before = Array.isArray(list) ? list.length : 0;
-  appendSceneObjects(scene, { [ops.field]: [payload] } as never);
+  const entryPayload = ops.field === "infoBoxCategories" ? { ...payload, id: objectId } : payload;
+  appendSceneObjects(scene, { [ops.field]: [entryPayload] } as never);
   const after = anyScene(scene)[ops.field] as unknown[] | undefined;
   if (Array.isArray(after)) {
     // Identität sicherstellen: die Objekt-ID bleibt über alle Geräte gleich.

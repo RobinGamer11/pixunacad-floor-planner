@@ -17,13 +17,11 @@ export function WorkspaceSaveStatus({ projectId, compact }: { projectId?: string
   const homeMeta = projectId ? readHomeMeta(projectId) : null;
   const sourceKeys = getRegisteredSyncSourceKeys(projectId);
   const homeOnly = sourceKeys.includes("home") && !sourceKeys.includes("cad");
-  const local = homeOnly
-    ? homeMeta?.localWriteError
-      ? { ...rawLocal, status: "error" as const, detail: homeMeta.localWriteError, savedAt: homeMeta.localSavedAt ?? rawLocal.savedAt }
-      : homeMeta?.localSavedAt
-        ? { ...rawLocal, status: "saved" as const, savedAt: homeMeta.localSavedAt }
-        : rawLocal
-    : rawLocal;
+  const local = homeMeta?.localWriteError
+    ? { ...rawLocal, status: "error" as const, detail: homeMeta.localWriteError, savedAt: homeMeta.localSavedAt ?? rawLocal.savedAt }
+    : homeOnly && homeMeta?.localSavedAt
+      ? { ...rawLocal, status: "saved" as const, savedAt: homeMeta.localSavedAt }
+      : rawLocal;
   const state = workspaceSaveStatus(local, cloud, projectId);
   const pendingAreas: string[] = [];
   if (homeMeta?.dirtyAreas?.details) pendingAreas.push("Projektangaben");

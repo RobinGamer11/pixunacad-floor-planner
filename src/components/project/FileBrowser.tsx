@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { projectStore, type FileKind, type FileNode, type Project } from "@/lib/projectStore";
 import { DocumentViewer } from "@/components/project/DocumentViewer";
-import { deleteProjectFileFromStorage, resolveProjectFileUrl } from "@/lib/projectFileStorage";
+import { deleteLocalDocumentBlob, queuePendingStorageDeletion, resolveProjectFileUrl, saveLocalDocumentBlob } from "@/lib/projectFileStorage";
 
 const DOCUMENT_DRAG_TYPE = "application/x-pixuna-document-node";
 const ACCEPTED_DOCUMENTS = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
@@ -368,6 +368,7 @@ export function FileBrowser({ project }: Props) {
           window.alert(`„${file.name}“ konnte nicht dauerhaft gespeichert werden. Der verfügbare Browser-Speicher reicht nicht aus.`);
           return;
         }
+        void saveLocalDocumentBlob(project.id, nodeId, file);
         projectStore.sealHistory(project.id);
       };
       reader.readAsDataURL(file);
@@ -898,7 +899,7 @@ export function FileBrowser({ project }: Props) {
                             type="button"
                             className="hover:underline"
                             onClick={() => {
-                              void resolveProjectFileUrl(file).then((url) => {
+                              void resolveProjectFileUrl(file, project.id).then((url) => {
                                 if (!url) { window.alert("Datei konnte nicht aus der Cloud geladen werden."); return; }
                                 const a = document.createElement("a");
                                 a.href = url;
@@ -920,7 +921,8 @@ export function FileBrowser({ project }: Props) {
                             const deleted = projectStore.deleteNode(project.id, "files", file.id);
                             if (deleted) {
                               projectStore.sealHistory(project.id);
-                              void deleteProjectFileFromStorage(file);
+                              queuePendingStorageDeletion(project.id, file);
+                              void deleteLocalDocumentBlob(project.id, file.id);
                             }
                             else showPersistenceError(`„${file.name}“`);
                           }
