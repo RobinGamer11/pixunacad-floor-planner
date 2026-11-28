@@ -36,6 +36,9 @@ vi.mock("@/lib/projectAccess", () => ({
   },
 }));
 
+vi.mock("@/lib/sharedProjectSync", () => ({ hydrateSharedProject: async () => false }));
+vi.mock("@/lib/accountStorage", () => ({ currentAccount: () => "presence-test", accountGeneration: () => 1, sessionIsCurrent: () => true, registerLocalFlusher: () => () => {}, accountRecordKey: (a: string, p: string) => `${a}\u0001${p}` }));
+
 import { CadCollabSession } from "../session";
 
 const app = {

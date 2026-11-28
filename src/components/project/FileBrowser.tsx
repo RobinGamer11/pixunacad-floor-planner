@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/dialog";
 import { projectStore, type FileKind, type FileNode, type Project } from "@/lib/projectStore";
 import { DocumentViewer } from "@/components/project/DocumentViewer";
-import { deleteProjectDocumentNode, importProjectDocument, resolveProjectFileUrl } from "@/lib/projectFileStorage";
+import { deleteProjectDocumentNode, importProjectDocument, resolveProjectFileUrl, releaseProjectFileUrl } from "@/lib/projectFileStorage";
 
 const DOCUMENT_DRAG_TYPE = "application/x-pixuna-document-node";
 const ACCEPTED_DOCUMENTS = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
@@ -883,7 +883,7 @@ export function FileBrowser({ project }: Props) {
 
                     <div className="ml-auto flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] opacity-70 transition-opacity group-hover:opacity-100">
                       <button type="button" onClick={() => startRename(file)} className="hover:underline">Umbenennen</button>
-                      {(file.dataUrl || file.storagePath) && (
+                      {(file.dataUrl || file.localBlob || file.storagePath) && (
                         file.dataUrl ? (
                           <a href={file.dataUrl} download={file.name} className="hover:underline">Herunterladen</a>
                         ) : (
@@ -899,7 +899,8 @@ export function FileBrowser({ project }: Props) {
                                 a.target = "_blank";
                                 a.rel = "noopener noreferrer";
                                 a.click();
-                              }).catch(() => window.alert("Datei konnte nicht aus der Cloud geladen werden."));
+                                window.setTimeout(() => releaseProjectFileUrl(project.id, file.id, url), 30000);
+                              }).catch(err => window.alert(err instanceof Error ? err.message : "Datei konnte nicht geöffnet werden."));
                             }}
                           >
                             Herunterladen

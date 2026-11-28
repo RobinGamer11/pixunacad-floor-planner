@@ -198,7 +198,7 @@ describe("Cloud-Abschluss: vollständige Abläufe mit simulierten Serverbestäti
     const a = await device();
     service.snapshot = JSON.stringify({
       sheets: [{ id: "s", name: "EG", sheetElevationM: 3.2, scaleValue: 50 }], labels: [{ id: "level", name: "Tragwerk" }],
-      scenesById: { s: { segments: [{ id: "line", a: { x: 1, y: 2 }, b: { x: 5, y: 2 }, labelId: "level", heightM: 0.1, objectElevationM: 1.2, pose3D: { rotation: { x: 0, y: 0, z: 0.4 } } }], infoBoxCategories: [{ id: "category", name: "Hinweise" }] } },
+      scenesById: { s: { segments: [{ id: "line", a: { x: 1, y: 2 }, b: { x: 5, y: 2 }, labelId: "level", heightM: 0.1, elevationM: 1.2, pose3D: [1,0,0,0,0,1,0,0,0,0,1,0,0.4,0,0,1] }], infoBoxCategories: [{ id: "category", name: "Hinweise" }] } },
       libraryFolders: [{ id: "libfolder", name: "Möbel" }],
       libraryDefinitions: [{ id: "definition", name: "Stuhl", folderId: "libfolder", geometry: [{ kind: "segment", data: { a: { x: 0, y: 0 }, b: { x: 1, y: 0 } } }], createdAt: 1, updatedAt: 1 }],
       plans: [{ id: "plan", name: "Ausgabe", projections: [{ id: "projection", sourceSheetId: "s", scale: 50, x: 0.12, y: 0.2 }] }],
@@ -226,7 +226,7 @@ describe("Cloud-Abschluss: vollständige Abläufe mit simulierten Serverbestäti
     const session = new CadCollabSession({ projectId: "p", userId: "A", displayName: "Test", app, requestRender: () => {} });
     try {
       await session.start();
-      expect(scenes.get("s")?.segments[0]).toMatchObject({ id: "line", a: { x: 1, y: 2 }, b: { x: 5, y: 2 }, objectElevationM: 1.2 });
+      expect(scenes.get("s")?.segments[0]).toMatchObject({ id: "line", a: { x: 1, y: 2 }, b: { x: 5, y: 2 }, elevationM: 1.2 });
       expect(scenes.get("s")?.infoBoxCategories.some(c => c.id === "category")).toBe(true);
       expect(app.libraryDefinitions).toHaveLength(1); expect(app.libraryFolders).toHaveLength(1);
       expect(fields.sheets).toMatchObject([{ sheetElevationM: 3.2, scaleValue: 50 }]);
@@ -235,6 +235,33 @@ describe("Cloud-Abschluss: vollständige Abläufe mit simulierten Serverbestäti
       expect(scenes.get("plan:plan")?.segments[0]?.id).toBe("export-line");
       expect(b.sync.getProjectAreaSyncState("p", "cad")?.dirty).toBe(false);
     } finally { session.destroy(); }
+  });
+
+  it("übernimmt bewusst leere persönliche Ordner und entfernte Zuordnungen", async () => {
+    const a = await device();
+    localStorage.setItem("pixuna.personal.projectLayout", JSON.stringify({ folders: [{ id: "folder", name: "Bau" }], items: { p: { folderId: "folder", favorite: true } } }));
+    a.project.applyPersonalLayout(); a.project.ensureCloudStub("p", "Haus");
+    localStorage.setItem("pixuna.personal.projectLayout", JSON.stringify({ folders: [], items: { p: { folderId: null, favorite: false } } }));
+    a.project.applyPersonalLayout();
+    expect(a.project.getState().folders).toEqual([]);
+    expect(a.project.getState().projects.find(p => p.id === "p")).toMatchObject({ folderId: null, favorite: false });
+  });
+  it("ordnet einen Organisationsfehler nicht durch einen erfolgreichen Finanzschreibvorgang um", async () => {
+    const a = await device(); a.project.ensureCloudStub("p", "Haus");
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation((key, _value) => { if (key.includes("pixuna.board02")) throw new Error("Organisation nicht gespeichert"); });
+    a.timeline.addItem("p", "task", { title: "Erhalten" }); spy.mockRestore();
+    a.finance.setProjectEstimate("p", 125000);
+    expect(a.home.readHomeMeta("p").areaErrors?.organization).toBe("Organisation nicht gespeichert");
+    expect(a.timeline.getState("p").items[0]?.title).toBe("Erhalten");
+    expect(a.home.readHomeMeta("p").areaErrors?.finance).toBeNull();
+  });
+
+  it("schützt lokale CAD-Löschungen auch bei der Cloud-Blattvorschau", async () => {
+    await device();
+    const { hasUnsavedLocalCad } = await import("./cadCollab/cloudSheetPreview");
+    const { BASELINE_SEP, hashText } = await import("./cloudBaseline");
+    const baseline = new Map([[`s${BASELINE_SEP}segments${BASELINE_SEP}removed`, hashText('{"id":"removed"}')]]);
+    expect(hasUnsavedLocalCad(JSON.stringify({ scenesById: { s: { segments: [] } } }), baseline, true)).toBe(true);
   });
 
 });

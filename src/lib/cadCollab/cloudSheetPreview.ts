@@ -14,8 +14,12 @@
  *    unberührt – CAD gleicht sich beim Öffnen wie gewohnt selbst ab.
  *  - Keine Dauerverbindung: eine Abfrage beim Öffnen/Zurückkehren.
  */
+import { accountGeneration, currentAccount, sessionIsCurrent } from "@/lib/accountStorage";
+import { loadLocalScene } from "@/cad/persist/localScenePersist";
+import { reportProjectSyncSource } from "@/lib/projectSync";
+import { classifyCloudError } from "@/lib/networkClient";
 import { useSyncExternalStore } from "react";
-import { baselineKey, BASELINE_SEP, hashText, hasBaseline, loadBaseline } from "@/lib/cloudBaseline";
+import { baselineKey, BASELINE_SEP, hashText, hasBaseline, loadBaseline, validateBaseline } from "@/lib/cloudBaseline";
 import { projectAccessStore } from "@/lib/projectAccess";
 import { projectStore, type Sheet } from "@/lib/projectStore";
 import { fetchLatestSeq, fetchObjectState } from "./opsRepo";
@@ -87,9 +91,11 @@ export function buildSheetsFromCloud(state: CadObjectOp[]): CloudSheetsResult {
 export function hasUnsavedLocalCad(snapshot: string | null, baseline: Map<string, string>, baselineExists: boolean): boolean {
   const index = indexSnapshot(snapshot);
   let content = 0;
+  const localKeys = new Set<string>();
   for (const [sheetId, kinds] of index) {
     for (const [kind, byId] of kinds) {
       for (const [objectId, json] of byId) {
+        localKeys.add(`${sheetId}${BASELINE_SEP}${kind}${BASELINE_SEP}${objectId}`);
         const isContent = sheetId !== CAD_LIBRARY_SHEET_ID && sheetId !== CAD_STRUCTURE_SHEET_ID;
         if (isContent) content += 1;
         if (!baselineExists) continue;
@@ -97,6 +103,7 @@ export function hasUnsavedLocalCad(snapshot: string | null, baseline: Map<string
       }
     }
   }
+  if (baselineExists && [...baseline.keys()].some(key => !localKeys.has(key))) return true;
   return !baselineExists && content > 0;
 }
 
@@ -137,39 +144,44 @@ const inflight = new Map<string, Promise<void>>();
  * tatsächlich ein neuerer Stand geladen wird.
  */
 export function refreshCadSheetsFromCloud(projectId: string, showLoading = true): Promise<void> {
-  const running = inflight.get(projectId);
+  const key = `${currentAccount()}:${accountGeneration()}:${projectId}`;
+  const running = inflight.get(key);
   if (running) return running;
   const job = run(projectId, showLoading).finally(() => {
-    inflight.delete(projectId);
+    inflight.delete(key);
     setLoading(projectId, false);
   });
-  inflight.set(projectId, job);
+  inflight.set(key, job);
   return job;
 }
 
 async function run(projectId: string, showLoading: boolean): Promise<void> {
   const access = projectAccessStore.accessFor(projectId);
   if (!access.cloud || access.role === null) return;
+  const owner = currentAccount(), epoch = accountGeneration();
   const baseKey = baselineKey("cad", projectId);
-  let snapshot: string | null = null;
-  try { snapshot = localStorage.getItem(`pixuna.cad.${projectId}`); } catch { snapshot = null; }
-  // Eigene ungesicherte CAD-Arbeit: die Mappe zeigt weiterhin diesen Stand.
-  if (hasUnsavedLocalCad(snapshot, loadBaseline(baseKey), hasBaseline(baseKey))) return;
-
-  if (showLoading) setLoading(projectId, true);
   try {
+    validateBaseline(baseKey);
+    const snapshot = (await loadLocalScene(projectId))?.snapshot ?? null;
+    if (!sessionIsCurrent(owner, epoch)) return;
+    if (hasUnsavedLocalCad(snapshot, loadBaseline(baseKey), hasBaseline(baseKey))) return;
+    if (showLoading) setLoading(projectId, true);
     const latestSeq = await fetchLatestSeq(projectId);
+    if (!sessionIsCurrent(owner, epoch)) return;
     const seen = Number(localStorage.getItem(seenKey(projectId)) ?? "0") || 0;
     const cadSeen = Number(localStorage.getItem(`${baseKey}.seq`) ?? "0") || 0;
-    if (latestSeq <= Math.max(seen, cadSeen)) return; // Mappe zeigt bereits diesen Stand
+    if (latestSeq <= Math.max(seen, cadSeen)) return;
     setLoading(projectId, true);
     const state = await fetchObjectState(projectId);
+    if (!sessionIsCurrent(owner, epoch)) return;
+    const latestLocal = (await loadLocalScene(projectId))?.snapshot ?? null;
+    if (!sessionIsCurrent(owner, epoch) || latestLocal !== snapshot) return;
     const built = buildSheetsFromCloud(state);
-    if (!built.sheets.length) return; // leerer Cloudstand ist nie verbindlich
+    if (!built.sheets.length) return;
     applySheets(projectId, built);
     try { localStorage.setItem(seenKey(projectId), String(latestSeq)); } catch { /* entbehrlich */ }
-  } catch {
-    /* offline / Schema fehlt: bisherige Darstellung bleibt */
+  } catch (error) {
+    if (sessionIsCurrent(owner, epoch)) reportProjectSyncSource(projectId, "cad", { error: classifyCloudError(error, "CAD-Cloudstand konnte nicht geprüft werden.").message });
   }
 }
 

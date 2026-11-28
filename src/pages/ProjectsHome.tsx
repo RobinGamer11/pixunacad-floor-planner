@@ -1,3 +1,4 @@
+import { accountGeneration, currentAccount, sessionIsCurrent } from "@/lib/accountStorage";
 import { registerProjectInCloud } from "@/lib/useCloudProjectLifecycle";
 import { WorkspaceSaveStatus } from "@/components/workspace/WorkspaceSaveStatus";
 import { useHomeProjectSync, refreshAllHomeProjectsFromCloud, checkCloudCadHead } from "@/lib/homeProjectSync";
@@ -253,9 +254,11 @@ export default function ProjectsHome() {
     if (cloudRefreshInflight.current) return cloudRefreshInflight.current;
     setCloudRefreshing(true);
     setCloudRefreshFeedback(null);
+    const owner = currentAccount(), epoch = accountGeneration();
     const run = (async () => {
       try {
         await projectAccessStore.reload();
+        if (!sessionIsCurrent(owner, epoch)) return;
         const accState = projectAccessStore.getState();
         if (accState.error) throw new Error(accState.error);
         accState.byProject.forEach((access, id) => {
@@ -276,6 +279,7 @@ export default function ProjectsHome() {
         });
         if (activeCloudIds.length > 0) {
           const { ok, failed } = await refreshAllHomeProjectsFromCloud(activeCloudIds, 4);
+          if (!sessionIsCurrent(owner, epoch)) return;
           if (failed.length > 0) {
             setCloudRefreshFeedback({
               kind: "error",
@@ -283,10 +287,11 @@ export default function ProjectsHome() {
             });
             return;
           }
-          await checkCloudCadHead(selected.id);
+          if (selected) await checkCloudCadHead(selected.id);
         }
-        setCloudRefreshFeedback({ kind: "ok", text: "Aktualisiert" });
+        if (sessionIsCurrent(owner, epoch)) setCloudRefreshFeedback({ kind: "ok", text: "Aktualisiert" });
       } catch (err) {
+        if (!sessionIsCurrent(owner, epoch)) return;
         setCloudRefreshFeedback({
           kind: "error",
           text: err instanceof Error ? err.message : "Aktualisierung aus der Cloud fehlgeschlagen.",

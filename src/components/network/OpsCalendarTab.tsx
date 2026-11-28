@@ -42,14 +42,14 @@ const SOFT = "hsl(var(--ink-soft))";
 /** Beiträge kommen aus der bestehenden Board-Datenbasis – keine zweite Speicherung. */
 function useProjectItems(projectIds: string[]) {
   const key = projectIds.join("|");
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     const ids = key ? key.split("|") : [];
     const offs = ids.map((id) => subscribeTimeline(id, () => setTick((t) => t + 1)));
     return () => offs.forEach((off) => off());
   }, [key]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => (key ? key.split("|") : []).map((id) => ({ id, state: timelineStore.getState(id) })), [key, setTick]);
+  return useMemo(() => (key ? key.split("|") : []).map((id) => ({ id, state: timelineStore.getState(id) })), [key, tick]);
 }
 
 /** Stabile Projektfarbe (identisch zur Projektliste). */

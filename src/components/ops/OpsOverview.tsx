@@ -29,6 +29,7 @@ import {
   type TlPriority,
   type TlStatus,
 } from "@/lib/timelineStore";
+import { WorkspaceSaveStatus } from "@/components/workspace/WorkspaceSaveStatus";
 import { OpsActionBar } from "@/components/ops/OpsActionBar";
 import { OpsCalendarTab } from "@/components/network/OpsCalendarTab";
 import { OPS_VIEWS, type OpsView } from "@/components/ops/OpsViews";
@@ -647,13 +648,15 @@ export function OpsOverview({
                 {projects.map((p) => {
                   const on = activeIds.has(p.id);
                   return (
-                    <label key={p.id}
-                           className="flex min-h-[44px] cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-[12px]"
-                           style={{ borderColor: on ? GOLD : LINE }}>
-                      <input type="checkbox" checked={on} onChange={() => toggleProject(p.id)} className="accent-foreground" />
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: projectColor(p.id) }} />
-                      <span className="truncate">{p.name}</span>
-                    </label>
+                    <div key={p.id} className="flex min-h-[44px] items-center gap-2 rounded-lg border px-3 py-2 text-[12px]"
+                         style={{ borderColor: on ? GOLD : LINE }}>
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2">
+                        <input type="checkbox" checked={on} onChange={() => toggleProject(p.id)} className="accent-foreground" />
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: projectColor(p.id) }} />
+                        <span className="truncate">{p.name}</span>
+                      </label>
+                      <WorkspaceSaveStatus projectId={p.id} compact />
+                    </div>
                   );
                 })}
                 {!projects.length && <div className="text-[12px]" style={{ color: SOFT }}>Keine Projekte.</div>}

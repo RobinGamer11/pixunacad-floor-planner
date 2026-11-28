@@ -1,13 +1,15 @@
 # Roadmap – Export/Muster-Auftrag (Basis bdffd521)
 ## Cloud-Abschluss (Basis 69cde11a)
-- [ ] Kontogetrennte Dokumentablage und bestätigte lokale Speicherung
-- [ ] Revisionsgebundene, serverseitig referenzgeprüfte Dateibereinigung
-- [ ] Persönliche Struktur beim Laden und bei Cloudplatzhaltern anwenden
-- [ ] Berechtigungsabhängiges Laden, Zusammenfassung und sichtbare Fehler
-- [ ] Dauerhafte Änderungen, Bereichsfehler und vollständige Sicherung
-- [ ] CAD-Baselines, Fehler und vollständige Wiederherstellung prüfen
-- [ ] Ablaufregressionen, saubere Installation und Abschlussnachweis
-- [ ] Angemeldete Zweigeräte-Abnahme und SQL-Anwendung: externe Sitzung/Cloudzugriff erforderlich
+- [x] Kontogetrennte Dokumentablage und bestätigte lokale Speicherung
+- [x] Revisionsgebundene Dateibereinigung implementiert; SQL lokal zweimal und mit Berechtigungs-/Referenz-/Quotentests geprüft
+- [x] Persönliche Struktur beim Laden und bei Cloudplatzhaltern anwenden, bewusst leere Zuordnungen übernehmen
+- [x] Berechtigungsabhängiges Laden, Anfragezusammenfassung und sichtbare Fehler
+- [x] Dauerhafte Änderungen, Bereichsfehler, allgemeine Organisation und vollständige Sicherung
+- [x] CAD-Baselines, Teilbestätigungen, Löschzustände, Bibliothek und Export-Wiederherstellung regressionsgeprüft
+- [x] 83 Regressionen, saubere npm-ci-Installation, gezieltes Lint, automatische Typ-/Produktionsprüfung und echte IndexedDB-/Offline-Browserprüfung
+- [ ] SQL-Anwendung in der bestehenden Cloud: manueller Anwendungsschritt für 20261127195500_document_references.sql erforderlich
+- [ ] Angemeldete Cloud-/Zweigeräte-Abnahme: keine nutzbare Testsitzung verfügbar
+- [ ] GitHub-main-Übertragung und Vercel-Abnahme des Abschlusscommits: nach Plattformübertragung zu verifizieren
 ## Kontogetrennte Speicherung und Projektöffnung (Basis 0f623ecd)
 - [x] Lokale Kontotrennung einschließlich CAD, offener Änderungen und Abgleichsstände; unklare Altbestände erhalten
 - [x] Einstellungs-Allowlist und sichere einmalige Altübernahme

@@ -79,7 +79,9 @@ export function readHomeMeta(projectId: string): HomeSyncMeta {
   try {
     const raw = localStorage.getItem(META_KEY(projectId));
     if (raw) return JSON.parse(raw) as HomeSyncMeta;
-  } catch {}
+  } catch {
+    return { baseRevision: 0, lastSavedAt: null, localSavedAt: null, dirty: true, conflict: false, updateAvailable: false, loadStatus: "error", localWriteError: "Lokaler Speicherstatus konnte nicht gelesen werden." };
+  }
   return { baseRevision: 0, lastSavedAt: null, localSavedAt: null, dirty: false, conflict: false, updateAvailable: false };
 }
 

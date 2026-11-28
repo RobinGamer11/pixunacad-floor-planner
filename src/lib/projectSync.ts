@@ -209,7 +209,7 @@ export async function saveProjectToCloud(projectId: string): Promise<void> {
     try {
       await syncLocalCadToCloud(projectId);
       assertSession();
-      reportProjectSyncSource(projectId, "cad", { ready: true, mode: "local", lastSavedAt: Date.now(), dirty: false, error: null });
+      reportProjectSyncSource(projectId, "cad", { ready: true, mode: "local", lastSavedAt: Date.now(), dirty: false, error: null, conflict: false, updateAvailable: false, deviceOnly: false });
     } catch (err) {
       if (sessionIsCurrent(owner, epoch)) reportProjectSyncSource(projectId, "cad", { ready: true, mode: "local", dirty: true, error: err instanceof Error ? err.message : "CAD-Sicherung fehlgeschlagen." });
       throw err;
