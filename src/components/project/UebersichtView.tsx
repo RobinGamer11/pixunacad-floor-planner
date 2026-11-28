@@ -53,6 +53,7 @@ function ProjectImageCard({ project }: { project: Project }) {
   // werden über `projectThumbnailSrc` auf das Standardbild aufgelöst.
   const legacyThumb = isLegacyAssetThumbnail(project.thumbnail);
   const hasImage = legacyThumb || !isPlaceholderThumbnail(project.thumbnail);
+  const imageSrc = projectThumbnailSrc(project.thumbnail, project.projektTyp);
 
   const pick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -67,9 +68,9 @@ function ProjectImageCard({ project }: { project: Project }) {
   return (
     <section className="rounded-2xl overflow-hidden relative" style={CARD}>
       <div className="relative aspect-[16/10] w-full" style={{ background: "hsl(var(--surface-muted))" }}>
-        {hasImage ? (
+        {imageSrc ? (
           <img
-            src={projectThumbnailSrc(project.thumbnail, project.projektTyp)}
+            src={imageSrc}
             onError={(e) => thumbnailErrorFallback(e, project.projektTyp)}
             alt={`Projektbild ${project.name}`}
             className="w-full h-full object-cover"

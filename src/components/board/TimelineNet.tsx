@@ -22,7 +22,7 @@ function kindIcon(kind: TlKind, size = 12) {
 }
 
 export function TimelineNet({
-  projectName, items, categories, statuses, selectedId, onSelect, compact = false, fitSignal,
+  projectName, items, categories, statuses, selectedId, onSelect, compact = false, fitSignal, renderItemActions,
 }: {
   projectName: string;
   items: TlItem[];
@@ -30,6 +30,7 @@ export function TimelineNet({
   statuses: TlStatus[];
   selectedId?: string | null;
   onSelect?: (id: string) => void;
+  renderItemActions?: (id: string) => React.ReactNode;
   /** Kompakte, nicht interaktive Vorschau (Startseite). */
   compact?: boolean;
   /** Erhöhen setzt Zoom und Position zurück („Ansicht einpassen“). */
@@ -253,6 +254,8 @@ export function TimelineNet({
           })}
         </g>
       </svg>
+
+      {!compact && renderItemActions && layout.nodes.filter((node) => node.item).map((node) => <div key={`actions-${node.id}`} className="absolute rounded-md bg-background text-foreground" style={{ left: cx + node.x * view.k - 46, top: cy + (node.y + node.r + 30) * view.k }} onPointerDown={(event) => event.stopPropagation()}>{renderItemActions(node.id)}</div>)}
 
       {!items.length && (
         <div className="absolute inset-0 grid place-items-center text-xs" style={{ color: "#6f665e" }}>

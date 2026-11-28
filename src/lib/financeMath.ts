@@ -195,7 +195,12 @@ export function computeProcessSummary(
   let unassignedPrepayCents = 0;
 
   for (const pay of payments) {
-    const c = toCents(pay.amount || 0);
+    const invoice = positions.find((position) => position.id === pay.invoiceId && position.type === "invoice");
+    const rates = new Set(positions.filter((position) => position.status !== "cancelled" && position.status !== "rejected" && (position.type === "invoice" || position.type === "order") && typeof position.taxRate === "number").map((position) => position.taxRate));
+    const rate = pay.taxRate ?? invoice?.taxRate ?? (rates.size === 1 ? [...rates][0] : null);
+    const converted = resolvePositionCents({ amount: pay.amount, amountBasis: pay.amountBasis ?? "gross", taxRate: rate }, taxDisplay);
+    if (converted.missingTax) hasMissingTax = true;
+    const c = converted.cents;
     paidTotalCents += c;
     if (pay.invoiceId) {
       paidByInvoice.set(pay.invoiceId, (paidByInvoice.get(pay.invoiceId) ?? 0) + c);
@@ -446,4 +451,20 @@ export function evaluateBudgetStatus(
 
 export function formatMoney(amount: number, currency = "EUR"): string {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(amount || 0);
+}
+
+/** Compare in the recorded budget basis; a budget without a tax rate is never arbitrarily converted. */
+export function computeBudgetComparison(state: FinanceState, kind: "project" | "cost") {
+  const basis = kind === "cost" ? state.costBudgetBasis ?? "gross" : state.budgetBasis ?? "gross";
+  const summary = computeScopeSummary(state, null, basis);
+  const amount = kind === "cost" ? summary.costBudgetAmount : summary.budgetAmount;
+  return {
+    basis, amount,
+    paid: summary.expense.paidTotal,
+    expected: summary.expense.expectedTotal,
+    unpaidBudget: amount === null ? null : fromCents(toCents(amount) - toCents(summary.expense.paidTotal)),
+    forecastDifference: amount === null ? null : fromCents(toCents(amount) - toCents(summary.expense.expectedTotal)),
+    provisional: summary.expense.isProvisional,
+    missingTax: summary.expense.hasMissingTax,
+  };
 }

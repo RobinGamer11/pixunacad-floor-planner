@@ -16,6 +16,8 @@
  * `time_entries`). Geräte/Werkzeuge und Abwesenheiten sind aus der
  * Oberfläche entfernt.
  */
+import { ContributionActions } from "./ContributionActions";
+import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Clock, Filter as FilterIcon, Layers, ListChecks } from "lucide-react";
 import {
@@ -456,6 +458,7 @@ export function OpsOverview({
           onToggleProject={toggleProject}
           calendarDefaultRange="week"
           onEditItem={openItem}
+          onEditContribution={(projectId, itemId) => setEditing({ projectId, itemId })}
           onSelectTime={selectTime}
           selection={selection}
           view={view}
@@ -550,10 +553,8 @@ export function OpsOverview({
                 {(showAllItems ? filteredRows : filteredRows.slice(0, 8)).map((r) => {
                   const on = isItemSelected(selection, r.projectId, r.item.id);
                   return (
-                    <button
+                    <div
                       key={r.id}
-                      type="button"
-                      onClick={() => openItem(r.projectId, r.item.id)}
                       className="flex min-h-[52px] items-center gap-3 rounded-lg border px-3 py-2 text-left"
                       style={{
                         borderColor: on ? GOLD : LINE,
@@ -561,8 +562,8 @@ export function OpsOverview({
                       }}
                     >
                       <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: r.catColor }} />
-                      <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-[13px] ${r.done ? "line-through" : ""}`}>
+                      <Button variant="ghost" className="h-auto min-w-0 flex-1 flex-col items-start whitespace-normal p-0 text-left" onClick={() => openItem(r.projectId, r.item.id)}>
+                        <span className={`block max-w-full truncate text-[13px] ${r.done ? "line-through" : ""}`}>
                           {r.item.title || "Ohne Titel"}
                         </span>
                         <span className="block truncate text-[11px]" style={{ color: SOFT }}>
@@ -570,9 +571,10 @@ export function OpsOverview({
                             r.item.startTime ? `${r.item.startTime}${r.item.endTime ? `–${r.item.endTime}` : ""}` : "",
                             r.people].filter(Boolean).join(" · ")}
                         </span>
-                      </span>
+                      </Button>
+                      <ContributionActions projectId={r.projectId} itemId={r.item.id} onEdit={() => setEditing({ projectId: r.projectId, itemId: r.item.id })} onDeleted={() => { if (on) setSelection(null); }} />
                       {r.prioLabel && (
-                        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px]"
+                        <span className="hidden shrink-0 rounded px-1.5 py-0.5 text-[10px] md:inline"
                               style={{ border: `1px solid ${LINE}`, color: SOFT }}>
                           {r.prioLabel}
                         </span>
@@ -583,7 +585,7 @@ export function OpsOverview({
                           {r.statusLabel}
                         </span>
                       )}
-                    </button>
+                    </div>
                   );
                 })}
                 {!filteredRows.length && (

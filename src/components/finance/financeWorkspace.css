@@ -1,0 +1,17 @@
+.finance-workspace { container-type: inline-size; min-width: 0; }
+.finance-budget-grid, .finance-kpis { display: grid; grid-template-columns: 1fr; gap: .75rem; }
+.finance-fields, .finance-payment-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.finance-workspace input, .finance-workspace select { min-width: 0; max-width: 100%; }
+.finance-amount-field { min-width: 0; }
+.finance-detail-summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.finance-process-tail { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-width: 0; }
+@container (min-width: 540px) {
+  .finance-budget-grid, .finance-kpis, .finance-fields, .finance-payment-form, .finance-detail-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .finance-amount-field, .finance-forecast-field { grid-column: 1 / -1; }
+}
+@container (min-width: 1000px) {
+  .finance-budget-grid, .finance-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .finance-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .finance-amount-field { grid-column: span 2; }
+  .finance-detail-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

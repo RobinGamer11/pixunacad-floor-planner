@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 
 /**
@@ -16,6 +17,7 @@ export interface CalEntry {
   sub?: string;
   done?: boolean;
   onOpen?: () => void;
+  actions?: React.ReactNode;
 }
 
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -110,27 +112,13 @@ export function RangeCalendar({
         : cursor.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
 
   const Chip = ({ e, big }: { e: CalEntry; big?: boolean }) => (
-    <span
-      key={e.id}
-      title={e.sub ? `${e.title} · ${e.sub}` : e.title}
-      onClick={(ev) => {
-        if (!e.onOpen) return;
-        ev.stopPropagation();
-        e.onOpen();
-      }}
-      className={`rounded-[4px] px-1 truncate ${big ? "text-[11px] leading-[18px]" : "text-[9px] leading-[13px]"} ${
-        e.onOpen ? "cursor-pointer" : ""
-      }`}
-      style={{
-        background: e.color,
-        color: "hsl(var(--surface))",
-        opacity: e.done ? 0.55 : 1,
-        textDecoration: e.done ? "line-through" : undefined,
-      }}
-    >
-      {e.title || "Eintrag"}
-      {big && e.sub ? ` · ${e.sub}` : ""}
-    </span>
+    <div className="flex min-w-0 flex-wrap items-center gap-1 rounded border border-border bg-background" onClick={(event) => event.stopPropagation()}>
+      <Button variant="ghost" className={`h-auto min-h-8 min-w-0 flex-1 justify-start whitespace-normal p-1 text-left ${big ? "text-xs" : "text-[10px]"}`} title={e.sub ? `${e.title} · ${e.sub}` : e.title} onClick={e.onOpen}>
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: e.color }} />
+        <span className={`min-w-0 break-words ${e.done ? "line-through" : ""}`}>{e.title || "Eintrag"}{big && e.sub ? ` · ${e.sub}` : ""}</span>
+      </Button>
+      {e.actions}
+    </div>
   );
 
   const DayCell = ({ day, height }: { day: Date; height: number }) => {
@@ -140,11 +128,13 @@ export function RangeCalendar({
     const isToday = s === todayIso;
     const max = height > 90 ? 6 : 2;
     return (
-      <button
+      <div
+        role="group"
+        aria-label={s}
         onClick={(e) => onSelectDate(s, e.shiftKey || e.metaKey || e.ctrlKey)}
         className="flex flex-col items-stretch rounded-md relative p-1 gap-0.5 text-left overflow-hidden"
         style={{
-          height,
+          minHeight: height,
           background: isSelected
             ? "hsl(var(--accent-gold) / 0.2)"
             : list.length
@@ -158,14 +148,14 @@ export function RangeCalendar({
           fontWeight: isToday || isSelected ? 600 : undefined,
         }}
       >
-        <span className="leading-none text-[11px]">{day.getDate()}</span>
+        <Button variant="ghost" className="h-7 justify-start p-0 text-[11px]" onClick={(event) => { event.stopPropagation(); onSelectDate(s, event.shiftKey || event.metaKey || event.ctrlKey); }}>{day.getDate()}</Button>
         {list.slice(0, max).map((e) => (
           <Chip key={e.id} e={e} />
         ))}
         {list.length > max && (
           <span className="text-[9px] leading-none text-muted-foreground">+{list.length - max}</span>
         )}
-      </button>
+      </div>
     );
   };
 

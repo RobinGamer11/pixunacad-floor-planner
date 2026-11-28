@@ -1,3 +1,4 @@
+import { ContributionActions } from "@/components/ops/ContributionActions";
 /**
  * Organisationsansicht mit Zeitachse.
  *
@@ -70,6 +71,7 @@ export function OpsCalendarTab({
   projectFilterAsDropdown = false,
   calendarDefaultRange = "month",
   onEditItem,
+  onEditContribution,
   onSelectTime,
   selection,
   view: viewProp,
@@ -96,6 +98,7 @@ export function OpsCalendarTab({
   calendarDefaultRange?: "month" | "week" | "day";
   /** Beitrag zum Bearbeiten öffnen. */
   onEditItem?: (projectId: string, itemId: string) => void;
+  onEditContribution?: (projectId: string, itemId: string) => void;
   /** Zeiterfassung auswählen (gemeinsamer Auswahlzustand). */
   onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
   /** Gemeinsame Auswahl – in allen Ansichten gleich hervorgehoben. */
@@ -181,6 +184,8 @@ export function OpsCalendarTab({
           const statusId = effectiveStatusId(item);
           const color = board.state.statuses.find((s) => s.id === statusId)?.color ?? "#c9a227";
           const open = onEditItem ? () => onEditItem(board.id, item.id) : undefined;
+          const edit = onEditContribution ? () => onEditContribution(board.id, item.id) : open;
+          const actions = edit ? <ContributionActions projectId={board.id} itemId={item.id} onEdit={edit} /> : undefined;
 
           // Projektzeitraum: nur Start- und Endmarkierung, kein Eintrag an
           // jedem Tag dazwischen. Gewöhnliche Beiträge bleiben unverändert.
@@ -188,10 +193,10 @@ export function OpsCalendarTab({
             const start = item.startDate;
             const end = item.endDate || item.startDate;
             if (start) {
-              out.push({ id: `period-start-${board.id}-${item.id}`, date: start, title: "Projektstart", sub: board.name, color, onOpen: open });
+              out.push({ id: `period-start-${board.id}-${item.id}`, date: start, title: "Projektstart", sub: board.name, color, onOpen: open, actions });
             }
             if (end && end !== start) {
-              out.push({ id: `period-end-${board.id}-${item.id}`, date: end, title: "Projektende", sub: board.name, color, onOpen: open });
+              out.push({ id: `period-end-${board.id}-${item.id}`, date: end, title: "Projektende", sub: board.name, color, onOpen: open, actions });
             }
             continue;
           }
@@ -204,6 +209,7 @@ export function OpsCalendarTab({
               sub: board.name,
               color,
               onOpen: open,
+              actions,
             });
           }
         }
@@ -211,7 +217,7 @@ export function OpsCalendarTab({
     }
 
     return out;
-  }, [times.entries, times.myId, peopleById, projectNames, showTimes, personFilter, filteredBoards, showItems, onEditItem]);
+  }, [times.entries, times.myId, peopleById, projectNames, showTimes, personFilter, filteredBoards, showItems, onEditItem, onEditContribution]);
 
   /** Dieselben Zeiterfassungen als Zeitspannen für Ansichtstrahl und Gantt. */
   const timeMarks: OpsTimeMark[] = useMemo(() => {
@@ -346,13 +352,13 @@ export function OpsCalendarTab({
         />
       )}
       {view === "ray" && (
-        <OpsRay boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onSelectTime={onSelectTime} />
+        <OpsRay boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onEditItem={onEditContribution} onSelectTime={onSelectTime} />
       )}
       {view === "net" && (
-        <OpsNet boards={filteredBoards} selection={selection} onSelectItem={onEditItem} />
+        <OpsNet boards={filteredBoards} selection={selection} onSelectItem={onEditItem} onEditItem={onEditContribution} />
       )}
       {view === "gantt" && (
-        <OpsGantt boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onSelectTime={onSelectTime} />
+        <OpsGantt boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onEditItem={onEditContribution} onSelectTime={onSelectTime} />
       )}
     </div>
   );

@@ -31,6 +31,8 @@ export interface FinanceNode {
   direction?: FinanceDirection;
   /** Auftraggeber, Auftragnehmer oder Geschäftspartner. */
   partner?: string;
+  /** Stable customer-process reference for analysis only; never changes the area hierarchy. */
+  customerProcessId?: string | null;
   /** Bewusst manuell festgelegte Gesamtprognose (ersetzt automatischen Vorschlag). */
   manualForecast?: number | null;
   /** Optionales Bereichsbudget (nur für Bereiche). */
@@ -70,6 +72,8 @@ export interface FinancePayment {
   invoiceId?: string | null;
   date: string; // YYYY-MM-DD
   amount: number; // tatsächlich gezahlter/erhaltener Betrag (immer positiv)
+  amountBasis?: TaxBasis;
+  taxRate?: number | null;
   reference: string;
   note: string;
 }
@@ -284,7 +288,7 @@ export const financeStore = {
         if (n.parentId && ids.has(n.parentId) && !ids.has(n.id)) { ids.add(n.id); grew = true; }
       }
     }
-    s.nodes = s.nodes.filter((n) => !ids.has(n.id));
+    s.nodes = s.nodes.filter((n) => !ids.has(n.id)).map((n) => ids.has(n.customerProcessId ?? "") ? { ...n, customerProcessId: null } : n);
     s.positions = s.positions.filter((p) => !ids.has(p.nodeId));
     s.payments = (s.payments ?? []).filter((pay) => !ids.has(pay.nodeId));
     write(projectId, s);

@@ -3,6 +3,10 @@
  * (`timelineStore`). Änderungen sind sofort projektbezogen und
  * projektübergreifend sichtbar, weil kein zweiter Datensatz entsteht.
  */
+import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useProjectReadOnly, projectAccessStore } from "@/lib/projectAccess";
+import { deleteContribution } from "@/lib/contributionActions";
 import { useEffect, useMemo, useState } from "react";
 import { Modal, Field, Actions, inputCls, LINE, SOFT } from "@/components/ops/OpsActionBar";
 import { subscribeTimeline, timelineStore, type TlItem } from "@/lib/timelineStore";
@@ -20,6 +24,7 @@ export function OpsItemEditDialog({
   itemId: string;
   onClose: () => void;
 }) {
+  const readOnly = useProjectReadOnly(projectId);
   const [tick, setTick] = useState(0);
   useEffect(() => subscribeTimeline(projectId, () => setTick((t) => t + 1)), [projectId]);
 
@@ -65,6 +70,7 @@ export function OpsItemEditDialog({
     setAssignees((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const save = () => {
+    if (!projectAccessStore.canEdit(projectId)) { setError("Keine Schreibberechtigung für dieses Projekt."); return; }
     if (!title.trim()) { setError("Bitte einen Namen angeben."); return; }
     if (endDate && startDate && endDate < startDate) { setError("Das Ende darf nicht vor dem Beginn liegen."); return; }
     timelineStore.updateItem(projectId, itemId, {
@@ -77,15 +83,15 @@ export function OpsItemEditDialog({
       statusId,
       statusManual: true,
       done: statusId === "done",
+      fresh: true,
       assignees,
     });
-    timelineStore.markFresh(projectId, itemId);
     onClose();
   };
 
   return (
     <Modal title={`Beitrag bearbeiten${projectName ? ` · ${projectName}` : ""}`} onClose={onClose}>
-      <div className="flex flex-col gap-2">
+      <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-2">
         <Field label="Name">
           <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
@@ -144,9 +150,10 @@ export function OpsItemEditDialog({
           Erfasste Arbeitszeit für diesen Beitrag: <span className="tabular-nums">{formatMinutes(bookedMinutes)}</span>
         </div>
 
+        <Button type="button" variant="outline" className="min-h-11 text-destructive" onClick={() => { if (deleteContribution(projectId, itemId)) onClose(); }}><Trash2 /> Beitrag löschen</Button>
         <Actions busy={false} onSave={save} onClose={onClose} />
         {error && <div className="text-[11px]" style={{ color: "#ef4444" }}>{error}</div>}
-      </div>
+      </fieldset>
     </Modal>
   );
 }

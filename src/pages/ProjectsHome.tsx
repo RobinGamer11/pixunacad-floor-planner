@@ -1597,7 +1597,7 @@ function ProjectCard({
             transformStyle: "preserve-3d",
           }}
         >
-          {p.thumbnail && (
+          {(
             <img src={projectThumbnailSrc(p.thumbnail, p.projektTyp)} onError={(e) => thumbnailErrorFallback(e, p.projektTyp)} alt="" className="w-full h-full object-cover" />
           )}
         </div>
@@ -2895,7 +2895,7 @@ function TrashView({ activeCount }: { activeCount: number }) {
             {trashed.map((p) => (
               <div key={p.id} className="flex items-center gap-3 p-3" style={{ borderColor: "hsl(var(--hairline))" }}>
                 <div className="h-10 w-10 rounded-md overflow-hidden shrink-0" style={{ background: "hsl(var(--surface-muted))" }}>
-                  {p.thumbnail && <img src={projectThumbnailSrc(p.thumbnail, p.projektTyp)} onError={(e) => thumbnailErrorFallback(e, p.projektTyp)} alt="" className="h-full w-full object-cover" />}
+                  {<img src={projectThumbnailSrc(p.thumbnail, p.projektTyp)} onError={(e) => thumbnailErrorFallback(e, p.projektTyp)} alt="" className="h-full w-full object-cover" />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-medium truncate">{p.name}</div>

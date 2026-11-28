@@ -1,3 +1,4 @@
+import { ContributionActions } from "./ContributionActions";
 /**
  * Zusätzliche Organisationsansichten (Ansichtstrahl, Projektnetz, Gantt).
  *
@@ -47,6 +48,7 @@ export interface OpsViewProps {
   times?: OpsTimeMark[];
   selection?: OpsSelection;
   onSelectItem?: (projectId: string, itemId: string) => void;
+  onEditItem?: (projectId: string, itemId: string) => void;
   onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
 }
 
@@ -73,7 +75,7 @@ function Empty({ text }: { text: string }) {
  * Klassischer Ansichtstrahl je Projekt – dieselbe Optik wie im Board,
  * ergänzt um Zoom und Verschieben.
  */
-export function OpsRay({ boards, times = [], selection, onSelectItem, onSelectTime }: OpsViewProps) {
+export function OpsRay({ boards, times = [], selection, onSelectItem, onSelectTime, onEditItem = onSelectItem }: OpsViewProps) {
   const timesByProject = useMemo(() => {
     const map = new Map<string, OpsTimeMark[]>();
     for (const t of times) {
@@ -101,6 +103,7 @@ export function OpsRay({ boards, times = [], selection, onSelectItem, onSelectTi
             }))}
             selectedItemId={selection && selection.kind === "item" && selection.projectId === b.id ? selection.itemId : null}
             selectedTimeId={selection && selection.kind === "time" ? selection.entryId : null}
+            renderItemActions={onEditItem ? (id) => <ContributionActions projectId={b.id} itemId={id} onEdit={() => onEditItem(b.id, id)} /> : undefined}
             onSelectItem={(id) => onSelectItem?.(b.id, id)}
             onSelectTime={(id) => {
               const mark = (timesByProject.get(b.id) ?? []).find((t) => t.id === id);
@@ -116,7 +119,7 @@ export function OpsRay({ boards, times = [], selection, onSelectItem, onSelectTi
 
 /* -------------------------------------------------------------- Projektnetz */
 
-export function OpsNet({ boards, selection, onSelectItem }: OpsViewProps) {
+export function OpsNet({ boards, selection, onSelectItem, onEditItem = onSelectItem }: OpsViewProps) {
   const [fitSignal, setFitSignal] = useState(0);
   if (!boards.length) return <Empty text="Keine Projekte im aktuellen Filter." />;
   return (
@@ -144,6 +147,7 @@ export function OpsNet({ boards, selection, onSelectItem }: OpsViewProps) {
               statuses={b.state.statuses}
               fitSignal={fitSignal}
               selectedId={selection && selection.kind === "item" && selection.projectId === b.id ? selection.itemId : null}
+              renderItemActions={onEditItem ? (id) => <ContributionActions projectId={b.id} itemId={id} onEdit={() => onEditItem(b.id, id)} /> : undefined}
               onSelect={(id) => onSelectItem?.(b.id, id)}
             />
           </div>
@@ -155,7 +159,7 @@ export function OpsNet({ boards, selection, onSelectItem }: OpsViewProps) {
 
 /* ------------------------------------------------------------------- Gantt */
 
-export function OpsGantt({ boards, times = [], selection, onSelectItem, onSelectTime }: OpsViewProps) {
+export function OpsGantt({ boards, times = [], selection, onSelectItem, onSelectTime, onEditItem = onSelectItem }: OpsViewProps) {
   const rows = useMemo(() => {
     const out: {
       key: string; projectId: string; itemId?: string; entryId?: string; label: string;
@@ -226,10 +230,12 @@ export function OpsGantt({ boards, times = [], selection, onSelectItem, onSelect
               ? isTimeSelected(selection ?? null, r.entryId ?? "")
               : isItemSelected(selection ?? null, r.projectId, r.itemId ?? "");
             return (
-              <button
+              <div
                 key={r.key}
-                type="button"
-                onClick={() => (r.time ? onSelectTime?.(r.projectId, r.entryId!, r.itemId) : onSelectItem?.(r.projectId, r.itemId!))}
+                role="button"
+                tabIndex={0}
+                onClick={() => { if (r.time && r.entryId) onSelectTime?.(r.projectId, r.entryId, r.itemId); else if (r.itemId) onSelectItem?.(r.projectId, r.itemId); }}
+                onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); if (r.time && r.entryId) onSelectTime?.(r.projectId, r.entryId, r.itemId); else if (r.itemId) onSelectItem?.(r.projectId, r.itemId); } }}
                 className="flex items-center gap-2 rounded text-left"
                 style={{ background: active ? "hsl(var(--surface-muted))" : "transparent" }}
                 title={`${r.label} · ${r.project} · ${fmt(r.from)} – ${fmt(r.to)}`}
@@ -253,7 +259,8 @@ export function OpsGantt({ boards, times = [], selection, onSelectItem, onSelect
                     }}
                   />
                 </span>
-              </button>
+                {!r.time && r.itemId && onEditItem && <ContributionActions projectId={r.projectId} itemId={r.itemId} onEdit={() => { if (r.itemId) onEditItem(r.projectId, r.itemId); }} />}
+              </div>
             );
           })}
         </div>

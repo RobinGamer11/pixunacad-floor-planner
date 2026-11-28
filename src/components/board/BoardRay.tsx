@@ -34,6 +34,7 @@ interface Props {
   selectedItemId?: string | null;
   selectedTimeId?: string | null;
   onSelectItem?: (id: string) => void;
+  renderItemActions?: (id: string) => React.ReactNode;
   onSelectTime?: (id: string) => void;
   /** Zähler: erhöht sich, wenn die Ansicht eingepasst werden soll. */
   fitSignal?: number;
@@ -43,7 +44,7 @@ const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 export function BoardRay({
   items, categories, times = [], height = 420,
-  selectedItemId, selectedTimeId, onSelectItem, onSelectTime, fitSignal = 0,
+  selectedItemId, selectedTimeId, onSelectItem, onSelectTime, fitSignal = 0, renderItemActions,
 }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(900);
@@ -217,6 +218,7 @@ export function BoardRay({
                 <text x={x0 + r + 6} y={cyi + 4} fontSize={11} fill={active ? "#fff" : "#cdc4bb"}>
                   {(i.title || "Beitrag").slice(0, 28)}
                 </text>
+                {renderItemActions && <foreignObject x={x0 + r + 6} y={cyi + 10} width={96} height={48}><div className="rounded-md bg-background text-foreground">{renderItemActions(i.id)}</div></foreignObject>}
               </g>
             );
           })}

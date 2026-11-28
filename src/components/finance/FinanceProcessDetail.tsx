@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+import { useProjectReadOnly } from "@/lib/projectAccess";
 import React, { useState } from "react";
 import {
   ArrowLeft, Plus, Trash2, CheckCircle2, CreditCard, FileText, Pencil, RotateCcw,
@@ -54,6 +56,7 @@ const FORECAST_SOURCE_LABEL = {
 };
 
 export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, onBack }) => {
+  const readOnly = useProjectReadOnly(projectId);
   const dir: FinanceDirection = node.direction ?? "expense";
   const taxDisplay: TaxBasis = state.taxDisplay ?? "gross";
   const currency = state.currency || "EUR";
@@ -71,8 +74,10 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
   const [payAmount, setPayAmount] = useState("");
   const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payRef, setPayRef] = useState("");
+  const [payInvoiceId, setPayInvoiceId] = useState("");
 
   const handleSaveForecast = () => {
+    if (readOnly) return;
     const val = parseEur(forecastDraft);
     if (forecastDraft.trim() === "") {
       financeStore.updateNode(projectId, node.id, { manualForecast: null });
@@ -84,10 +89,13 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
 
   const handleAddPayment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     const val = parseEur(payAmount);
     if (!Number.isFinite(val) || val <= 0) return;
     financeStore.addPayment(projectId, {
       nodeId: node.id,
+      invoiceId: payInvoiceId || null,
+      amountBasis: "gross",
       date: payDate || new Date().toISOString().slice(0, 10),
       amount: Math.round(val * 100) / 100,
       reference: payRef.trim(),
@@ -115,21 +123,22 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={onBack}
           className="min-h-[44px] px-3 rounded-lg border text-sm font-medium flex items-center gap-2 hover:bg-muted"
           style={{ borderColor: "hsl(var(--hairline))" }}
         >
           <ArrowLeft size={16} /> Zurück zur Übersicht
-        </button>
+        </Button>
         <div className="flex items-center gap-2">
           {(["expense", "income"] as FinanceDirection[]).map((d) => {
             const active = dir === d;
             return (
-              <button
+              <Button variant="ghost"
                 key={d}
                 type="button"
+                disabled={readOnly}
                 onClick={() => financeStore.updateNode(projectId, node.id, { direction: d })}
                 className="min-h-[40px] px-3 rounded-lg border text-xs font-semibold"
                 style={{
@@ -139,12 +148,13 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
                 }}
               >
                 {d === "expense" ? "Ausgabe" : "Einnahme"}
-              </button>
+              </Button>
             );
           })}
         </div>
       </div>
 
+      <fieldset disabled={readOnly} className="min-w-0 space-y-4">
       {/* Kopfdaten des Vorgangs */}
       <div
         className="rounded-xl border p-4 grid grid-cols-1 md:grid-cols-2 gap-3"
@@ -188,8 +198,16 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
         </div>
       </div>
 
+      {dir === "expense" && state.perspective === "contractor" && <label className="block text-xs text-muted-foreground">Zuordnung zum Kundenauftrag
+        <select aria-label="Zuordnung zum Kundenauftrag" className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground" value={node.customerProcessId ?? ""} onChange={(event) => financeStore.updateNode(projectId, node.id, { customerProcessId: event.target.value || null })}>
+          <option value="">Allgemeine Projektkosten</option>
+          {node.customerProcessId && !state.nodes.some((candidate) => candidate.id === node.customerProcessId && candidate.direction === "income") && <option value={node.customerProcessId}>Bisherige Zuordnung (Auftrag nicht verfügbar)</option>}
+          {state.nodes.filter((candidate) => candidate.type === "action" && candidate.direction === "income").map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+        </select>
+      </label>}
+      {dir === "income" && state.perspective === "contractor" && <div className="space-y-2"><h3 className="text-sm font-semibold">Zugeordnete Kosten</h3>{state.nodes.filter((candidate) => candidate.type === "action" && candidate.direction !== "income" && candidate.customerProcessId === node.id).map((candidate) => <p key={candidate.id} className="flex flex-wrap justify-between gap-2 text-sm"><span>{candidate.name}{candidate.enabled === false ? " (ausgeschaltet)" : ""}</span><span>{fmt(computeProcessSummary(state, candidate, taxDisplay).expectedTotal)}</span></p>)}</div>}
       {/* Kompakte Zusammenfassung */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5">
+      <div className="finance-detail-summary">
         <div className="rounded-xl border p-3" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
           <div className="text-[11px] uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>Beauftragt</div>
           <div className="text-base font-semibold mt-1">{fmt(summary.orderTotal)}</div>
@@ -238,22 +256,22 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
             {summary.overpaymentAmount > 0 ? fmt(summary.overpaymentAmount) : fmt(summary.openInvoiceAmount)}
           </div>
         </div>
-        <div className="col-span-2 lg:col-span-1 rounded-xl border p-3" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
-          <div className="flex items-center justify-between gap-1">
+        <div className="finance-forecast-field min-w-0 rounded-xl border p-3" style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface-card))" }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-[11px] uppercase tracking-wider" style={{ color: "hsl(var(--ink-soft))" }}>Erwartet gesamt</span>
             {!editingForecast && (
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => { setForecastDraft(String(summary.expectedTotal || "")); setEditingForecast(true); }}
-                className="text-[11px] flex items-center gap-1 hover:underline"
+                className="min-h-11 max-w-full whitespace-normal text-left text-xs flex items-center gap-1"
                 style={{ color: "hsl(var(--accent-gold))" }}
               >
-                <Pencil size={11} /> Ändern
-              </button>
+                <Pencil size={14} /> Erwarteten Gesamtbetrag ändern
+              </Button>
             )}
           </div>
           {editingForecast ? (
-            <div className="mt-1 flex items-center gap-1">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <input
                 autoFocus
                 type="text"
@@ -261,10 +279,11 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
                 value={forecastDraft}
                 onChange={(e) => setForecastDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSaveForecast(); if (e.key === "Escape") setEditingForecast(false); }}
-                className="w-full h-8 rounded border px-2 text-xs outline-none"
+                aria-label={`Erwarteter Gesamtbetrag (${currency})`}
+                className="w-full min-w-0 h-11 rounded border px-3 text-sm outline-none"
                 style={{ borderColor: "hsl(var(--accent-gold))", background: "hsl(var(--surface))" }}
               />
-              <button type="button" onClick={handleSaveForecast} className="h-8 px-2 rounded text-xs font-semibold" style={{ background: "hsl(var(--accent-gold))", color: "#111" }}>OK</button>
+              <Button variant="ghost" type="button" onClick={handleSaveForecast} className="h-8 px-2 rounded text-xs font-semibold" style={{ background: "hsl(var(--accent-gold))", color: "#111" }}>OK</Button>
             </div>
           ) : (
             <>
@@ -272,14 +291,14 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
               <div className="text-[11px] mt-0.5 flex items-center gap-1.5" style={{ color: "hsl(var(--ink-soft))" }}>
                 <span>{FORECAST_SOURCE_LABEL[summary.forecastSource]}</span>
                 {summary.forecastSource === "manual" && (
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     title="Manuelle Prognose zurücksetzen"
                     onClick={() => financeStore.updateNode(projectId, node.id, { manualForecast: null })}
                     className="hover:text-foreground"
                   >
                     <RotateCcw size={11} />
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
@@ -290,7 +309,7 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
       {/* Aktionsleiste */}
       <div className="flex flex-wrap gap-2">
         {actionButtons.map((btn) => (
-          <button
+          <Button variant="ghost"
             key={btn.type}
             type="button"
             onClick={() => financeStore.addPosition(projectId, node.id, btn.type)}
@@ -299,27 +318,27 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
           >
             <Plus size={15} style={{ color: "hsl(var(--accent-gold))" }} />
             {btn.label}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={() => setAddingPayment((v) => !v)}
           className="min-h-[44px] px-3.5 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-1.5"
           style={{ background: "hsl(var(--accent-gold))", color: "#111" }}
         >
           <CreditCard size={15} /> Zahlung erfassen
-        </button>
+        </Button>
       </div>
 
       {/* Zahlung erfassen Formular */}
       {addingPayment && (
         <form
           onSubmit={handleAddPayment}
-          className="rounded-xl border p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end"
+          className="finance-payment-form rounded-xl border p-4 items-end"
           style={{ borderColor: "hsl(var(--accent-gold) / 0.5)", background: "hsl(var(--surface-card))" }}
         >
           <div>
-            <label className="block text-xs mb-1" style={{ color: "hsl(var(--ink-soft))" }}>Betrag ({currency})</label>
+            <label className="block text-xs mb-1" style={{ color: "hsl(var(--ink-soft))" }}>Tatsächlicher Zahlbetrag (Brutto, {currency})</label>
             <input
               autoFocus
               type="text"
@@ -351,22 +370,28 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
               style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
             />
           </div>
-          <div className="flex gap-2">
-            <button
+          <label className="text-xs text-muted-foreground">Rechnung / Vorauszahlung
+            <select className="mt-1 h-11 w-full rounded-md border border-input bg-background px-2 text-foreground" value={payInvoiceId} onChange={(event) => setPayInvoiceId(event.target.value)}>
+              <option value="">Vorauszahlung / ohne Rechnung</option>
+              {positions.filter((position) => position.type === "invoice" && position.status !== "cancelled").map((position) => <option key={position.id} value={position.id}>{position.number || "Rechnung"} · {fmt(position.amount)}</option>)}
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost"
               type="submit"
               className="h-10 flex-1 rounded-lg text-sm font-semibold"
               style={{ background: "hsl(var(--accent-gold))", color: "#111" }}
             >
               Speichern
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               onClick={() => setAddingPayment(false)}
               className="h-10 px-3 rounded-lg border text-sm"
               style={{ borderColor: "hsl(var(--hairline))" }}
             >
               Abbruch
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -413,14 +438,14 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
         ) : (
           <div className="divide-y" style={{ borderColor: "hsl(var(--hairline))" }}>
             {payments.map((pay) => (
-              <div key={pay.id} className="px-4 py-3 flex items-center justify-between gap-3 text-sm">
+              <div key={pay.id} className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-sm">
                 <div className="min-w-0">
                   <div className="font-medium truncate">{pay.reference || "Zahlung"}</div>
                   <div className="text-xs" style={{ color: "hsl(var(--ink-soft))" }}>{pay.date}</div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-semibold">{fmt(pay.amount)}</span>
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     aria-label="Zahlung löschen"
                     onClick={() => financeStore.deletePayment(projectId, pay.id)}
@@ -428,13 +453,14 @@ export const FinanceProcessDetail: React.FC<Props> = ({ projectId, state, node, 
                     style={{ color: "hsl(var(--ink-soft))" }}
                   >
                     <Trash2 size={15} />
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+      </fieldset>
     </div>
   );
 };
@@ -445,6 +471,7 @@ const PositionRow: React.FC<{
   typeLabel: string;
   currency: string;
 }> = ({ projectId, pos, typeLabel, currency }) => {
+  const [expanded, setExpanded] = useState(false);
   const [amountDraft, setAmountDraft] = useState(
     pos.amount ? new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pos.amount) : "",
   );
@@ -453,6 +480,16 @@ const PositionRow: React.FC<{
 
   return (
     <div className="p-3.5 space-y-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0"><div className="break-words text-sm font-semibold">{pos.number || typeLabel}</div><div className="text-xs text-muted-foreground">{typeLabel} · {STATUS_LABEL[pos.status ?? "open"]}</div></div>
+        <strong className="break-words text-sm">{formatMoney(pos.amount, currency)}</strong>
+        <div className="flex flex-wrap gap-1">
+          <Button variant="outline" className="h-11" aria-expanded={expanded} onClick={() => setExpanded((open) => !open)}><Pencil />{expanded ? "Details schließen" : "Bearbeiten"}</Button>
+          <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive" aria-label="Beleg löschen" onClick={() => financeStore.deletePosition(projectId, pos.id)}><Trash2 /></Button>
+        </div>
+      </div>
+      {expanded && <>
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <span
@@ -498,28 +535,20 @@ const PositionRow: React.FC<{
 
         <div className="flex items-center gap-1.5">
           {pos.type === "offer" && pos.status !== "approved" && (
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => financeStore.acceptOfferAsOrder(projectId, pos.id)}
               className="h-8 px-2.5 rounded-lg border text-xs font-medium flex items-center gap-1 hover:border-[hsl(var(--accent-gold))]"
               style={{ borderColor: "hsl(var(--hairline))", color: "hsl(var(--accent-gold))" }}
             >
               <CheckCircle2 size={13} /> Beauftragen
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            aria-label="Beleg löschen"
-            onClick={() => financeStore.deletePosition(projectId, pos.id)}
-            className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-muted"
-            style={{ color: "hsl(var(--ink-soft))" }}
-          >
-            <Trash2 size={14} />
-          </button>
+
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+      <div className="finance-fields">
         <input
           value={pos.number}
           onChange={(e) => upd({ number: e.target.value })}
@@ -534,7 +563,8 @@ const PositionRow: React.FC<{
           className="h-9 rounded-lg border px-2.5 text-sm outline-none"
           style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
         />
-        <div className="flex gap-1">
+        <label className="finance-amount-field block min-w-0 text-xs text-muted-foreground">Betrag ({currency})
+        <div className="mt-1 flex flex-wrap gap-2">
           <input
             type="text"
             inputMode="decimal"
@@ -546,7 +576,7 @@ const PositionRow: React.FC<{
               setAmountDraft(v ? new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) : "");
             }}
             placeholder={`Betrag (${currency})`}
-            className="w-full h-9 rounded-lg border px-2.5 text-sm font-medium outline-none text-right"
+            className="w-full min-w-0 h-11 rounded-lg border px-2.5 text-sm font-medium outline-none text-right"
             style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
           />
           <select
@@ -559,6 +589,7 @@ const PositionRow: React.FC<{
             <option value="net">Netto</option>
           </select>
         </div>
+        </label>
         {pos.type === "invoice" ? (
           <input
             type="date"
@@ -588,6 +619,7 @@ const PositionRow: React.FC<{
           style={{ borderColor: "hsl(var(--hairline))", background: "hsl(var(--surface))" }}
         />
       </div>
+      </>}
     </div>
   );
 };

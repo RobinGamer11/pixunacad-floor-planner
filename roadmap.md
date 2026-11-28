@@ -1,4 +1,11 @@
 # Roadmap – Export/Muster-Auftrag (Basis bdffd521)
+## Projektbild, Beitragsaktionen und Finanzen (Basis f283a77f)
+- [x] Gemeinsame Projektbildquelle einschließlich Standardbilder
+- [x] Bearbeiten/Löschen in beiden Organisationsansichten mit Bestätigung und Schreibschutz
+- [x] Finanzbereichsauswahl ohne Seitenleiste, Budgetvergleiche und Kostenzuordnung
+- [x] Bedienbarkeit nach verfügbarer Breite, 42 Regressionen und isolierte Browserprüfung
+- [ ] Angemeldete Cloud-/Zweigeräteprüfung: keine Testsitzung verfügbar
+- [ ] GitHub-main-Übertragung: erfolgt erst durch Plattformübertragung nach Abschluss; nicht live verifiziert
 ## Cloud-Abschluss (Basis 69cde11a)
 - [x] Kontogetrennte Dokumentablage und bestätigte lokale Speicherung
 - [x] Revisionsgebundene Dateibereinigung implementiert; SQL lokal zweimal und mit Berechtigungs-/Referenz-/Quotentests geprüft

@@ -20,6 +20,7 @@ interface Props {
   perspective: FinancePerspective;
   onSelectFilter: (filter: ComparisonFilter) => void;
   onOpenBudget: (kind: "project" | "cost") => void;
+  showBudgetComparisons?: boolean;
 }
 
 const TONE_COLOR: Record<FinanceTone, string> = {
@@ -45,6 +46,7 @@ export const FinanceComparisonCards: React.FC<Props> = ({
   perspective,
   onSelectFilter,
   onOpenBudget,
+  showBudgetComparisons = true,
 }) => {
   const fmt = (v: number) => formatMoney(v, summary.currency);
   const rows: RowData[] = [];
@@ -192,7 +194,7 @@ export const FinanceComparisonCards: React.FC<Props> = ({
 
   return (
     <div className="space-y-2.5">
-      {rows.map((r) => (
+      {rows.filter((row) => showBudgetComparisons || (row.id !== "budget-expected" && row.id !== "cost-budget")).map((r) => (
         <div
           key={r.id}
           onClick={() => onSelectFilter(r.filter)}
