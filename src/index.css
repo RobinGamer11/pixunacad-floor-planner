@@ -116,6 +116,7 @@
     --infobox-done: 140 62% 36%;
     --ink: 222 20% 12%;
     --ink-soft: 222 12% 38%;
+    --contribution-icon-foreground: 222 20% 12%;
     --accent-gold: 32 55% 52%;
     --accent-gold-soft: 32 60% 88%;
     --hairline: 30 12% 86%;
@@ -188,6 +189,7 @@
     --infobox-done: 140 60% 42%;
     --ink: 210 20% 93%;
     --ink-soft: 215 12% 68%;
+    --contribution-icon-foreground: 0 0% 100%;
     --accent-gold: 38 62% 62%;
     --accent-gold-soft: 38 30% 28%;
     --hairline: 220 12% 26%;
@@ -465,6 +467,15 @@
      behält sein dunkles Aussehen. */
   .dark select {
     color-scheme: light;
+  }
+
+  .contribution-delete-icon,
+  .contribution-delete-icon:hover {
+    color: hsl(var(--contribution-icon-foreground));
+  }
+
+  .dark .ops-contribution-fields input[type="date"] {
+    color-scheme: dark;
   }
 
   /* Geschlossenes Feld bleibt im dunklen Design dunkel und kontraststark

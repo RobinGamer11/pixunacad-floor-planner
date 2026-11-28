@@ -46,5 +46,15 @@ export function deriveInfoBox(box: InfoBoxShape & {id:string;x:number;y:number;t
   const facePositions = [box.x,yT,z+height/2], faceIndices:number[] = [], uvs=[.5,.5];
   ring.forEach((p,i)=>{facePositions.push(box.x+p.u,yT,z+p.v);uvs.push(p.u/width+.5,p.v/height);faceIndices.push(0,1+i,1+(i+1)%n);});
   const front: Derived3D = { type:"mesh", source:"infobox", sourceId:box.id, sheetId, closed:false, color:"#ffffff", mesh:{positions:facePositions,indices:faceIndices}, texture:{list:"infoBoxes",corners:[]}, uvs, glow:0.35 };
-  return [body, front];
+  // A separate rear face sits outside the solid; double-sided front material alone
+  // would be occluded by the body. Mirror U so the same symbol reads from behind.
+  const backPositions = facePositions.map((value, i) => i % 3 === 1 ? yB - 0.004 : value);
+  const backIndices: number[] = [];
+  for (let i = 0; i < faceIndices.length; i += 3) backIndices.push(faceIndices[i], faceIndices[i + 2], faceIndices[i + 1]);
+  const back: Derived3D = {
+    ...front,
+    mesh: { positions: backPositions, indices: backIndices },
+    uvs: uvs.map((value, i) => i % 2 === 0 ? 1 - value : value),
+  };
+  return [body, front, back];
 }

@@ -91,7 +91,7 @@ export function OpsItemEditDialog({
 
   return (
     <Modal title={`Beitrag bearbeiten${projectName ? ` · ${projectName}` : ""}`} onClose={onClose}>
-      <fieldset disabled={readOnly} className="flex min-w-0 flex-col gap-2">
+      <fieldset disabled={readOnly} className="ops-contribution-fields flex min-w-0 flex-col gap-2">
         <Field label="Name">
           <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
@@ -150,8 +150,9 @@ export function OpsItemEditDialog({
           Erfasste Arbeitszeit für diesen Beitrag: <span className="tabular-nums">{formatMinutes(bookedMinutes)}</span>
         </div>
 
-        <Button type="button" variant="outline" className="min-h-11 text-destructive" onClick={() => { if (deleteContribution(projectId, itemId)) onClose(); }}><Trash2 /> Beitrag löschen</Button>
-        <Actions busy={false} onSave={save} onClose={onClose} />
+        <Actions busy={false} onSave={save} onClose={onClose} afterClose={
+          <Button type="button" variant="ghost" size="icon" className="h-10 w-10 shrink-0 contribution-delete-icon" title="Beitrag löschen" aria-label="Beitrag löschen" onClick={() => { if (deleteContribution(projectId, itemId)) onClose(); }}><Trash2 className="h-4 w-4" /></Button>
+        } />
         {error && <div className="text-[11px]" style={{ color: "#ef4444" }}>{error}</div>}
       </fieldset>
     </Modal>

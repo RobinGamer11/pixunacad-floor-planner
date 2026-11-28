@@ -457,6 +457,7 @@ export function OpsOverview({
           hiddenProjects={hiddenProjects}
           onToggleProject={toggleProject}
           calendarDefaultRange="week"
+          showContributionActions={false}
           onEditItem={openItem}
           onEditContribution={(projectId, itemId) => setEditing({ projectId, itemId })}
           onSelectTime={selectTime}

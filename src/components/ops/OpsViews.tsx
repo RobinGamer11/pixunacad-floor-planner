@@ -48,7 +48,8 @@ export interface OpsViewProps {
   times?: OpsTimeMark[];
   selection?: OpsSelection;
   onSelectItem?: (projectId: string, itemId: string) => void;
-  onEditItem?: (projectId: string, itemId: string) => void;
+  /** Null explicitly disables actions while preserving entry selection. */
+  onEditItem?: ((projectId: string, itemId: string) => void) | null;
   onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
 }
 

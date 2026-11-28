@@ -72,6 +72,7 @@ export function OpsCalendarTab({
   calendarDefaultRange = "month",
   onEditItem,
   onEditContribution,
+  showContributionActions = true,
   onSelectTime,
   selection,
   view: viewProp,
@@ -99,6 +100,7 @@ export function OpsCalendarTab({
   /** Beitrag zum Bearbeiten öffnen. */
   onEditItem?: (projectId: string, itemId: string) => void;
   onEditContribution?: (projectId: string, itemId: string) => void;
+  showContributionActions?: boolean;
   /** Zeiterfassung auswählen (gemeinsamer Auswahlzustand). */
   onSelectTime?: (projectId: string, entryId: string, itemId?: string) => void;
   /** Gemeinsame Auswahl – in allen Ansichten gleich hervorgehoben. */
@@ -185,7 +187,7 @@ export function OpsCalendarTab({
           const color = board.state.statuses.find((s) => s.id === statusId)?.color ?? "#c9a227";
           const open = onEditItem ? () => onEditItem(board.id, item.id) : undefined;
           const edit = onEditContribution ? () => onEditContribution(board.id, item.id) : open;
-          const actions = edit ? <ContributionActions projectId={board.id} itemId={item.id} onEdit={edit} /> : undefined;
+          const actions = showContributionActions && edit ? <ContributionActions projectId={board.id} itemId={item.id} onEdit={edit} /> : undefined;
 
           // Projektzeitraum: nur Start- und Endmarkierung, kein Eintrag an
           // jedem Tag dazwischen. Gewöhnliche Beiträge bleiben unverändert.
@@ -217,7 +219,7 @@ export function OpsCalendarTab({
     }
 
     return out;
-  }, [times.entries, times.myId, peopleById, projectNames, showTimes, personFilter, filteredBoards, showItems, onEditItem, onEditContribution]);
+  }, [times.entries, times.myId, peopleById, projectNames, showTimes, personFilter, filteredBoards, showItems, onEditItem, onEditContribution, showContributionActions]);
 
   /** Dieselben Zeiterfassungen als Zeitspannen für Ansichtstrahl und Gantt. */
   const timeMarks: OpsTimeMark[] = useMemo(() => {
@@ -352,13 +354,13 @@ export function OpsCalendarTab({
         />
       )}
       {view === "ray" && (
-        <OpsRay boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onEditItem={onEditContribution} onSelectTime={onSelectTime} />
+        <OpsRay boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onEditItem={showContributionActions ? onEditContribution : null} onSelectTime={onSelectTime} />
       )}
       {view === "net" && (
-        <OpsNet boards={filteredBoards} selection={selection} onSelectItem={onEditItem} onEditItem={onEditContribution} />
+        <OpsNet boards={filteredBoards} selection={selection} onSelectItem={onEditItem} onEditItem={showContributionActions ? onEditContribution : null} />
       )}
       {view === "gantt" && (
-        <OpsGantt boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onEditItem={onEditContribution} onSelectTime={onSelectTime} />
+        <OpsGantt boards={filteredBoards} times={timeMarks} selection={selection} onSelectItem={onEditItem} onEditItem={showContributionActions ? onEditContribution : null} onSelectTime={onSelectTime} />
       )}
     </div>
   );

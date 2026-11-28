@@ -1,4 +1,10 @@
 # Roadmap – Export/Muster-Auftrag (Basis bdffd521)
+## Beitragsaktionen und beidseitige 3D-Infoboxen (Basis 896950a3)
+- [x] Bearbeiten/Löschen oben entfernen; Aktionen nur bei Aktuelle Beiträge
+- [x] Weiße kompakte Mülltonne neben Schließen, weiße Datumskalendersymbole im dunklen Design
+- [x] Infobox-Bild auf beiden Kreisflächen in 3D, lesbar von jeder Seite
+- [x] 30 Regressionen, Build OK, Desktop-/Handy-Komponentenabläufe und beide Infobox-Seiten geprüft
+- [ ] Angemeldete Projektprüfung: keine bereitstellbare Testsitzung; GitHub-Übertragung nach Abschluss nicht verifiziert
 ## Projektbild, Beitragsaktionen und Finanzen (Basis f283a77f)
 - [x] Gemeinsame Projektbildquelle einschließlich Standardbilder
 - [x] Bearbeiten/Löschen in beiden Organisationsansichten mit Bestätigung und Schreibschutz

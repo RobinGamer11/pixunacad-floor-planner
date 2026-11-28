@@ -203,7 +203,7 @@ export function AutoTextarea({
   );
 }
 
-export function Actions({ busy, onSave, onClose }: { busy: boolean; onSave: () => void; onClose: () => void }) {
+export function Actions({ busy, onSave, onClose, afterClose }: { busy: boolean; onSave: () => void; onClose: () => void; afterClose?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mt-1">
       <button disabled={busy} onClick={onSave}
@@ -214,6 +214,7 @@ export function Actions({ busy, onSave, onClose }: { busy: boolean; onSave: () =
       <button onClick={onClose} className="h-10 px-4 rounded-md border text-xs" style={{ borderColor: LINE }}>
         Schließen
       </button>
+      {afterClose}
     </div>
   );
 }
